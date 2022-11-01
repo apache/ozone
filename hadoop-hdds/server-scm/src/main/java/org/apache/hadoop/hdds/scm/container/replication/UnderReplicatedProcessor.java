@@ -126,7 +126,11 @@ public class UnderReplicatedProcessor implements Runnable {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       pendingOps.scheduleAddReplica(
           containerID, targetDatanode, rcc.getReplicaIndex());
-      replicationManager.getMetrics().incrEcReplicationCmdsSentTotal();
+      if (rcc.getReplicaIndex() > 0) {
+        replicationManager.getMetrics().incrEcReplicationCmdsSentTotal();
+      } else if (rcc.getReplicaIndex() == 0) {
+        replicationManager.getMetrics().incrNumReplicationCmdsSent();
+      }
     } else {
       throw new IOException("Unexpected command type " + cmd.getType());
     }

@@ -116,6 +116,8 @@ public class OverReplicatedProcessor implements Runnable {
           rcc.getReplicaIndex());
       if (rcc.getReplicaIndex() > 0) {
         replicationManager.getMetrics().incrEcDeletionCmdsSentTotal();
+      } else if (rcc.getReplicaIndex() == 0) {
+        replicationManager.getMetrics().incrNumDeletionCmdsSent();
       }
     } else {
       throw new IOException("Unexpected command type " + cmd.getType());

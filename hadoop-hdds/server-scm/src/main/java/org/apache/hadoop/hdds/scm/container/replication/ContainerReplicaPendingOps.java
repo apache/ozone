@@ -25,14 +25,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
@@ -49,14 +49,17 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
   private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
-  private Map<ContainerReplicaOp.PendingOpType, Long>
-      pendingOpCount = new HashMap<>();
+  private final ConcurrentHashMap<PendingOpType, AtomicLong>
+      pendingOpCount = new ConcurrentHashMap<>();
   private ReplicationManagerMetrics replicationMetrics = null;
 
   public ContainerReplicaPendingOps(final ConfigurationSource conf,
       Clock clock) {
     this.config = conf;
     this.clock = clock;
+    for (PendingOpType opType: PendingOpType.values()) {
+      pendingOpCount.put(opType, new AtomicLong(0));
+    }
   }
 
   /**
@@ -114,8 +117,12 @@ public class ContainerReplicaPendingOps {
   public boolean completeAddReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
     boolean completed = completeOp(ADD, containerID, target, replicaIndex);
-    if (isMetricsNotNull() && completed && replicaIndex > 0) {
-      replicationMetrics.incrEcReplicationCmdsCompletedTotal();
+    if (isMetricsNotNull() && completed) {
+      if (replicaIndex > 0) {
+        replicationMetrics.incrEcReplicationCmdsCompletedTotal();
+      } else if (replicaIndex == 0) {
+        replicationMetrics.incrNumReplicationCmdsCompleted();
+      }
     }
     return completed;
   }
@@ -132,8 +139,12 @@ public class ContainerReplicaPendingOps {
   public boolean completeDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
     boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
-    if (isMetricsNotNull() && completed && replicaIndex > 0) {
-      replicationMetrics.incrEcDeletionCmdsCompletedTotal();
+    if (isMetricsNotNull() && completed) {
+      if (replicaIndex > 0) {
+        replicationMetrics.incrEcDeletionCmdsCompletedTotal();
+      } else if (replicaIndex == 0) {
+        replicationMetrics.incrNumDeletionCmdsCompleted();
+      }
     }
     return completed;
   }
@@ -176,9 +187,8 @@ public class ContainerReplicaPendingOps {
           if (op.getScheduledEpochMillis() + expiryMilliSeconds
               < clock.millis()) {
             iterator.remove();
-            pendingOpCount.put(op.getOpType(),
-                pendingOpCount.get(op.getOpType()) - 1);
-            updateMetrics(op.getOpType());
+            pendingOpCount.get(op.getOpType()).decrementAndGet();
+            updateTimeoutMetrics(op);
           }
         }
         if (ops.size() == 0) {
@@ -190,11 +200,19 @@ public class ContainerReplicaPendingOps {
     }
   }
 
-  private void updateMetrics(ContainerReplicaOp.PendingOpType opType) {
-    if (opType == ADD && isMetricsNotNull()) {
-      replicationMetrics.incrEcReplicationCmdsTimeoutTotal();
-    } else if (opType == DELETE && isMetricsNotNull()) {
-      replicationMetrics.incrEcDeletionCmdsTimeoutTotal();
+  private void updateTimeoutMetrics(ContainerReplicaOp op) {
+    if (op.getOpType() == ADD && isMetricsNotNull()) {
+      if (op.getReplicaIndex() > 0) {
+        replicationMetrics.incrEcReplicationCmdsTimeoutTotal();
+      } else if (op.getReplicaIndex() == 0) {
+        replicationMetrics.incrNumReplicationCmdsTimeout();
+      }
+    } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
+      if (op.getReplicaIndex() > 0) {
+        replicationMetrics.incrEcDeletionCmdsTimeoutTotal();
+      } else if (op.getReplicaIndex() == 0) {
+        replicationMetrics.incrNumDeletionCmdsTimeout();
+      }
     }
   }
 
@@ -207,8 +225,7 @@ public class ContainerReplicaPendingOps {
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
           target, replicaIndex, clock.millis()));
-      pendingOpCount.put(opType,
-          pendingOpCount.getOrDefault(opType, 0L) + 1);
+      pendingOpCount.get(opType).incrementAndGet();
     } finally {
       lock.unlock();
     }
@@ -230,8 +247,7 @@ public class ContainerReplicaPendingOps {
               && op.getReplicaIndex() == replicaIndex) {
             found = true;
             iterator.remove();
-            pendingOpCount.put(op.getOpType(),
-                pendingOpCount.get(op.getOpType()) - 1);
+            pendingOpCount.get(op.getOpType()).decrementAndGet();
           }
         }
         if (ops.size() == 0) {
@@ -261,7 +277,7 @@ public class ContainerReplicaPendingOps {
     this.replicationMetrics = replicationMetrics;
   }
 
-  public long getPendingOpCount(ContainerReplicaOp.PendingOpType opType) {
-    return this.pendingOpCount.getOrDefault(opType, 0L);
+  public long getPendingOpCount(PendingOpType opType) {
+    return pendingOpCount.get(opType).get();
   }
 }
