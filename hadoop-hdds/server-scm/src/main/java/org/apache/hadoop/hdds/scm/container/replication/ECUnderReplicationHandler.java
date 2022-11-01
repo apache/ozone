@@ -418,15 +418,23 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       return Collections.emptyMap();
     }
     Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-
-    List<Integer> sortedReplicaIdx =
+    //HDDS-6966: Getting the placement group for each of the replica
+    // (Rack for SCMCommonPlacementPolicy).
+    // Placement group mapping to the set of replica indexes it holds
+    Map<?, Set<Integer>> placementGroupReplicaIndexMap =
             getSourcesStream(replicas, deletionInFlight)
             .map(Pair::getKey).collect(Collectors.groupingBy(r ->
-                    containerPlacement.getPlacementGroup(
-                            r.getDatanodeDetails()),
+                            containerPlacement.getPlacementGroup(
+                                    r.getDatanodeDetails()),
                     Collectors.mapping(
                             ContainerReplica::getReplicaIndex,
-                            Collectors.toSet())))
+                            Collectors.toSet())));
+    //Filtering out the placement group containing only one index & adding that
+    //replica index to excluded Index set as it has it's own placement group.
+    //Creating a map of replica index to the number of
+    // placement groups it belongs to
+    Map<Integer, Long> replicaIndexPlacementGroupCntMap =
+            placementGroupReplicaIndexMap
             .entrySet().stream()
             .filter(e -> {
               if (e.getValue().size() == 1) {
@@ -435,7 +443,13 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               return e.getValue().size() > 1;
             }).flatMap(e -> e.getValue().stream())
             .collect(Collectors.groupingBy(Function.identity(),
-                    Collectors.counting())).entrySet().stream()
+                    Collectors.counting()));
+    //Sorting the replica indexes based on the
+    // number of placement groups it belongs to.
+    // This would be iterated
+    // to create replica to reduce misreplication
+    List<Integer> sortedReplicaIdx = replicaIndexPlacementGroupCntMap
+            .entrySet().stream()
             .sorted(Comparator.comparingLong(Map.Entry::getValue))
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
