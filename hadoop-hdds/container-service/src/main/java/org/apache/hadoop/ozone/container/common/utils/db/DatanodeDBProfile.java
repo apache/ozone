@@ -125,10 +125,12 @@ public abstract class DatanodeDBProfile {
       return cfOptions.get();
     }
 
-    private ManagedColumnFamilyOptions createColumnFamilyOptions(ConfigurationSource config) {
-      ManagedColumnFamilyOptions cfOptions = baseProfile.getColumnFamilyOptions();
-      cfOptions.setReused(true);
-      return cfOptions.closeAndSetTableFormatConfig(
+    private ManagedColumnFamilyOptions createColumnFamilyOptions(
+        ConfigurationSource config) {
+      ManagedColumnFamilyOptions options =
+          baseProfile.getColumnFamilyOptions();
+      options.setReused(true);
+      return options.closeAndSetTableFormatConfig(
           getBlockBasedTableConfig(config));
     }
 
