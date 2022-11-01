@@ -509,8 +509,7 @@ public class TestBlockDeletingService {
   @Test
   public void testWithUnrecordedBlocks() throws Exception {
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
-    // from received TNXs will be skipped to delete and will not be added into
-    // the NumPendingDeletionBlocks
+    // from received TNXs will be deleted, not in BlockDeletingService
     if (Objects.equals(schemaVersion, SCHEMA_V1)) {
       return;
     }
