@@ -170,7 +170,19 @@ public class RocksDBCheckpointDiffer {
       return;
     }
 
-    // TODO: Write a README there explaining what the dir is for
+    // Create a readme file explaining what the compaction log dir is for
+    final Path readmePath = Paths.get(compactionLogDir, "readme.txt");
+    final File readmeFile = new File(readmePath.toString());
+    if (!readmeFile.exists()) {
+      try (BufferedWriter bw = Files.newBufferedWriter(
+          readmePath, StandardOpenOption.CREATE)) {
+        bw.write("This directory holds Ozone Manager RocksDB compaction logs.\n"
+            + "DO NOT add, change or delete any files in this directory unless "
+            + "you know what you are doing.\n");
+      } catch (IOException ignored) {
+      }
+    }
+
   }
 
   /**
