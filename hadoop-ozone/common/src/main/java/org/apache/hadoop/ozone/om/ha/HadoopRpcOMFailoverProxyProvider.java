@@ -227,6 +227,11 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   }
 
   @VisibleForTesting
+  public Map<String, OMProxyInfo> getOMProxyInfoMap() {
+    return omProxyInfos;
+  }
+
+  @VisibleForTesting
   protected void setProxiesForTesting(
       Map<String, ProxyInfo<T>> setOMProxies,
       Map<String, OMProxyInfo> setOMProxyInfos,
