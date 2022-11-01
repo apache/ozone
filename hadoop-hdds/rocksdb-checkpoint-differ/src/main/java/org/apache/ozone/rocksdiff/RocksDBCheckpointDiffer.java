@@ -90,7 +90,7 @@ import java.util.stream.Stream;
 //      compaction-DAG information as well.
 
 /**
- *  RocksDBCheckpointDiffer class.
+ * RocksDB checkpoint differ.
  */
 public class RocksDBCheckpointDiffer {
 
@@ -99,12 +99,7 @@ public class RocksDBCheckpointDiffer {
 
   private String sstBackupDir;
 
-  private String compactionLogParentDir = null;
   private String compactionLogDir = null;
-
-  // Name of the directory that holds compaction logs (under metadata dir)
-  // TODO: Make this a constructor parameter as well
-  private static final String COMPACTION_LOG_DIR = "compaction-log/";
 
   /**
    * Compaction log path for DB compaction history persistence.
@@ -146,24 +141,49 @@ public class RocksDBCheckpointDiffer {
   private static final int LONG_MAX_STRLEN =
       String.valueOf(Long.MAX_VALUE).length();
 
-  public void setCompactionLogParentDir(String parentDir) {
-    this.compactionLogParentDir = parentDir;
+  /**
+   * Dummy object that acts as a write lock in compaction listener.
+   */
+  private final Object compactionListenerWriteLock = new Object();
 
-    // Append /
-    if (!compactionLogParentDir.endsWith("/")) {
-      compactionLogParentDir += "/";
+  /**
+   * Constructor.
+   * Note that previous compaction logs are loaded by RDBStore after this
+   * object's initialization by calling loadAllCompactionLogs().
+   * @param metadataDir Ozone metadata directory.
+   * @param sstBackupDir Name of the SST backup dir under metadata dir.
+   * @param compactionLogDirName Name of the compaction log dir.
+   */
+  public RocksDBCheckpointDiffer(String metadataDir, String sstBackupDir,
+      String compactionLogDirName) {
+
+    setCompactionLogDir(metadataDir, compactionLogDirName);
+
+    this.sstBackupDir = Paths.get(metadataDir, sstBackupDir) + "/";
+
+    // Create the directory if SST backup path does not already exist
+    File dir = new File(this.sstBackupDir);
+    if (!dir.exists() && !dir.mkdir()) {
+      final String errorMsg = "Failed to create SST file backup directory. "
+          + "Check if OM has write permission.";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
     }
+  }
 
-    File pDir = new File(compactionLogParentDir);
-    if (!pDir.exists()) {
-      if (!pDir.mkdir()) {
+  private void setCompactionLogDir(String metadataDir,
+      String compactionLogDirName) {
+
+    final File parentDir = new File(metadataDir);
+    if (!parentDir.exists()) {
+      if (!parentDir.mkdir()) {
         LOG.error("Error creating compaction log parent dir.");
         return;
       }
     }
 
-    compactionLogDir =
-        Paths.get(compactionLogParentDir, COMPACTION_LOG_DIR).toString();
+    this.compactionLogDir =
+        Paths.get(metadataDir, compactionLogDirName).toString();
     File clDir = new File(compactionLogDir);
     if (!clDir.exists() && !clDir.mkdir()) {
       LOG.error("Error creating compaction log dir.");
@@ -171,7 +191,7 @@ public class RocksDBCheckpointDiffer {
     }
 
     // Create a readme file explaining what the compaction log dir is for
-    final Path readmePath = Paths.get(compactionLogDir, "readme.txt");
+    final Path readmePath = Paths.get(compactionLogDir, "_README.txt");
     final File readmeFile = new File(readmePath.toString());
     if (!readmeFile.exists()) {
       try (BufferedWriter bw = Files.newBufferedWriter(
@@ -183,6 +203,8 @@ public class RocksDBCheckpointDiffer {
       }
     }
 
+    // Append /
+    this.compactionLogDir += "/";
   }
 
   /**
@@ -193,49 +215,26 @@ public class RocksDBCheckpointDiffer {
     String latestSequenceIdStr = String.valueOf(latestSequenceNum);
 
     if (latestSequenceIdStr.length() < LONG_MAX_STRLEN) {
-      // Pad zeroes to the left for ordered file listing
+      // Pad zeroes to the left for ordered file listing when sorted
+      // alphabetically.
       latestSequenceIdStr =
           StringUtils.leftPad(latestSequenceIdStr, LONG_MAX_STRLEN, "0");
     }
 
     // Local temp variable for storing the new compaction log file path
-    final String newCompactionLog = compactionLogParentDir +
-        COMPACTION_LOG_DIR + latestSequenceIdStr +
-        COMPACTION_LOG_FILENAME_SUFFIX;
+    final String newCompactionLog =
+        compactionLogDir + latestSequenceIdStr + COMPACTION_LOG_FILENAME_SUFFIX;
 
     File clFile = new File(newCompactionLog);
     if (clFile.exists()) {
       LOG.warn("Compaction log exists: {}. Will append", newCompactionLog);
     }
 
-    this.currentCompactionLogPath = compactionLogParentDir +
-        COMPACTION_LOG_DIR + latestSequenceIdStr +
-        COMPACTION_LOG_FILENAME_SUFFIX;
+    this.currentCompactionLogPath =
+        compactionLogDir + latestSequenceIdStr + COMPACTION_LOG_FILENAME_SUFFIX;
 
     // Create empty file if it doesn't exist
     appendToCurrentCompactionLog("");
-  }
-
-  public RocksDBCheckpointDiffer(String sstBackupDir) {
-
-    this.sstBackupDir = sstBackupDir;
-
-    // Append /
-    if (!this.sstBackupDir.endsWith("/")) {
-      this.sstBackupDir += "/";
-    }
-
-    // Create the directory if SST backup path does not already exist
-    File dir = new File(this.sstBackupDir);
-
-    if (!dir.exists() && !dir.mkdir()) {
-      final String errorMsg = "Failed to create SST file backup directory. "
-          + "Check write permission.";
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-
-    // Note: Previous compaction logs are loaded in RDBStore, not here
   }
 
   // Node in the DAG to represent an SST file
@@ -357,7 +356,7 @@ public class RocksDBCheckpointDiffer {
       public void onCompactionBegin(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        synchronized (db) {
+        synchronized (compactionListenerWriteLock) {
 
           if (compactionJobInfo.inputFiles().size() == 0) {
             LOG.error("Compaction input files list is empty");
@@ -414,7 +413,7 @@ public class RocksDBCheckpointDiffer {
       public void onCompactionCompleted(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        synchronized (db) {
+        synchronized (compactionListenerWriteLock) {
 
           if (compactionJobInfo.inputFiles().size() == 0) {
             LOG.error("Compaction input files list is empty");

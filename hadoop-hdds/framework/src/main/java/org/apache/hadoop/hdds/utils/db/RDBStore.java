@@ -64,8 +64,17 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
-  private final String dbCompactionSSTBackupDirectory = "compaction-sst-backup";
   private final String dbCheckpointDirectory = "db.checkpoints";
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  private final String dbCompactionSSTBackupDirName = "compaction-sst-backup";
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  private final String dbCompactionLogDirName = "compaction-log";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
@@ -88,8 +97,9 @@ public class RDBStore implements DBStore {
         dbJmxBeanNameName;
 
     try {
-      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(Paths.get(
-          dbLocation.getParent(), dbCompactionSSTBackupDirectory).toString());
+      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+          dbLocation.getParent(), dbCompactionSSTBackupDirName,
+          dbCompactionLogDirName);
       rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
@@ -138,7 +148,6 @@ public class RDBStore implements DBStore {
 
       // Finish the initialization of compaction DAG tracker by setting the
       // sequence number as current compaction log filename.
-      rocksDBCheckpointDiffer.setCompactionLogParentDir(snapshotsParentDir);
       rocksDBCheckpointDiffer.setCurrentCompactionLog(
           db.getLatestSequenceNumber());
       // Load all previous compaction logs

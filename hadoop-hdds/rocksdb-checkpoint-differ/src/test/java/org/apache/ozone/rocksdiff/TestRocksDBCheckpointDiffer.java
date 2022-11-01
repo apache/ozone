@@ -69,10 +69,7 @@ public class TestRocksDBCheckpointDiffer {
    * RocksDB checkpoint path prefix.
    */
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
-  private static final int MAX_SNAPSHOTS = 100;
-  private final Snapshot[] allSnapshots = new Snapshot[MAX_SNAPSHOTS];
-  private int lastSnapshotCounter = 0;
-  private String lastSnapshotPrefix = "snap_id_";
+  private final ArrayList<Snapshot> snapshots = new ArrayList<>();
 
   /**
    * Graph type.
@@ -87,6 +84,8 @@ public class TestRocksDBCheckpointDiffer {
   public static void init() {
     // Set differ log level to DEBUG
     GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.DEBUG);
+    // Set test class log level to DEBUG
+    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.DEBUG);
   }
 
   @Test
@@ -98,10 +97,12 @@ public class TestRocksDBCheckpointDiffer {
       deleteDirectory(clDir);
     }
 
-    final String sstDirStr = "./compaction-sst-backup/";
+    final String metadataDirStr = ".";
+    final String sstDirStr = "compaction-sst-backup";
+    final String clDirStr = "compaction-log";
 
-    TestRocksDBCheckpointDiffer tester = new TestRocksDBCheckpointDiffer();
-    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(sstDirStr);
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
+        metadataDirStr, sstDirStr, clDirStr);
 
     // Empty the SST backup folder first for testing
     File sstDir = new File(sstDirStr);
@@ -110,8 +111,8 @@ public class TestRocksDBCheckpointDiffer {
       fail("Unable to create SST backup directory");
     }
 
-    RocksDB rocksDB = tester.createRocksDBInstance(TEST_DB_PATH, differ);
-    tester.readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
+    RocksDB rocksDB = createRocksDBInstance(TEST_DB_PATH, differ);
+    readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
 
     printAllSnapshots();
     differ.traverseGraph(
@@ -152,14 +153,14 @@ public class TestRocksDBCheckpointDiffer {
    * Test SST diffs.
    */
   public void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
-    for (Snapshot snap : allSnapshots) {
+    for (Snapshot snap : snapshots) {
       if (snap == null) {
         break;
       }
       System.out.println();
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstListForRocksDiff =
-          differ.getSSTDiffList(allSnapshots[lastSnapshotCounter - 1], snap);
+          differ.getSSTDiffList(snapshots.get(snapshots.size() - 1), snap);
       LOG.debug("getSSTDiffList returns: {}", sstListForRocksDiff);
     }
   }
@@ -167,13 +168,14 @@ public class TestRocksDBCheckpointDiffer {
   /**
    * Helper function that creates an RDB checkpoint (= Ozone snapshot).
    */
-  public void createCheckpoint(RocksDBCheckpointDiffer differ, RocksDB rocksDB)
-      throws InterruptedException {
+  private void createCheckpoint(RocksDBCheckpointDiffer differ,
+      RocksDB rocksDB) {
 
     LOG.trace("Current time: " + System.currentTimeMillis());
     long t1 = System.currentTimeMillis();
 
-    final String cpPath = CP_PATH_PREFIX + lastSnapshotCounter;
+    final long snapshotGeneration = rocksDB.getLatestSequenceNumber();
+    final String cpPath = CP_PATH_PREFIX + snapshotGeneration;
 
     // Delete the checkpoint dir if it already exists for the test
     File dir = new File(cpPath);
@@ -184,21 +186,19 @@ public class TestRocksDBCheckpointDiffer {
     final long dbLatestSequenceNumber = rocksDB.getLatestSequenceNumber();
 
     createCheckPoint(TEST_DB_PATH, cpPath, rocksDB);
-    allSnapshots[lastSnapshotCounter] =
-        new Snapshot(cpPath, lastSnapshotPrefix, lastSnapshotCounter);
+    final String snapshotId = "snap_id_" + snapshotGeneration;
+    final Snapshot currentSnapshot =
+        new Snapshot(cpPath, snapshotId, snapshotGeneration);
+    this.snapshots.add(currentSnapshot);
 
-    // Does what OmSnapshotManager#createOmSnapshotCheckpoint would do
+    // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
     differ.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber);
 
-    differ.setCompactionLogParentDir(".");
     differ.setCurrentCompactionLog(dbLatestSequenceNumber);
 
     long t2 = System.currentTimeMillis();
     LOG.trace("Current time: " + t2);
     LOG.debug("Time elapsed: " + (t2 - t1) + " ms");
-    Thread.sleep(100);
-    ++lastSnapshotCounter;
-    lastSnapshotPrefix = "sid_" + lastSnapshotCounter;
   }
 
   // Flushes the WAL and Creates a RocksDB checkpoint
@@ -215,7 +215,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   public void printAllSnapshots() {
-    for (Snapshot snap : allSnapshots) {
+    for (Snapshot snap : snapshots) {
       if (snap == null) {
         break;
       }
@@ -227,9 +227,8 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   // Test Code to create sample RocksDB instance.
-  public RocksDB createRocksDBInstance(String dbPathArg,
-                                       RocksDBCheckpointDiffer differ)
-      throws RocksDBException, InterruptedException {
+  private RocksDB createRocksDBInstance(String dbPathArg,
+      RocksDBCheckpointDiffer differ) throws RocksDBException {
 
     LOG.debug("Creating RocksDB at '{}'", dbPathArg);
 
@@ -242,7 +241,6 @@ public class TestRocksDBCheckpointDiffer {
     RocksDB rocksDB;
     rocksDB = differ.getRocksDBInstanceWithCompactionTracking(dbPathArg);
 
-    differ.setCompactionLogParentDir(".");
     differ.setCurrentCompactionLog(rocksDB.getLatestSequenceNumber());
 
     Random random = new Random();
@@ -273,7 +271,9 @@ public class TestRocksDBCheckpointDiffer {
     return directoryToBeDeleted.delete();
   }
 
-  //  RocksDB.DEFAULT_COLUMN_FAMILY
+  /**
+   * RocksDB.DEFAULT_COLUMN_FAMILY.
+   */
   private void updateRocksDBInstance(String dbPathArg, RocksDB rocksDB) {
     System.out.println("Updating RocksDB instance at :" + dbPathArg);
 
@@ -426,7 +426,6 @@ public class TestRocksDBCheckpointDiffer {
 
   // Read from a given RocksDB instance and optionally write all the
   // keys to a given file.
-  //
   public void readRocksDBInstance(String dbPathArg, RocksDB rocksDB,
                                   FileWriter file,
                                   RocksDBCheckpointDiffer differ) {

@@ -152,7 +152,6 @@ public final class OmSnapshotManager {
     //
     // Note it doesn't matter if sequence number hasn't increased (even though
     // it shouldn't happen), since the writer always appends the file.
-    dbCpDiffer.setCompactionLogParentDir(store.getSnapshotsParentDir());
     dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
 
     return dbCheckpoint;
