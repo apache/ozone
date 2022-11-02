@@ -133,9 +133,7 @@ public final class OmSnapshotManager {
       throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
 
-    final long dbLatestSequenceNumber =
-        ((RDBStore) omMetadataManager.getStore()).getDb()
-            .getLatestSequenceNumber();
+    final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
 
     final RocksDBCheckpointDiffer dbCpDiffer =
         omMetadataManager.getStore().getRocksDBCheckpointDiffer();

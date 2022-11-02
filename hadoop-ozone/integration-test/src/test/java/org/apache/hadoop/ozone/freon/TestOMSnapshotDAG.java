@@ -124,7 +124,7 @@ public class TestOMSnapshotDAG {
     return dbKeyPrefix + OM_KEY_PREFIX + snapshotName;
   }
 
-  private DifferSnapshotInfo getRDBDiffSnapshotObj(
+  private DifferSnapshotInfo getDifferSnapshotInfo(
       OMMetadataManager omMetadataManager, String volumeName, String bucketName,
       String snapshotName) throws IOException {
 
@@ -133,10 +133,10 @@ public class TestOMSnapshotDAG {
         omMetadataManager.getSnapshotInfoTable().get(dbKey);
     String checkpointPath = getDBCheckpointAbsolutePath(snapshotInfo);
 
-    // TODO: RocksDB transaction sequence number at the time of checkpoint
-    //  creation needs to be added to SnapshotInfo as well
+    // Use RocksDB transaction sequence number in SnapshotInfo, which is
+    // persisted at the time of snapshot creation, as the snapshot generation
     return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
-        0);
+        snapshotInfo.getDbTxSequenceNumber());
   }
 
   @Test
@@ -192,9 +192,9 @@ public class TestOMSnapshotDAG {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
 
-    DifferSnapshotInfo snap1 = getRDBDiffSnapshotObj(omMetadataManager,
+    DifferSnapshotInfo snap1 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap1");
-    DifferSnapshotInfo snap3 = getRDBDiffSnapshotObj(omMetadataManager,
+    DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap3");
 
     // RocksDB does checkpointing in a separate thread, wait for it
