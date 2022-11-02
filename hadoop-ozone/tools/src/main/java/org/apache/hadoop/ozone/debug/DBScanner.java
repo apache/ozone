@@ -106,14 +106,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   public static byte[] getValueObject(
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
-    String str = dbColumnFamilyDefinition.getKeyType().getName();
-    if (str.equals("java.lang.String")) {
-      return startKey.getBytes();
-    } else if (str.equals("org.apache.hadoop.hdds.scm.container.ContainerID")) {
+    Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
+    if (keyType.equals(String.class)) {
+      return startKey.getBytes(StandardCharsets.UTF_8);
+    } else if (keyType.equals(ContainerID.class)) {
       return new ContainerID(Long.parseLong(startKey)).getBytes();
-    } else if (str.equals("java.lang.Long")) {
+    } else if (keyType.equals(Long.class)) {
       return Longs.toByteArray(Long.parseLong(startKey));
-    } else if (str.equals("org.apache.hadoop.hdds.scm.pipeline.PipelineID")) {
+    } else if (keyType.equals(PipelineID.class)) {
       return PipelineID.valueOf(UUID.fromString(startKey)).getProtobuf()
           .toByteArray();
     } else {
@@ -329,7 +329,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return RDBParser.class;
   }
 
-  public void setStartKey(String startKey) {
+  public static void setStartKey(String startKey) {
     DBScanner.startKey = startKey;
   }
 }
