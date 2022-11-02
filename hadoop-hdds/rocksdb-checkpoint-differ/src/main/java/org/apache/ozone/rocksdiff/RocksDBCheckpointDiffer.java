@@ -499,8 +499,8 @@ public class RocksDBCheckpointDiffer {
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
     reader.open(sstBackupDir + filename);
-    TableProperties properties = reader.getTableProperties();
 
+    TableProperties properties = reader.getTableProperties();
     if (LOG.isDebugEnabled()) {
       LOG.debug("{} has {} keys", filename, properties.getNumEntries());
     }
@@ -892,9 +892,29 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
-   * Populate the compaction DAG with input and output SST files lists.
+   * Helper method to add a new file node to the DAG.
+   * @return CompactionNode
    */
   @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION"})
+  private CompactionNode addNodeToDAG(String file, long seqNum) {
+    long numKeys = 0L;
+    try {
+      numKeys = getSSTFileSummary(file);
+    } catch (RocksDBException e) {
+      // Error getting number of keys. Warn and continue
+      LOG.warn("Error getting number of keys in '{}': {}",
+          file, e.getMessage());
+    }
+    CompactionNode fileNode = new CompactionNode(file, null, numKeys, seqNum);
+    forwardCompactionDAG.addNode(fileNode);
+    backwardCompactionDAG.addNode(fileNode);
+    compactionNodeMap.put(file, fileNode);
+    return fileNode;
+  }
+
+  /**
+   * Populate the compaction DAG with input and output SST files lists.
+   */
   private void populateCompactionDAG(List<String> inputFiles,
       List<String> outputFiles, long seqNum) {
 
@@ -903,38 +923,19 @@ public class RocksDBCheckpointDiffer {
     }
 
     for (String outfile : outputFiles) {
+//      final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
+//          outfile, file -> addNodeToDAG(file, seqNum));
       CompactionNode outfileNode = compactionNodeMap.get(outfile);
       if (outfileNode == null) {
-        long numKeys = 0L;
-        try {
-          numKeys = getSSTFileSummary(outfile);
-        } catch (RocksDBException e) {
-          // Most likely this SST file hasn't gone through a compaction yet,
-          // thus it doesn't exist in the SST backup directory.
-          // Warn and move on.
-          LOG.warn("Error getting number of keys in '{}': {}",
-              outfile, e.getMessage());
-        }
-        outfileNode = new CompactionNode(outfile, null, numKeys, seqNum);
-        forwardCompactionDAG.addNode(outfileNode);
-        backwardCompactionDAG.addNode(outfileNode);
-        compactionNodeMap.put(outfile, outfileNode);
+        outfileNode = addNodeToDAG(outfile, seqNum);
       }
 
       for (String infile : inputFiles) {
+//        final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
+//            infile, file -> addNodeToDAG(file, seqNum));
         CompactionNode infileNode = compactionNodeMap.get(infile);
         if (infileNode == null) {
-          long numKeys = 0L;
-          try {
-            numKeys = getSSTFileSummary(infile);
-          } catch (RocksDBException e) {
-            LOG.warn("Error getting number of keys in '{}': {}",
-                infile, e.getMessage());
-          }
-          infileNode = new CompactionNode(infile, null, numKeys, seqNum);
-          forwardCompactionDAG.addNode(infileNode);
-          backwardCompactionDAG.addNode(infileNode);
-          compactionNodeMap.put(infile, infileNode);
+          infileNode = addNodeToDAG(infile, seqNum);
         }
         // Draw the edges
         if (!outfileNode.fileName.equals(infileNode.fileName)) {
