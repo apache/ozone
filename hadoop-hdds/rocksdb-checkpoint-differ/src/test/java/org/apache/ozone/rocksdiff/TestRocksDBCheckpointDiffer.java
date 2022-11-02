@@ -18,6 +18,7 @@
 package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.asList;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -26,13 +27,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.Checkpoint;
@@ -82,9 +84,9 @@ public class TestRocksDBCheckpointDiffer {
 
   @BeforeAll
   public static void init() {
-    // Set differ log level
+    // Checkpoint differ log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
-    // Set test class log level
+    // Test class log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
   }
 
@@ -160,11 +162,29 @@ public class TestRocksDBCheckpointDiffer {
    */
   void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
+
+    // Hard-coded expected output.
+    // The results are deterministic. Retrieved from a successful run.
+    final List<List<String>> expectedDifferResult = asList(
+        asList("000024", "000017", "000028", "000026", "000019", "000021"),
+        asList("000024", "000028", "000026", "000019", "000021"),
+        asList("000024", "000028", "000026", "000021"),
+        asList("000024", "000028", "000026"),
+        asList("000028", "000026"),
+        Collections.singletonList("000028"),
+        Collections.emptyList()
+    );
+    Assertions.assertEquals(snapshots.size(), expectedDifferResult.size());
+
+    int index = 0;
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksDiff
-      List<String> sstListForRocksDiff = differ.getSSTDiffList(src, snap);
-      LOG.info("SST diff from '{}' to '{}': {}",
-          src.getDbPath(), snap.getDbPath(), sstListForRocksDiff);
+      List<String> sstDiffList = differ.getSSTDiffList(src, snap);
+      LOG.debug("SST diff list from '{}' to '{}': {}",
+          src.getDbPath(), snap.getDbPath(), sstDiffList);
+
+      Assertions.assertEquals(expectedDifferResult.get(index), sstDiffList);
+      ++index;
     }
   }
 
@@ -235,13 +255,10 @@ public class TestRocksDBCheckpointDiffer {
       deleteDirectory(dir);
     }
 
-    final String customCF = "keyTable";
-    ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
+    final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
         .optimizeUniversalStyleCompaction();
-    final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
-        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
-        new ColumnFamilyDescriptor(customCF.getBytes(UTF_8), cfOpts)
-    );
+    final List<ColumnFamilyDescriptor> cfDescriptors =
+        RocksDBCheckpointDiffer.getCFDescriptorList(cfOpts);
     List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
 
     // Create a RocksDB instance with compaction tracking
@@ -326,7 +343,7 @@ public class TestRocksDBCheckpointDiffer {
         rocksDB.put("SecondKey".getBytes(UTF_8), "SecondValue".getBytes(UTF_8));
 
         // List
-        List<byte[]> keys = Arrays.asList(key, "SecondKey".getBytes(UTF_8),
+        List<byte[]> keys = asList(key, "SecondKey".getBytes(UTF_8),
             "missKey".getBytes(UTF_8));
         List<byte[]> values = rocksDB.multiGetAsList(keys);
         for (int i = 0; i < keys.size(); i++) {
@@ -364,7 +381,7 @@ public class TestRocksDBCheckpointDiffer {
       String cfName = "my-first-columnfamily";
       // list of column family descriptors, first entry must always be
       // default column family
-      final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
+      final List<ColumnFamilyDescriptor> cfDescriptors = asList(
           new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
           new ColumnFamilyDescriptor(cfName.getBytes(UTF_8), cfOpts)
       );
@@ -394,10 +411,9 @@ public class TestRocksDBCheckpointDiffer {
         rocksDB.put(cfHandles.get(1), "SecondKey".getBytes(UTF_8),
             "SecondValue".getBytes(UTF_8));
 
-        List<byte[]> keys = Arrays.asList(key.getBytes(UTF_8),
+        List<byte[]> keys = asList(key.getBytes(UTF_8),
             "SecondKey".getBytes(UTF_8));
-        List<ColumnFamilyHandle> cfHandleList = Arrays.asList(cfHandle,
-            cfHandle);
+        List<ColumnFamilyHandle> cfHandleList = asList(cfHandle, cfHandle);
 
         // key
         List<byte[]> values = rocksDB.multiGetAsList(cfHandleList, keys);

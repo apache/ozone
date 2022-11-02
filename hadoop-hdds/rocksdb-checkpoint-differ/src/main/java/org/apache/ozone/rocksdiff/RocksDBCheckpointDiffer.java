@@ -24,6 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -39,13 +40,11 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -56,32 +55,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-//  1. Create a local instance of RocksDiff-local-RocksDB. This is the
-//  rocksDB that we can use for maintaining DAG and any other state. This is
-//  a per node state so it it doesn't have to go through RATIS anyway.
-//  2. Store fwd DAG in Diff-Local-RocksDB in Compaction Listener
-//  3. Store fwd DAG in Diff-Local-RocksDB in Compaction Listener
-//  4. Store last-Snapshot-counter/Compaction-generation-counter in Diff-Local
-//  -RocksDB in Compaction Listener
-//  5. System Restart handling. Read the DAG from Disk and load it in memory.
-//  6. Take the base snapshot. All the SST file nodes in the base snapshot
-//  should be arked with that Snapshot generation. Subsequently, all SST file
-//  node should have a snapshot-generation count and Compaction-generation
-//  count.
-//  6. DAG based SST file pruning. Start from the oldest snapshot and we can
-//  unlink any SST
-//  file from the SaveCompactedFilePath directory that is reachable in the
-//  reverse DAG.
-//  7. DAG pruning : For each snapshotted bucket, We can recycle the part of
-//  the DAG that is older than the predefined policy for the efficient snapdiff.
-//  E.g. we may decide not to support efficient snapdiff from any snapshot that
-//  is older than 2 weeks.
-//  Note on 8. & 9 .
-//  ==================
-//  A simple handling is to just iterate over all keys in keyspace when the
-//  compaction DAG is lost, instead of optimizing every case. And start
-//  Compaction-DAG afresh from the latest snapshot.
-//  --
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.asList;
+
+// TODO
 //  8. Handle bootstrapping rocksDB for a new OM follower node
 //      - new node will receive Active object store as well as all existing
 //      rocksDB checkpoints.
@@ -94,6 +71,13 @@ import java.util.stream.Stream;
 
 /**
  * RocksDB checkpoint differ.
+ * <p>
+ * Implements Ozone Manager RocksDB compaction listener (compaction log
+ * persistence and SST file hard-linking), compaction DAG construction,
+ * and compaction DAG reconstruction upon OM restarts.
+ * <p>
+ * It is important to note that compaction log is per-DB instance. Since
+ * each OM DB instance might trigger compactions at different timings.
  */
 public class RocksDBCheckpointDiffer {
 
@@ -519,6 +503,22 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
+   * Get a list of relevant column family descriptors.
+   * @param cfOpts ColumnFamilyOptions
+   * @return List of ColumnFamilyDescriptor
+   */
+  @VisibleForTesting
+  static List<ColumnFamilyDescriptor> getCFDescriptorList(
+      ColumnFamilyOptions cfOpts) {
+    return asList(
+        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
+        new ColumnFamilyDescriptor("keyTable".getBytes(UTF_8), cfOpts),
+        new ColumnFamilyDescriptor("directoryTable".getBytes(UTF_8), cfOpts),
+        new ColumnFamilyDescriptor("fileTable".getBytes(UTF_8), cfOpts)
+    );
+  }
+
+  /**
    * Read the current Live manifest for a given RocksDB instance (Active or
    * Checkpoint).
    * @param dbPathArg path to a RocksDB directory
@@ -528,18 +528,16 @@ public class RocksDBCheckpointDiffer {
     RocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
 
+    final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions();
+    final List<ColumnFamilyDescriptor> cfDescriptors =
+        getCFDescriptorList(cfOpts);
     final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-    final List<ColumnFamilyDescriptor> cfd = new ArrayList<>();
-    cfd.add(new ColumnFamilyDescriptor(
-        "keyTable".getBytes(StandardCharsets.UTF_8)));
-    cfd.add(new ColumnFamilyDescriptor(
-        "default".getBytes(StandardCharsets.UTF_8)));
 
     try (DBOptions dbOptions = new DBOptions()
         .setParanoidChecks(true)) {
 
       rocksDB = RocksDB.openReadOnly(dbOptions, dbPathArg,
-          cfd, columnFamilyHandles);
+          cfDescriptors, columnFamilyHandles);
       List<LiveFileMetaData> liveFileMetaDataList =
           rocksDB.getLiveFilesMetaData();
       LOG.debug("SST File Metadata for DB: " + dbPathArg);
@@ -555,6 +553,7 @@ public class RocksDBCheckpointDiffer {
       if (rocksDB != null) {
         rocksDB.close();
       }
+      cfOpts.close();
     }
     return liveFiles;
   }
@@ -588,8 +587,8 @@ public class RocksDBCheckpointDiffer {
       }
       final String[] inputFiles = io[0].split(",");
       final String[] outputFiles = io[1].split(",");
-      populateCompactionDAG(Arrays.asList(inputFiles),
-          Arrays.asList(outputFiles), reconstructionSnapshotGeneration);
+      populateCompactionDAG(asList(inputFiles),
+          asList(outputFiles), reconstructionSnapshotGeneration);
     } else {
       LOG.error("Invalid line in compaction log: {}", line);
     }
@@ -601,7 +600,7 @@ public class RocksDBCheckpointDiffer {
   private void readCompactionLogToDAG(String currCompactionLogPath) {
     LOG.debug("Loading compaction log: {}", currCompactionLogPath);
     try (Stream<String> logLineStream =
-        Files.lines(Paths.get(currCompactionLogPath), StandardCharsets.UTF_8)) {
+        Files.lines(Paths.get(currCompactionLogPath), UTF_8)) {
       logLineStream.forEach(this::processCompactionLogLine);
     } catch (IOException ioEx) {
       throw new RuntimeException(ioEx);

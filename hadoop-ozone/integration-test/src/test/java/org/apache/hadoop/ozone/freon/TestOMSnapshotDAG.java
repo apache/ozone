@@ -48,7 +48,7 @@ import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -205,11 +205,13 @@ public class TestOMSnapshotDAG {
 
     List<String> actualDiffList = differ.getSSTDiffList(snap3, snap1);
     LOG.debug("Got diff list: {}", actualDiffList);
-    final List<String> expectedDiffList = Arrays.asList("000059");
+    // Hard-coded expected output.
+    // The result is deterministic. Retrieved from a successful run.
+    final List<String> expectedDiffList = Collections.singletonList("000059");
     Assertions.assertEquals(expectedDiffList, actualDiffList);
 
-    // TODO: Lower DB write buffer size (it is set to 128 MB in DBProfile),
-    //  or generate enough keys (in the number of millions) to trigger
+    // TODO: Use smaller DB write buffer size (currently it is set to 128 MB
+    //  in DBProfile), or generate enough keys (in the millions) to trigger
     //  RDB compaction. Take another snapshot and do the diff again.
     //  Then restart OM, do the same diff again to see if DAG reconstruction
     //  works.
