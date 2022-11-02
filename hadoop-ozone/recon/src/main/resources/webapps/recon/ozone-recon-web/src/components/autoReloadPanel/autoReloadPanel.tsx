@@ -78,7 +78,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
      (
       <>
       &nbsp; | OM DB updated at {lastUpdatedDeltaFullToolTip}
-           &nbsp;<Button shape='circle' icon='play-circle' size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true } />
+      &nbsp;<Button shape='circle' icon='play-circle' size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true } />
       </>
      );
 
