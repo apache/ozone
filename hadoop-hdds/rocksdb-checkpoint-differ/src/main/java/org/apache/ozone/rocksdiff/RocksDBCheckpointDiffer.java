@@ -908,7 +908,7 @@ public class RocksDBCheckpointDiffer {
     CompactionNode fileNode = new CompactionNode(file, null, numKeys, seqNum);
     forwardCompactionDAG.addNode(fileNode);
     backwardCompactionDAG.addNode(fileNode);
-    compactionNodeMap.put(file, fileNode);
+
     return fileNode;
   }
 
@@ -919,24 +919,16 @@ public class RocksDBCheckpointDiffer {
       List<String> outputFiles, long seqNum) {
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Input {} -> Output {}", inputFiles, outputFiles);
+      LOG.debug("Input files: {} -> Output files: {}", inputFiles, outputFiles);
     }
 
     for (String outfile : outputFiles) {
-//      final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
-//          outfile, file -> addNodeToDAG(file, seqNum));
-      CompactionNode outfileNode = compactionNodeMap.get(outfile);
-      if (outfileNode == null) {
-        outfileNode = addNodeToDAG(outfile, seqNum);
-      }
+      final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
+          outfile, file -> addNodeToDAG(file, seqNum));
 
       for (String infile : inputFiles) {
-//        final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
-//            infile, file -> addNodeToDAG(file, seqNum));
-        CompactionNode infileNode = compactionNodeMap.get(infile);
-        if (infileNode == null) {
-          infileNode = addNodeToDAG(infile, seqNum);
-        }
+        final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
+            infile, file -> addNodeToDAG(file, seqNum));
         // Draw the edges
         if (!outfileNode.fileName.equals(infileNode.fileName)) {
           forwardCompactionDAG.putEdge(outfileNode, infileNode);
