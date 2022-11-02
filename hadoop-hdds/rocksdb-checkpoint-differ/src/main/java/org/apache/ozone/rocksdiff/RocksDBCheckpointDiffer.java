@@ -805,12 +805,12 @@ public class RocksDBCheckpointDiffer {
   }
 
   @VisibleForTesting
-  public void dumpCompactionNodeTable() {
+  void dumpCompactionNodeTable() {
     List<CompactionNode> nodeList = compactionNodeMap.values().stream()
         .sorted(new NodeComparator()).collect(Collectors.toList());
     for (CompactionNode n : nodeList) {
-      LOG.info("File '{}' total keys: {}", n.fileName, n.totalNumberOfKeys);
-      LOG.info("File '{}' cumulative keys: {}", n.fileName,
+      LOG.debug("File '{}' total keys: {}", n.fileName, n.totalNumberOfKeys);
+      LOG.debug("File '{}' cumulative keys: {}", n.fileName,
           n.cumulativeKeysReverseTraversal);
     }
   }
@@ -909,7 +909,9 @@ public class RocksDBCheckpointDiffer {
         try {
           numKeys = getSSTFileSummary(outfile);
         } catch (RocksDBException e) {
-          // Error getting number of keys. Warn and continue
+          // Most likely this SST file hasn't gone through a compaction yet,
+          // thus it doesn't exist in the SST backup directory.
+          // Warn and move on.
           LOG.warn("Error getting number of keys in '{}': {}",
               outfile, e.getMessage());
         }

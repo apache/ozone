@@ -82,10 +82,10 @@ public class TestRocksDBCheckpointDiffer {
 
   @BeforeAll
   public static void init() {
-    // Set differ log level to DEBUG
-    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.DEBUG);
-    // Set test class log level to DEBUG
-    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.DEBUG);
+    // Set differ log level
+    GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
+    // Set test class log level
+    GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
   }
 
   @Test
@@ -114,14 +114,19 @@ public class TestRocksDBCheckpointDiffer {
     RocksDB rocksDB = createRocksDBInstance(TEST_DB_PATH, differ);
     readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
 
-    printAllSnapshots();
+    if (LOG.isDebugEnabled()) {
+      printAllSnapshots();
+    }
+
     differ.traverseGraph(
         differ.getBackwardCompactionDAG(),
         differ.getForwardCompactionDAG());
 
     diffAllSnapshots(differ);
 
-    differ.dumpCompactionNodeTable();
+    if (LOG.isDebugEnabled()) {
+      differ.dumpCompactionNodeTable();
+    }
 
     for (GType gtype : GType.values()) {
       String fname = "fwdGraph_" + gtype +  ".png";
@@ -157,10 +162,12 @@ public class TestRocksDBCheckpointDiffer {
       if (snap == null) {
         break;
       }
+      Snapshot src = snapshots.get(snapshots.size() - 1);
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstListForRocksDiff =
-          differ.getSSTDiffList(snapshots.get(snapshots.size() - 1), snap);
-      LOG.debug("getSSTDiffList returns: {}", sstListForRocksDiff);
+          differ.getSSTDiffList(src, snap);
+      LOG.info("SST diff from '{}' to '{}': {}",
+          src.getDbPath(), snap.getDbPath(), sstListForRocksDiff);
     }
   }
 
@@ -218,10 +225,10 @@ public class TestRocksDBCheckpointDiffer {
       if (snap == null) {
         break;
       }
-      LOG.warn("Snapshot id" + snap.getSnapshotID());
-      LOG.warn("Snapshot path" + snap.getDbPath());
-      LOG.warn("Snapshot Generation" + snap.getSnapshotGeneration());
-      LOG.warn("");
+      LOG.debug("Snapshot id" + snap.getSnapshotID());
+      LOG.debug("Snapshot path" + snap.getDbPath());
+      LOG.debug("Snapshot Generation" + snap.getSnapshotGeneration());
+      LOG.debug("");
     }
   }
 
@@ -428,7 +435,7 @@ public class TestRocksDBCheckpointDiffer {
   void readRocksDBInstance(String dbPathArg, RocksDB rocksDB, FileWriter file,
       RocksDBCheckpointDiffer differ) {
 
-    LOG.info("Reading RocksDB: " + dbPathArg);
+    LOG.debug("Reading RocksDB: " + dbPathArg);
     boolean createdDB = false;
 
     try (Options options = new Options()
@@ -443,10 +450,10 @@ public class TestRocksDBCheckpointDiffer {
       List<LiveFileMetaData> liveFileMetaDataList =
           rocksDB.getLiveFilesMetaData();
       for (LiveFileMetaData m : liveFileMetaDataList) {
-        LOG.info("SST File: " + m.fileName());
-        LOG.info("\tLevel: " + m.level());
-        LOG.info("\tTable: " + toStr(m.columnFamilyName()));
-        LOG.info("\tKey Range: " + toStr(m.smallestKey())
+        LOG.debug("SST File: {}. ", m.fileName());
+        LOG.debug("\tLevel: {}", m.level());
+        LOG.debug("\tTable: {}", toStr(m.columnFamilyName()));
+        LOG.debug("\tKey Range: {}", toStr(m.smallestKey())
             + " <-> " + toStr(m.largestKey()));
         if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           differ.printMutableGraphFromAGivenNode(m.fileName(), m.level(),
@@ -457,7 +464,7 @@ public class TestRocksDBCheckpointDiffer {
       if (differ.debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
         RocksIterator iter = rocksDB.newIterator();
         for (iter.seekToFirst(); iter.isValid(); iter.next()) {
-          System.out.println("Iterator key:" + toStr(iter.key()) + ", " +
+          LOG.debug("Iterator key:" + toStr(iter.key()) + ", " +
               "iter value:" + toStr(iter.value()));
           if (file != null) {
             file.write("iterator key:" + toStr(iter.key()) + ", iter " +
