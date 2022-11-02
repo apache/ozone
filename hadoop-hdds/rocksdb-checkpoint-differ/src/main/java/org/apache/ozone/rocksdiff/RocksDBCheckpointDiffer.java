@@ -48,7 +48,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -400,24 +399,6 @@ public class RocksDBCheckpointDiffer {
     };
   }
 
-  /**
-   * Helper function to append the list of SST files to a StringBuilder
-   * for a compaction log entry. Does not append a new line.
-   */
-  private static void appendCompactionLogStringBuilder(List<String> files,
-      StringBuilder sb) {
-
-    Iterator<String> it = files.iterator();
-    while (it.hasNext()) {
-      final String filename = it.next();
-      sb.append(filename);
-      // Do not append delimiter if this is the last one
-      if (it.hasNext()) {
-        sb.append(',');
-      }
-    }
-  }
-
   private AbstractEventListener newCompactionCompletedListener() {
     return new AbstractEventListener() {
       @Override
@@ -450,9 +431,11 @@ public class RocksDBCheckpointDiffer {
 
           // Append the list of input files
           final List<String> inputFiles = compactionJobInfo.inputFiles();
+          // Trim the file path, leave only the SST file name without extension
           inputFiles.replaceAll(s -> s.substring(
               filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
-          appendCompactionLogStringBuilder(inputFiles, sb);
+          final String inputFilesJoined = String.join(",", inputFiles);
+          sb.append(inputFilesJoined);
 
           // Insert delimiter between input files an output files
           sb.append(':');
@@ -461,7 +444,10 @@ public class RocksDBCheckpointDiffer {
           final List<String> outputFiles = compactionJobInfo.outputFiles();
           outputFiles.replaceAll(s -> s.substring(
               filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
-          appendCompactionLogStringBuilder(outputFiles, sb);
+          final String outputFilesJoined = String.join(",", outputFiles);
+          sb.append(outputFilesJoined);
+
+          // End of line
           sb.append('\n');
 
           // Write input and output file names to compaction log
