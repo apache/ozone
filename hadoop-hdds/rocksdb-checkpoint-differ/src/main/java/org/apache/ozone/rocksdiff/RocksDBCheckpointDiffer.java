@@ -654,14 +654,14 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
-   * Snapshot information node class in the DAG.
+   * Snapshot information node class for the differ.
    */
-  public static class Snapshot {
+  public static class DifferSnapshotInfo {
     private final String dbPath;
     private final String snapshotID;
     private final long snapshotGeneration;
 
-    public Snapshot(String db, String id, long gen) {
+    public DifferSnapshotInfo(String db, String id, long gen) {
       dbPath = db;
       snapshotID = id;
       snapshotGeneration = gen;
@@ -688,7 +688,8 @@ public class RocksDBCheckpointDiffer {
    * @param src source snapshot
    * @param dest destination snapshot
    */
-  public synchronized List<String> getSSTDiffList(Snapshot src, Snapshot dest) {
+  public synchronized List<String> getSSTDiffList(
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) {
 
     LOG.debug("src '{}' -> dest '{}'", src.dbPath, dest.dbPath);
     HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.dbPath);
@@ -721,7 +722,7 @@ public class RocksDBCheckpointDiffer {
         logSB.append(file).append(" ");
         res.add(file);
       }
-      LOG.debug(logSB.toString());
+      LOG.debug("{}", logSB);
 
     } else {
       res.addAll(fwdDAGDifferentFiles);
@@ -733,7 +734,8 @@ public class RocksDBCheckpointDiffer {
   /**
    * Core getSSTDiffList logic.
    */
-  private void internalGetSSTDiffList(Snapshot src, Snapshot dest,
+  private void internalGetSSTDiffList(
+      DifferSnapshotInfo src, DifferSnapshotInfo dest,
       HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
       HashSet<String> sameFiles, HashSet<String> differentFiles) {

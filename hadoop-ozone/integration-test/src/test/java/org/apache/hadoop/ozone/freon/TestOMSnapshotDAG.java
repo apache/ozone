@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.Snapshot;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -124,7 +124,7 @@ public class TestOMSnapshotDAG {
     return dbKeyPrefix + OM_KEY_PREFIX + snapshotName;
   }
 
-  private Snapshot getRDBDiffSnapshotObj(
+  private DifferSnapshotInfo getRDBDiffSnapshotObj(
       OMMetadataManager omMetadataManager, String volumeName, String bucketName,
       String snapshotName) throws IOException {
 
@@ -133,8 +133,10 @@ public class TestOMSnapshotDAG {
         omMetadataManager.getSnapshotInfoTable().get(dbKey);
     String checkpointPath = getDBCheckpointAbsolutePath(snapshotInfo);
 
-    return new Snapshot(checkpointPath, snapshotInfo.getSnapshotID(),
-        0 /* TODO: locate the snapshot with UUID in global snapshot chain */);
+    // TODO: RocksDB transaction sequence number at the time of checkpoint
+    //  creation needs to be added to SnapshotInfo as well
+    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
+        0);
   }
 
   @Test
@@ -190,9 +192,9 @@ public class TestOMSnapshotDAG {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
 
-    Snapshot snap1 = getRDBDiffSnapshotObj(omMetadataManager,
+    DifferSnapshotInfo snap1 = getRDBDiffSnapshotObj(omMetadataManager,
         volumeName, bucketName, "snap1");
-    Snapshot snap3 = getRDBDiffSnapshotObj(omMetadataManager,
+    DifferSnapshotInfo snap3 = getRDBDiffSnapshotObj(omMetadataManager,
         volumeName, bucketName, "snap3");
 
     // RocksDB does checkpointing in a separate thread, wait for it

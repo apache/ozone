@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.Snapshot;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -69,7 +69,7 @@ public class TestRocksDBCheckpointDiffer {
    * RocksDB checkpoint path prefix.
    */
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
-  private final ArrayList<Snapshot> snapshots = new ArrayList<>();
+  private final ArrayList<DifferSnapshotInfo> snapshots = new ArrayList<>();
 
   /**
    * Graph type.
@@ -159,11 +159,11 @@ public class TestRocksDBCheckpointDiffer {
    * Test SST diffs.
    */
   void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
-    for (Snapshot snap : snapshots) {
+    for (DifferSnapshotInfo snap : snapshots) {
       if (snap == null) {
         break;
       }
-      Snapshot src = snapshots.get(snapshots.size() - 1);
+      DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstListForRocksDiff =
           differ.getSSTDiffList(src, snap);
@@ -194,8 +194,8 @@ public class TestRocksDBCheckpointDiffer {
 
     createCheckPoint(TEST_DB_PATH, cpPath, rocksDB);
     final String snapshotId = "snap_id_" + snapshotGeneration;
-    final Snapshot currentSnapshot =
-        new Snapshot(cpPath, snapshotId, snapshotGeneration);
+    final DifferSnapshotInfo currentSnapshot =
+        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration);
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
@@ -222,7 +222,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   void printAllSnapshots() {
-    for (Snapshot snap : snapshots) {
+    for (DifferSnapshotInfo snap : snapshots) {
       if (snap == null) {
         break;
       }
