@@ -20,7 +20,6 @@ package org.apache.ozone.rocksdiff;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.CompactionJobInfo;
@@ -420,15 +419,12 @@ public class RocksDBCheckpointDiffer {
   private AbstractEventListener newCompactionCompletedListener() {
     return new AbstractEventListener() {
       @Override
-      @SuppressFBWarnings({
-          "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-          "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
       public void onCompactionCompleted(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
         synchronized (compactionListenerWriteLock) {
 
-          if (compactionJobInfo.inputFiles().size() == 0) {
+          if (compactionJobInfo.inputFiles().isEmpty()) {
             LOG.error("Compaction input files list is empty");
             return;
           }
