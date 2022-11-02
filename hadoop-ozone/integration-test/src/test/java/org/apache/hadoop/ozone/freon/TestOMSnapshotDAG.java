@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,32 +6,38 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.Snapshot;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -39,12 +45,18 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -56,6 +68,7 @@ public class TestOMSnapshotDAG {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static ObjectStore store;
+  private final File metaDir = OMStorage.getOmDbDir(conf);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -97,15 +110,43 @@ public class TestOMSnapshotDAG {
     }
   }
 
+  private String getDBCheckpointAbsolutePath(SnapshotInfo snapshotInfo) {
+    return metaDir + OM_KEY_PREFIX +
+        OM_SNAPSHOT_DIR + OM_KEY_PREFIX +
+        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+  }
+
+  private static String getSnapshotDBKey(String volumeName, String bucketName,
+      String snapshotName) {
+
+    final String dbKeyPrefix = OM_KEY_PREFIX + volumeName +
+        OM_KEY_PREFIX + bucketName;
+    return dbKeyPrefix + OM_KEY_PREFIX + snapshotName;
+  }
+
+  private Snapshot getRDBDiffSnapshotObj(
+      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
+      String snapshotName) throws IOException {
+
+    final String dbKey = getSnapshotDBKey(volumeName, bucketName, snapshotName);
+    final SnapshotInfo snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable().get(dbKey);
+    String checkpointPath = getDBCheckpointAbsolutePath(snapshotInfo);
+
+    return new Snapshot(checkpointPath, snapshotInfo.getSnapshotID(),
+        0 /* TODO: locate the snapshot with UUID in global snapshot chain */);
+  }
+
   @Test
-  void testZeroSizeKey() throws IOException {
+  void testZeroSizeKey()
+      throws IOException, InterruptedException, TimeoutException {
 
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
-        "--num-of-keys", "6000",
+        "--num-of-keys", "600",
         "--num-of-threads", "1",
         "--key-size", "0",
         "--factor", "THREE",
@@ -113,8 +154,8 @@ public class TestOMSnapshotDAG {
         "--validate-writes"
     );
 
-    Assert.assertEquals(6000L, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(6000L,
+    Assertions.assertEquals(600L, randomKeyGenerator.getNumberOfKeysAdded());
+    Assertions.assertEquals(600L,
         randomKeyGenerator.getSuccessfulValidationCount());
 
     List<OmVolumeArgs> volList = cluster.getOzoneManager()
@@ -142,6 +183,34 @@ public class TestOMSnapshotDAG {
     // Create another snapshot
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
+
+    // Get snapshot SST diff list
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
+    RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
+
+    Snapshot snap1 = getRDBDiffSnapshotObj(omMetadataManager,
+        volumeName, bucketName, "snap1");
+    Snapshot snap3 = getRDBDiffSnapshotObj(omMetadataManager,
+        volumeName, bucketName, "snap3");
+
+    // RocksDB does checkpointing in a separate thread, wait for it
+    final File checkpointSnap1 = new File(snap1.getDbPath());
+    GenericTestUtils.waitFor(checkpointSnap1::exists, 2000, 20000);
+    final File checkpointSnap3 = new File(snap3.getDbPath());
+    GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
+
+    List<String> actualDiffList = differ.getSSTDiffList(snap3, snap1);
+    LOG.debug("Got diff list: {}", actualDiffList);
+    final List<String> expectedDiffList = Arrays.asList("000059");
+    Assertions.assertEquals(expectedDiffList, actualDiffList);
+
+    // TODO: Lower DB write buffer size (it is set to 128 MB in DBProfile),
+    //  or generate enough keys (in the number of millions) to trigger
+    //  RDB compaction. Take another snapshot and do the diff again.
+    //  Then restart OM, do the same diff again to see if DAG reconstruction
+    //  works.
   }
 
 }

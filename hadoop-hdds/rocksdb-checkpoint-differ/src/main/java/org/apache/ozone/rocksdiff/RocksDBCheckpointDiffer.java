@@ -656,12 +656,12 @@ public class RocksDBCheckpointDiffer {
   /**
    * Snapshot information node class in the DAG.
    */
-  static class Snapshot {
+  public static class Snapshot {
     private final String dbPath;
     private final String snapshotID;
     private final long snapshotGeneration;
 
-    Snapshot(String db, String id, long gen) {
+    public Snapshot(String db, String id, long gen) {
       dbPath = db;
       snapshotID = id;
       snapshotGeneration = gen;
