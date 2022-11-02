@@ -31,14 +31,19 @@ public abstract class Shell extends GenericCli {
 
   public static final String OZONE_URI_DESCRIPTION = "Ozone URI could either " +
       "be a full URI or short URI.\n" +
-      "Full URI should start with o3://serviceId/ " +
-      "and can optionally also contain " +
-      "the port number: o3://serviceId:9999/\n" +
-      "Example of a full URI for a key:\no3://om/vol1/bucket1/key1\n" +
-      "With port number for a volume:\no3://om:9862/vol1/\n" +
-      "Not specified information will be identified from the config files.\n" +
+      "Full URI should start with o3:// followed by the OM host name or the " +
+      "service id and can optionally also contain the port number. " +
+      "Service id provides a logical name for multiple hosts. " +
+      "It is defined in ozone.om.service.ids and later resolved as an " +
+      "exact host through the property: " +
+      "ozone.om.address.<serviceID>.<nodeID>=host. " +
+      "Example of a full URI with host name for a key:" +
+      "\no3://omhostname/vol1/bucket1/key1\n" +
+      "With a service id and port number for a volume:" +
+      "\no3://omserviceid:9862/vol1/\n" +
       "Short URI should start from the volume.\n" +
-      "Example of a short URI for a bucket:\nvol1/bucket1";
+      "Example of a short URI for a bucket:\nvol1/bucket1\n" +
+      "Unspecified information will be identified from the config files.";
 
   public Shell() {
   }
