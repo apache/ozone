@@ -64,7 +64,6 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
-  private final String dbCheckpointDirectory = "db.checkpoints";
   /**
    * Name of the SST file backup directory placed under metadata dir.
    * Can be made configurable later.
@@ -125,9 +124,9 @@ public class RDBStore implements DBStore {
         }
       }
 
-      // Create checkpoint directory if does not exist
+      //create checkpoints directory if not exists.
       checkpointsParentDir =
-          Paths.get(dbLocation.getParent(), dbCheckpointDirectory).toString();
+          Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
@@ -138,9 +137,9 @@ public class RDBStore implements DBStore {
         }
       }
 
-      // Create snapshot directory if does not exist
-      snapshotsParentDir =
-          Paths.get(dbLocation.getParent(), OM_SNAPSHOT_DIR).toString();
+      //create snapshot directory if does not exist.
+      snapshotsParentDir = Paths.get(dbLocation.getParent(),
+          OM_SNAPSHOT_DIR).toString();
       File snapshotsDir = new File(snapshotsParentDir);
       if (!snapshotsDir.exists()) {
         boolean success = snapshotsDir.mkdir();
