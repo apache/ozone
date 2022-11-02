@@ -287,11 +287,16 @@ public class ReconServer extends GenericCli {
       if (ozoneManagerServiceProvider != null) {
         ozoneManagerServiceProvider.stop();
       }
-      if (reconDBProvider != null) {
-        reconDBProvider.close();
-      }
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.unregister();
+      }
+      if (reconDBProvider != null) {
+        try {
+          LOG.info("Closing Recon Container Key DB.");
+          reconDBProvider.close();
+        } catch (Exception ex) {
+          LOG.error("Recon Container Key DB close failed", ex);
+        }
       }
       isStarted = false;
     }
