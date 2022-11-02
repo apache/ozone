@@ -112,7 +112,7 @@ public class TestRocksDBCheckpointDiffer {
       fail("Unable to create SST backup directory");
     }
 
-    RocksDB rocksDB = createRocksDBInstance(TEST_DB_PATH, differ);
+    RocksDB rocksDB = createRocksDBInstanceAndWriteKeys(TEST_DB_PATH, differ);
     readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
 
     if (LOG.isDebugEnabled()) {
@@ -156,17 +156,13 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
-   * Test SST diffs.
+   * Test SST differ.
    */
   void diffAllSnapshots(RocksDBCheckpointDiffer differ) {
+    final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
     for (DifferSnapshotInfo snap : snapshots) {
-      if (snap == null) {
-        break;
-      }
-      DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
       // Returns a list of SST files to be fed into RocksDiff
-      List<String> sstListForRocksDiff =
-          differ.getSSTDiffList(src, snap);
+      List<String> sstListForRocksDiff = differ.getSSTDiffList(src, snap);
       LOG.info("SST diff from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstListForRocksDiff);
     }
@@ -223,18 +219,12 @@ public class TestRocksDBCheckpointDiffer {
 
   void printAllSnapshots() {
     for (DifferSnapshotInfo snap : snapshots) {
-      if (snap == null) {
-        break;
-      }
-      LOG.debug("Snapshot id" + snap.getSnapshotID());
-      LOG.debug("Snapshot path" + snap.getDbPath());
-      LOG.debug("Snapshot Generation" + snap.getSnapshotGeneration());
-      LOG.debug("");
+      LOG.debug("{}", snap);
     }
   }
 
   // Test Code to create sample RocksDB instance.
-  private RocksDB createRocksDBInstance(String dbPathArg,
+  private RocksDB createRocksDBInstanceAndWriteKeys(String dbPathArg,
       RocksDBCheckpointDiffer differ) throws RocksDBException {
 
     LOG.debug("Creating RocksDB at '{}'", dbPathArg);
@@ -245,8 +235,22 @@ public class TestRocksDBCheckpointDiffer {
       deleteDirectory(dir);
     }
 
-    RocksDB rocksDB;
-    rocksDB = differ.getRocksDBInstanceWithCompactionTracking(dbPathArg);
+    final String customCF = "keyTable";
+    ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
+        .optimizeUniversalStyleCompaction();
+    final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
+        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
+        new ColumnFamilyDescriptor(customCF.getBytes(UTF_8), cfOpts)
+    );
+    List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
+
+    // Create a RocksDB instance with compaction tracking
+    final DBOptions dbOptions = new DBOptions()
+        .setCreateIfMissing(true)
+        .setCreateMissingColumnFamilies(true);
+    differ.setRocksDBForCompactionTracking(dbOptions);
+    RocksDB rocksDB = RocksDB.open(dbOptions, dbPathArg, cfDescriptors,
+        cfHandles);
 
     differ.setCurrentCompactionLog(rocksDB.getLatestSequenceNumber());
 
@@ -257,7 +261,8 @@ public class TestRocksDBCheckpointDiffer {
       String keyStr = "Key-" + i + "-" + generatedString;
       String valueStr = "Val-" + i + "-" + generatedString;
       byte[] key = keyStr.getBytes(UTF_8);
-      rocksDB.put(key, valueStr.getBytes(UTF_8));
+      // Put entry in keyTable
+      rocksDB.put(cfHandles.get(1), key, valueStr.getBytes(UTF_8));
       if (i % SNAPSHOT_EVERY_SO_MANY_KEYS == 0) {
         createCheckpoint(differ, rocksDB);
       }

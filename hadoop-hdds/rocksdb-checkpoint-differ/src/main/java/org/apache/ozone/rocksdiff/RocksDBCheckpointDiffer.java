@@ -480,13 +480,6 @@ public class RocksDBCheckpointDiffer {
     };
   }
 
-  public RocksDB getRocksDBInstanceWithCompactionTracking(String dbPath)
-      throws RocksDBException {
-    final Options opt = new Options().setCreateIfMissing(true);
-    setRocksDBForCompactionTracking(opt);
-    return RocksDB.open(opt, dbPath);
-  }
-
   /**
    * Get number of keys in an SST file.
    * @param filename SST filename
@@ -678,6 +671,13 @@ public class RocksDBCheckpointDiffer {
     public long getSnapshotGeneration() {
       return snapshotGeneration;
     }
+
+    @Override
+    public String toString() {
+      return "DifferSnapshotInfo{" + "dbPath='" + dbPath + '\''
+          + ", snapshotID='" + snapshotID + '\'' + ", snapshotGeneration="
+          + snapshotGeneration + '}';
+    }
   }
 
   /**
@@ -691,19 +691,16 @@ public class RocksDBCheckpointDiffer {
   public synchronized List<String> getSSTDiffList(
       DifferSnapshotInfo src, DifferSnapshotInfo dest) {
 
-    LOG.debug("src '{}' -> dest '{}'", src.dbPath, dest.dbPath);
     HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.dbPath);
     HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.dbPath);
 
     HashSet<String> fwdDAGSameFiles = new HashSet<>();
     HashSet<String> fwdDAGDifferentFiles = new HashSet<>();
 
-    LOG.debug("Doing forward diff between src and dest snapshots: " +
-        src.dbPath + " to " + dest.dbPath);
+    LOG.debug("Doing forward diff from src '{}' to dest '{}'",
+        src.dbPath, dest.dbPath);
     internalGetSSTDiffList(src, dest, srcSnapFiles, destSnapFiles,
         forwardCompactionDAG, fwdDAGSameFiles, fwdDAGDifferentFiles);
-
-    List<String> res = new ArrayList<>();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Result of diff from src '" + src.dbPath + "' to dest '" +
@@ -720,15 +717,11 @@ public class RocksDBCheckpointDiffer {
       logSB.append("Fwd DAG different SST files: ");
       for (String file : fwdDAGDifferentFiles) {
         logSB.append(file).append(" ");
-        res.add(file);
       }
       LOG.debug("{}", logSB);
-
-    } else {
-      res.addAll(fwdDAGDifferentFiles);
     }
 
-    return res;
+    return new ArrayList<>(fwdDAGDifferentFiles);
   }
 
   /**
