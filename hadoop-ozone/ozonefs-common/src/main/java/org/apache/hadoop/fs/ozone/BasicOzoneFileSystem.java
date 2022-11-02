@@ -630,7 +630,8 @@ public class BasicOzoneFileSystem extends FileSystem {
               .collect(Collectors.toList());
 
       if (!tmpStatusList.isEmpty()) {
-        if (startKey.isEmpty()) {
+        if (startKey.isEmpty() || !statuses.getLast().getPath().toString()
+            .equals(tmpStatusList.get(0).getPath().toString())) {
           statuses.addAll(tmpStatusList);
         } else {
           statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
