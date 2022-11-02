@@ -61,6 +61,11 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
+  protected boolean handleExpiration() {
+    return false;
+  }
+
+  @Override
   protected InitResponse handleCase(InitCase init)
       throws CertificateException {
     // This is similar to OM.

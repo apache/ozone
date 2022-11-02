@@ -117,19 +117,14 @@ public class ReconServer extends GenericCli {
       loginReconUserIfSecurityEnabled(configuration);
       try {
         if (reconStorage.getState() != INITIALIZED) {
-          if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
-            initializeCertificateClient(configuration);
-          }
           reconStorage.initialize();
-        } else {
-          if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
-              reconStorage.getReconCertSerialId() == null) {
-            LOG.info("ReconStorageConfig is already initialized." +
-                "Initializing certificate.");
-            initializeCertificateClient(configuration);
-            reconStorage.persistCurrentState();
-          }
         }
+        if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
+          LOG.info("ReconStorageConfig initialized." +
+              "Initializing certificate.");
+          initializeCertificateClient(configuration);
+        }
+        reconStorage.persistCurrentState();
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
@@ -182,6 +177,14 @@ public class ReconServer extends GenericCli {
         reconStorage.getReconCertSerialId());
 
     CertificateClient.InitResponse response = certClient.init();
+    if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      LOG.info("Re-initialize certificate client.");
+      reconStorage.unsetReconCertSerialId();
+      reconStorage.persistCurrentState();
+      certClient = new ReconCertificateClient(new SecurityConfig(configuration),
+          reconStorage.getReconCertSerialId());
+      response = certClient.init();
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:

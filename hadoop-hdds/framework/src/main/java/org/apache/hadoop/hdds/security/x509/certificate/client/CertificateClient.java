@@ -203,7 +203,8 @@ public interface CertificateClient {
     SUCCESS,
     FAILURE,
     GETCERT,
-    RECOVER
+    RECOVER,
+    REINIT
   }
 
   /**

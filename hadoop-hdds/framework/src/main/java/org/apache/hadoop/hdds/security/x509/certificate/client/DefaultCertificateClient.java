@@ -39,6 +39,7 @@ import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -63,8 +65,10 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.validator.routines.DomainValidator;
+
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.BOOTSTRAP_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CERTIFICATE_ERROR;
@@ -74,7 +78,6 @@ import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateExcepti
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
-import org.apache.ratis.util.FileUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 
@@ -647,7 +650,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PRIVATE_KEY,
     PRIVATEKEY_CERT,
     PUBLICKEY_PRIVATEKEY,
-    ALL
+    ALL,
+    EXPIRES
   }
 
   /**
@@ -696,6 +700,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PublicKey pubKey = getPublicKey();
     X509Certificate certificate = getCertificate();
 
+    Calendar shouldRenewAfter = Calendar.getInstance();
+    shouldRenewAfter
+        .add(Calendar.DAY_OF_YEAR, securityConfig.getRenewalGraceDays());
+    if (handleExpiration() && certificate != null &&
+        certificate.getNotAfter().before(shouldRenewAfter.getTime())) {
+      InitCase init = InitCase.EXPIRES;
+      return handleCase(init);
+    }
+
     if (pvtKey != null) {
       initCase = initCase | 1 << 2;
     }
@@ -710,6 +723,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         "valid case.");
     InitCase init = InitCase.values()[initCase];
     return handleCase(init);
+  }
+
+  protected boolean handleExpiration() {
+    return true;
   }
 
   /**
@@ -766,11 +783,29 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       } else {
         return FAILURE;
       }
+    case EXPIRES:
+      getLogger().info("Component certificate is about to expire. Initiating" +
+          "renewal.");
+      removeMaterial();
+      return REINIT;
     default:
       getLogger().error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));
 
       return FAILURE;
+    }
+  }
+
+  protected void removeMaterial() throws CertificateException {
+    try {
+      FileUtils.deleteDirectory(
+          securityConfig.getKeyLocation(component).toFile());
+      getLogger().info("Certificate renewal: key material is removed.");
+      FileUtils.deleteDirectory(
+          securityConfig.getCertificateLocation(component).toFile());
+      getLogger().info("Certificate renewal: certificates are removed.");
+    } catch (IOException e) {
+      throw new CertificateException("Certificate renewal failed.", e);
     }
   }
 
@@ -988,7 +1023,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             certName = ROOT_CA_CERT_PREFIX + certName;
           }
 
-          FileUtils.deleteFileQuietly(basePath.resolve(certName).toFile());
+          FileUtils.deleteQuietly(basePath.resolve(certName).toFile());
           // remove in memory
           certificateMap.remove(certId);
 

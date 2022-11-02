@@ -63,6 +63,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_FILE_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_FILE_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -100,6 +102,7 @@ public class SecurityConfig {
   private final String certificateFileName;
   private final boolean grpcTlsEnabled;
   private final Duration defaultCertDuration;
+  private final int renewalGraceDays;
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
@@ -164,6 +167,10 @@ public class SecurityConfig {
         this.configuration.get(HDDS_X509_DEFAULT_DURATION,
             HDDS_X509_DEFAULT_DURATION_DEFAULT);
     defaultCertDuration = Duration.parse(certDurationString);
+    String renewalGraceDuration = this.configuration.get(
+        HDDS_X509_RENEW_GRACE_DURATION,
+        HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
+    renewalGraceDays = Integer.parseInt(renewalGraceDuration);
 
     if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
       LOG.error("Certificate duration {} should not be greater than Maximum " +
@@ -214,6 +221,16 @@ public class SecurityConfig {
    */
   public Duration getDefaultCertDuration() {
     return defaultCertDuration;
+  }
+
+  /**
+   * Returns the number of days within which before expiration a certificate
+   * should be renewed.
+   *
+   * @return the value of hdds.x509.renew.grace.duration property
+   */
+  public int getRenewalGraceDays() {
+    return renewalGraceDays;
   }
 
   /**
