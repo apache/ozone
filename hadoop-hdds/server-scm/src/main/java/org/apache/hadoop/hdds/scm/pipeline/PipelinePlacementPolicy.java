@@ -124,13 +124,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    if (healthyNodes.size() < nodesRequired) {
-      String msg = String.format("Pipeline creation failed due to "
-                      + "no sufficient healthy nodes.Required %d. Found %d.",
-              nodesRequired, healthyNodes.size());
+    String msg;
+    if (healthyNodes.size() == 0) {
+      msg = "No healthy node found to allocate container.";
       LOG.error(msg);
-      throw new SCMException(msg,
-              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      throw new SCMException(msg, SCMException.ResultCodes
+              .FAILED_TO_FIND_HEALTHY_NODES);
     }
 
     healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired,
@@ -140,7 +139,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       healthyNodes.removeAll(excludedNodes);
     }
     int initialHealthyNodesCount = healthyNodes.size();
-    String msg;
 
     if (initialHealthyNodesCount < nodesRequired) {
       msg = String.format("Pipeline creation failed due to no sufficient" +
