@@ -228,9 +228,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       loading: true
     });
 
-    axios.all([
-      axios.get('/api/v1/containers/unhealthy')
-    ]).then(axios.spread((allReplicatedResponse) => {
+    axios.get('/api/v1/containers/unhealthy').then(allReplicatedResponse => {
 
       const allContainersResponseData: IUnhealthyContainersResponse = allReplicatedResponse.data;
       const allContainers: IContainerResponse[] = allContainersResponseData.containers;
@@ -254,7 +252,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         overReplicatedDataSource: oContainers,
         misReplicatedDataSource: mrContainers
       });
-    })).catch(error => {
+    }).catch(error => {
       this.setState({
         loading: false
       });
