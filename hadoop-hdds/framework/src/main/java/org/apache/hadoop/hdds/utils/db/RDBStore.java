@@ -101,7 +101,7 @@ public class RDBStore implements DBStore {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
             dbLocation.getParent(), dbCompactionSSTBackupDirName,
-            dbCompactionLogDirName);
+            dbCompactionLogDirName, dbLocation);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;

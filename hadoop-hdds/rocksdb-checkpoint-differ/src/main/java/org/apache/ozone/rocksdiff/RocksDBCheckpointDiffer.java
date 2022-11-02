@@ -101,6 +101,7 @@ public class RocksDBCheckpointDiffer {
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
 
   private final String sstBackupDir;
+  private final String activeDBLocationStr;
 
   private String compactionLogDir = null;
 
@@ -160,7 +161,7 @@ public class RocksDBCheckpointDiffer {
    * @param compactionLogDirName Name of the compaction log dir.
    */
   public RocksDBCheckpointDiffer(String metadataDir, String sstBackupDir,
-      String compactionLogDirName) {
+      String compactionLogDirName, File activeDBLocation) {
 
     setCompactionLogDir(metadataDir, compactionLogDirName);
 
@@ -174,6 +175,9 @@ public class RocksDBCheckpointDiffer {
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
+
+    // Active DB location is used in getSSTFileSummary
+    this.activeDBLocationStr = activeDBLocation.toString() + "/";
   }
 
   private void setCompactionLogDir(String metadataDir,
@@ -498,7 +502,16 @@ public class RocksDBCheckpointDiffer {
 
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
-    reader.open(sstBackupDir + filename);
+
+    File sstFile = new File(sstBackupDir + filename);
+    File sstFileInActiveDB = new File(activeDBLocationStr + filename);
+    if (sstFile.exists()) {
+      reader.open(sstBackupDir + filename);
+    } else if (sstFileInActiveDB.exists()) {
+      reader.open(activeDBLocationStr + filename);
+    } else {
+      throw new RuntimeException("Can't find SST file: " + filename);
+    }
 
     TableProperties properties = reader.getTableProperties();
     if (LOG.isDebugEnabled()) {
@@ -895,15 +908,12 @@ public class RocksDBCheckpointDiffer {
    * Helper method to add a new file node to the DAG.
    * @return CompactionNode
    */
-  @SuppressFBWarnings({"AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION"})
   private CompactionNode addNodeToDAG(String file, long seqNum) {
     long numKeys = 0L;
     try {
       numKeys = getSSTFileSummary(file);
     } catch (RocksDBException e) {
-      // Error getting number of keys. Warn and continue
-      LOG.warn("Error getting number of keys in '{}': {}",
-          file, e.getMessage());
+      LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     }
     CompactionNode fileNode = new CompactionNode(file, null, numKeys, seqNum);
     forwardCompactionDAG.addNode(fileNode);

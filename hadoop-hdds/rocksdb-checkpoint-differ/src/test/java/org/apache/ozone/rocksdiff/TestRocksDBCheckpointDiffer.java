@@ -91,18 +91,19 @@ public class TestRocksDBCheckpointDiffer {
   @Test
   void testMain() throws Exception {
 
+    final String clDirStr = "compaction-log";
     // Delete the compaction log dir for the test, if it exists
-    File clDir = new File("./compaction-log");
+    File clDir = new File(clDirStr);
     if (clDir.exists()) {
       deleteDirectory(clDir);
     }
 
     final String metadataDirStr = ".";
     final String sstDirStr = "compaction-sst-backup";
-    final String clDirStr = "compaction-log";
 
+    final File dbLocation = new File(TEST_DB_PATH);
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
-        metadataDirStr, sstDirStr, clDirStr);
+        metadataDirStr, sstDirStr, clDirStr, dbLocation);
 
     // Empty the SST backup folder first for testing
     File sstDir = new File(sstDirStr);
