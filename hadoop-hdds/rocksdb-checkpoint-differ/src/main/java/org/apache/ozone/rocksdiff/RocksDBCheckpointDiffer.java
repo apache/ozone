@@ -22,6 +22,8 @@ import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.StringUtils;
 import org.rocksdb.AbstractEventListener;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -547,11 +549,18 @@ public class RocksDBCheckpointDiffer {
     RocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
 
-    try (Options options = new Options()
-        .setParanoidChecks(true)
-        .setForceConsistencyChecks(false)) {
+    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+    final List<ColumnFamilyDescriptor> cfd = new ArrayList<>();
+    cfd.add(new ColumnFamilyDescriptor(
+        "keyTable".getBytes(StandardCharsets.UTF_8)));
+    cfd.add(new ColumnFamilyDescriptor(
+        "default".getBytes(StandardCharsets.UTF_8)));
 
-      rocksDB = RocksDB.openReadOnly(options, dbPathArg);
+    try (DBOptions dbOptions = new DBOptions()
+        .setParanoidChecks(true)) {
+
+      rocksDB = RocksDB.openReadOnly(dbOptions, dbPathArg,
+          cfd, columnFamilyHandles);
       List<LiveFileMetaData> liveFileMetaDataList =
           rocksDB.getLiveFilesMetaData();
       LOG.debug("SST File Metadata for DB: " + dbPathArg);
