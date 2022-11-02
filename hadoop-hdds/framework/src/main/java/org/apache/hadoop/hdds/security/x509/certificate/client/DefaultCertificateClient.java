@@ -699,16 +699,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PrivateKey pvtKey = getPrivateKey();
     PublicKey pubKey = getPublicKey();
     X509Certificate certificate = getCertificate();
-
-    Calendar shouldRenewAfter = Calendar.getInstance();
-    shouldRenewAfter
-        .add(Calendar.DAY_OF_YEAR, securityConfig.getRenewalGraceDays());
-    if (handleExpiration() && certificate != null &&
-        certificate.getNotAfter().before(shouldRenewAfter.getTime())) {
-      InitCase init = InitCase.EXPIRES;
-      return handleCase(init);
-    }
-
     if (pvtKey != null) {
       initCase = initCase | 1 << 2;
     }
@@ -718,6 +708,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (certificate != null) {
       initCase = initCase | 1;
     }
+
+    Calendar shouldRenewAfter = Calendar.getInstance();
+    shouldRenewAfter
+        .add(Calendar.DAY_OF_YEAR, securityConfig.getRenewalGraceDays());
+    if (initCase == InitCase.ALL.ordinal() &&
+        handleExpiration() && certificate != null &&
+        certificate.getNotAfter().before(shouldRenewAfter.getTime())) {
+      InitCase init = InitCase.EXPIRES;
+      return handleCase(init);
+    }
+
     getLogger().info("Certificate client init case: {}", initCase);
     Preconditions.checkArgument(initCase < 8, "Not a " +
         "valid case.");
