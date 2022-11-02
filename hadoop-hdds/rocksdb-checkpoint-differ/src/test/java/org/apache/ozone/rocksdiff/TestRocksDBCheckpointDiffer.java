@@ -116,8 +116,8 @@ public class TestRocksDBCheckpointDiffer {
 
     printAllSnapshots();
     differ.traverseGraph(
-        differ.getCompactionReverseDAG(),
-        differ.getCompactionFwdDAG());
+        differ.getBackwardCompactionDAG(),
+        differ.getForwardCompactionDAG());
 
     diffAllSnapshots(differ);
 
@@ -450,7 +450,7 @@ public class TestRocksDBCheckpointDiffer {
             + " <-> " + toStr(m.largestKey()));
         if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           differ.printMutableGraphFromAGivenNode(m.fileName(), m.level(),
-              differ.getCompactionFwdDAG());
+              differ.getForwardCompactionDAG());
         }
       }
 

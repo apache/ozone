@@ -48,7 +48,9 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -252,24 +254,30 @@ public class RocksDBCheckpointDiffer {
 
     CompactionNode(String file, String ssId, long numKeys, long seqNum) {
       fileName = file;
-      snapshotId = ssId;  // TODO: Unused. Remove?
+      // Retained for debuggability. Unused for now.
+      snapshotId = ssId;
       totalNumberOfKeys = numKeys;
       snapshotGeneration = seqNum;
       cumulativeKeysReverseTraversal = 0L;
     }
+
+    @Override
+    public String toString() {
+      return String.format("Node{%s}", fileName);
+    }
   }
 
   // Hash table to track CompactionNode for a given SST File.
-  private final ConcurrentHashMap<String, CompactionNode> compactionNodeTable =
+  private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
       new ConcurrentHashMap<>();
 
   // We are maintaining a two way DAG. This allows easy traversal from
   // source snapshot to destination snapshot as well as the other direction.
 
-  private final MutableGraph<CompactionNode> compactionDAGFwd =
+  private final MutableGraph<CompactionNode> forwardCompactionDAG =
       GraphBuilder.directed().build();
 
-  private final MutableGraph<CompactionNode> compactionDAGReverse =
+  private final MutableGraph<CompactionNode> backwardCompactionDAG =
       GraphBuilder.directed().build();
 
   public static final Integer DEBUG_DAG_BUILD_UP = 2;
@@ -490,11 +498,7 @@ public class RocksDBCheckpointDiffer {
 
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
-    try {
-      reader.open(sstBackupDir + filename);
-    } catch (RocksDBException e) {
-      throw new RuntimeException("Failed to open SST file: " + filename);
-    }
+    reader.open(sstBackupDir + filename);
     TableProperties properties = reader.getTableProperties();
 
     if (LOG.isDebugEnabled()) {
@@ -678,7 +682,7 @@ public class RocksDBCheckpointDiffer {
     LOG.debug("Doing forward diff between src and dest snapshots: " +
         src.dbPath + " to " + dest.dbPath);
     internalGetSSTDiffList(src, dest, srcSnapFiles, destSnapFiles,
-        compactionDAGFwd, fwdDAGSameFiles, fwdDAGDifferentFiles);
+        forwardCompactionDAG, fwdDAGSameFiles, fwdDAGDifferentFiles);
 
     List<String> res = new ArrayList<>();
 
@@ -711,7 +715,6 @@ public class RocksDBCheckpointDiffer {
   /**
    * Core getSSTDiffList logic.
    */
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void internalGetSSTDiffList(Snapshot src, Snapshot dest,
       HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
@@ -724,58 +727,67 @@ public class RocksDBCheckpointDiffer {
         sameFiles.add(fileName);
         continue;
       }
-      CompactionNode infileNode =
-          compactionNodeTable.get(Paths.get(fileName).getFileName().toString());
+
+      CompactionNode infileNode = compactionNodeMap.get(fileName);
       if (infileNode == null) {
-        LOG.debug("Src " + src.dbPath + " File " + fileName +
-            " was never compacted");
+        LOG.debug("Source '{}' SST file '{}' is never compacted",
+            src.dbPath, fileName);
         differentFiles.add(fileName);
         continue;
       }
-      LOG.debug("Expanding SST file: " + fileName);
+
+      LOG.debug("Expanding SST file: {}", fileName);
       Set<CompactionNode> currentLevel = new HashSet<>();
       currentLevel.add(infileNode);
-      Set<CompactionNode> nextLevel = new HashSet<>();
-      int i = 1;
-      while (currentLevel.size() != 0) {
-        LOG.debug("DAG Level: " + i++);
+      // Traversal level/depth indicator for debug print
+      int level = 1;
+      while (!currentLevel.isEmpty()) {
+        LOG.debug("BFS level: {}. Current level has {} nodes.",
+            level++, currentLevel.size());
+
+        final Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
-          LOG.debug("Acknowledging file " + current.fileName);
+          LOG.debug("Processing node: {}", current.fileName);
           if (current.snapshotGeneration <= dest.snapshotGeneration) {
-            LOG.debug("Reached dest generation count. Src: " +
-                src.dbPath + " and Dest: " + dest.dbPath +
-                " have different file: " + current.fileName);
+            LOG.debug("Current node's snapshot generation '{}' "
+                    + "reached destination snapshot's '{}'. "
+                    + "Src '{}' and dest '{}' have different SST file: '{}'",
+                current.snapshotGeneration, dest.snapshotGeneration,
+                src.dbPath, dest.dbPath, current.fileName);
             differentFiles.add(current.fileName);
             continue;
           }
+
           Set<CompactionNode> successors = mutableGraph.successors(current);
-          if (successors.size() == 0) {
-            LOG.debug("No further compaction happened for the current file. " +
-                "src: " + src.dbPath + " and dest: " + dest.dbPath +
-                " have different file: " + current.fileName);
+          if (successors.isEmpty()) {
+            LOG.debug("No further compaction happened to the current file. " +
+                "Src '{}' and dest '{}' have different file: {}",
+                src.dbPath, dest.dbPath, current.fileName);
             differentFiles.add(current.fileName);
-          } else {
-            for (CompactionNode oneSucc : successors) {
-              if (sameFiles.contains(oneSucc.fileName) ||
-                  differentFiles.contains(oneSucc.fileName)) {
-                LOG.debug("Skipping known same file: " + oneSucc.fileName);
-                continue;
-              }
-              if (destSnapFiles.contains(oneSucc.fileName)) {
-                LOG.debug("src: " + src.dbPath + " and dest: " + dest.dbPath +
-                    " have the same file: " + oneSucc.fileName);
-                sameFiles.add(oneSucc.fileName);
-                continue;
-              } else {
-                LOG.debug("src " + src.dbPath + " and dest " + dest.dbPath +
-                    " have a different SST: " + oneSucc.fileName);
-                nextLevel.add(oneSucc);
-              }
+            continue;
+          }
+
+          for (CompactionNode node : successors) {
+            if (sameFiles.contains(node.fileName) ||
+                differentFiles.contains(node.fileName)) {
+              LOG.debug("Skipping known processed SST: {}", node.fileName);
+              continue;
             }
+
+            if (destSnapFiles.contains(node.fileName)) {
+              LOG.debug("Src '{}' and dest '{}' have the same SST: {}",
+                  src.dbPath, dest.dbPath, node.fileName);
+              sameFiles.add(node.fileName);
+              continue;
+            }
+
+            // Queue different SST to the next level
+            LOG.debug("Src '{}' and dest '{}' have a different SST: {}",
+                src.dbPath, dest.dbPath, node.fileName);
+            nextLevel.add(node);
           }
         }
-        currentLevel = new HashSet<>(nextLevel);
-        nextLevel = new HashSet<>();
+        currentLevel = nextLevel;
       }
     }
   }
@@ -794,7 +806,7 @@ public class RocksDBCheckpointDiffer {
 
   @VisibleForTesting
   public void dumpCompactionNodeTable() {
-    List<CompactionNode> nodeList = compactionNodeTable.values().stream()
+    List<CompactionNode> nodeList = compactionNodeMap.values().stream()
         .sorted(new NodeComparator()).collect(Collectors.toList());
     for (CompactionNode n : nodeList) {
       LOG.info("File '{}' total keys: {}", n.fileName, n.totalNumberOfKeys);
@@ -804,83 +816,79 @@ public class RocksDBCheckpointDiffer {
   }
 
   @VisibleForTesting
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public synchronized void printMutableGraphFromAGivenNode(String fileName,
-      int level, MutableGraph<CompactionNode> mutableGraph) {
-    CompactionNode infileNode =
-        compactionNodeTable.get(Paths.get(fileName).getFileName().toString());
+      int sstLevel, MutableGraph<CompactionNode> mutableGraph) {
+
+    CompactionNode infileNode = compactionNodeMap.get(fileName);
     if (infileNode == null) {
       return;
     }
-    LOG.info("\nCompaction Level: " + level + " Expanding File: " + fileName);
-    Set<CompactionNode> nextLevel = new HashSet<>();
-    nextLevel.add(infileNode);
-    Set<CompactionNode> currentLevel = new HashSet<>(nextLevel);
-    int i = 1;
-    while (currentLevel.size() != 0) {
-      LOG.info("DAG Level: " + i++);
+    LOG.debug("Expanding file: {}. SST compaction level: {}",
+        fileName, sstLevel);
+    Set<CompactionNode> currentLevel = new HashSet<>();
+    currentLevel.add(infileNode);
+    int levelCounter = 1;
+    while (!currentLevel.isEmpty()) {
+      LOG.debug("DAG Level: {}", levelCounter++);
+      final Set<CompactionNode> nextLevel = new HashSet<>();
       StringBuilder sb = new StringBuilder();
       for (CompactionNode current : currentLevel) {
         Set<CompactionNode> successors = mutableGraph.successors(current);
-        for (CompactionNode oneSucc : successors) {
-          sb.append(oneSucc.fileName).append(" ");
-          nextLevel.add(oneSucc);
+        for (CompactionNode succNode : successors) {
+          sb.append(succNode.fileName).append(" ");
+          nextLevel.add(succNode);
         }
       }
-      LOG.info(sb.toString());
-      currentLevel = new HashSet<>(nextLevel);
-      nextLevel = new HashSet<>();
+      LOG.debug("{}", sb);
+      currentLevel = nextLevel;
     }
   }
 
   synchronized void printMutableGraph(String srcSnapId, String destSnapId,
       MutableGraph<CompactionNode> mutableGraph) {
-    LOG.warn("Printing the Graph");
-    Set<CompactionNode> topLevelNodes = new HashSet<>();
-    Set<CompactionNode> allNodes = new HashSet<>();
-    for (CompactionNode n : mutableGraph.nodes()) {
+
+    LOG.debug("Gathering all SST file nodes from src '{}' to dest '{}'",
+        srcSnapId, destSnapId);
+
+    final Queue<CompactionNode> nodeQueue = new LinkedList<>();
+    // Queue source snapshot SST file nodes
+    for (CompactionNode node : mutableGraph.nodes()) {
       if (srcSnapId == null ||
-          n.snapshotId.compareToIgnoreCase(srcSnapId) == 0) {
-        topLevelNodes.add(n);
+          node.snapshotId.compareToIgnoreCase(srcSnapId) == 0) {
+        nodeQueue.add(node);
       }
     }
-    Iterator<CompactionNode> iter = topLevelNodes.iterator();
-    while (iter.hasNext()) {
-      CompactionNode n = iter.next();
-      Set<CompactionNode> succ = mutableGraph.successors(n);
-      LOG.debug("Parent Node: " + n.fileName);
-      if (succ.size() == 0) {
-        LOG.debug("No child node");
-        allNodes.add(n);
-        iter.remove();
-        iter = topLevelNodes.iterator();
+
+    final Set<CompactionNode> allNodesSet = new HashSet<>();
+    while (!nodeQueue.isEmpty()) {
+      CompactionNode node = nodeQueue.poll();
+      Set<CompactionNode> succSet = mutableGraph.successors(node);
+      LOG.debug("Current node: {}", node);
+      if (succSet.isEmpty()) {
+        LOG.debug("Has no successor node");
+        allNodesSet.add(node);
         continue;
       }
-      for (CompactionNode oneSucc : succ) {
-        LOG.debug("Children Node: " + oneSucc.fileName);
+      for (CompactionNode succNode : succSet) {
+        LOG.debug("Has successor node: {}", succNode);
         if (srcSnapId == null ||
-            oneSucc.snapshotId.compareToIgnoreCase(destSnapId) == 0) {
-          allNodes.add(oneSucc);
-        } else {
-          topLevelNodes.add(oneSucc);
+            succNode.snapshotId.compareToIgnoreCase(destSnapId) == 0) {
+          allNodesSet.add(succNode);
+          continue;
         }
+        nodeQueue.add(succNode);
       }
-      iter.remove();
-      iter = topLevelNodes.iterator();
     }
-    LOG.debug("src snap: " + srcSnapId);
-    LOG.debug("dest snap: " + destSnapId);
-    for (CompactionNode n : allNodes) {
-      LOG.debug("Files are: " + n.fileName);
-    }
+
+    LOG.debug("Files are: {}", allNodesSet);
   }
 
-  public MutableGraph<CompactionNode> getCompactionFwdDAG() {
-    return compactionDAGFwd;
+  public MutableGraph<CompactionNode> getForwardCompactionDAG() {
+    return forwardCompactionDAG;
   }
 
-  public MutableGraph<CompactionNode> getCompactionReverseDAG() {
-    return compactionDAGReverse;
+  public MutableGraph<CompactionNode> getBackwardCompactionDAG() {
+    return backwardCompactionDAG;
   }
 
   /**
@@ -895,39 +903,41 @@ public class RocksDBCheckpointDiffer {
     }
 
     for (String outfile : outputFiles) {
-      CompactionNode outfileNode = compactionNodeTable.get(outfile);
+      CompactionNode outfileNode = compactionNodeMap.get(outfile);
       if (outfileNode == null) {
         long numKeys = 0L;
         try {
           numKeys = getSSTFileSummary(outfile);
-        } catch (Exception e) {
-          LOG.warn("Exception in getSSTFileSummary: {}", e.getMessage());
+        } catch (RocksDBException e) {
+          // Error getting number of keys. Warn and continue
+          LOG.warn("Error getting number of keys in '{}': {}",
+              outfile, e.getMessage());
         }
         outfileNode = new CompactionNode(outfile, null, numKeys, seqNum);
-        compactionDAGFwd.addNode(outfileNode);
-        compactionDAGReverse.addNode(outfileNode);
-        compactionNodeTable.put(outfile, outfileNode);
+        forwardCompactionDAG.addNode(outfileNode);
+        backwardCompactionDAG.addNode(outfileNode);
+        compactionNodeMap.put(outfile, outfileNode);
       }
 
       for (String infile : inputFiles) {
-        CompactionNode infileNode = compactionNodeTable.get(infile);
+        CompactionNode infileNode = compactionNodeMap.get(infile);
         if (infileNode == null) {
           long numKeys = 0L;
           try {
             numKeys = getSSTFileSummary(infile);
-          } catch (Exception e) {
-            LOG.warn("Exception in getSSTFileSummary: {}", e.getMessage());
+          } catch (RocksDBException e) {
+            LOG.warn("Error getting number of keys in '{}': {}",
+                infile, e.getMessage());
           }
           infileNode = new CompactionNode(infile, null, numKeys, seqNum);
-          compactionDAGFwd.addNode(infileNode);
-          compactionDAGReverse.addNode(infileNode);
-          compactionNodeTable.put(infile, infileNode);
+          forwardCompactionDAG.addNode(infileNode);
+          backwardCompactionDAG.addNode(infileNode);
+          compactionNodeMap.put(infile, infileNode);
         }
         // Draw the edges
-        if (outfileNode.fileName.compareToIgnoreCase(
-            infileNode.fileName) != 0) {
-          compactionDAGFwd.putEdge(outfileNode, infileNode);
-          compactionDAGReverse.putEdge(infileNode, outfileNode);
+        if (!outfileNode.fileName.equals(infileNode.fileName)) {
+          forwardCompactionDAG.putEdge(outfileNode, infileNode);
+          backwardCompactionDAG.putEdge(infileNode, outfileNode);
         }
       }
     }
@@ -939,7 +949,7 @@ public class RocksDBCheckpointDiffer {
       MutableGraph<CompactionNode> reverseMutableGraph,
       MutableGraph<CompactionNode> fwdMutableGraph) {
 
-    List<CompactionNode> nodeList = compactionNodeTable.values().stream()
+    List<CompactionNode> nodeList = compactionNodeMap.values().stream()
         .sorted(new NodeComparator()).collect(Collectors.toList());
 
     for (CompactionNode infileNode : nodeList) {
@@ -962,34 +972,33 @@ public class RocksDBCheckpointDiffer {
       }
       visited.add(infileNode);
       LOG.debug("Visiting node '{}'", infileNode.fileName);
-      Set<CompactionNode> nextLevel = new HashSet<>();
-      nextLevel.add(infileNode);
-      Set<CompactionNode> currentLevel = new HashSet<>(nextLevel);
-      nextLevel = new HashSet<>();
-      int i = 1;
-      while (currentLevel.size() != 0) {
-        LOG.debug("DAG Level {}", i++);
+      Set<CompactionNode> currentLevel = new HashSet<>();
+      currentLevel.add(infileNode);
+      int level = 1;
+      while (!currentLevel.isEmpty()) {
+        LOG.debug("BFS Level: {}. Current level has {} nodes",
+            level++, currentLevel.size());
+        final Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
-          LOG.debug("Expanding node {}", current.fileName);
+          LOG.debug("Expanding node: {}", current.fileName);
           Set<CompactionNode> successors =
               reverseMutableGraph.successors(current);
-          if (successors.size() == 0) {
+          if (successors.isEmpty()) {
             LOG.debug("No successors. Cumulative keys: {}",
                 current.cumulativeKeysReverseTraversal);
-          } else {
-            for (CompactionNode oneSucc : successors) {
-              LOG.debug("Adding to the next level: {}", oneSucc.fileName);
-              LOG.debug("'{}' cumulative keys: {}. parent '{}' total keys: {}",
-                  oneSucc.fileName, oneSucc.cumulativeKeysReverseTraversal,
-                  current.fileName, current.totalNumberOfKeys);
-              oneSucc.cumulativeKeysReverseTraversal +=
-                  current.cumulativeKeysReverseTraversal;
-              nextLevel.add(oneSucc);
-            }
+            continue;
+          }
+          for (CompactionNode node : successors) {
+            LOG.debug("Adding to the next level: {}", node.fileName);
+            LOG.debug("'{}' cumulative keys: {}. parent '{}' total keys: {}",
+                node.fileName, node.cumulativeKeysReverseTraversal,
+                current.fileName, current.totalNumberOfKeys);
+            node.cumulativeKeysReverseTraversal +=
+                current.cumulativeKeysReverseTraversal;
+            nextLevel.add(node);
           }
         }
-        currentLevel = new HashSet<>(nextLevel);
-        nextLevel = new HashSet<>();
+        currentLevel = nextLevel;
       }
     }
   }
