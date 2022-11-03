@@ -79,10 +79,10 @@ public final class OnDemandContainerScanner {
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
       resultFuture = instance.scanExecutor.submit(() -> {
-        removeContainerFromScheduledContainers(containerId);
         if (container.shouldScanData()) {
           performOnDemandScan(container);
         }
+        removeContainerFromScheduledContainers(containerId);
       });
     }
     return Optional.ofNullable(resultFuture);

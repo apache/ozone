@@ -30,10 +30,12 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 import org.mockito.verification.VerificationMode;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
@@ -99,26 +101,28 @@ public class TestOnDemandContainerScanner {
   }
 
   @Test
-  public void testSameContainerQueuedMultipleTimes() {
+  public void testSameContainerQueuedMultipleTimes() throws Exception {
     OnDemandContainerScanner.init(conf, controller);
-    //We need a scan to be in progress to test scheduling a container
-    // multiple times, because the first scheduled scan is immediately removed
-    // from the list of to be scanned containers.
-    //Given a container that is scheduled when another scan is already running
+    //Given a container that has not finished scanning
+    CountDownLatch latch = new CountDownLatch(1);
+    Mockito.lenient().when(corruptData.scanMetaData()).thenAnswer(
+        (Answer<Boolean>) invocation -> {
+          latch.await();
+          return false;
+        });
     Optional<Future<?>> onGoingScan = OnDemandContainerScanner
-        .scanContainer(healthy);
-    Optional<Future<?>> firstScan = OnDemandContainerScanner
         .scanContainer(corruptData);
     Assert.assertTrue(onGoingScan.isPresent());
-    if (!onGoingScan.get().isDone()) {
-      //When scheduling the same container again, while the other container's
-      // scan is still not finished
-      Optional<Future<?>> secondScanResult = OnDemandContainerScanner
-          .scanContainer(corruptData);
-      //Then the first schedule will run and the second one is dismissed
-      Assert.assertTrue(firstScan.isPresent());
-      Assert.assertFalse(secondScanResult.isPresent());
-    }
+    Assert.assertFalse(onGoingScan.get().isDone());
+    //When scheduling the same container again
+    Optional<Future<?>> secondScan = OnDemandContainerScanner
+        .scanContainer(corruptData);
+    //Then the second scan is not scheduled and the first scan can still finish
+    Assert.assertFalse(secondScan.isPresent());
+    latch.countDown();
+    onGoingScan.get().get();
+    Mockito.verify(controller, atLeastOnce()).
+        markContainerUnhealthy(corruptData.getContainerData().getContainerID());
   }
 
   private void testContainerMarkedUnhealthy(
