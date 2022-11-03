@@ -102,7 +102,7 @@ public class TestHddsSecureDatanodeInit {
     X509Certificate x509Certificate = null;
 
     x509Certificate = KeyStoreTestUtil.generateCertificate(
-        "CN=Test", new KeyPair(publicKey, privateKey), 10,
+        "CN=Test", new KeyPair(publicKey, privateKey), 365,
         securityConfig.getSignatureAlgo());
     certHolder = new X509CertificateHolder(x509Certificate.getEncoded());
 
