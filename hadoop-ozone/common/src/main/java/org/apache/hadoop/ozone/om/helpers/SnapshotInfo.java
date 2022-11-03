@@ -107,6 +107,10 @@ public final class SnapshotInfo implements Auditable {
   private String globalPreviousSnapshotID;
   private String snapshotPath; // snapshot mask
   private String checkpointDir;
+  /**
+   * RocksDB transaction sequence number at the time of checkpoint creation.
+   */
+  private long dbTxSequenceNumber;
 
   /**
    * Private constructor, constructed via builder.
@@ -408,6 +412,14 @@ public final class SnapshotInfo implements Auditable {
    */
   public String getCheckpointDirName() {
     return getCheckpointDirName(getSnapshotID());
+  }
+
+  public long getDbTxSequenceNumber() {
+    return dbTxSequenceNumber;
+  }
+
+  public void setDbTxSequenceNumber(long dbTxSequenceNumber) {
+    this.dbTxSequenceNumber = dbTxSequenceNumber;
   }
 
   /**

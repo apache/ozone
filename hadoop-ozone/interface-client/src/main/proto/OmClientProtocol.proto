@@ -744,17 +744,18 @@ enum SnapshotStatusProto {
  * SnapshotInfo table entry for Bucket/Volume snapshot metadata
  */
 message SnapshotInfo {
-  required string snapshotID = 1;
-  required string name = 2;
-  required string volumeName = 3;
-  required string bucketName = 4;
-  required SnapshotStatusProto snapshotStatus = 5;
-  required uint64 creationTime = 6;
-  required uint64 deletionTime = 7;
-  required string pathPreviousSnapshotID = 8;
-  required string globalPreviousSnapshotID = 9;
-  required string snapshotPath = 10;
-  required string checkpointDir = 11;
+  optional string snapshotID = 1;
+  optional string name = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
+  optional SnapshotStatusProto snapshotStatus = 5;
+  optional uint64 creationTime = 6;
+  optional uint64 deletionTime = 7;
+  optional string pathPreviousSnapshotID = 8;
+  optional string globalPreviousSnapshotID = 9;
+  optional string snapshotPath = 10;
+  optional string checkpointDir = 11;
+  optional int64 dbTxSequenceNumber = 12;
  }
 
 message OzoneObj {

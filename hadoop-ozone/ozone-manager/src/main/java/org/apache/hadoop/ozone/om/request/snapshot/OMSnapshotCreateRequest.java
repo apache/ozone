@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -131,6 +132,13 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         LOG.debug("snapshot: {} already exists ", key);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
       }
+
+      // Note down RDB latest transaction sequence number, which is used
+      // as snapshot generation in the differ.
+      final long dbLatestSequenceNumber =
+          ((RDBStore) omMetadataManager.getStore()).getDb()
+              .getLatestSequenceNumber();
+      snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
 
       omMetadataManager.getSnapshotInfoTable()
           .addCacheEntry(new CacheKey<>(key),
