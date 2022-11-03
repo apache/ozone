@@ -64,19 +64,30 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  private final String dbCompactionSSTBackupDirName = "compaction-sst-backup";
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  private final String dbCompactionLogDirName = "compaction-log";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000, null);
+        new CodecRegistry(), false, 1000, null, false);
   }
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
-                  String dbJmxBeanNameName) throws IOException {
+                  String dbJmxBeanNameName, boolean enableCompactionLog)
+      throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
@@ -86,13 +97,14 @@ public class RDBStore implements DBStore {
         dbJmxBeanNameName;
 
     try {
-      rocksDBCheckpointDiffer =
-          new RocksDBCheckpointDiffer(
-              dbLocation.getAbsolutePath(), maxFSSnapshots,
-          Paths.get(dbLocation.getParent(), "db.checkpoints").toString(),
-          Paths.get(dbLocation.getParent(), "db.savedSSTFiles").toString(),
-          dbLocation.getAbsolutePath(), 0, "Snapshot_");
-      rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+      if (enableCompactionLog) {
+        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+            dbLocation.getParent(), dbCompactionSSTBackupDirName,
+            dbCompactionLogDirName, dbLocation);
+        rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+      } else {
+        rocksDBCheckpointDiffer = null;
+      }
 
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
@@ -114,7 +126,7 @@ public class RDBStore implements DBStore {
 
       //create checkpoints directory if not exists.
       checkpointsParentDir =
-              Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
+          Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
@@ -136,6 +148,15 @@ public class RDBStore implements DBStore {
               "Unable to create RocksDB snapshot directory: " +
               snapshotsParentDir);
         }
+      }
+
+      if (enableCompactionLog) {
+        // Finish the initialization of compaction DAG tracker by setting the
+        // sequence number as current compaction log filename.
+        rocksDBCheckpointDiffer.setCurrentCompactionLog(
+            db.getLatestSequenceNumber());
+        // Load all previous compaction logs
+        rocksDBCheckpointDiffer.loadAllCompactionLogs();
       }
 
       //Initialize checkpoint manager
@@ -160,7 +181,10 @@ public class RDBStore implements DBStore {
     }
   }
 
-  @VisibleForTesting
+  public String getSnapshotsParentDir() {
+    return snapshotsParentDir;
+  }
+
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
   }

@@ -92,6 +92,7 @@ public final class DBStoreBuilder {
   private boolean openReadOnly = false;
   private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
+  private boolean enableCompactionLog;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -190,7 +191,8 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-          registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName);
+          registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
+          enableCompactionLog);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -244,6 +246,11 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setOpenReadOnly(boolean readOnly) {
     this.openReadOnly = readOnly;
+    return this;
+  }
+
+  public DBStoreBuilder setEnableCompactionLog(boolean enableCompactionLog) {
+    this.enableCompactionLog = enableCompactionLog;
     return this;
   }
 

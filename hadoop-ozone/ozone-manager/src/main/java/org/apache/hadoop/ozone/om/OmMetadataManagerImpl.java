@@ -176,6 +176,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  deletedDirTable | /volumeId/bucketId/parentId/dirName -> KeyInfo    |
    * |----------------------------------------------------------------------|
+   *
+   * Snapshot Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * |----------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -459,7 +466,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         rocksDBConfiguration).setName(dbName)
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
-        .setMaxFSSnapshots(maxFSSnapshots);
+        .setMaxFSSnapshots(maxFSSnapshots)
+        .setEnableCompactionLog(true);
     DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
     return dbStore;
   }
