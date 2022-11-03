@@ -121,6 +121,11 @@ public class TestLDBCli {
     DBScanner.setLimit(1);
     Assert.assertEquals(1, getKeyNames(dbScanner).size());
 
+    // Testing the startKey function
+    DBScanner.setLimit(-1);
+    DBScanner.setStartKey("key3");
+    Assert.assertEquals(3, getKeyNames(dbScanner).size());
+
     DBScanner.setLimit(0);
     try {
       getKeyNames(dbScanner);
@@ -131,6 +136,7 @@ public class TestLDBCli {
 
     // If set with -1, check if it dumps entire table data.
     DBScanner.setLimit(-1);
+    DBScanner.setStartKey(null);
     Assert.assertEquals(5, getKeyNames(dbScanner).size());
 
     // Test dump to file.
