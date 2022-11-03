@@ -50,8 +50,6 @@ class AutoReloadHelper {
       this.stopPolling();
     }
   };
-
-  
 }
 
 export {AutoReloadHelper};
