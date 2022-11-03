@@ -2274,6 +2274,16 @@
       Iterate batch size of delete when use BasicOzoneFileSystem.
     </description>
   </property>
+
+  <property>
+    <name>fs.trash.classname</name>
+    <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+    <tag>OZONE, OZONEFS, CLIENT</tag>
+    <description>
+      Trash Policy to be used.
+    </description>
+  </property>
+
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
