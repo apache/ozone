@@ -29,6 +29,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivilegedExceptionAction;
@@ -48,6 +49,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
@@ -230,6 +232,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -3597,10 +3601,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
         lastAppliedIndex + "_" + System.currentTimeMillis();
     File dbDir = oldDB.getParentFile();
-    File dbBackup = new File(dbDir, dbBackupName);
-
+    File dbBackupDir = new File(dbDir, dbBackupName);
+    if (!dbBackupDir.mkdirs()) {
+      throw new IOException("Failed to make db backup dir: " +
+          dbBackupDir.toString());
+    }
+    File dbBackup = new File(dbBackupDir, oldDB.getName());
+    File dbSnapshotsDir = new File(dbDir, OM_SNAPSHOT_DIR);
+    File dbSnapshotsBackup = new File(dbBackupDir, OM_SNAPSHOT_DIR);
     try {
       Files.move(oldDB.toPath(), dbBackup.toPath());
+      if (dbSnapshotsDir.exists()) {
+        Files.move(dbSnapshotsDir.toPath(),
+            dbSnapshotsBackup.toPath());
+      }
     } catch (IOException e) {
       LOG.error("Failed to create a backup of the current DB. Aborting " +
           "snapshot installation.");
@@ -3617,6 +3631,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // starting up.
       Files.createFile(markerFile);
       FileUtils.moveDirectory(checkpointPath, oldDB.toPath());
+      moveOmSnapshotData(oldDB.toPath(), dbSnapshotsDir.toPath());
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
@@ -3624,6 +3639,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           oldDB.toPath());
       try {
         Files.move(dbBackup.toPath(), oldDB.toPath());
+        if (dbSnapshotsBackup.exists()) {
+          Files.move(dbSnapshotsBackup.toPath(), dbSnapshotsDir.toPath());
+        }
         Files.deleteIfExists(markerFile);
       } catch (IOException ex) {
         String errorMsg = "Failed to reset to original DB. OM is in an " +
@@ -3632,9 +3650,44 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       throw e;
     }
-    return dbBackup;
+    return dbBackupDir;
   }
 
+  private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
+      throws IOException {
+    Path incomingSnapshotsDir = Paths.get(dbPath.toString(), OM_SNAPSHOT_DIR);
+    if (incomingSnapshotsDir.toFile().exists()) {
+      Files.move(incomingSnapshotsDir, dbSnapshotsDir);
+      createHardLinks(dbPath);
+    }
+
+  }
+
+  private void createHardLinks(Path dbPath) throws IOException {
+    File hardLinkFile = new File(dbPath.toString(),
+        OMDBCheckpointServlet.OM_HARDLINK_FILE);
+    if (hardLinkFile.exists()) {
+      List<String> lines =
+          Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());
+      for (String l : lines) {
+        String from = l.split("\t")[1];
+        String to = l.split("\t")[0];
+        Path fixedFrom = fixName(dbPath, from);
+        Path fixedTo = fixName(dbPath, to);
+        Files.createLink(fixedTo, fixedFrom);
+      }
+      hardLinkFile.delete();
+    } else {
+      throw new RuntimeException("hardlink file not found");
+    }
+  }
+
+  private Path fixName(Path dbPath, String fileName) {
+    if (fileName.startsWith(OM_SNAPSHOT_DIR)) {
+      return Paths.get(dbPath.getParent().toString(), fileName);
+    }
+    return Paths.get(dbPath.toString(), fileName);
+  }
   /**
    * Re-instantiate MetadataManager with new DB checkpoint.
    * All the classes which use/ store MetadataManager should also be updated

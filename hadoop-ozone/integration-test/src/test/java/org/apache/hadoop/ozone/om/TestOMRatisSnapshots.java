@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.hdds.ExitManager;
@@ -535,6 +537,79 @@ public class TestOMRatisSnapshots {
     }, 100, 3000);
     String msg = "RPC server is stopped";
     Assert.assertTrue(logCapture.getOutput().contains(msg));
+  }
+
+  @Test
+  public void testOmSnapshots() throws Exception {
+    // Get the leader OM
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
+        .getCurrentProxyOMNodeId();
+
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+
+    // Find the inactive OM
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    // Do some transactions so that the log index increases
+    List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
+
+    objectStore.createSnapshot(volumeName, bucketName, "snap1");
+
+    // Get the latest db checkpoint from the leader OM.
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+    long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
+
+
+
+    // Start the inactive OM. Checkpoint installation will happen spontaneously.
+    cluster.startInactiveOM(followerNodeId);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
+
+    // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+          >= leaderOMSnapshotIndex - 1;
+    }, 100, 3000);
+
+    long followerOMLastAppliedIndex =
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+    assertTrue(
+        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+
+    // After the new checkpoint is installed, the follower OM
+    // lastAppliedIndex must >= the snapshot index of the checkpoint. It
+    // could be great than snapshot index if there is any conf entry from ratis.
+    followerOMLastAppliedIndex = followerOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
+    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm() >= leaderOMSnapshotTermIndex);
+
+    // Verify checkpoint installation was happened.
+    String msg = "Reloaded OM state";
+    Assert.assertTrue(logCapture.getOutput().contains(msg));
+
+    // read back data from the snapshot
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+                .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
+    OmKeyInfo omKeyInfo = followerOM.lookupKey(omKeyArgs);
+    Assert.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 
   private List<String> writeKeysToIncreaseLogIndex(
