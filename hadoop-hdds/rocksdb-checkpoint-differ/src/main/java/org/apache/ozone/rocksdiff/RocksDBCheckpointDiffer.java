@@ -29,9 +29,11 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileReader;
+import org.rocksdb.SstFileReaderIterator;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,9 +48,11 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -680,7 +684,7 @@ public class RocksDBCheckpointDiffer {
     HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.dbPath);
 
     HashSet<String> fwdDAGSameFiles = new HashSet<>();
-    HashSet<String> fwdDAGDifferentFiles = new HashSet<>();
+    HashMap<String, String> fwdDAGDifferentFiles = new HashMap<>();
 
     LOG.debug("Doing forward diff from src '{}' to dest '{}'",
         src.dbPath, dest.dbPath);
@@ -700,13 +704,52 @@ public class RocksDBCheckpointDiffer {
 
       logSB.setLength(0);
       logSB.append("Fwd DAG different SST files: ");
-      for (String file : fwdDAGDifferentFiles) {
+      for (String file : fwdDAGDifferentFiles.keySet()) {
         logSB.append(file).append(" ");
       }
       LOG.debug("{}", logSB);
     }
 
-    return new ArrayList<>(fwdDAGDifferentFiles);
+    return new ArrayList<>(fwdDAGDifferentFiles.keySet());
+  }
+
+  public void filterRelevantSstFiles(HashMap<String, String> inputFiles,
+      HashMap<String, String> tableToPrefixMap) {
+    for (Map.Entry<String, String> entry : inputFiles.entrySet()) {
+      String filepath =
+          entry.getValue() + "/" + entry.getKey() + SST_FILE_EXTENSION;
+      try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
+        sstFileReader.open(filepath);
+        TableProperties properties = sstFileReader.getTableProperties();
+        String tableName = new String(properties.getColumnFamilyName());
+        if (tableToPrefixMap.containsKey(tableName)) {
+          String prefix = tableToPrefixMap.get(tableName);
+          SstFileReaderIterator iterator =
+              sstFileReader.newIterator(new ReadOptions());
+          iterator.seekToFirst();
+          String firstKey = new String(iterator.key());
+          iterator.seekToLast();
+          String lastKey = new String(iterator.key());
+          if (!isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
+            inputFiles.remove(entry.getKey());
+          }
+        } else {
+          // entry from other tables
+          inputFiles.remove(entry.getKey());
+        }
+      } catch (RocksDBException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+
+   boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
+      String firstDbKey, String lastDbKey) {
+    boolean isKeyWithPrefixPresent =
+        firstDbKey.compareTo(prefixForColumnFamily) <= 0
+            && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
+    return isKeyWithPrefixPresent;
   }
 
   /**
@@ -716,7 +759,7 @@ public class RocksDBCheckpointDiffer {
       DifferSnapshotInfo src, DifferSnapshotInfo dest,
       HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
-      HashSet<String> sameFiles, HashSet<String> differentFiles) {
+      HashSet<String> sameFiles, HashMap<String,String> differentFiles) {
 
     for (String fileName : srcSnapFiles) {
       if (destSnapFiles.contains(fileName)) {
@@ -730,7 +773,7 @@ public class RocksDBCheckpointDiffer {
       if (infileNode == null) {
         LOG.debug("Source '{}' SST file '{}' is never compacted",
             src.dbPath, fileName);
-        differentFiles.add(fileName);
+        differentFiles.put(fileName,src.dbPath);
         continue;
       }
 
@@ -752,7 +795,7 @@ public class RocksDBCheckpointDiffer {
                     + "Src '{}' and dest '{}' have different SST file: '{}'",
                 current.snapshotGeneration, dest.snapshotGeneration,
                 src.dbPath, dest.dbPath, current.fileName);
-            differentFiles.add(current.fileName);
+            differentFiles.put(current.fileName,sstBackupDir);
             continue;
           }
 
@@ -761,13 +804,13 @@ public class RocksDBCheckpointDiffer {
             LOG.debug("No further compaction happened to the current file. " +
                 "Src '{}' and dest '{}' have different file: {}",
                 src.dbPath, dest.dbPath, current.fileName);
-            differentFiles.add(current.fileName);
+            differentFiles.put(current.fileName,sstBackupDir);
             continue;
           }
 
           for (CompactionNode node : successors) {
             if (sameFiles.contains(node.fileName) ||
-                differentFiles.contains(node.fileName)) {
+                differentFiles.containsKey(node.fileName)) {
               LOG.debug("Skipping known processed SST: {}", node.fileName);
               continue;
             }
