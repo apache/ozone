@@ -107,6 +107,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -510,7 +511,23 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public S3VolumeContext getS3VolumeContext() throws IOException {
-    return ozoneManagerClient.getS3VolumeContext();
+    S3VolumeContext resp = ozoneManagerClient.getS3VolumeContext();
+    String userPrincipal = resp.getUserPrincipal();
+    updateS3Principal(userPrincipal);
+    return resp;
+  }
+
+  private void updateS3Principal(String userPrincipal) {
+    S3Auth s3Auth = this.getThreadLocalS3Auth();
+    // Update user principal if needed to be used for KMS client
+    if (s3Auth != null) {
+      // Update userPrincipal field with the value returned from OM. So that
+      //  in multi-tenancy, KMS client can use the correct identity
+      //  (instead of using accessId) to communicate with KMS.
+      LOG.debug("Updating S3Auth.userPrincipal to {}", userPrincipal);
+      s3Auth.setUserPrincipal(userPrincipal);
+      this.setThreadLocalS3Auth(s3Auth);
+    }
   }
 
   public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
@@ -1417,6 +1434,11 @@ public class RpcClient implements ClientProtocol {
     OmKeyInfo keyInfo =
         getKeyInfo(volumeName, bucketName, keyName, false);
 
+    return getOzoneKeyDetails(keyInfo);
+  }
+
+  @NotNull
+  private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo) {
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
     long lastKeyOffset = 0L;
     List<OmKeyLocationInfo> omKeyLocationInfos = keyInfo
@@ -1437,6 +1459,36 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
         getInputStream);
+  }
+
+  @Override
+  public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
+      throws IOException {
+    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
+    return getOzoneKeyDetails(keyInfo);
+  }
+
+  @NotNull
+  private OmKeyInfo getS3KeyInfo(
+      String bucketName, String keyName, boolean isHeadOp) throws IOException {
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        // Volume name is not important, as we call GetKeyInfo with
+        // assumeS3Context = true, OM will infer the correct s3 volume.
+        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setForceUpdateContainerCacheFromSCM(false)
+        .setHeadOp(isHeadOp)
+        .build();
+    KeyInfoWithVolumeContext keyInfoWithS3Context =
+        ozoneManagerClient.getKeyInfo(keyArgs, true);
+    keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
+    return keyInfoWithS3Context.getKeyInfo();
   }
 
   private OmKeyInfo getKeyInfo(
@@ -2027,11 +2079,14 @@ public class RpcClient implements ClientProtocol {
         .build();
     OmKeyInfo keyInfo = getKeyInfo(keyArgs);
 
-    return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
-        keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
-        keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata());
+    return OzoneKey.fromKeyInfo(keyInfo);
+  }
 
+  @Override
+  public OzoneKey headS3Object(String bucketName, String keyName)
+      throws IOException {
+    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, true);
+    return OzoneKey.fromKeyInfo(keyInfo);
   }
 
   @Override
