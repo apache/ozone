@@ -43,6 +43,7 @@ class AutoReloadHelper {
   };
 
   handleAutoReloadToggle = (checked: boolean) => {
+    sessionStorage.setItem('toggleRefreshCheck', JSON.stringify(checked));
     if (checked) {
       this.startPolling();
     } else {
@@ -50,9 +51,7 @@ class AutoReloadHelper {
     }
   };
 
-  toggleChecking = (checked: boolean) => {
-    sessionStorage.setItem('toggleCheck', JSON.stringify(checked));
-  };
+  
 }
 
 export {AutoReloadHelper};

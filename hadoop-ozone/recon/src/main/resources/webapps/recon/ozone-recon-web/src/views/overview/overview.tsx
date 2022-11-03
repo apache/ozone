@@ -160,8 +160,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           Overview
           <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
             lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
-            togglePolling={this.autoReload.handleAutoReloadToggle} toggleChecking={this.autoReload.toggleChecking}
-            onReload={this._loadData}/>
+            togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
