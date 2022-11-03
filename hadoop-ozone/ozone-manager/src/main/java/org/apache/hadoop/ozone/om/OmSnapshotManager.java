@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,7 +132,27 @@ public final class OmSnapshotManager {
       OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo)
       throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
-    return store.getSnapshot(snapshotInfo.getCheckpointDirName());
+
+    final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
+
+    final RocksDBCheckpointDiffer dbCpDiffer =
+        omMetadataManager.getStore().getRocksDBCheckpointDiffer();
+
+    final DBCheckpoint dbCheckpoint = store.getSnapshot(
+        snapshotInfo.getCheckpointDirName());
+
+    // Write snapshot generation (latest sequence number) to compaction log.
+    // This will be used for DAG reconstruction as snapshotGeneration.
+    dbCpDiffer.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber);
+
+    // Set compaction log filename to the latest DB sequence number
+    // right after taking the RocksDB checkpoint for Ozone snapshot.
+    //
+    // Note it doesn't matter if sequence number hasn't increased (even though
+    // it shouldn't happen), since the writer always appends the file.
+    dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
+
+    return dbCheckpoint;
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator

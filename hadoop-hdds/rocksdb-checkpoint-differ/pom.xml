@@ -22,6 +22,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <artifactId>hdds</artifactId>
     <version>1.3.0-SNAPSHOT</version>
   </parent>
+
   <artifactId>rocksdb-checkpoint-differ</artifactId>
   <version>1.3.0-SNAPSHOT</version>
   <description>RocksDB Checkpoint Differ</description>
@@ -29,50 +30,56 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <dependencies>
-
     <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.github.vlsi.mxgraph</groupId>
       <artifactId>jgraphx</artifactId>
       <version>4.2.2</version>
     </dependency>
-
     <dependency>
       <groupId>org.jgrapht</groupId>
       <artifactId>jgrapht-core</artifactId>
       <version>1.5.0</version>
     </dependency>
-
     <dependency>
       <groupId>org.jgrapht</groupId>
       <artifactId>jgrapht-guava</artifactId>
       <version>1.5.0</version>
     </dependency>
-
     <dependency>
       <groupId>org.jgrapht</groupId>
       <artifactId>jgrapht-ext</artifactId>
       <version>1.4.0</version>
     </dependency>
     <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
       <scope>compile</scope>
     </dependency>
-
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -145,6 +152,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <allowedImports>
                     <allowedImport>org.rocksdb.AbstractEventListener</allowedImport>
                     <allowedImport>org.rocksdb.Checkpoint</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyOptions</allowedImport>
                     <allowedImport>org.rocksdb.CompactionJobInfo</allowedImport>
                     <allowedImport>org.rocksdb.CompressionType</allowedImport>
                     <allowedImport>org.rocksdb.DBOptions</allowedImport>
