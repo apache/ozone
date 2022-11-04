@@ -120,6 +120,7 @@ public class SCMNodeManager implements NodeManager {
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
   private final DNSToSwitchMapping dnsToSwitchMapping;
+  private final boolean useHostname;
   private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
       new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
@@ -157,6 +158,9 @@ public class SCMNodeManager implements NodeManager {
     this.dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
+    this.useHostname = conf.getBoolean(
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
@@ -360,8 +364,9 @@ public class SCMNodeManager implements NodeManager {
     InetAddress dnAddress = Server.getRemoteIp();
     if (dnAddress != null) {
       // Mostly called inside an RPC, update ip
-      datanodeDetails.setHostName(dnAddress.getHostName());
-
+      if (!useHostname) {
+        datanodeDetails.setHostName(dnAddress.getHostName());
+      }
       datanodeDetails.setIpAddress(dnAddress.getHostAddress());
     }
 
@@ -369,7 +374,7 @@ public class SCMNodeManager implements NodeManager {
     String ipAddress = datanodeDetails.getIpAddress();
     String hostName = datanodeDetails.getHostName();
     datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-    if (Strings.isNullOrEmpty(ipAddress)) {
+    if (useHostname) {
       networkLocation = nodeResolve(hostName);
     } else {
       networkLocation = nodeResolve(ipAddress);

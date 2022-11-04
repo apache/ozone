@@ -1936,36 +1936,7 @@ public class TestSCMNodeManager {
    * Test node register with updated IP and host name.
    */
   @Test
-  public void testNodeWithUpdatedIpAndHostname()
-      throws IOException, InterruptedException, AuthenticationException {
-    String updatedIpAddress = "2.3.4.5";
-    String updatedHostName = "host2";
-    testScmRegisterNodeWithUpdatedIpAndHostname(
-        updatedIpAddress, updatedHostName);
-  }
-
-  /**
-   * Test node register with no IP and updated host name.
-   */
-  @Test
-  public void testNodeWithNoIpAndUpdatedHostname()
-      throws IOException, InterruptedException, AuthenticationException {
-    String updatedHostName = "host2";
-    testScmRegisterNodeWithUpdatedIpAndHostname(null, updatedHostName);
-  }
-
-  /**
-   * Test node register with updated IP and no host name.
-   */
-  @Test
-  public void testNodeWithUpdatedIpAndNoHostname()
-      throws IOException, InterruptedException, AuthenticationException {
-    String updatedIpAddress = "2.3.4.5";
-    testScmRegisterNodeWithUpdatedIpAndHostname(updatedIpAddress, null);
-  }
-
-  public void testScmRegisterNodeWithUpdatedIpAndHostname(
-      String updatedIpAddress, String updatedHostName)
+  public void testScmRegisterNodeWithUpdatedIpAndHostname()
           throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
@@ -2006,7 +1977,9 @@ public class TestSCMNodeManager {
               .startsWith("/rack1/ng"));
       assertTrue(returnedNode.getParent() != null);
 
-      // updating ip address and host name
+      // test updating ip address and host name
+      String updatedIpAddress = "2.3.4.5";
+      String updatedHostName = "host2";
       DatanodeDetails updatedNode = createDatanodeDetails(
               nodeUuid, updatedHostName, updatedIpAddress, null);
       nodeManager.register(updatedNode, null, null);
