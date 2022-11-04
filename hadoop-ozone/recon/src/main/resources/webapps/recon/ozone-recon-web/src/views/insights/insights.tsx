@@ -89,7 +89,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     // selected buckets value should be reset to all buckets
     let selectedBuckets = [allBucketsOption];
     // Update bucket options only if one volume is selected
-    if (selectedVolumes && selectedVolumes.length !== null && (selectedVolumes.length === 2 && selectedVolumes[0].value == '*') || (selectedVolumes.length === 1)){
+    if (((selectedVolumes && selectedVolumes.length != null) && (selectedVolumes.length === 2 && selectedVolumes[0].value === '*')) || (selectedVolumes.length === 1)){
       let selectedVolume;
       if (selectedVolumes.length === 1) {
         selectedVolume = selectedVolumes[0].value;
