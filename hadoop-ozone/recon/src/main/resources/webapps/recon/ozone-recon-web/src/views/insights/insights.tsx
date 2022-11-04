@@ -91,12 +91,11 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     // Update bucket options only if one volume is selected
     if (selectedVolumes && selectedVolumes.length !== null && (selectedVolumes.length === 2 && selectedVolumes[0].value == '*') || (selectedVolumes.length === 1)){
       let selectedVolume;
-      if (selectedVolumes.length === 1)
-      {
-      selectedVolume = selectedVolumes[0].value;
+      if (selectedVolumes.length === 1) {
+        selectedVolume = selectedVolumes[0].value;
       }
       else {
-      selectedVolume = selectedVolumes[1].value;
+        selectedVolume = selectedVolumes[1].value;
       }
       if (volumeBucketMap.has(selectedVolume) && volumeBucketMap.get(selectedVolume)) {
         bucketOptions = Array.from(volumeBucketMap.get(selectedVolume)!).map(bucket => ({
