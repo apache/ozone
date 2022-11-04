@@ -270,7 +270,7 @@ public class TestECContainerRecovery {
       } catch (ContainerNotFoundException e) {
         return false;
       }
-    }, 100, 100000);
+    }, 1000, 100000);
   }
 
   private byte[] getInputBytes(int numChunks) {
