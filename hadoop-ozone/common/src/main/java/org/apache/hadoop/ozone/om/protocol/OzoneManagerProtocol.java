@@ -759,7 +759,9 @@ public interface OzoneManagerProtocol
    *                     if bucket does not exist
    * @throws IOException if there is error in the db
    *                     invalid arguments
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Deprecated
   OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
 
   /**
