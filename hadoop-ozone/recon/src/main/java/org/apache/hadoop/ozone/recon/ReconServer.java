@@ -290,6 +290,7 @@ public class ReconServer extends GenericCli {
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.unregister();
       }
+      isStarted = false;
       if (reconDBProvider != null) {
         try {
           LOG.info("Closing Recon Container Key DB.");
@@ -298,7 +299,6 @@ public class ReconServer extends GenericCli {
           LOG.error("Recon Container Key DB close failed", ex);
         }
       }
-      isStarted = false;
     }
   }
 
