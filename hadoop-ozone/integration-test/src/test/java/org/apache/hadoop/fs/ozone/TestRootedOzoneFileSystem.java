@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -94,6 +95,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -1978,71 +1980,50 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testCreateAndCheckECFileDiskUsage() throws Exception {
-    // create EC bucket
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
-    builder.setBucketLayout(BucketLayout.LEGACY);
-    builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig("RS-3-2-1024")));
-    BucketArgs omBucketArgs = builder.build();
     String vol = "vol1";
-    String buck = "bucket1";
-    final OzoneBucket bucket101 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
-            omBucketArgs);
-    Assert.assertEquals(ReplicationType.EC.name(),
-        bucket101.getReplicationConfig().getReplicationType().name());
-    // write some test data into bucket
-    byte[] objContent = RandomUtils.nextBytes(10);
+    String bucket = "bucket1";
     String key = "key1";
-    try (FSDataOutputStream stream =
-        ofs.create(new Path(key))) {
-      stream.write(objContent);
+    Path volPath = new Path(OZONE_URI_DELIMITER, vol);
+    Path bucketPath = new Path(volPath, bucket);
+    Path filePath = new Path(bucketPath, key);
+    fs.mkdirs(bucketPath);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).getBucket(bucketName).
+            createKey(key, 1, new ECReplicationConfig("RS-3-2-1024"), new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
     }
     // make sure the disk usage matches the expected value
-    Path filePath = new Path(key);
     ContentSummary contentSummary = ofs.getContentSummary(filePath);
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
-    ReplicationConfig rconfig = new ECReplicationConfig(3, 2, RS, 1024);
-    long expectDiskUsage = QuotaUtil.getReplicatedSize(length, rconfig);
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length, new ECReplicationConfig(3, 2, RS, 1024));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
   }
 
 
   @Test
   public void testCreateAndCheckRatisFileDiskUsage() throws Exception {
-    // create RATIS bucket
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setStorageType(StorageType.DISK);
-    builder.setBucketLayout(BucketLayout.LEGACY);
-    builder.setDefaultReplicationConfig(
-            new DefaultReplicationConfig(RatisReplicationConfig
-                    .getInstance(HddsProtos.ReplicationFactor.THREE)));
-    BucketArgs omBucketArgs = builder.build();
     String vol = "vol2";
-    String buck = "bucket2";
-    final OzoneBucket bucket101 = TestDataUtil
-            .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
-                    omBucketArgs);
-    Assert.assertEquals(ReplicationType.RATIS.name(),
-            bucket101.getReplicationConfig().getReplicationType().name());
-    // write some test data into bucket
-    byte[] objContent = RandomUtils.nextBytes(10);
+    String bucket = "bucket2";
     String key = "key2";
-    try (FSDataOutputStream stream =
-                 ofs.create(new Path(key))) {
-      stream.write(objContent);
+    Path volPath = new Path(OZONE_URI_DELIMITER, vol);
+    Path bucketPath = new Path(volPath, bucket);
+    Path filePath = new Path(bucketPath, key);
+    fs.mkdirs(bucketPath);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(vol).getBucket(bucket).
+            createKey(key, 1, RatisReplicationConfig
+                    .getInstance(HddsProtos.ReplicationFactor.THREE), new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
     }
     // make sure the disk usage matches the expected value
-    Path filePath = new Path(key);
     ContentSummary contentSummary = ofs.getContentSummary(filePath);
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
-    ReplicationConfig rconfig = RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.THREE);
-    long expectDiskUsage = QuotaUtil.getReplicatedSize(length, rconfig);
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length, RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
   }
 
