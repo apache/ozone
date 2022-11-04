@@ -29,6 +29,12 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
     super();
   }
 
+  /**
+   * Indicate if this ColumnFamilyOptions is intentionally used across RockDB
+   * instances.
+   */
+  private boolean reused = false;
+
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
   }
@@ -60,6 +66,13 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
     return this;
   }
 
+  public void setReused(boolean reused) {
+    this.reused = reused;
+  }
+
+  public boolean isReused() {
+    return reused;
+  }
 
   @Override
   protected void finalize() throws Throwable {
