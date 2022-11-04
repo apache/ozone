@@ -76,7 +76,7 @@ import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.OM_HARDLINK_FILE;
-import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.fixFileName;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.fixFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;

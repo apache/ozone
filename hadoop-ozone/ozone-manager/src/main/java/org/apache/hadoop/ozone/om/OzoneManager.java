@@ -3658,34 +3658,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Path incomingSnapshotsDir = Paths.get(dbPath.toString(), OM_SNAPSHOT_DIR);
     if (incomingSnapshotsDir.toFile().exists()) {
       Files.move(incomingSnapshotsDir, dbSnapshotsDir);
-      createHardLinks(dbPath);
+      OmSnapshotManager.createHardLinks(dbPath);
     }
 
-  }
-
-  private void createHardLinks(Path dbPath) throws IOException {
-    File hardLinkFile = new File(dbPath.toString(),
-        OMDBCheckpointServlet.OM_HARDLINK_FILE);
-    if (hardLinkFile.exists()) {
-      List<String> lines =
-          Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());
-      for (String l : lines) {
-        String from = l.split("\t")[1];
-        String to = l.split("\t")[0];
-        Path fixedFrom = fixName(dbPath, from);
-        Path fixedTo = fixName(dbPath, to);
-        Files.createLink(fixedTo, fixedFrom);
-      }
-      hardLinkFile.delete();
-    }
-  }
-
-  private Path fixName(Path dbPath, String fileName) {
-    File file = new File(fileName);
-    if (!file.getName().equals(fileName)) {
-      return Paths.get(dbPath.getParent().toString(), fileName);
-    }
-    return Paths.get(dbPath.toString(), fileName);
   }
 
   /**
