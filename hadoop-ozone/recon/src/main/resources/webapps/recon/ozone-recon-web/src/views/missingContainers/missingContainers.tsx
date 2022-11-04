@@ -341,6 +341,22 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     return <div>Loading...</div>;
   };
 
+  serachCoulmn = () => {
+    return CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
+      if (column.isSearchable) {
+        const newColumn = {
+          ...column,
+          ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+        };
+        filtered.push(newColumn);
+      } else {
+        filtered.push(column);
+      }
+
+      return filtered;
+    }, [])
+  };
+
   render() {
     const {missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
     const paginationConfig: PaginationConfig = {
@@ -358,19 +374,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             <TabPane key='1' tab="Missing">
               <Table
                 expandRowByClick dataSource={missingDataSource} 
-                columns={CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
-                  if (column.isSearchable) {
-                    const newColumn = {
-                      ...column,
-                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
-                    };
-                    filtered.push(newColumn);
-                  } else {
-                    filtered.push(column);
-                  }
-
-                  return filtered;
-                }, [])}
+                columns={this.serachCoulmn()}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
@@ -378,19 +382,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             <TabPane key='2' tab='Under-Replicated'>
               <Table
                 expandRowByClick dataSource={underReplicatedDataSource}
-                columns={CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
-                  if (column.isSearchable) {
-                    const newColumn = {
-                      ...column,
-                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
-                    };
-                    filtered.push(newColumn);
-                  } else {
-                    filtered.push(column);
-                  }
-
-                  return filtered;
-                }, [])}
+                columns={this.serachCoulmn()}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
@@ -398,19 +390,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             <TabPane key='3' tab='Over-Replicated'>
               <Table
                 expandRowByClick dataSource={overReplicatedDataSource}
-                columns={CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
-                  if (column.isSearchable) {
-                    const newColumn = {
-                      ...column,
-                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
-                    };
-                    filtered.push(newColumn);
-                  } else {
-                    filtered.push(column);
-                  }
-
-                  return filtered;
-                }, [])}
+                columns={this.serachCoulmn()}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
@@ -418,19 +398,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             <TabPane key='4' tab='Mis-Replicated'>
               <Table
                 expandRowByClick dataSource={misReplicatedDataSource}
-                columns={CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
-                  if (column.isSearchable) {
-                    const newColumn = {
-                      ...column,
-                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
-                    };
-                    filtered.push(newColumn);
-                  } else {
-                    filtered.push(column);
-                  }
-
-                  return filtered;
-                }, [])}
+                columns={this.serachCoulmn()}
                 loading={loading}
                 pagination={paginationConfig} rowKey='containerID'
                 expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
