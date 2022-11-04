@@ -3677,17 +3677,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Files.createLink(fixedTo, fixedFrom);
       }
       hardLinkFile.delete();
-    } else {
-      throw new RuntimeException("hardlink file not found");
     }
   }
 
   private Path fixName(Path dbPath, String fileName) {
-    if (fileName.startsWith(OM_SNAPSHOT_DIR)) {
+    File file = new File(fileName);
+    if (!file.getName().equals(fileName)) {
       return Paths.get(dbPath.getParent().toString(), fileName);
     }
     return Paths.get(dbPath.toString(), fileName);
   }
+
   /**
    * Re-instantiate MetadataManager with new DB checkpoint.
    * All the classes which use/ store MetadataManager should also be updated
