@@ -99,13 +99,13 @@ public final class RatisHelper {
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
     final String address;
-    if (Strings.isNullOrEmpty(id.getIpAddress())) {
-      address = id.getHostName() + ":" + id.getPort(port).getValue();
-      LOG.debug("Datanode is using hostname for raft peer address: {}",
-              address);
-    } else {
+    if (Strings.isNullOrEmpty(id.getHostName())) {
       address = id.getIpAddress() + ":" + id.getPort(port).getValue();
       LOG.debug("Datanode is using IP for raft peer address: {}", address);
+    } else {
+      address = id.getHostName() + ":" + id.getPort(port).getValue();
+      LOG.debug("Datanode is using hostname for raft peer address: {}",
+          address);
     }
     return address;
   }
