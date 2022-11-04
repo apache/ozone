@@ -29,13 +29,20 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -112,6 +119,34 @@ public class TestOmSnapshotManager {
 
     // confirm store was closed
     verify(firstSnapshotStore, timeout(3000).times(1)).close();
+  }
+
+  @Test
+  public void testHardLinkCreation() throws IOException {
+    byte[] dummyData = {0};
+    File dbDir = new File(testDir.toString(), "om.db");
+    File snapDir1 = new File(testDir.toString(), "db.snapshots/dir1");
+    File snapDir2 = new File(testDir.toString(), "db.snapshots/dir2");
+    dbDir.mkdirs();
+    snapDir1.mkdirs();
+    snapDir2.mkdirs();
+    Files.write(Paths.get(dbDir.toString(), "f1"), dummyData);
+    Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
+    Map<Path, Path> hardLinkFiles = new HashMap<>();
+    hardLinkFiles.put(Paths.get(snapDir2.toString(), "f1"),
+        Paths.get(testDir.toString(), "db.checkpoints/dir1/f1"));
+    hardLinkFiles.put(Paths.get(snapDir2.toString(), "s1"),
+        Paths.get(snapDir1.toString(), "s1"));
+
+    Path hardLinkList =
+        OmSnapshotManager.createHardLinkList(testDir.toString().length() + 1, hardLinkFiles);
+    Files.move(hardLinkList, Paths.get(dbDir.toString(), OM_HARDLINK_FILE));
+
+    OmSnapshotManager.createHardLinks(dbDir.toPath());
+
+    for (Path path : hardLinkFiles.keySet()) {
+      Assert.assertTrue(path.toFile().exists());
+    }
   }
 
   private SnapshotInfo createSnapshotInfo() {
