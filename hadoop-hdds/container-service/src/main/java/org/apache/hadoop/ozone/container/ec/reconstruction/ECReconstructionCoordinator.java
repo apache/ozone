@@ -352,7 +352,8 @@ public class ECReconstructionCoordinator implements Closeable {
             .setBlockID(blockID)
             .setLength(blockGroupLen)
             .setPipeline(pipeline)
-            .setToken(tokenHelper.getBlockToken(blockID, blockGroupLen))
+            .setToken(tokenHelper.getBlockToken(blockID, blockGroupLen,
+                pipeline))
             .build();
         blockInfoMap.put(localID, blockLocationInfo);
       }

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -56,9 +57,11 @@ public class OzoneBlockTokenSecretManager extends
   }
 
   public OzoneBlockTokenIdentifier createIdentifier(String owner,
-      BlockID blockID, Set<AccessModeProto> modes, long maxLength) {
+      BlockID blockID, Set<AccessModeProto> modes, long maxLength,
+      String pipelineId) {
     return new OzoneBlockTokenIdentifier(owner, blockID, modes,
-        getTokenExpiryTime().toEpochMilli(), getCertSerialId(), maxLength);
+        getTokenExpiryTime().toEpochMilli(), getCertSerialId(), maxLength,
+        pipelineId);
   }
 
   /**
@@ -66,9 +69,14 @@ public class OzoneBlockTokenSecretManager extends
    * token is set to blockId.
    */
   public Token<OzoneBlockTokenIdentifier> generateToken(String user,
-      BlockID blockId, Set<AccessModeProto> modes, long maxLength) {
+      BlockID blockId, Set<AccessModeProto> modes, long maxLength,
+      Pipeline pipeline) {
+    String pipelineId = "";
+    if (null != pipeline) {
+      pipelineId = pipeline.getId().getId().toString();
+    }
     OzoneBlockTokenIdentifier tokenIdentifier = createIdentifier(user,
-        blockId, modes, maxLength);
+        blockId, modes, maxLength, pipelineId);
     if (LOG.isDebugEnabled()) {
       long expiryTime = tokenIdentifier.getExpiryDate();
       LOG.info("Issued delegation token -> expiryTime:{}, tokenId:{}",
@@ -83,10 +91,11 @@ public class OzoneBlockTokenSecretManager extends
    * Generate an block token for current user.
    */
   public Token<OzoneBlockTokenIdentifier> generateToken(BlockID blockId,
-      Set<AccessModeProto> modes, long maxLength) throws IOException {
+      Set<AccessModeProto> modes, long maxLength, Pipeline pipeline)
+      throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     String userID = (ugi == null ? null : ugi.getShortUserName());
-    return generateToken(userID, blockId, modes, maxLength);
+    return generateToken(userID, blockId, modes, maxLength, pipeline);
   }
 
   @Override

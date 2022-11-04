@@ -288,7 +288,7 @@ public class TestContainerCommandsEC {
           .getTestBlockID(container.containerID().getProtobuf().getId());
       Token<? extends TokenIdentifier> blockToken =
           blockTokenGenerator.generateToken(ANY_USER, blockID,
-              EnumSet.of(READ, WRITE), Long.MAX_VALUE);
+              EnumSet.of(READ, WRITE), Long.MAX_VALUE, null);
       byte[] data = "TestData".getBytes(UTF_8);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.newWriteChunkRequestBuilder(newPipeline, blockID,

@@ -71,6 +71,6 @@ public class TestBlockTokenVerifier
         new BlockID(1, 0),
         EnumSet.allOf(AccessModeProto.class),
         Instant.now().plusSeconds(3600).toEpochMilli(),
-        CERT_ID, 100);
+        CERT_ID, 100, "");
   }
 }

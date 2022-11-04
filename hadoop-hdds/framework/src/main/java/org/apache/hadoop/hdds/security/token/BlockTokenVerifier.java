@@ -46,12 +46,16 @@ public class BlockTokenVerifier extends
   private static final Logger LOGGER =
       LoggerFactory.getLogger(BlockTokenVerifier.class);
 
-  public static String getTokenService(BlockID blockID) {
-    return getTokenService(blockID.getContainerBlockID());
+  public static String getTokenService(BlockID blockID, String pipelineId) {
+    return getTokenService(blockID.getContainerBlockID(), pipelineId);
   }
 
-  public static String getTokenService(ContainerBlockID blockID) {
-    return String.valueOf(blockID);
+  public static String getTokenService(ContainerBlockID blockID,
+                                       String pipelineId) {
+    if (null == pipelineId) {
+      return blockID + " pipelineId: ";
+    }
+    return blockID + " pipelineId: " + pipelineId;
   }
 
   public BlockTokenVerifier(SecurityConfig conf, CertificateClient caClient) {
@@ -74,7 +78,7 @@ public class BlockTokenVerifier extends
     BlockID blockID = HddsUtils.getBlockID(cmd);
     Preconditions.checkNotNull(blockID,
         "no blockID in %s command", cmd.getCmdType());
-    return getTokenService(blockID);
+    return getTokenService(blockID, cmd.getPipelineID());
   }
 
   @Override

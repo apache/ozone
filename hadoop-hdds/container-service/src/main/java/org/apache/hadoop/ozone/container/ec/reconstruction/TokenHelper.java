@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -110,9 +111,10 @@ class TokenHelper {
     }
   }
 
-  Token<OzoneBlockTokenIdentifier> getBlockToken(BlockID blockID, long length) {
+  Token<OzoneBlockTokenIdentifier> getBlockToken(BlockID blockID, long length,
+                                                 Pipeline pipeline) {
     return blockTokenMgr != null
-        ? blockTokenMgr.generateToken(user, blockID, MODES, length)
+        ? blockTokenMgr.generateToken(user, blockID, MODES, length, pipeline)
         : null;
   }
 

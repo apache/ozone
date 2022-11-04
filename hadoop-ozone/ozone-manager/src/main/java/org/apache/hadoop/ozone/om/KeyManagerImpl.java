@@ -435,7 +435,7 @@ public class KeyManagerImpl implements KeyManager {
       for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
           k.setToken(secretManager.generateToken(remoteUser, k.getBlockID(),
-              EnumSet.of(READ), k.getLength()));
+              EnumSet.of(READ), k.getLength(), null));
         });
       }
     }

@@ -133,12 +133,12 @@ public class TestOzoneBlockTokenSecretManager {
     BlockID blockID = new BlockID(101, 0);
 
     Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
-        blockID, EnumSet.allOf(AccessModeProto.class), 100);
+        blockID, EnumSet.allOf(AccessModeProto.class), 100, null);
     OzoneBlockTokenIdentifier identifier =
         OzoneBlockTokenIdentifier.readFieldsProtobuf(new DataInputStream(
             new ByteArrayInputStream(token.getIdentifier())));
     // Check basic details.
-    Assert.assertEquals(OzoneBlockTokenIdentifier.getTokenService(blockID),
+    Assert.assertEquals(OzoneBlockTokenIdentifier.getTokenService(blockID, ""),
         identifier.getService());
     Assert.assertEquals(EnumSet.allOf(AccessModeProto.class),
         identifier.getAccessModes());
@@ -151,11 +151,11 @@ public class TestOzoneBlockTokenSecretManager {
   public void testCreateIdentifierSuccess() throws Exception {
     BlockID blockID = new BlockID(101, 0);
     OzoneBlockTokenIdentifier btIdentifier = secretManager.createIdentifier(
-        "testUser", blockID, EnumSet.allOf(AccessModeProto.class), 100);
+        "testUser", blockID, EnumSet.allOf(AccessModeProto.class), 100, "");
 
     // Check basic details.
     Assert.assertEquals("testUser", btIdentifier.getOwnerId());
-    Assert.assertEquals(BlockTokenVerifier.getTokenService(blockID),
+    Assert.assertEquals(BlockTokenVerifier.getTokenService(blockID, ""),
         btIdentifier.getService());
     Assert.assertEquals(EnumSet.allOf(AccessModeProto.class),
         btIdentifier.getAccessModes());
@@ -173,7 +173,7 @@ public class TestOzoneBlockTokenSecretManager {
     // WHEN
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken("testUser", blockID,
-            EnumSet.allOf(AccessModeProto.class), 100);
+            EnumSet.allOf(AccessModeProto.class), 100, pipeline);
     String encodedToken = token.encodeToUrlString();
     ContainerCommandRequestProto writeChunkRequest =
         newWriteChunkRequestBuilder(pipeline, blockID, 100)
@@ -182,6 +182,7 @@ public class TestOzoneBlockTokenSecretManager {
     ContainerCommandRequestProto putBlockCommand = newPutBlockRequestBuilder(
         pipeline, writeChunkRequest.getWriteChunk())
         .setEncodedToken(encodedToken)
+        .setPipelineID(pipeline.getId().getId().toString())
         .build();
 
     // THEN
@@ -197,7 +198,7 @@ public class TestOzoneBlockTokenSecretManager {
     // WHEN
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken("testUser", blockID,
-            EnumSet.allOf(AccessModeProto.class), 100);
+            EnumSet.allOf(AccessModeProto.class), 100, null);
     String encodedToken = token.encodeToUrlString();
     ContainerCommandRequestProto writeChunkRequest =
         newWriteChunkRequestBuilder(pipeline, otherBlockID, 100)
@@ -208,9 +209,9 @@ public class TestOzoneBlockTokenSecretManager {
         () -> tokenVerifier.verify("testUser", token, writeChunkRequest));
     String msg = e.getMessage();
     assertTrue(msg, msg.contains("Token for ID: " +
-        OzoneBlockTokenIdentifier.getTokenService(blockID) +
+        OzoneBlockTokenIdentifier.getTokenService(blockID, "") +
         " can't be used to access: " +
-        OzoneBlockTokenIdentifier.getTokenService(otherBlockID)));
+        OzoneBlockTokenIdentifier.getTokenService(otherBlockID, "")));
   }
 
   /**
@@ -272,7 +273,7 @@ public class TestOzoneBlockTokenSecretManager {
     BlockID blockID = new BlockID(101, 0);
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken(testUser1, blockID,
-            EnumSet.of(AccessModeProto.READ), 100);
+            EnumSet.of(AccessModeProto.READ), 100, null);
     String encodedToken = token.encodeToUrlString();
     ContainerCommandRequestProto writeChunkRequest =
         newWriteChunkRequestBuilder(pipeline, blockID, 100)
@@ -299,7 +300,7 @@ public class TestOzoneBlockTokenSecretManager {
     BlockID blockID = new BlockID(102, 0);
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken(testUser2, blockID,
-            EnumSet.of(AccessModeProto.WRITE), 100);
+            EnumSet.of(AccessModeProto.WRITE), 100, null);
     String encodedToken = token.encodeToUrlString();
     ContainerCommandRequestProto writeChunkRequest =
         newWriteChunkRequestBuilder(pipeline, blockID, 100)
@@ -322,7 +323,7 @@ public class TestOzoneBlockTokenSecretManager {
     BlockID blockID = new BlockID(102, 0);
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken(user, blockID,
-            EnumSet.allOf(AccessModeProto.class), 100);
+            EnumSet.allOf(AccessModeProto.class), 100, null);
     ContainerCommandRequestProto writeChunkRequest =
         newWriteChunkRequestBuilder(pipeline, blockID, 100)
         .setEncodedToken(token.encodeToUrlString())
@@ -348,7 +349,7 @@ public class TestOzoneBlockTokenSecretManager {
     BlockID blockID = new BlockID(102, 0);
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken(user, blockID,
-            EnumSet.allOf(AccessModeProto.class), 100);
+            EnumSet.allOf(AccessModeProto.class), 100, null);
     ContainerCommandRequestProto writeChunkRequest =
         newWriteChunkRequestBuilder(pipeline, blockID, 100)
         .setEncodedToken(token.encodeToUrlString())

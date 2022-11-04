@@ -51,8 +51,8 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   private EnumSet<AccessModeProto> modes;
   private long maxLength;
 
-  public static String getTokenService(BlockID blockID) {
-    return String.valueOf(blockID.getContainerBlockID());
+  public static String getTokenService(BlockID blockID, String pipelineId) {
+    return blockID.getContainerBlockID() + " pipelineId: " + pipelineId;
   }
 
   public OzoneBlockTokenIdentifier() {
@@ -60,9 +60,9 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   public OzoneBlockTokenIdentifier(String ownerId, BlockID blockId,
       Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
-      long maxLength) {
-    this(ownerId, getTokenService(blockId), modes, expiryDate, omCertSerialId,
-        maxLength);
+      long maxLength, String pipelineId) {
+    this(ownerId, getTokenService(blockId, pipelineId), modes, expiryDate,
+        omCertSerialId, maxLength);
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, String blockId,
