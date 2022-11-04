@@ -37,7 +37,6 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -1983,21 +1982,24 @@ public class TestRootedOzoneFileSystem {
     String vol = "vol1";
     String bucket = "bucket1";
     String key = "key1";
-    Path volPath = new Path(OZONE_URI_DELIMITER, vol);
-    Path bucketPath = new Path(volPath, bucket);
-    Path filePath = new Path(bucketPath, key);
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, vol);
+    Path bucketPathTest = new Path(volPathTest, bucket);
     fs.mkdirs(bucketPath);
 
     // write some test data into bucket
-    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).getBucket(bucketName).
-            createKey(key, 1, new ECReplicationConfig("RS-3-2-1024"), new HashMap<>())) {
+    try (OzoneOutputStream outputStream = objectStore.getVolume(vol).
+            getBucket(bucket).createKey(key, 1,
+                    new ECReplicationConfig("RS-3-2-1024"),
+                    new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
     // make sure the disk usage matches the expected value
+    Path filePath = new Path(bucketPathTest, key);
     ContentSummary contentSummary = ofs.getContentSummary(filePath);
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
-    long expectDiskUsage = QuotaUtil.getReplicatedSize(length, new ECReplicationConfig(3, 2, RS, 1024));
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
+            new ECReplicationConfig(3, 2, RS, 1024));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
   }
 
@@ -2007,23 +2009,26 @@ public class TestRootedOzoneFileSystem {
     String vol = "vol2";
     String bucket = "bucket2";
     String key = "key2";
-    Path volPath = new Path(OZONE_URI_DELIMITER, vol);
-    Path bucketPath = new Path(volPath, bucket);
-    Path filePath = new Path(bucketPath, key);
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, vol);
+    Path bucketPathTest = new Path(volPathTest, bucket);
+    Path filePathTest = new Path(bucketPathTest, key);
     fs.mkdirs(bucketPath);
 
     // write some test data into bucket
-    try (OzoneOutputStream outputStream = objectStore.getVolume(vol).getBucket(bucket).
-            createKey(key, 1, RatisReplicationConfig
-                    .getInstance(HddsProtos.ReplicationFactor.THREE), new HashMap<>())) {
+    try (OzoneOutputStream outputStream = objectStore.getVolume(vol).
+            getBucket(bucket).createKey(key, 1,
+                    RatisReplicationConfig.getInstance(
+                            HddsProtos.ReplicationFactor.THREE),
+                    new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
     // make sure the disk usage matches the expected value
-    ContentSummary contentSummary = ofs.getContentSummary(filePath);
+    ContentSummary contentSummary = ofs.getContentSummary(filePathTest);
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
-    long expectDiskUsage = QuotaUtil.getReplicatedSize(length, RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.THREE));
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
+            RatisReplicationConfig.getInstance(
+                    HddsProtos.ReplicationFactor.THREE));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
   }
 
