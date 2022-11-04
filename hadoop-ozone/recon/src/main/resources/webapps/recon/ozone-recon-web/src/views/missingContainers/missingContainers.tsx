@@ -228,9 +228,9 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       loading: true
     });
 
-    axios.get('/api/v1/containers/unhealthy').then(allReplicatedResponse => {
+    axios.get('/api/v1/containers/unhealthy').then(allContainersResponse => {
 
-      const allContainersResponseData: IUnhealthyContainersResponse = allReplicatedResponse.data;
+      const allContainersResponseData: IUnhealthyContainersResponse = allContainersResponse.data;
       const allContainers: IContainerResponse[] = allContainersResponseData.containers;
 
       const missingContainersResponseData = allContainers && allContainers.filter(item => item.containerState === 'MISSING');
