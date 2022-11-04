@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
 
@@ -104,6 +106,8 @@ public abstract class DatanodeDBProfile {
    * Base profile for datanode storage disks.
    */
   private static final class StorageBasedProfile {
+    private final AtomicReference<ManagedColumnFamilyOptions> cfOptions =
+        new AtomicReference<>();
     private final DBProfile baseProfile;
 
     private StorageBasedProfile(DBProfile profile) {
@@ -116,9 +120,17 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      ManagedColumnFamilyOptions cfOptions =
+      cfOptions.updateAndGet(op -> op != null ? op :
+          createColumnFamilyOptions(config));
+      return cfOptions.get();
+    }
+
+    private ManagedColumnFamilyOptions createColumnFamilyOptions(
+        ConfigurationSource config) {
+      ManagedColumnFamilyOptions options =
           baseProfile.getColumnFamilyOptions();
-      return cfOptions.closeAndSetTableFormatConfig(
+      options.setReused(true);
+      return options.closeAndSetTableFormatConfig(
           getBlockBasedTableConfig(config));
     }
 
