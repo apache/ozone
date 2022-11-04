@@ -53,7 +53,6 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.nio.file.Paths;
-import java.util.Objects;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -203,8 +202,10 @@ public class TestOzoneManagerServiceProviderImpl {
         .getOzoneManagerDBSnapshot();
     assertNotNull(checkpoint);
     assertTrue(checkpoint.getCheckpointLocation().toFile().isDirectory());
-    assertEquals(2, Objects.requireNonNull(checkpoint.
-        getCheckpointLocation().toFile().listFiles()).length);
+
+    File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
+    assertNotNull(files);
+    assertEquals(2, files.length);
   }
 
 
