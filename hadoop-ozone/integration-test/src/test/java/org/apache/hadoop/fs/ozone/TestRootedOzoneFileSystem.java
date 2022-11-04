@@ -1984,7 +1984,7 @@ public class TestRootedOzoneFileSystem {
     String key = "key1";
     Path volPathTest = new Path(OZONE_URI_DELIMITER, vol);
     Path bucketPathTest = new Path(volPathTest, bucket);
-    fs.mkdirs(bucketPath);
+    fs.mkdirs(bucketPathTest);
 
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(vol).
@@ -2012,7 +2012,7 @@ public class TestRootedOzoneFileSystem {
     Path volPathTest = new Path(OZONE_URI_DELIMITER, vol);
     Path bucketPathTest = new Path(volPathTest, bucket);
     Path filePathTest = new Path(bucketPathTest, key);
-    fs.mkdirs(bucketPath);
+    fs.mkdirs(filePathTest);
 
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(vol).
