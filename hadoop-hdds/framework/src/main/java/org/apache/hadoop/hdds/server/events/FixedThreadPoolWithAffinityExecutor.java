@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +78,15 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   @Metric
   private MutableCounterLong dropped;
+  
+  @Metric
+  private MutableCounterLong longWaitInQueue;
+  
+  @Metric
+  private MutableCounterLong longTimeExecution;
+  
+  private final long queueWaitThreshold;
+  private final long execWaitThreshold;
 
   private final AtomicBoolean isRunning = new AtomicBoolean(true);
 
@@ -91,13 +101,16 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       String name, EventHandler<P> eventHandler,
       List<BlockingQueue<Q>> workQueues, EventPublisher eventPublisher,
       Class<P> clazz, List<ThreadPoolExecutor> executors,
-      Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
+      Map<String, FixedThreadPoolWithAffinityExecutor> executorMap,
+      long queueWaitThreshold, long execWaitThreshold) {
     this.name = name;
     this.eventHandler = eventHandler;
     this.workQueues = workQueues;
     this.eventPublisher = eventPublisher;
     this.executors = executors;
     this.executorMap = executorMap;
+    this.queueWaitThreshold = queueWaitThreshold;
+    this.execWaitThreshold = execWaitThreshold;
     executorMap.put(clazz.getName(), this);
 
     // Add runnable which will wait for task over another queue
@@ -180,6 +193,14 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     return dropped.value();
   }
 
+  public long longWaitInQueueEvents() {
+    return longWaitInQueue.value();
+  }
+  
+  public long longTimeExecutionEvents() {
+    return longTimeExecution.value();
+  }
+
   @Override
   public void close() {
     isRunning.set(false);
@@ -226,12 +247,34 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
             LOG.warn("Executor for report is not found");
             continue;
           }
+          
+          long createTime = 0;
+          String eventId = "";
+          if (report instanceof IEventInfo) {
+            createTime = ((IEventInfo) report).getCreateTime();
+            eventId = ((IEventInfo) report).getEventId();
+          }
+          
+          long curTime = Time.monotonicNow();
+          if (createTime != 0
+              && ((curTime - createTime) > executor.queueWaitThreshold)) {
+            executor.longWaitInQueue.incr();
+            LOG.warn("Event remained in queue for long time {} millisec, {}",
+                (curTime - createTime), eventId);
+          }
 
           executor.scheduled.incr();
           try {
             executor.eventHandler.onMessage(report,
                 executor.eventPublisher);
             executor.done.incr();
+            curTime = Time.monotonicNow();
+            if (createTime != 0
+                && (curTime - createTime) > executor.execWaitThreshold) {
+              executor.longTimeExecution.incr();
+              LOG.warn("Event taken long execution time {} millisec, {}",
+                  (curTime - createTime), eventId);
+            }
           } catch (Exception ex) {
             LOG.error("Error on execution message {}", report, ex);
             executor.failed.incr();

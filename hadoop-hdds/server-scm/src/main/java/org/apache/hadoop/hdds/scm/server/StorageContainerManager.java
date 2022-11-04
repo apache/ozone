@@ -184,6 +184,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -476,6 +478,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
+    long waitQueueThreshold = configuration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".queue.wait.threshold",
+        OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT);
+    long execWaitThreshold = configuration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
+        OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT);
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
@@ -489,7 +497,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, waitQueueThreshold, execWaitThreshold);
     EventExecutor<IncrementalContainerReportFromDatanode>
         incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
@@ -498,7 +506,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 incrementalContainerReportHandler),
             incrementalContainerReportHandler, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, waitQueueThreshold, execWaitThreshold);
 
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);

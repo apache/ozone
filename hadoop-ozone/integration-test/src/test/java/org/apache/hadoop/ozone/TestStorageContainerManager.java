@@ -874,7 +874,7 @@ public class TestStorageContainerManager {
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, 60000, 60000);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
@@ -886,6 +886,52 @@ public class TestStorageContainerManager {
     Assert.assertEquals(containerReportExecutors.droppedEvents()
             + containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
+    containerReportExecutors.close();
+  }
+
+  @Test
+  public void testContainerReportQueueTakingMoreTime() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+        queues = new ArrayList<>();
+    for (int i = 0; i < 1; ++i) {
+      queues.add(new ContainerReportQueue());
+    }
+
+    ContainerReportHandler containerReportHandler =
+        Mockito.mock(ContainerReportHandler.class);
+    Mockito.doAnswer((inv) -> {
+      Thread.currentThread().sleep(1000);
+      return null;
+    }).when(containerReportHandler).onMessage(Mockito.any(), Mockito.eq(eventQueue));
+    List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
+        .initializeExecutorPool(queues);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
+    EventExecutor<ContainerReportFromDatanode>
+        containerReportExecutors =
+        new FixedThreadPoolWithAffinityExecutor<>(
+            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+                containerReportHandler),
+            containerReportHandler, queues, eventQueue,
+            ContainerReportFromDatanode.class, executors,
+            reportExecutorMap, 1000, 1000);
+    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
+        containerReportHandler);
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .build();
+    ContainerReportFromDatanode dndata1
+        = new ContainerReportFromDatanode(dn, report);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
+    dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .build();
+    ContainerReportFromDatanode dndata2
+        = new ContainerReportFromDatanode(dn, report);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata2);
+    Thread.currentThread().sleep(3000);
+    Assert.assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
+    Assert.assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
     containerReportExecutors.close();
   }
 
@@ -920,7 +966,7 @@ public class TestStorageContainerManager {
                 icr),
             icr, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, 60000, 60000);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
         containerReportExecutors, icr);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
