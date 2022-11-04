@@ -1005,10 +1005,10 @@ public class TestOzoneFileSystem {
     Path fileNotExists = new Path("/file_notexist");
     try {
       fs.open(fileNotExists);
-      Assert.fail("Should throw FILE_NOT_FOUND error as file doesn't exist!");
+      Assert.fail("Should throw FileNotFoundException as file doesn't exist!");
     } catch (FileNotFoundException fnfe) {
-      Assert.assertTrue("Expected FILE_NOT_FOUND error",
-              fnfe.getMessage().contains("FILE_NOT_FOUND"));
+      Assert.assertTrue("Expected KEY_NOT_FOUND error",
+              fnfe.getMessage().contains("KEY_NOT_FOUND"));
     }
   }
 

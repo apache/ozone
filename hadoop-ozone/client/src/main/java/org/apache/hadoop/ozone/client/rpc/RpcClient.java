@@ -1750,7 +1750,17 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .build();
-    OmKeyInfo keyInfo = ozoneManagerClient.lookupFile(keyArgs);
+    final OmKeyInfo keyInfo;
+    if (omVersion.compareTo(OzoneManagerVersion.OPTIMIZED_GET_KEY_INFO) >= 0) {
+      keyInfo = ozoneManagerClient.getKeyInfo(keyArgs, false)
+          .getKeyInfo();
+      if (!keyInfo.isFile()) {
+        throw new OMException(keyName + " is not a file.",
+            OMException.ResultCodes.NOT_A_FILE);
+      }
+    } else {
+      keyInfo = ozoneManagerClient.lookupFile(keyArgs);
+    }
     return getInputStreamWithRetryFunction(keyInfo);
   }
 
