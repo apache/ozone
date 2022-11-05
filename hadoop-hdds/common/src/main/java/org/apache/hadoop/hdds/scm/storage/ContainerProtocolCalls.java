@@ -63,6 +63,7 @@ import org.apache.hadoop.security.token.Token;
 
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Implementation of all container protocol calls performed by Container
@@ -108,6 +109,7 @@ public final class ContainerProtocolCalls  {
             .setCmdType(Type.ListBlock)
             .setContainerID(containerID)
             .setDatanodeUuid(datanodeID)
+            .setPipelineID(getPipelineID(xceiverClient))
             .setListBlock(listBlockBuilder.build());
 
     if (token != null) {
@@ -142,6 +144,7 @@ public final class ContainerProtocolCalls  {
         .setCmdType(Type.GetBlock)
         .setContainerID(datanodeBlockID.getContainerID())
         .setDatanodeUuid(id)
+        .setPipelineID(getPipelineID(xceiverClient))
         .setGetBlock(readBlockRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -177,6 +180,7 @@ public final class ContainerProtocolCalls  {
             .setCmdType(Type.GetCommittedBlockLength)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
+            .setPipelineID(getPipelineID(xceiverClient))
             .setGetCommittedBlockLength(getBlockLengthRequestBuilder);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -207,6 +211,7 @@ public final class ContainerProtocolCalls  {
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
             .setContainerID(containerBlockData.getBlockID().getContainerID())
             .setDatanodeUuid(id)
+            .setPipelineID(getPipelineID(xceiverClient))
             .setPutBlock(createBlockRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -242,6 +247,7 @@ public final class ContainerProtocolCalls  {
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
             .setContainerID(containerBlockData.getBlockID().getContainerID())
             .setDatanodeUuid(id)
+            .setPipelineID(getPipelineID(xceiverClient))
             .setPutBlock(createBlockRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -274,6 +280,7 @@ public final class ContainerProtocolCalls  {
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)
             .setContainerID(blockID.getContainerID())
+            .setPipelineID(getPipelineID(xceiverClient))
             .setDatanodeUuid(id).setReadChunk(readChunkRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -309,6 +316,7 @@ public final class ContainerProtocolCalls  {
         .setCmdType(Type.WriteChunk)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(id)
+        .setPipelineID(getPipelineID(xceiverClient))
         .setWriteChunk(writeChunkRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -349,6 +357,7 @@ public final class ContainerProtocolCalls  {
             .setCmdType(Type.WriteChunk)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
+            .setPipelineID(getPipelineID(xceiverClient))
             .setWriteChunk(writeChunkRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -407,6 +416,7 @@ public final class ContainerProtocolCalls  {
             .setCmdType(Type.PutSmallFile)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
+            .setPipelineID(getPipelineID(client))
             .setPutSmallFile(putSmallFileRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -481,6 +491,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setCreateContainer(createRequest.build());
     request.setDatanodeUuid(id);
+    request.setPipelineID(getPipelineID(client));
     client.sendCommand(request.build(), getValidatorList());
   }
 
@@ -505,6 +516,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setDeleteContainer(deleteRequest);
     request.setDatanodeUuid(id);
+    request.setPipelineID(getPipelineID(client));
     if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
@@ -530,6 +542,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setCloseContainer(CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
+    request.setPipelineID(getPipelineID(client));
     if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
@@ -554,6 +567,7 @@ public final class ContainerProtocolCalls  {
     request.setContainerID(containerID);
     request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(id);
+    request.setPipelineID(getPipelineID(client));
     if (encodedToken != null) {
       request.setEncodedToken(encodedToken);
     }
@@ -561,6 +575,14 @@ public final class ContainerProtocolCalls  {
         client.sendCommand(request.build(), getValidatorList());
 
     return response.getReadContainer();
+  }
+
+  @NotNull
+  private static String getPipelineID(XceiverClientSpi client) {
+    if (client.getPipeline() != null) {
+      return client.getPipeline().getId().getId().toString();
+    }
+    return "";
   }
 
   /**
@@ -590,6 +612,7 @@ public final class ContainerProtocolCalls  {
         .setCmdType(Type.GetSmallFile)
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(id)
+        .setPipelineID(getPipelineID(client))
         .setGetSmallFile(getSmallFileRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
@@ -649,6 +672,7 @@ public final class ContainerProtocolCalls  {
         .setCmdType(Type.GetBlock)
         .setContainerID(datanodeBlockID.getContainerID())
         .setDatanodeUuid(id)
+        .setPipelineID(getPipelineID(xceiverClient))
         .setGetBlock(readBlockRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());

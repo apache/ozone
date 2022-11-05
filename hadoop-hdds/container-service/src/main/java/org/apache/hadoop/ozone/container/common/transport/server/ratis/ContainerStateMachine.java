@@ -358,6 +358,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               .newBuilder(proto)
               .setWriteChunk(commitWriteChunkProto)
               .setTraceID(proto.getTraceID())
+              .setPipelineID(proto.getPipelineID())
               .build();
       Preconditions.checkArgument(write.hasData());
       Preconditions.checkArgument(!write.getData().isEmpty());
