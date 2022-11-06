@@ -36,6 +36,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT;
+
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
  * Payloads with the same hashcode will be mapped to the same thread.
@@ -84,11 +87,10 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   
   @Metric
   private MutableCounterLong longTimeExecution;
-  
-  private final long queueWaitThreshold;
-  private final long execWaitThreshold;
 
   private final AtomicBoolean isRunning = new AtomicBoolean(true);
+  private long queueWaitThreshold = OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT;
+  private long execWaitThreshold = OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT;
 
   /**
    * Create FixedThreadPoolExecutor with affinity.
@@ -101,16 +103,13 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       String name, EventHandler<P> eventHandler,
       List<BlockingQueue<Q>> workQueues, EventPublisher eventPublisher,
       Class<P> clazz, List<ThreadPoolExecutor> executors,
-      Map<String, FixedThreadPoolWithAffinityExecutor> executorMap,
-      long queueWaitThreshold, long execWaitThreshold) {
+      Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
     this.name = name;
     this.eventHandler = eventHandler;
     this.workQueues = workQueues;
     this.eventPublisher = eventPublisher;
     this.executors = executors;
     this.executorMap = executorMap;
-    this.queueWaitThreshold = queueWaitThreshold;
-    this.execWaitThreshold = execWaitThreshold;
     executorMap.put(clazz.getName(), this);
 
     // Add runnable which will wait for task over another queue
@@ -129,6 +128,14 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
         .register(EVENT_QUEUE + name,
             "Event Executor metrics ",
             this);
+  }
+  
+  public void setQueueWaitThreshold(long queueWaitThreshold) {
+    this.queueWaitThreshold = queueWaitThreshold;
+  }
+
+  public void setExecWaitThreshold(long execWaitThreshold) {
+    this.execWaitThreshold = execWaitThreshold;
   }
 
   public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(

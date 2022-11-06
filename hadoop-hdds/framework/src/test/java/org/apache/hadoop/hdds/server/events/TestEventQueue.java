@@ -86,7 +86,7 @@ public class TestEventQueue {
             EventQueue.getExecutorName(EVENT1, testHandler),
             testHandler, queues, queue, Long.class,
             FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
-            queues), reportExecutorMap, 0, 0), testHandler);
+            queues), reportExecutorMap), testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);

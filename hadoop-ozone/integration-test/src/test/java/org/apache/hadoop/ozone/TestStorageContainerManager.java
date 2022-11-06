@@ -874,7 +874,7 @@ public class TestStorageContainerManager {
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap, 60000, 60000);
+            reportExecutorMap);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
@@ -903,19 +903,24 @@ public class TestStorageContainerManager {
     Mockito.doAnswer((inv) -> {
       Thread.currentThread().sleep(1000);
       return null;
-    }).when(containerReportHandler).onMessage(Mockito.any(), Mockito.eq(eventQueue));
+    }).when(containerReportHandler).onMessage(Mockito.any(),
+        Mockito.eq(eventQueue));
     List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
         .initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
-    EventExecutor<ContainerReportFromDatanode>
+    FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
+        SCMDatanodeHeartbeatDispatcher.ContainerReport>
         containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap, 1000, 1000);
+            reportExecutorMap);
+    containerReportExecutors.setQueueWaitThreshold(1000);
+    containerReportExecutors.setExecWaitThreshold(1000);
+    
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
@@ -966,7 +971,7 @@ public class TestStorageContainerManager {
                 icr),
             icr, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
-            reportExecutorMap, 60000, 60000);
+            reportExecutorMap);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
         containerReportExecutors, icr);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);

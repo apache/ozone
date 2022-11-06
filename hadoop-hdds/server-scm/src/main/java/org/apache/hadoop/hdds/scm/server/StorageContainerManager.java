@@ -490,23 +490,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
-    EventExecutor<ContainerReportFromDatanode>
-        containerReportExecutors =
+    FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
+        ContainerReport> containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap, waitQueueThreshold, execWaitThreshold);
-    EventExecutor<IncrementalContainerReportFromDatanode>
-        incrementalReportExecutors =
+            reportExecutorMap);
+    containerReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
+    containerReportExecutors.setExecWaitThreshold(execWaitThreshold);
+    FixedThreadPoolWithAffinityExecutor<IncrementalContainerReportFromDatanode,
+        ContainerReport> incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(
                 SCMEvents.INCREMENTAL_CONTAINER_REPORT,
                 incrementalContainerReportHandler),
             incrementalContainerReportHandler, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
-            reportExecutorMap, waitQueueThreshold, execWaitThreshold);
+            reportExecutorMap);
+    incrementalReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
+    incrementalReportExecutors.setExecWaitThreshold(execWaitThreshold);
 
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
