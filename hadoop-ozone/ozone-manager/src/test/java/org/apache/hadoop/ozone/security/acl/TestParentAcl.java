@@ -119,10 +119,10 @@ public class TestParentAcl {
         new String[]{"test1"});
   }
 
-  // Refined the parent context
-  // OP         |CHILD     |PARENT
+  // Refined the parent context, parent will be 'create' when op is 'create bucket'
+  // OP         |CHILD       |PARENT
 
-  // CREATE      NONE         WRITE
+  // CREATE      NONE         WRITE/CREATE
   // DELETE      DELETE       WRITE
   // WRITE       WRITE        WRITE
   // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
@@ -202,7 +202,7 @@ public class TestParentAcl {
     testParentChild(bucketObj, READ, LIST);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, WRITE, CREATE);
+    testParentChild(bucketObj, CREATE, CREATE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
     testParentChild(bucketObj, READ, READ);

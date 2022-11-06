@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -100,10 +101,9 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    // Refined the parent context
-    // OP         |CHILD     |PARENT
-
-    // CREATE      NONE         WRITE
+    // Refined the parent context, parent will be 'create' when op is 'create bucket'
+    // OP         |CHILD       |PARENT
+    // CREATE      NONE         WRITE/CREATE
     // DELETE      DELETE       WRITE
     // WRITE       WRITE        WRITE
     // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
@@ -120,6 +120,9 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       parentAclRight = ACLType.WRITE;
     } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST) {
       parentAclRight = ACLType.READ;
+    }
+    if (objInfo.getResourceType() == BUCKET && aclRight == ACLType.CREATE) {
+      parentAclRight = ACLType.CREATE;
     }
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
