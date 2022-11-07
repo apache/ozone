@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -71,6 +72,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
     Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config, omSvcId);
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
     List<String> omNodeIDList = new ArrayList<>();
+    Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
       String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
@@ -93,6 +95,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
                         .GrpcOmTransportConfig.class)
                     .getPort()));
         omProxies.put(nodeId, proxyInfo);
+        omNodeAddressMap.put(nodeId, NetUtils.createSocketAddr(hostaddr.get()));
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
         throw new ConfigurationException(rpcAddrKey + "is not defined");
@@ -107,6 +110,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
     }
     setOmProxies(omProxies);
     setOmNodeIDList(omNodeIDList);
+    setOmNodeAddressMap(omNodeAddressMap);
   }
 
   private T createOMProxy() throws IOException {

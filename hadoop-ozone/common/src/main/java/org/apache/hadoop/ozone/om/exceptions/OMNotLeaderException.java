@@ -38,7 +38,7 @@ public class OMNotLeaderException extends IOException {
   private static final Pattern CURRENT_PEER_ID_PATTERN =
       Pattern.compile("OM:(.*) is not the leader[.]+.*", Pattern.DOTALL);
   private static final Pattern SUGGESTED_LEADER_PATTERN =
-      Pattern.compile(".*Suggested leader is OM:([^.]*)\\/(.*)\\.",
+      Pattern.compile(".*Suggested leader is OM:([^.]*)\\[(.*)\\]\\.",
           Pattern.DOTALL);
 
   public OMNotLeaderException(RaftPeerId currentPeerId) {
@@ -57,7 +57,7 @@ public class OMNotLeaderException extends IOException {
   public OMNotLeaderException(RaftPeerId currentPeerId,
       RaftPeerId suggestedLeaderPeerId, String suggestedLeaderAddress) {
     super("OM:" + currentPeerId + " is not the leader. Suggested leader is" +
-        " OM:" + suggestedLeaderPeerId + "/" + suggestedLeaderAddress + ".");
+        " OM:" + suggestedLeaderPeerId + "[" + suggestedLeaderAddress + "].");
     this.currentPeerId = currentPeerId.toString();
     this.leaderPeerId = suggestedLeaderPeerId.toString();
     this.leaderAddress = suggestedLeaderAddress;

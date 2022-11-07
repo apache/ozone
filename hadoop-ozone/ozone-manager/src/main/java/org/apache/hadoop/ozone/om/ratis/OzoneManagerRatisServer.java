@@ -832,7 +832,7 @@ public final class OzoneManagerRatisServer {
           getRaftLeader().getAddress());
     }
     return leaderInetAddress == null ? null :
-        leaderInetAddress.getHostAddress();
+        leaderInetAddress.toString();
   }
 
   @VisibleForTesting

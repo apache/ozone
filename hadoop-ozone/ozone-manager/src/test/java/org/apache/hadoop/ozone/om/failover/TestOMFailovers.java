@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.failover;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -136,6 +137,7 @@ public class TestOMFailovers {
       HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
           new HashMap<>();
       HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();
+      HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
@@ -143,8 +145,10 @@ public class TestOMFailovers {
         omProxies.put(nodeId, null);
         omProxyInfos.put(nodeId, null);
         omNodeIDList.add(nodeId);
+        omNodeAddressMap.put(nodeId, null);
       }
-      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList);
+      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList,
+          omNodeAddressMap);
     }
 
     @Override

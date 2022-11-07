@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -47,6 +48,7 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import javax.management.MBeanInfo;
@@ -280,6 +282,53 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Attempted " +
               maxFailoverAttempts + " failovers."));
+    }
+  }
+
+  /**
+   * Choose a follower to send the request, the returned exception should
+   * include the suggested leader node.
+   */
+  @Test
+  public void testFailoverWithSuggestedLeader() throws Exception {
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+
+    // Make sure All OMs are ready.
+    createVolumeTest(true);
+
+    // The OMFailoverProxyProvider will point to the current leader OM node.
+    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    String leaderOMAddress = ((OMProxyInfo)
+        omFailoverProxyProvider.getOMProxyInfoMap().get(leaderOMNodeId))
+        .getAddress().getAddress().toString();
+    OzoneManager followerOM = null;
+    for (OzoneManager om: getCluster().getOzoneManagersList()) {
+      if (!om.isLeaderReady()) {
+        followerOM = om;
+        break;
+      }
+    }
+    assert followerOM != null;
+    Assertions.assertSame(followerOM.getOmRatisServer().checkLeaderStatus(),
+        OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER);
+
+    OzoneManagerProtocolProtos.OMRequest writeRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.ListVolume)
+            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setClientId(UUID.randomUUID().toString())
+            .build();
+
+    try {
+      OzoneManagerProtocolProtos.OMResponse
+          omResponse = followerOM.getOmServerProtocol()
+          .submitRequest(null, writeRequest);
+      Assertions.fail("Test failure with NotLeaderException");
+    } catch (Exception ex) {
+      GenericTestUtils.assertExceptionContains("Suggested leader is OM:" +
+          leaderOMNodeId + "[" + leaderOMAddress + "]", ex);
     }
   }
 
