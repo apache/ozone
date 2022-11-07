@@ -87,15 +87,16 @@ public class GrpcOMFailoverProxyProvider<T> extends
         nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
       }
       if (hostaddr.isPresent()) {
+        int port = hostport.orElse(config
+            .getObject(GrpcOmTransport
+                .GrpcOmTransportConfig.class)
+            .getPort());
         ProxyInfo<T> proxyInfo =
             new ProxyInfo<>(createOMProxy(),
-                hostaddr.get() + ":"
-                    + hostport.orElse(config
-                    .getObject(GrpcOmTransport
-                        .GrpcOmTransportConfig.class)
-                    .getPort()));
+                hostaddr.get() + ":" + port);
         omProxies.put(nodeId, proxyInfo);
-        omNodeAddressMap.put(nodeId, NetUtils.createSocketAddr(hostaddr.get()));
+        omNodeAddressMap.put(nodeId, NetUtils.createSocketAddr(hostaddr.get() +
+            ":" + port));
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
         throw new ConfigurationException(rpcAddrKey + "is not defined");
