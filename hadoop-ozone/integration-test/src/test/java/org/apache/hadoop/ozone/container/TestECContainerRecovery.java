@@ -61,6 +61,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -280,9 +281,13 @@ public class TestECContainerRecovery {
     AtomicReference<HddsDatanodeService> reconstructedDN =
             new AtomicReference<>();
     ContainerInfo finalContainer = container;
+    Map<HddsDatanodeService, Long> recoveryTimeoutMap = new HashMap<>();
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      recoveryTimeoutMap.put(dn, dn.getDatanodeStateMachine().getContainer()
+              .getContainerSet().getRecoveringTimeout());
       dn.getDatanodeStateMachine().getContainer()
               .getContainerSet().setRecoveringTimeout(100);
+
       ECReconstructionSupervisor ecReconstructionSupervisor =
               GenericTestUtils.getFieldReflection(dn.getDatanodeStateMachine(),
                       "ecReconstructionSupervisor");
@@ -329,6 +334,10 @@ public class TestECContainerRecovery {
             .getDatanodeStateMachine().getContainer().getContainerSet()
             .getContainer(finalContainer.getContainerID()) == null,
             10000, 100000);
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      dn.getDatanodeStateMachine().getContainer().getContainerSet()
+              .setRecoveringTimeout(recoveryTimeoutMap.get(dn));
+    }
   }
 
   private void waitForDNContainerState(ContainerInfo container,
