@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -44,10 +45,15 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -58,6 +64,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -80,6 +87,8 @@ public class TestECContainerRecovery {
   private static int dataBlocks = 3;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
+  private static final Logger LOG =
+          LoggerFactory.getLogger(TestECContainerRecovery.class);
   /**
    * Create a MiniDFSCluster for testing.
    */
@@ -94,7 +103,8 @@ public class TestECContainerRecovery {
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
-
+    conf.set("hdds.datanode.recovering.container.scrubbing.service.interval",
+            "10s");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
             .getObject(
@@ -237,6 +247,88 @@ public class TestECContainerRecovery {
     // Resume RM and wait the over replicated replica deleted.
     scm.getReplicationManager().start();
     waitForContainerCount(5, container.containerID(), scm);
+  }
+
+  @Test
+  public void testECContainerRecoveryWithTimedOutRecovery() throws Exception {
+    byte[] inputData = getInputBytes(3);
+    final OzoneBucket bucket = getOzoneBucket();
+    String keyName = UUID.randomUUID().toString();
+    final Pipeline pipeline;
+    ECReplicationConfig repConfig =
+            new ECReplicationConfig(3, 2,
+                    ECReplicationConfig.EcCodec.RS, chunkSize);
+    try (OzoneOutputStream out = bucket
+            .createKey(keyName, 1024, repConfig, new HashMap<>())) {
+      out.write(inputData);
+      pipeline = ((ECKeyOutputStream) out.getOutputStream())
+              .getStreamEntries().get(0).getPipeline();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    List<ContainerInfo> containers =
+            cluster.getStorageContainerManager().getContainerManager()
+                    .getContainers();
+    ContainerInfo container = null;
+    for (ContainerInfo info : containers) {
+      if (info.getPipelineID().getId().equals(pipeline.getId().getId())) {
+        container = info;
+      }
+    }
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    AtomicReference<HddsDatanodeService> reconstructedDN =
+            new AtomicReference<>();
+    ContainerInfo finalContainer = container;
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      dn.getDatanodeStateMachine().getContainer()
+              .getContainerSet().setRecoveringTimeout(100);
+      ECReconstructionSupervisor ecReconstructionSupervisor =
+              GenericTestUtils.getFieldReflection(dn.getDatanodeStateMachine(),
+                      "ecReconstructionSupervisor");
+      ECReconstructionCoordinator coordinator = GenericTestUtils
+              .mockFieldReflection(ecReconstructionSupervisor,
+                      "reconstructionCoordinator");
+
+      Mockito.doAnswer(invocation -> {
+        GenericTestUtils.waitFor(() ->
+                        dn.getDatanodeStateMachine()
+                                .getContainer()
+                                .getContainerSet()
+                                .getContainer(finalContainer.getContainerID())
+                                .getContainerState() ==
+                        ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+                1000, 100000);
+        reconstructedDN.set(dn);
+        invocation.callRealMethod();
+        return null;
+      }).when(coordinator).reconstructECBlockGroup(Mockito.any(), Mockito.any(),
+              Mockito.any());
+    }
+
+    // Shutting sown DN triggers close pipeline and close container.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+
+
+    // Make sure container closed.
+    waitForSCMContainerState(StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED, container.containerID());
+    //Temporarily stop the RM process.
+    scm.getReplicationManager().stop();
+
+    // Wait for the lower replication.
+    waitForContainerCount(4, container.containerID(), scm);
+
+    // Start the RM to resume the replication process and wait for the
+    // reconstruction.
+    scm.getReplicationManager().start();
+    GenericTestUtils.waitFor(() -> reconstructedDN.get() != null, 10000,
+            100000);
+    GenericTestUtils.waitFor(() -> reconstructedDN.get()
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(finalContainer.getContainerID()) == null,
+            10000, 100000);
   }
 
   private void waitForDNContainerState(ContainerInfo container,
