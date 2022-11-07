@@ -359,13 +359,13 @@ public class TestKeyValueHandler {
     try {
       final long containerID = 1L;
       final String clusterId = UUID.randomUUID().toString();
+      final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
       final ContainerSet containerSet = new ContainerSet(1000);
       final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
 
-      String clusterId = UUID.randomUUID().toString();
       HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
-          .clusterID(clusterId).datanodeUuid(UUID.randomUUID().toString())
+          .clusterID(clusterId).datanodeUuid(datanodeId)
           .build();
       hddsVolume.format(clusterId);
       hddsVolume.createWorkingDir(clusterId, null);
@@ -378,11 +378,6 @@ public class TestKeyValueHandler {
 
       assertTrue(hddsVolumeList.size() == 1);
 
-      HddsVolume hddsVolume = hddsVolumeList.get(0);
-
-      hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDir(clusterId, null);
-
       final int[] interval = new int[1];
       interval[0] = 2;
       final ContainerMetrics metrics = new ContainerMetrics(interval);
@@ -390,14 +385,14 @@ public class TestKeyValueHandler {
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-          UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
+          datanodeId, containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
       kvHandler.setClusterID(clusterId);
 
       final ContainerCommandRequestProto createContainer =
           ContainerCommandRequestProto.newBuilder()
               .setCmdType(ContainerProtos.Type.CreateContainer)
-              .setDatanodeUuid(UUID.randomUUID().toString())
+              .setDatanodeUuid(datanodeId)
               .setCreateContainer(
                   ContainerProtos.CreateContainerRequestProto.newBuilder()
                       .setContainerType(ContainerType.KeyValueContainer)

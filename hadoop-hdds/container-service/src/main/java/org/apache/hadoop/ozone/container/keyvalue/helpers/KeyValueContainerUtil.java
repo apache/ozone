@@ -23,10 +23,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -50,7 +50,6 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
@@ -423,6 +422,17 @@ public final class KeyValueContainerUtil {
    * Containers will be moved under it before getting deleted
    * to avoid, in case of failure, having artifact leftovers
    * on the default container path on the disk.
+   *
+   * Delete operation for Schema < V3
+   * 1. Container directory renamed to tmp directory.
+   * 2. Container is removed from in memory container set.
+   * 3. Container is deleted from tmp directory.
+   *
+   * Delete operation for Schema V3
+   * 1. Container directory renamed to tmp directory.
+   * 2. Container is removed from in memory container set.
+   * 3. Container's entries are removed from RocksDB.
+   * 4. Container is deleted from tmp directory.
    */
   public static class ContainerDeleteDirectory {
 
@@ -452,11 +462,26 @@ public final class KeyValueContainerUtil {
       while (leftoversListIt.hasNext()) {
         File file = leftoversListIt.next();
 
-        // If SchemaV3 is enabled and we have a RocksDB
+        // Check the case where we have Schema V3 and
+        // removing the container's entries from RocksDB fails.
+        // --------------------------------------------
+        // On datanode restart, we populate the container set
+        // based on the available datanode volumes and
+        // populate the container metadata based on the values in RocksDB.
+        // The container is in the tmp directory,
+        // so it won't be loaded in the container set
+        // but there will be orphaned entries in the volume's RocksDB.
+        // --------------------------------------------
+        // For every .container file we find under /tmp,
+        // we use it to get the RocksDB entries and delete them.
+        // If the .container file doesn't exist then the contents of the
+        // directory are probably leftovers of a failed delete and
+        // the RocksDB entries must have already been removed.
+        // In any case we can proceed with deleting the directory's contents.
         if (VersionedDatanodeFeatures.isFinalized(
             HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
           // Get container file
-          File containerFile = getContainerFile(file);
+          File containerFile = ContainerUtils.getContainerFile(file);
 
           // If file exists
           if (containerFile != null) {
@@ -466,11 +491,8 @@ public final class KeyValueContainerUtil {
                 (KeyValueContainerData) containerData;
 
             // Remove container from Rocks DB
-            String dbPath = hddsVolume.getDbParentDir().getAbsolutePath();
-            DatanodeStoreSchemaThreeImpl store =
-                new DatanodeStoreSchemaThreeImpl(hddsVolume.getConf(),
-                    dbPath, false);
-            store.removeKVContainerData(keyValueContainerData.getContainerID());
+            BlockUtils.removeContainerFromDB(keyValueContainerData,
+                hddsVolume.getConf());
           }
         }
 
@@ -488,41 +510,6 @@ public final class KeyValueContainerUtil {
     }
 
     /**
-     * Search recursively for the container file under a
-     * directory. Return null if the file is not found.
-     * @param file
-     * @return container file or null if it doesn't exist
-     * @throws IOException
-     */
-    public static File getContainerFile(File file) throws IOException {
-      try {
-        if (file.isDirectory()) {
-          for (File subFile : file.listFiles()) {
-            if (subFile.isDirectory()) {
-              File containerFile = getContainerFile(subFile);
-              if (containerFile != null) {
-                return containerFile;
-              }
-            } else {
-              if (FilenameUtils.getExtension(subFile.getName())
-                  .equals("container")) {
-                return subFile;
-              }
-            }
-          }
-        } else {
-          if (FilenameUtils.getExtension(file.getName())
-              .equals("container")) {
-            return file;
-          }
-        }
-      } catch (NullPointerException ex) {
-        LOG.error("File object is null.", ex);
-      }
-      return null;
-    }
-
-    /**
      * In the future might be used to gather metrics
      * for the files left under
      * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
@@ -531,20 +518,16 @@ public final class KeyValueContainerUtil {
     public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume) {
       List<File> leftovers = new ArrayList<>();
 
-      try {
-        File tmpDir = new File(hddsVolume.getDeleteServiceDirPath().toString());
+      File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
 
-        if (tmpDir.exists()) {
-          for (File file : tmpDir.listFiles()) {
-            leftovers.add(file);
-          }
+      if (tmpDir.exists() && tmpDir.isDirectory()) {
+        File[] tmpFiles = tmpDir.listFiles();
+        if (tmpFiles != null) {
+          leftovers.addAll(Arrays.asList(tmpFiles));
         }
-      } catch (NullPointerException ex) {
-        LOG.error("tmp delete directory is null, path doesn't exist", ex);
       }
 
-      ListIterator<File> leftoversListIt = leftovers.listIterator();
-      return leftoversListIt;
+      return leftovers.listIterator();
     }
 
     /**
