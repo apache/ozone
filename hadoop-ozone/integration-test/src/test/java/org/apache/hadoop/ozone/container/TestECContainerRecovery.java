@@ -93,6 +93,8 @@ public class TestECContainerRecovery {
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
+    conf.set("hdds.datanode.recovering.container.scrubbing.service.interval",
+            "10s");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
