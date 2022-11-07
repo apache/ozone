@@ -290,14 +290,13 @@ public class TestContainerBalancerTask {
   public void containerBalancerShouldObeyMaxDatanodesToInvolveLimit()
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException {
-    int percent = 20;
+    int percent = 40;
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(
         percent);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setThreshold(1);
     balancerConfiguration.setIterations(1);
     startBalancer(balancerConfiguration);
-
 
     int number = percent * numberOfNodes / 100;
     ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();

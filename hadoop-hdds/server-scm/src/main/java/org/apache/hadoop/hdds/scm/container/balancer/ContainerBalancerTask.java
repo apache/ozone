@@ -480,26 +480,25 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
 
+      // break out if we've reached max size to move limit
+      if (reachedMaxSizeToMovePerIteration()) {
+        break;
+      }
+
       /* if balancer is approaching the iteration limits for max datanodes to
-       involve and max size to move, take some action in
-       adaptWhenNearingIterationLimits()
+       involve, take some action in adaptWhenNearingIterationLimits()
       */
       if (canAdaptWhenNearingLimits) {
-        if (!adaptWhenNearingIterationLimits()) {
-          // we weren't able to adapt, so this iteration cannot continue
-          break;
+        if (adaptWhenNearingIterationLimits()) {
+          canAdaptWhenNearingLimits = false;
         }
-        canAdaptWhenNearingLimits = false;
-      } else if (canAdaptOnReachingLimits) {
-        /*
-        if balancer has hit the iteration limits, then take some action in
-        adaptOnReachingIterationLimits()
-         */
-        if (!adaptOnReachingIterationLimits()) {
-          // we weren't able to adapt, so this iteration cannot continue
-          break;
+      }
+      if (canAdaptOnReachingLimits) {
+        // check if balancer has hit the iteration limits and take some action
+        if (adaptOnReachingIterationLimits()) {
+          canAdaptOnReachingLimits = false;
+          canAdaptWhenNearingLimits = false;
         }
-        canAdaptOnReachingLimits = false;
       }
 
       DatanodeDetails source =
@@ -692,15 +691,14 @@ public class ContainerBalancerTask implements Runnable {
     return false;
   }
 
+  /**
+   * Restricts potential target datanodes to nodes that have
+   * already been selected if balancer is one datanode away from
+   * "datanodes.involved.max.percentage.per.iteration" limit.
+   * @return true if potential targets were restricted, else false
+   */
   private boolean adaptWhenNearingIterationLimits() {
-    // check if we've reached max size to move limit
-    if (reachedMaxSizeToMovePerIteration()) {
-      // return false because we cannot adapt if we've reached max size to
-      // move limit
-      return false;
-    }
-
-    // check if we've nearing max datanodes to involve
+    // check if we're nearing max datanodes to involve
     int maxDatanodesToInvolve =
         (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
     if (countDatanodesInvolvedPerIteration + 1 == maxDatanodesToInvolve) {
@@ -713,20 +711,20 @@ public class ContainerBalancerTask implements Runnable {
               "{}. Only already selected targets can be selected as targets" +
               " now.",
           countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
+      return true;
     }
 
-    // we either didn't need to or were able to adapt, so return true
-    return true;
+    // return false if we didn't adapt
+    return false;
   }
 
+  /**
+   * Restricts potential source and target datanodes to nodes that have
+   * already been selected if balancer has reached
+   * "datanodes.involved.max.percentage.per.iteration" limit.
+   * @return true if potential sources and targets were restricted, else false
+   */
   private boolean adaptOnReachingIterationLimits() {
-    // check if we've reached max size to move limit
-    if (reachedMaxSizeToMovePerIteration()) {
-      // return false because we cannot adapt if we've reached max size to
-      // move limit
-      return false;
-    }
-
     // check if we've reached max datanodes to involve limit
     int maxDatanodesToInvolve =
         (int) (maxDatanodesRatioToInvolvePerIteration * totalNodesInCluster);
@@ -739,10 +737,11 @@ public class ContainerBalancerTask implements Runnable {
               "is {}. Only already selected sources and targets can be " +
               "involved in balancing now.",
           countDatanodesInvolvedPerIteration, maxDatanodesToInvolve);
+      return true;
     }
 
-    // we either didn't need to or were able to adapt, so return true
-    return true;
+    // return false if we didn't adapt
+    return false;
   }
 
   /**
