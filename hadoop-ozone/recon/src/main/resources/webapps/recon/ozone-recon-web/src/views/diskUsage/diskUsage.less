@@ -38,9 +38,28 @@
     margin-right: 25px;
   }
 
-  h3 {
-    display: inline-block;
-    padding-right: 5px;
+  .legendtext {
+    fill: rgba(0, 0, 0, 0.65) !important;
+    line-height: 1.5;
+    font-size: 16px !important;
+    font-feature-settings: 'tnum', "tnum";
+    font-variant: tabular-nums;
+  }
+
+  .gtitle {
+    font-size: 22px;
+    font-weight: 500 !important;
+    fill: rgba(0, 0, 0, 0.60) !important;
+    font-feature-settings: 'tnum', "tnum";
+    font-variant: tabular-nums;
+  }
+
+  .slicetext {
+    fill: rgba(0, 0, 0, 0.60) !important;
+    font-size: 17px !important;
+    line-height: 1.5;
+    font-feature-settings: 'tnum', "tnum";
+    font-variant: tabular-nums;
   }
 }
 
@@ -49,4 +68,15 @@
     margin-right: 10px;
     display: inline-block;
     width: 300px;
+}
+
+.metadatainformation {
+  font-size: 14px;
+  fill: rgba(0, 0, 0, 0.65) !important;
+  line-height: 1.5;
+  font-feature-settings: 'tnum', "tnum";
+}
+
+.ant-drawer-open .ant-drawer-mask {
+  opacity: 0 !important;
 }

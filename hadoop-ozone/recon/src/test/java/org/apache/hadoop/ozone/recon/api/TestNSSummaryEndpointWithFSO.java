@@ -1,4 +1,4 @@
-/*'
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -367,8 +367,9 @@ public class TestNSSummaryEndpointWithFSO {
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager);
-    nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
   @Test
@@ -840,7 +841,6 @@ public class TestNSSummaryEndpointWithFSO {
           KEY_ELEVEN_SIZE,
           getBucketLayout());
   }
-
 
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two

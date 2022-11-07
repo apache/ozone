@@ -22,14 +22,21 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
+import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.BeforeClass;
@@ -133,8 +140,8 @@ public class TestKeyDeletingService {
         () -> keyDeletingService.getDeletedKeyCount().get() >= keyCount,
         1000, 10000);
     Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
+    Assert.assertEquals(0,
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
   }
 
   @Test(timeout = 40000)
@@ -176,9 +183,9 @@ public class TestKeyDeletingService {
         () -> keyDeletingService.getRunCount().get() >= 5,
         100, 1000);
     // Since SCM calls are failing, deletedKeyCount should be zero.
-    Assert.assertEquals(keyDeletingService.getDeletedKeyCount().get(), 0);
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), keyCount);
+    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+    Assert.assertEquals(keyCount,
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
   }
 
   @Test(timeout = 30000)
@@ -200,15 +207,86 @@ public class TestKeyDeletingService {
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
 
-    // Since empty keys are directly deleted from db there should be no
-    // pending deletion keys. Also deletedKeyCount should be zero.
-    Assert.assertEquals(
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size(), 0);
+    // the pre-allocated blocks are not committed, hence they will be deleted.
+    Assert.assertEquals(100,
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
     // Make sure that we have run the background thread 2 times or more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 2,
         100, 1000);
-    Assert.assertEquals(keyDeletingService.getDeletedKeyCount().get(), 0);
+    // the blockClient is set to fail the deletion of key blocks, hence no keys
+    // will be deleted
+    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+  }
+
+  @Test(timeout = 30000)
+  public void checkDeletionForPartiallyCommitKey()
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
+    OzoneConfiguration conf = createConfAndInitValues();
+    ScmBlockLocationProtocol blockClient =
+        //failCallsFrequency = 1 , means all calls fail.
+        new ScmBlockLocationTestingClient(null, null, 1);
+    OmTestManagers omTestManagers
+        = new OmTestManagers(conf, blockClient, null);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+
+    String volumeName = String.format("volume%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    String bucketName = String.format("bucket%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    String keyName = String.format("key%s",
+        RandomStringUtils.randomAlphanumeric(5));
+
+    // Create Volume and Bucket
+    createVolumeAndBucket(keyManager, volumeName, bucketName, false);
+
+    OmKeyArgs keyArg = createAndCommitKey(keyManager, volumeName, bucketName,
+        keyName, 3, 1);
+
+    // Only the uncommitted block should be pending to be deleted.
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+                .stream()
+                .map(BlockGroup::getBlockIDList)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList()).size() == 1;
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+          return false;
+        },
+        500, 3000);
+
+    // Delete the key
+    writeClient.deleteKey(keyArg);
+
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) keyManager.getDeletingService();
+
+    // All blocks should be pending to be deleted.
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+                .stream()
+                .map(BlockGroup::getBlockIDList)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList()).size() == 3;
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+          return false;
+        },
+        500, 3000);
+
+    // the blockClient is set to fail the deletion of key blocks, hence no keys
+    // will be deleted
+    Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
   @Test(timeout = 30000)
@@ -299,6 +377,15 @@ public class TestKeyDeletingService {
 
   private OmKeyArgs createAndCommitKey(KeyManager keyManager, String volumeName,
       String bucketName, String keyName, int numBlocks) throws IOException {
+    return createAndCommitKey(keyManager, volumeName, bucketName, keyName,
+        numBlocks, 0);
+  }
+
+  private OmKeyArgs createAndCommitKey(KeyManager keyManager, String volumeName,
+      String bucketName, String keyName, int numBlocks, int numUncommitted)
+      throws IOException {
+    // Even if no key size is appointed, there will be at least one
+    // block pre-allocated when key is created
     OmKeyArgs keyArg =
         new OmKeyArgs.Builder()
             .setVolumeName(volumeName)
@@ -311,10 +398,35 @@ public class TestKeyDeletingService {
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = writeClient.openKey(keyArg);
-    for (int i = 0; i < numBlocks; i++) {
-      keyArg.addLocationInfo(writeClient.allocateBlock(keyArg, session.getId(),
+
+    // add pre-allocated blocks into args and avoid creating excessive block
+    OmKeyLocationInfoGroup keyLocationVersions = session.getKeyInfo().
+        getLatestVersionLocations();
+    assert keyLocationVersions != null;
+    List<OmKeyLocationInfo> latestBlocks = keyLocationVersions.
+        getBlocksLatestVersionOnly();
+    int preAllocatedSize = latestBlocks.size();
+    for (OmKeyLocationInfo block : latestBlocks) {
+      keyArg.addLocationInfo(block);
+    }
+
+    // allocate blocks until the blocks num equal to numBlocks
+    LinkedList<OmKeyLocationInfo> allocated = new LinkedList<>();
+    for (int i = 0; i < numBlocks - preAllocatedSize; i++) {
+      allocated.add(writeClient.allocateBlock(keyArg, session.getId(),
           new ExcludeList()));
     }
+
+    // remove the blocks not to be committed
+    for (int i = 0; i < numUncommitted; i++) {
+      allocated.removeFirst();
+    }
+
+    // add the blocks to be committed
+    for (OmKeyLocationInfo block: allocated) {
+      keyArg.addLocationInfo(block);
+    }
+
     writeClient.commitKey(keyArg, session.getId());
     return keyArg;
   }

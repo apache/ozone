@@ -46,6 +46,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,11 +141,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
     IOException catchEx = null;
     do {
       try {
-        // If refresh returns new pipeline, retry with it.
-        // If we get IOException due to connectivity issue,
-        // retry according to retry policy.
         chunks = getChunkInfos();
         break;
+        // If we get a StorageContainerException or an IOException due to
+        // datanodes are not reachable, refresh to get the latest pipeline
+        // info and retry.
+        // Otherwise, just retry according to the retry policy.
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
@@ -152,6 +154,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
         catchEx = ex;
       } catch (IOException ex) {
         LOG.debug("Retry to get chunk info fail", ex);
+        if (isConnectivityIssue(ex)) {
+          refreshPipeline(ex);
+        }
         catchEx = ex;
       }
     } while (shouldRetryRead(catchEx));
@@ -187,19 +192,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
+  /**
+   * Check if this exception is because datanodes are not reachable.
+   */
+  private boolean isConnectivityIssue(IOException ex) {
+    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+  }
+
   private void refreshPipeline(IOException cause) throws IOException {
     LOG.info("Unable to read information for block {} from pipeline {}: {}",
         blockID, pipeline.getId(), cause.getMessage());
     if (refreshPipelineFunction != null) {
       LOG.debug("Re-fetching pipeline for block {}", blockID);
-      Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
-      if (newPipeline == null || newPipeline.sameDatanodes(pipeline)) {
-        LOG.warn("No new pipeline for block {}", blockID);
-        throw cause;
-      } else {
-        LOG.debug("New pipeline got for block {}", blockID);
-        this.pipeline = newPipeline;
-      }
+      this.pipeline = refreshPipelineFunction.apply(blockID);
     } else {
       throw cause;
     }
@@ -301,7 +306,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
       int numBytesRead;
       try {
         numBytesRead = strategy.readFromBlock(current, numBytesToRead);
-        retries = 0; // reset retries after successful read
+        retries = 0;
+        // If we get a StorageContainerException or an IOException due to
+        // datanodes are not reachable, refresh to get the latest pipeline
+        // info and retry.
+        // Otherwise, just retry according to the retry policy.
+      } catch (SCMSecurityException ex) {
+        throw ex;
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e)) {
           handleReadError(e);
@@ -309,13 +320,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
         } else {
           throw e;
         }
-      } catch (SCMSecurityException ex) {
-        throw ex;
       } catch (IOException ex) {
-        // We got a IOException which might be due
-        // to DN down or connectivity issue.
         if (shouldRetryRead(ex)) {
-          current.releaseClient();
+          if (isConnectivityIssue(ex)) {
+            handleReadError(ex);
+          } else {
+            current.releaseClient();
+          }
           continue;
         } else {
           throw ex;
