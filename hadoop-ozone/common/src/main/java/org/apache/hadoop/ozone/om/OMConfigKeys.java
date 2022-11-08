@@ -325,7 +325,7 @@ public final class OMConfigKeys {
   public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
 
   public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
-      "ozone.directory.deleting.service.interval";
+      "ozone.snapshot.filtering.service.interval";
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
 

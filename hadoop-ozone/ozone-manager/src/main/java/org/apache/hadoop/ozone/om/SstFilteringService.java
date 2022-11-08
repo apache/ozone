@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -78,6 +79,14 @@ public class SstFilteringService extends BackgroundService {
   private final long snapshotLimitPerTask;
 
   private AtomicLong snapshotFilteredCount;
+
+  private BooleanTriFunction<String, String, String, Boolean> filterFunction =
+      (first, last, prefix) -> {
+        String firstBucketKey = constructBucketKey(first);
+        String lastBucketKey = constructBucketKey(last);
+        return firstBucketKey.compareTo(prefix) <= 0
+            && prefix.compareTo(lastBucketKey) <= 0;
+      };
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -140,7 +149,7 @@ public class SstFilteringService extends BackgroundService {
                 .loadDB(ozoneManager.getConfiguration(), new File(snapshotDir),
                     dbName, true);
             RocksDatabase db = rdbStore.getDb();
-            db.deleteFilesNotMatchingPrefix(prefixPairs);
+            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
 
             // mark the snapshot as filtered by writing to the file
             String content = snapshotInfo.getSnapshotID() + "\n";
@@ -174,11 +183,10 @@ public class SstFilteringService extends BackgroundService {
           ozoneManager.getMetadataManager().getBucketId(volumeName, bucketName);
 
       String filterPrefix =
-          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
-              + OM_KEY_PREFIX;
+          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName;
 
       String filterPrefixFSO =
-          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId;
 
       List<Pair<String, String>> prefixPairs = new ArrayList<>();
       prefixPairs
@@ -202,4 +210,15 @@ public class SstFilteringService extends BackgroundService {
   public AtomicLong getSnapshotFilteredCount() {
     return snapshotFilteredCount;
   }
+
+  String constructBucketKey(String keyName) {
+    if (!keyName.startsWith(OM_KEY_PREFIX)) {
+      keyName = OM_KEY_PREFIX.concat(keyName);
+    }
+    String[] elements = keyName.split(OM_KEY_PREFIX);
+    String volume = elements[1];
+    String bucket = elements[2];
+    return ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+  }
+
 }

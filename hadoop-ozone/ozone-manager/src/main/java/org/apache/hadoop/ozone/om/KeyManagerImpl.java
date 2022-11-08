@@ -142,6 +142,7 @@ import org.slf4j.LoggerFactory;
 public class KeyManagerImpl implements KeyManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyManagerImpl.class);
+  public static final int DISABLE_VALUE = -1;
 
   /**
    * A SCM block client, used to talk to SCM to allocate block during putKey.
@@ -252,10 +253,12 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
-      snapshotSstFilteringService =
-          new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
-              serviceTimeout, ozoneManager, configuration);
-      snapshotSstFilteringService.start();
+      if (serviceInterval != DISABLE_VALUE) {
+        snapshotSstFilteringService =
+            new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
+                serviceTimeout, ozoneManager, configuration);
+        snapshotSstFilteringService.start();
+      }
     }
   }
 

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -611,10 +612,13 @@ public final class RocksDatabase {
    * @throws RocksDBException
    */
   public void deleteFilesNotMatchingPrefix(
-      List<Pair<String, String>> prefixPairs) throws RocksDBException {
+      List<Pair<String, String>> prefixPairs,
+      BooleanTriFunction<String, String, String, Boolean> filterFunction)
+      throws RocksDBException {
     for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
-      String sstFileColumnFamily = new String(liveFileMetaData
-          .columnFamilyName(), StandardCharsets.UTF_8);
+      String sstFileColumnFamily =
+          new String(liveFileMetaData.columnFamilyName(),
+              StandardCharsets.UTF_8);
       int lastLevel = getLastLevel();
       for (Pair<String, String> prefixPair : prefixPairs) {
         String columnFamily = prefixPair.getKey();
@@ -631,9 +635,8 @@ public final class RocksDatabase {
                 StandardCharsets.UTF_8);
             String lastDbKey = new String(liveFileMetaData.largestKey(),
                 StandardCharsets.UTF_8);
-            boolean isKeyWithPrefixPresent =
-                firstDbKey.compareTo(prefixForColumnFamily) <= 0
-                    && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
+            boolean isKeyWithPrefixPresent = filterFunction
+                .apply(firstDbKey, lastDbKey, prefixForColumnFamily);
             if (!isKeyWithPrefixPresent) {
               db.get().deleteFile(liveFileMetaData.fileName());
             }

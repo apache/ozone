@@ -52,7 +52,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -460,29 +459,31 @@ public class RocksDBCheckpointDiffer {
    * @return number of keys
    */
   private long getSSTFileSummary(String filename) throws RocksDBException {
-
-    if (!filename.endsWith(SST_FILE_EXTENSION)) {
-      filename += SST_FILE_EXTENSION;
-    }
-
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
 
-    File sstFile = new File(sstBackupDir + filename);
-    File sstFileInActiveDB = new File(activeDBLocationStr + filename);
-    if (sstFile.exists()) {
-      reader.open(sstBackupDir + filename);
-    } else if (sstFileInActiveDB.exists()) {
-      reader.open(activeDBLocationStr + filename);
-    } else {
-      throw new RuntimeException("Can't find SST file: " + filename);
-    }
+    reader.open(getAbsoluteSstFilePath(filename));
 
     TableProperties properties = reader.getTableProperties();
     if (LOG.isDebugEnabled()) {
       LOG.debug("{} has {} keys", filename, properties.getNumEntries());
     }
     return properties.getNumEntries();
+  }
+
+  private String getAbsoluteSstFilePath(String filename) {
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
+    }
+    File sstFile = new File(sstBackupDir + filename);
+    File sstFileInActiveDB = new File(activeDBLocationStr + filename);
+    if (sstFile.exists()) {
+      return sstBackupDir + filename;
+    } else if (sstFileInActiveDB.exists()) {
+      return activeDBLocationStr + filename;
+    } else {
+      throw new RuntimeException("Can't find SST file: " + filename);
+    }
   }
 
   /**
@@ -642,11 +643,14 @@ public class RocksDBCheckpointDiffer {
     private final String dbPath;
     private final String snapshotID;
     private final long snapshotGeneration;
+    private final HashMap<String, String> tablePrefixes;
 
-    public DifferSnapshotInfo(String db, String id, long gen) {
+    public DifferSnapshotInfo(String db, String id, long gen,
+        HashMap<String, String> prefixes) {
       dbPath = db;
       snapshotID = id;
       snapshotGeneration = gen;
+      tablePrefixes = prefixes;
     }
 
     public String getDbPath() {
@@ -659,6 +663,10 @@ public class RocksDBCheckpointDiffer {
 
     public long getSnapshotGeneration() {
       return snapshotGeneration;
+    }
+
+    public HashMap<String, String> getTablePrefixes() {
+      return tablePrefixes;
     }
 
     @Override
@@ -684,7 +692,7 @@ public class RocksDBCheckpointDiffer {
     HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.dbPath);
 
     HashSet<String> fwdDAGSameFiles = new HashSet<>();
-    HashMap<String, String> fwdDAGDifferentFiles = new HashMap<>();
+    HashSet<String> fwdDAGDifferentFiles = new HashSet<>();
 
     LOG.debug("Doing forward diff from src '{}' to dest '{}'",
         src.dbPath, dest.dbPath);
@@ -704,20 +712,23 @@ public class RocksDBCheckpointDiffer {
 
       logSB.setLength(0);
       logSB.append("Fwd DAG different SST files: ");
-      for (String file : fwdDAGDifferentFiles.keySet()) {
+      for (String file : fwdDAGDifferentFiles) {
         logSB.append(file).append(" ");
       }
       LOG.debug("{}", logSB);
     }
 
-    return new ArrayList<>(fwdDAGDifferentFiles.keySet());
+/*    if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
+    //  filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes());
+    }*/
+
+    return new ArrayList<>(fwdDAGDifferentFiles);
   }
 
-  public void filterRelevantSstFiles(HashMap<String, String> inputFiles,
+  public void filterRelevantSstFiles(Set<String> inputFiles,
       HashMap<String, String> tableToPrefixMap) {
-    for (Map.Entry<String, String> entry : inputFiles.entrySet()) {
-      String filepath =
-          entry.getValue() + "/" + entry.getKey() + SST_FILE_EXTENSION;
+    for (String filename : inputFiles) {
+      String filepath = getAbsoluteSstFilePath(filename);
       try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
         sstFileReader.open(filepath);
         TableProperties properties = sstFileReader.getTableProperties();
@@ -727,15 +738,15 @@ public class RocksDBCheckpointDiffer {
           SstFileReaderIterator iterator =
               sstFileReader.newIterator(new ReadOptions());
           iterator.seekToFirst();
-          String firstKey = new String(iterator.key());
+          String firstKey = constructBucketKey(new String(iterator.key()));
           iterator.seekToLast();
-          String lastKey = new String(iterator.key());
+          String lastKey = constructBucketKey(new String(iterator.key()));
           if (!isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
-            inputFiles.remove(entry.getKey());
+            inputFiles.remove(filename);
           }
         } else {
           // entry from other tables
-          inputFiles.remove(entry.getKey());
+          inputFiles.remove(filename);
         }
       } catch (RocksDBException e) {
         e.printStackTrace();
@@ -743,13 +754,10 @@ public class RocksDBCheckpointDiffer {
     }
   }
 
-
-   boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
+  boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
       String firstDbKey, String lastDbKey) {
-    boolean isKeyWithPrefixPresent =
-        firstDbKey.compareTo(prefixForColumnFamily) <= 0
-            && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
-    return isKeyWithPrefixPresent;
+    return firstDbKey.compareTo(prefixForColumnFamily) <= 0
+        && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
   }
 
   /**
@@ -759,7 +767,7 @@ public class RocksDBCheckpointDiffer {
       DifferSnapshotInfo src, DifferSnapshotInfo dest,
       HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
-      HashSet<String> sameFiles, HashMap<String,String> differentFiles) {
+      HashSet<String> sameFiles, HashSet<String> differentFiles) {
 
     for (String fileName : srcSnapFiles) {
       if (destSnapFiles.contains(fileName)) {
@@ -773,7 +781,7 @@ public class RocksDBCheckpointDiffer {
       if (infileNode == null) {
         LOG.debug("Source '{}' SST file '{}' is never compacted",
             src.dbPath, fileName);
-        differentFiles.put(fileName,src.dbPath);
+        differentFiles.add(fileName);
         continue;
       }
 
@@ -795,7 +803,7 @@ public class RocksDBCheckpointDiffer {
                     + "Src '{}' and dest '{}' have different SST file: '{}'",
                 current.snapshotGeneration, dest.snapshotGeneration,
                 src.dbPath, dest.dbPath, current.fileName);
-            differentFiles.put(current.fileName,sstBackupDir);
+            differentFiles.add(current.fileName);
             continue;
           }
 
@@ -804,13 +812,13 @@ public class RocksDBCheckpointDiffer {
             LOG.debug("No further compaction happened to the current file. " +
                 "Src '{}' and dest '{}' have different file: {}",
                 src.dbPath, dest.dbPath, current.fileName);
-            differentFiles.put(current.fileName,sstBackupDir);
+            differentFiles.add(current.fileName);
             continue;
           }
 
           for (CompactionNode node : successors) {
             if (sameFiles.contains(node.fileName) ||
-                differentFiles.containsKey(node.fileName)) {
+                differentFiles.contains(node.fileName)) {
               LOG.debug("Skipping known processed SST: {}", node.fileName);
               continue;
             }
@@ -1045,4 +1053,20 @@ public class RocksDBCheckpointDiffer {
   public static Logger getLog() {
     return LOG;
   }
+
+  private String constructBucketKey(String keyName) {
+    if (!keyName.startsWith("/")) {
+      keyName = "/".concat(keyName);
+    }
+    String[] elements = keyName.split("/");
+    String volume = elements[1];
+    String bucket = elements[2];
+    StringBuilder builder = new StringBuilder().append("/").append(volume);
+
+    if (StringUtils.isNotBlank(bucket)) {
+      builder.append("/").append(bucket);
+    }
+    return builder.toString();
+  }
+
 }
