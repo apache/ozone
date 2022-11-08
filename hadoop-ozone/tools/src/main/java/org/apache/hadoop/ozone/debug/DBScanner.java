@@ -90,9 +90,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
   
-   @CommandLine.Option(names = {"--startkey", "-sk"},
+  @CommandLine.Option(names = {"--startkey", "-sk"},
       description = "Key from which to iterate the DB")
-  private static String startKey;
+   private static String startKey;
 
   @CommandLine.Option(names = {"--container-id", "--cid", "-cid"},
       description = "Container ID when datanode DB Schema is V3." +
