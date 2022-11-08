@@ -33,8 +33,10 @@ import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
- * ManagedSSTFileReader provides an abstraction layer using which we can
+ * ManagedSstFileReader provides an abstraction layer using which we can
  * iterate over multiple underlying SST files transparently.
  */
 public class ManagedSstFileReader {
@@ -45,13 +47,13 @@ public class ManagedSstFileReader {
     this.sstFiles = sstFiles;
   }
   public Stream<String> getKeyStream() throws RocksDBException {
-    final OmSstFileIterator iterator = new OmSstFileIterator(sstFiles);
+    final ManagedSstFileIterator itr = new ManagedSstFileIterator(sstFiles);
     final Spliterator<String> spliterator = Spliterators
-        .spliteratorUnknownSize(iterator, 0);
-    return StreamSupport.stream(spliterator, false).onClose(iterator::close);
+        .spliteratorUnknownSize(itr, 0);
+    return StreamSupport.stream(spliterator, false).onClose(itr::close);
   }
 
-  private static final class OmSstFileIterator implements
+  private static final class ManagedSstFileIterator implements
       Iterator<String>, Closeable {
 
     private final Iterator<String> fileNameIterator;
@@ -61,7 +63,7 @@ public class ManagedSstFileReader {
     private SstFileReader currentFileReader;
     private SstFileReaderIterator currentFileIterator;
 
-    private OmSstFileIterator(Collection<String> files)
+    private ManagedSstFileIterator(Collection<String> files)
         throws RocksDBException {
       // TODO: Check if default Options and ReadOptions is enough.
       this.options = new Options();
@@ -89,7 +91,7 @@ public class ManagedSstFileReader {
     @Override
     public String next() {
       if (hasNext()) {
-        final String value = new String(currentFileIterator.key());
+        final String value = new String(currentFileIterator.key(), UTF_8);
         currentFileIterator.next();
         return value;
       }

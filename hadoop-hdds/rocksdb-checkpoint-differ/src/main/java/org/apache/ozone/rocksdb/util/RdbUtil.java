@@ -50,13 +50,12 @@ public final class RdbUtil {
     cfd.add(
         new ColumnFamilyDescriptor(
             "default".getBytes(StandardCharsets.UTF_8)));
-    try (DBOptions options = new DBOptions()) {
-      try (RocksDB rocksDB = RocksDB.openReadOnly(options, dbLocation,
-          cfd, columnFamilyHandles)) {
-        return rocksDB.getLiveFilesMetaData().stream().map(lfm ->
-            new File(lfm.path(), lfm.fileName()).getPath())
-            .collect(Collectors.toCollection(HashSet::new));
-      }
+    try (DBOptions options = new DBOptions();
+         RocksDB rocksDB = RocksDB.openReadOnly(options, dbLocation,
+             cfd, columnFamilyHandles)) {
+      return rocksDB.getLiveFilesMetaData().stream().map(lfm ->
+              new File(lfm.path(), lfm.fileName()).getPath())
+          .collect(Collectors.toCollection(HashSet::new));
     }
   }
 
