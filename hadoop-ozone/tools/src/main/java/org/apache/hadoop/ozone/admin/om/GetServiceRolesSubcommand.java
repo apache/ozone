@@ -42,8 +42,9 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(names = {"-id", "--service-id"},
-      description = "OM Service ID",
+  @CommandLine.Option(names = {"-id", "--id", "--service-id"},
+      description = "Ozone Manager Service ID." + "Command line option " +
+          "-id will be removed in later versions.",
       required = true)
   private String omServiceId;
 

@@ -39,8 +39,9 @@ public class SetS3SecretHandler extends S3Handler {
           + "(Admins only)'")
   private String username;
 
-  @CommandLine.Option(names = {"-s", "--secret", "--secretKey"},
-      description = "Secret key", required = true)
+  @CommandLine.Option(names = {"-s", "--secret", "--secretKey", "--secret-key"},
+      description = "Secret key. " + "Command line option " +
+          "--secretKey will be removed in later versions.", required = true)
   private String secretKey;
 
   @Option(names = "-e",

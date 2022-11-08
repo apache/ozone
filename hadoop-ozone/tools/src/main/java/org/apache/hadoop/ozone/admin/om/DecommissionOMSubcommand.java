@@ -44,9 +44,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NO
  */
 @CommandLine.Command(
     name = "decommission",
-    customSynopsis = "ozone admin om decommission -id=<om-service-id> " +
-        "-nodeid=<decommission-om-node-id> " +
-        "-hostname=<decommission-om-node-address> [options]",
+    customSynopsis = "ozone admin om decommission --id=<om-service-id> " +
+        "--nodeid=<decommission-om-node-id> " +
+        "--hostname=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
         "decommissioned is shutdown first." +
         "\nNote - Add the node to be decommissioned to " +
@@ -66,18 +66,22 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(names = {"-id", "--service-id"},
-      description = "OM Service ID",
+  @CommandLine.Option(names = {"-id", "--id", "--service-id"},
+      description = "Ozone Manager Service ID." + "Command line option " +
+          "-id will be removed in later versions.",
       required = true)
   private String omServiceId;
 
-  @CommandLine.Option(names = {"-nodeid"},
-      description = "NodeID of the OM to be decommissioned.",
+  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
+      description = "NodeID of the OM to be decommissioned." + "Command line " +
+          "option -nodeid will be removed in later versions.",
       required = true)
   private String decommNodeId;
 
-  @CommandLine.Option(names = {"-hostname", "--node-host-address"},
-      description = "Host name/address of the OM to be decommissioned.",
+  @CommandLine.Option(names = {"-hostname", "--hostname",
+      "--node-host-address"},
+      description = "Host name/address of the OM to be decommissioned." +
+          "Command line option -hostname will be removed in later versions.",
       required = true)
   private String hostname;
 

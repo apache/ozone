@@ -55,42 +55,47 @@ public class PrepareSubCommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID",
+      names = {"-id", "--id", "--service-id"},
+      description = "Ozone Manager Service ID." + "Command line option " +
+          "-id will be removed in later versions.",
       required = true
   )
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-tawt", "--transaction-apply-wait-timeout"},
+      names = {"-tawt", "--tawt", "--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
-          "the prepare request to be applied to the OM DB.",
+          "the prepare request to be applied to the OM DB." + "Command line " +
+          "option -tawt will be removed in later versions.",
       defaultValue = "120",
       hidden = true
   )
   private long txnApplyWaitTimeSeconds;
 
   @CommandLine.Option(
-      names = {"-tact", "--transaction-apply-check-interval"},
+      names = {"-tact", "--tact", "--transaction-apply-check-interval"},
       description = "Time in SECONDS to wait between successive checks for " +
-          "all transactions to be applied to the OM DB.",
+          "all transactions to be applied to the OM DB." + "Command line " +
+          "option -tact will be removed in later versions.",
       defaultValue = "5",
       hidden = true
   )
   private long txnApplyCheckIntervalSeconds;
 
   @CommandLine.Option(
-      names = {"-pct", "--prepare-check-interval"},
+      names = {"-pct", "--pct", "--prepare-check-interval"},
       description = "Time in SECONDS to wait between successive checks for OM" +
-          " preparation.",
+          " preparation." + "Command line option -pct will be removed in " +
+          "later versions.",
       defaultValue = "10",
       hidden = true
   )
   private long prepareCheckInterval;
 
   @CommandLine.Option(
-      names = {"-pt", "--prepare-timeout"},
-      description = "Max time in SECONDS to wait for all OMs to be prepared",
+      names = {"-pt", "--pt", "--prepare-timeout"},
+      description = "Max time in SECONDS to wait for all OMs to be prepared." +
+          "Command line option -pt will be removed in later versions.",
       defaultValue = "300",
       hidden = true
   )

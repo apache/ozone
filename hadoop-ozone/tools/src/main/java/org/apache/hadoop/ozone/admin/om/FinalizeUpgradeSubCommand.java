@@ -61,14 +61,16 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
+      names = {"--id", "-id", "--service-id"},
+      description = "Ozone Manager Service ID. Command line option -id will " +
+          "be removed in later versions."
   )
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host"
+      names = {"-host", "--host", "--service-host"},
+      description = "Ozone Manager Host. Command line option -host will be" +
+          " removed in later versions."
   )
   private String omHost;
 

@@ -26,7 +26,7 @@ import picocli.CommandLine.ParentCommand;
  * Handler for ozone getconf confKey [key].
  */
 @Command(name = "confKey",
-    aliases = {"-confKey"},
+    aliases = {"-confKey", "--confKey"},
     description = "gets a specific key from the configuration",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

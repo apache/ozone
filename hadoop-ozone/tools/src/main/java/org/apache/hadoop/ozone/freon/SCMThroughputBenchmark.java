@@ -163,9 +163,10 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
       defaultValue = "4")
   private int numHeartbeats = 4;
 
-  @CommandLine.Option(names = {"--scmHost"},
+  @CommandLine.Option(names = {"--scmHost", "--scm-host"},
       required = true,
-      description = "The leader scm host x.x.x.x.")
+      description = "The leader scm host x.x.x.x. " + "Command line option " +
+          "--scmHost will be removed in later versions.")
   private String scm;
 
   static final int CHECK_INTERVAL_MILLIS = 5000;

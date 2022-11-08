@@ -60,9 +60,10 @@ import java.util.concurrent.Callable;
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
-  @CommandLine.Option(names = {"--column_family"},
+  @CommandLine.Option(names = {"--column-family", "--column_family"},
       required = true,
-      description = "Table name")
+      description = "Table name. " + "Command line option --column_family " +
+          "will be removed in later versions.")
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
@@ -77,16 +78,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private static int limit = 100;
 
   @CommandLine.Option(names = {"--out", "-o"},
-      description = "File to dump table scan data")
+      description = "File to dump table scan data.")
   private static String fileName;
 
-  @CommandLine.Option(names = {"--dnSchema", "-d"},
-      description = "Datanode DB Schema Version : V1/V2/V3",
+  @CommandLine.Option(names = {"--dn-schema", "--dnSchema", "-d"},
+      description = "Datanode DB Schema Version : V1/V2/V3." +
+          "Command line option --dnSchema will be removed in later versions.",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
 
-  @CommandLine.Option(names = {"--container-id", "-cid"},
-      description = "Container ID when datanode DB Schema is V3",
+  @CommandLine.Option(names = {"--container-id", "--cid", "-cid"},
+      description = "Container ID when datanode DB Schema is V3." +
+          "Command line option -cid will be removed in later versions.",
       defaultValue = "-1")
   private static long containerId;
 

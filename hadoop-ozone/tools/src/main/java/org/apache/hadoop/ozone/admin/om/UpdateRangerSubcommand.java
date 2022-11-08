@@ -30,8 +30,8 @@ import java.util.concurrent.Callable;
  * Handler of om updateranger command.
  *
  * Usage:
- * ozone admin om updateranger -host=om
- * ozone admin om updateranger -id=ozone1
+ * ozone admin om updateranger --host=om
+ * ozone admin om updateranger --id=ozone1
  */
 @CommandLine.Command(
     name = "updateranger",
@@ -46,18 +46,19 @@ public class UpdateRangerSubcommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
+      names = {"-id", "--id", "--service-id"},
+      description = "Ozone Manager Service ID. Command line option -id will " +
+          "be removed in later versions."
   )
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host. If OM HA is enabled, use -id instead. "
-          + "If insists on using -host with OM HA, this must point directly "
-          + "to the leader OM. "
-          + "This option is required when -id is not provided or "
-          + "when HA is not enabled."
+      names = {"-host", "--host", "--service-host"},
+      description = "Ozone Manager Host. If OM HA is enabled, use --id " +
+          "instead. If insists on using --host with OM HA, this must point " +
+          "directly to the leader OM. This option is required when --id is " +
+          "not provided or when HA is not enabled." + "Command line option " +
+          "-host will be removed in later versions."
   )
   private String omHost;
 
@@ -70,7 +71,7 @@ public class UpdateRangerSubcommand implements Callable<Void> {
   public Void call() throws Exception {
 
     if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify -id or -host");
+      System.err.println("Error: Please specify --id or --host");
       return null;
     }
 
