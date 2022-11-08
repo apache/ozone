@@ -639,7 +639,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 6. PUBLICKEY_PRIVATEKEY  indicates private and public key were read
    *                          successfully from configured location but
    *                          Certificate.
-   * 7. All                   Keypair as well as certificate is present.
+   * 7. ALL                   Keypair as well as certificate is present.
+   * 8. EXPIRED_CERT          The certificate is present, but either it has
+   *                          already expired, or is about to be expired within
+   *                          the grace period provided in the configuration.
    *
    * */
   protected enum InitCase {
@@ -661,7 +664,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. Generates and stores a keypair.
    * 3. Try to recover public key if private key and certificate is present
    *    but public key is missing.
-   * 4. Checks is the certificate is about to be expired or have already been
+   * 4. Checks if the certificate is about to be expired or have already been
    *    expired, and if yes removes the key material and the certificate and
    *    asks for re-initialization in the result.
    *

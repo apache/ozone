@@ -224,8 +224,9 @@ public class SecurityConfig {
   }
 
   /**
-   * Returns the number of days within which before expiration a certificate
-   * should be renewed.
+   * Duration of the grace period within which a certificate should be
+   * renewed before the current one expires.
+   * Default is 28 days.
    *
    * @return the value of hdds.x509.renew.grace.duration property
    */
