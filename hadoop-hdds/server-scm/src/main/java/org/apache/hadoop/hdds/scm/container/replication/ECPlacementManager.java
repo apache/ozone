@@ -88,9 +88,9 @@ public class ECPlacementManager<G> {
   public List<Integer> getMisreplicatedIndexes(
           Map<G, Set<Integer>> placementGroupReplicaIndexMap,
           Set<Integer> excludedIndexes) {
-    for (G placementGroup : placementGroupReplicaIndexMap.keySet()) {
-      placementGroupReplicaIndexMap.get(placementGroup)
-              .removeAll(excludedIndexes);
+    for (Set<Integer> placementGroupIndexes :
+            placementGroupReplicaIndexMap.values()) {
+      placementGroupIndexes.removeAll(excludedIndexes);
     }
     Map<Integer, Set<G>> replicaIndexPlacementGroupMap =
             getReverseMapSet(placementGroupReplicaIndexMap);
