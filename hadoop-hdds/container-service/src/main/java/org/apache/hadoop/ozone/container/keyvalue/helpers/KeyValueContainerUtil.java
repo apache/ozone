@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -480,8 +481,10 @@ public final class KeyValueContainerUtil {
         // In any case we can proceed with deleting the directory's contents.
         if (VersionedDatanodeFeatures.isFinalized(
             HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-          // Get container file
-          File containerFile = ContainerUtils.getContainerFile(file);
+          // Get container file.
+          // Due to a failed cleanup of the tmp directory, the container
+          // parent directory might not be in its normal structure.
+          File containerFile = getContainerFile(file);
 
           // If file exists
           if (containerFile != null) {
@@ -510,6 +513,41 @@ public final class KeyValueContainerUtil {
     }
 
     /**
+     * Search recursively for the container file under a
+     * directory. Return null if the file is not found.
+     * @param file
+     * @return container file or null if it doesn't exist
+     * @throws IOException
+     */
+    public static File getContainerFile(File file) throws IOException {
+      try {
+        if (file.isDirectory()) {
+          for (File subFile : file.listFiles()) {
+            if (subFile.isDirectory()) {
+              File containerFile = getContainerFile(subFile);
+              if (containerFile != null) {
+                return containerFile;
+              }
+            } else {
+              if (FilenameUtils.getExtension(subFile.getName())
+                  .equals("container")) {
+                return subFile;
+              }
+            }
+          }
+        } else {
+          if (FilenameUtils.getExtension(file.getName())
+              .equals("container")) {
+            return file;
+          }
+        }
+      } catch (NullPointerException ex) {
+        LOG.error("File object is null.", ex);
+      }
+      return null;
+    }
+
+    /**
      * In the future might be used to gather metrics
      * for the files left under
      * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
@@ -517,6 +555,15 @@ public final class KeyValueContainerUtil {
      */
     public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume) {
       List<File> leftovers = new ArrayList<>();
+
+      if (!hddsVolume.getClusterID().isEmpty()) {
+        // Initialize tmp and delete service directories
+        hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
+      } else {
+        LOG.error("Volume hasn't been formatted " +
+            "properly and has no ClusterId. " +
+            "Unable to initialize tmp and delete service directories.");
+      }
 
       File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
 
@@ -539,7 +586,7 @@ public final class KeyValueContainerUtil {
      */
     public static boolean moveToTmpDeleteDirectory(
         KeyValueContainerData keyValueContainerData,
-        HddsVolume hddsVolume) throws IOException {
+        HddsVolume hddsVolume) {
       String containerPath = keyValueContainerData.getContainerPath();
       File container = new File(containerPath);
       String containerDirName = container.getName();
@@ -548,7 +595,9 @@ public final class KeyValueContainerUtil {
         // Initialize delete directory
         hddsVolume.createDeleteServiceDir();
       } else {
-        throw new IOException("Volume has no ClusterId");
+        LOG.error("Volume hasn't been formatted " +
+            "properly and has no ClusterId. " +
+            "Unable to initialize delete service directory.");
       }
 
       String destinationDirPath = hddsVolume.getDeleteServiceDirPath()

@@ -109,6 +109,9 @@ public class TestHddsVolume {
 
     File tmpDir = new File(volume.getTmpDirPath().toString());
     assertTrue(tmpDir.exists());
+
+    // Shutdown the volume.
+    volume.shutdown();
   }
 
   @Test

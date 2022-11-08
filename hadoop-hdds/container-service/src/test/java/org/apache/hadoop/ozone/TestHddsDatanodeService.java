@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedList;
@@ -32,9 +31,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -55,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -69,35 +67,27 @@ public class TestHddsDatanodeService {
 
   @TempDir
   private File tempDir;
-
+  private File testDir;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHddsDatanodeService.class);
 
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
+  private final String[] args = new String[] {};
+  private final HddsDatanodeService service =
+      HddsDatanodeService.createHddsDatanodeService(args);
   private static final int SCM_SERVER_COUNT = 1;
   private static final String FILE_SEPARATOR = File.separator;
-
-  private File testDir;
-  private List<String> serverAddresses;
-  private List<RPC.Server> scmServers;
-  private List<ScmTestMock> mockServers;
 
   @BeforeEach
   public void setUp() throws IOException {
     // Set SCM
-    serverAddresses = new ArrayList<>();
-    scmServers = new ArrayList<>();
-    mockServers = new ArrayList<>();
+    List<String> serverAddresses = new ArrayList<>();
 
     for (int x = 0; x < SCM_SERVER_COUNT; x++) {
       int port = SCMTestUtils.getReuseableAddress().getPort();
       String address = "127.0.0.1";
       serverAddresses.add(address + ":" + port);
-      ScmTestMock mock = new ScmTestMock();
-      scmServers.add(SCMTestUtils.startScmRpcServer(conf,
-          mock, new InetSocketAddress(address, port), 10));
-      mockServers.add(mock);
     }
 
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
@@ -124,21 +114,30 @@ public class TestHddsDatanodeService {
     FileUtil.fullyDelete(testDir);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {OzoneConsts.SCHEMA_V1,
-      OzoneConsts.SCHEMA_V2, OzoneConsts.SCHEMA_V3})
-  public void testStartup(String schemaVersion) throws IOException {
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-    String[] args = new String[] {};
-    HddsDatanodeService service = HddsDatanodeService
-        .createHddsDatanodeService(args);
-    LOG.info("SchemaV3_enabled: " +
-        conf.get(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED));
+  @Test
+  public void testStartup() {
     service.start(conf);
+
     assertNotNull(service.getDatanodeDetails());
     assertNotNull(service.getDatanodeDetails().getHostName());
     assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
     assertNotNull(service.getCRLStore());
+
+    service.stop();
+    // CRL store must be stopped when the service stops
+    assertNull(service.getCRLStore().getStore());
+    service.join();
+    service.close();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {OzoneConsts.SCHEMA_V1,
+      OzoneConsts.SCHEMA_V2, OzoneConsts.SCHEMA_V3})
+  public void testTmpDirOnStartup(String schemaVersion) throws IOException {
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    LOG.info("SchemaV3_enabled: " +
+        conf.get(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED));
+    service.start(conf);
 
     // Get volumeSet and store volumes in temp folders
     // in order to access them after service.stop()
@@ -148,7 +147,6 @@ public class TestHddsDatanodeService {
         volumeSet.getVolumesList());
     int volumeSetSize = volumes.size();
     File[] tempHddsVolumes = new File[volumeSetSize];
-    StringBuilder hddsDirs = new StringBuilder();
 
     for (int i = 0; i < volumeSetSize; i++) {
       HddsVolume volume = volumes.get(i);
@@ -158,7 +156,6 @@ public class TestHddsDatanodeService {
       if (this.tempDir.isDirectory()) {
         tempHddsVolumes[i] = tempDir;
       }
-      hddsDirs.append(tempHddsVolumes[i]).append(",");
 
       // Write to tmp dir under volume
       File testFile = new File(volume.getDeleteServiceDirPath() +
@@ -184,8 +181,6 @@ public class TestHddsDatanodeService {
         Arrays.toString(tempHddsVolumes));
 
     service.stop();
-    // CRL store must be stopped when the service stops
-    assertNull(service.getCRLStore().getStore());
     service.join();
     service.close();
 

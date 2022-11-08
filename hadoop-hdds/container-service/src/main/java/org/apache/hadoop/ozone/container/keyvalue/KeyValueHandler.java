@@ -1245,15 +1245,9 @@ public class KeyValueHandler extends Handler {
             (KeyValueContainerData) container.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-        boolean success = false;
-        try {
-          // Rename container location
-          success = KeyValueContainerUtil.ContainerDeleteDirectory
-              .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
-        } catch (IOException ex) {
-          LOG.error("Failed to move container, " +
-              "cluster ID for volume {}, is not available.", hddsVolume, ex);
-        }
+        // Rename container location
+        boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
+            .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
 
         if (success) {
           String containerPath = keyValueContainerData

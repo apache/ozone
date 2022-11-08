@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -93,7 +92,6 @@ public class TestEndPoint {
   private static RPC.Server scmServer;
   private static ScmTestMock scmServerImpl;
   private static File testDir;
-  private static OzoneConfiguration config;
 
   @AfterAll
   public static void tearDown() throws Exception {
@@ -110,20 +108,13 @@ public class TestEndPoint {
     scmServer = SCMTestUtils.startScmRpcServer(SCMTestUtils.getConf(),
         scmServerImpl, serverAddress, 10);
     testDir = PathUtils.getTestDir(TestEndPoint.class);
-    config = SCMTestUtils.getConf();
-    config.set(DFS_DATANODE_DATA_DIR_KEY, testDir.getAbsolutePath());
-    config.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    config
-        .setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
-    config.set(HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL, "1s");
-    config.setFromObject(new ReplicationConfig().setPort(0));
   }
 
-  @Test
   /**
    * This test asserts that we are able to make a version call to SCM server
    * and gets back the expected values.
    */
+  @Test
   public void testGetVersion() throws Exception {
     try (EndpointStateMachine rpcEndPoint =
         createEndpoint(SCMTestUtils.getConf(),
@@ -138,15 +129,45 @@ public class TestEndPoint {
     }
   }
 
-  @Test
   /**
    * We make getVersion RPC call, but via the VersionEndpointTask which is
    * how the state machine would make the call.
-   * Writing data to tmp dir and checking if it has been cleaned.
    */
+  @Test
   public void testGetVersionTask() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      OzoneContainer ozoneContainer = new OzoneContainer(
+          datanodeDetails, conf, getContext(datanodeDetails), null);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          conf, ozoneContainer);
+      EndpointStateMachine.EndPointStates newState = versionTask.call();
 
+      // if version call worked the endpoint should automatically move to the
+      // next state.
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+          newState);
+
+      // Now rpcEndpoint should remember the version it got from SCM
+      Assertions.assertNotNull(rpcEndPoint.getVersion());
+    }
+  }
+
+
+  /**
+   * Writing data to tmp dir and checking if it has been cleaned.
+   */
+  @Test
+  public void testTmpDirCleanup() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+        true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
@@ -186,14 +207,6 @@ public class TestEndPoint {
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
-
-      // if version call worked the endpoint should automatically move to the
-      // next state.
-      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
-          newState);
-
-      // Now rpcEndpoint should remember the version it got from SCM
-      Assertions.assertNotNull(rpcEndPoint.getVersion());
 
       // assert that tmp dir is empty
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
@@ -253,11 +266,11 @@ public class TestEndPoint {
     }
   }
 
-  @Test
   /**
    * This test makes a call to end point where there is no SCM server. We
    * expect that versionTask should be able to handle it.
    */
+  @Test
   public void testGetVersionToInvalidEndpoint() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     InetSocketAddress nonExistentServerAddress = SCMTestUtils
@@ -279,12 +292,12 @@ public class TestEndPoint {
     }
   }
 
-  @Test
   /**
    * This test makes a getVersionRPC call, but the DummyStorageServer is
    * going to respond little slowly. We will assert that we are still in the
    * GETVERSION state after the timeout.
    */
+  @Test
   public void testGetVersionAssertRpcTimeOut() throws Exception {
     final long rpcTimeout = 1000;
     final long tolerance = 100;
