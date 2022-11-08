@@ -364,6 +364,16 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
     };
+    
+    const generateTable = (dataSource) => {
+      return <Table
+        expandRowByClick dataSource={dataSource}
+        columns={this.serachCoulmn()}
+        loading={loading}
+        pagination={paginationConfig} rowKey='containerID'
+        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+    }
+
     return (
       <div className='missing-containers-container'>
         <div className='page-header'>
@@ -372,36 +382,16 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         <div className='content-div'>
           <Tabs defaultActiveKey='1'>
             <TabPane key='1' tab="Missing">
-              <Table
-                expandRowByClick dataSource={missingDataSource} 
-                columns={this.serachCoulmn()}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(missingDataSource)}
             </TabPane>
             <TabPane key='2' tab='Under-Replicated'>
-              <Table
-                expandRowByClick dataSource={underReplicatedDataSource}
-                columns={this.serachCoulmn()}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(underReplicatedDataSource)}
             </TabPane>
             <TabPane key='3' tab='Over-Replicated'>
-              <Table
-                expandRowByClick dataSource={overReplicatedDataSource}
-                columns={this.serachCoulmn()}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(overReplicatedDataSource)}
             </TabPane>
             <TabPane key='4' tab='Mis-Replicated'>
-              <Table
-                expandRowByClick dataSource={misReplicatedDataSource}
-                columns={this.serachCoulmn()}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(misReplicatedDataSource)}
             </TabPane>
           </Tabs>
         </div>
