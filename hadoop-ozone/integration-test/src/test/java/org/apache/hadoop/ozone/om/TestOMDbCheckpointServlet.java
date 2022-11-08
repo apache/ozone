@@ -76,7 +76,7 @@ import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.OM_HARDLINK_FILE;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.fixFileName;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -314,9 +314,9 @@ public class TestOMDbCheckpointServlet {
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
     String shortSnapshotLocation =
-        fixFileName(metaDirLength, Paths.get(snapshotDirName));
+        truncateFileName(metaDirLength, Paths.get(snapshotDirName));
     String shortSnapshotLocation2 =
-        fixFileName(metaDirLength, Paths.get(snapshotDirName2));
+        truncateFileName(metaDirLength, Paths.get(snapshotDirName2));
     Path finalSnapshotLocation =
         Paths.get(testDirName, shortSnapshotLocation);
 
@@ -361,7 +361,7 @@ public class TestOMDbCheckpointServlet {
       for (Path file : files.collect(Collectors.toList())) {
         if (file != null) {
           if (!file.getFileName().toString().equals("dummyFile")) {
-            fileSet.add(fixFileName(truncateLength, file));
+            fileSet.add(truncateFileName(truncateLength, file));
           }
         }
       }

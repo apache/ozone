@@ -3653,6 +3653,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return dbBackupDir;
   }
 
+  // move the new snapshot directory into place and create hard links
   private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
       throws IOException {
     Path incomingSnapshotsDir = Paths.get(dbPath.toString(), OM_SNAPSHOT_DIR);

@@ -42,6 +42,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.mockito.Mockito.mock;
@@ -124,9 +128,14 @@ public class TestOmSnapshotManager {
   @Test
   public void testHardLinkCreation() throws IOException {
     byte[] dummyData = {0};
-    File dbDir = new File(testDir.toString(), "om.db");
-    File snapDir1 = new File(testDir.toString(), "db.snapshots/dir1");
-    File snapDir2 = new File(testDir.toString(), "db.snapshots/dir2");
+    File dbDir = new File(testDir.toString(), OM_DB_NAME);
+    File snapDir1 = new File(testDir.toString(),
+        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + "dir1");
+    File snapDir2 = new File(testDir.toString(),
+        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + "dir2");
+    File checkpointDir1 = new File(testDir.toString(),
+        OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
+
     dbDir.mkdirs();
     snapDir1.mkdirs();
     snapDir2.mkdirs();
@@ -134,12 +143,13 @@ public class TestOmSnapshotManager {
     Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     hardLinkFiles.put(Paths.get(snapDir2.toString(), "f1"),
-        Paths.get(testDir.toString(), "db.checkpoints/dir1/f1"));
+        Paths.get(checkpointDir1.toString(), "f1"));
     hardLinkFiles.put(Paths.get(snapDir2.toString(), "s1"),
         Paths.get(snapDir1.toString(), "s1"));
 
     Path hardLinkList =
-        OmSnapshotManager.createHardLinkList(testDir.toString().length() + 1, hardLinkFiles);
+        OmSnapshotManager.createHardLinkList(
+            testDir.toString().length() + 1, hardLinkFiles);
     Files.move(hardLinkList, Paths.get(dbDir.toString(), OM_HARDLINK_FILE));
 
     OmSnapshotManager.createHardLinks(dbDir.toPath());

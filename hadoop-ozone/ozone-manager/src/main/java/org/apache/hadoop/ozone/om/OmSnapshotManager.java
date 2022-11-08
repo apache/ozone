@@ -289,20 +289,22 @@ public final class OmSnapshotManager {
       for (String l : lines) {
         String from = l.split("\t")[1];
         String to = l.split("\t")[0];
-        Path fixedFrom = fixName(dbPath, from);
-        Path fixedTo = fixName(dbPath, to);
-        Files.createLink(fixedTo, fixedFrom);
+        Path fullFromPath = getFullPath(dbPath, from);
+        Path fullToPath = getFullPath(dbPath, to);
+        Files.createLink(fullToPath, fullFromPath);
       }
       hardLinkFile.delete();
     }
   }
 
-  private static Path fixName(Path dbPath, String fileName) {
+  private static Path getFullPath(Path dbPath, String fileName) {
     File file = new File(fileName);
-    if (!file.getName().equals(fileName)) {
-      return Paths.get(dbPath.getParent().toString(), fileName);
+    // If there is no directory then this file belongs in the db
+    if (file.getName().equals(fileName)) {
+      return Paths.get(dbPath.toString(), fileName);
     }
-    return Paths.get(dbPath.toString(), fileName);
+    // else this file belong in a directory parallel to the db
+    return Paths.get(dbPath.getParent().toString(), fileName);
   }
 
   static Path createHardLinkList(int truncateLength,
@@ -311,11 +313,12 @@ public final class OmSnapshotManager {
     Path data = Files.createTempFile("data", "txt");
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
-      String fixedFile = fixFileName(truncateLength, entry.getValue());
+      String fixedFile = truncateFileName(truncateLength, entry.getValue());
+      // If this file is from the active db, strip the path
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
-      sb.append(fixFileName(truncateLength, entry.getKey()))
+      sb.append(truncateFileName(truncateLength, entry.getKey()))
           .append("\t")
           .append(fixedFile)
           .append("\n");
@@ -324,8 +327,7 @@ public final class OmSnapshotManager {
     return data;
   }
 
-  static String fixFileName(int truncateLength, Path file) {
+  static String truncateFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
   }
-
 }

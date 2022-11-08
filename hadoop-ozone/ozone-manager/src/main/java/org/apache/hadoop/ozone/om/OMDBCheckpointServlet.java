@@ -58,7 +58,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.createHardLinkList;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.fixFileName;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 
 /**
@@ -237,7 +237,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     int truncateLength = metaDirPath.toString().length() + 1;
 
     for (Path file : copyFiles.values()) {
-      String fixedFile = fixFileName(truncateLength, file);
+      String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
         fixedFile = Paths.get(fixedFile).getFileName().toString();

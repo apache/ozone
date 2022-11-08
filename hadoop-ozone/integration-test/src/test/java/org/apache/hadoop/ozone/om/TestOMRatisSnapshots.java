@@ -599,6 +599,11 @@ public class TestOMRatisSnapshots {
     assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
         .getTerm() >= leaderOMSnapshotTermIndex);
 
+    // Verify RPC server is running
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.isOmRpcServerRunning();
+    }, 100, 5000);
+
     // Verify checkpoint installation was happened.
     String msg = "Reloaded OM state";
     Assert.assertTrue(logCapture.getOutput().contains(msg));
