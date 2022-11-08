@@ -192,7 +192,7 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_RENEW_GRACE_DURATION =
       "hdds.x509.renew.grace.duration";
 
-  public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "28D";
+  public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
 
   /**
    * Do not instantiate.
