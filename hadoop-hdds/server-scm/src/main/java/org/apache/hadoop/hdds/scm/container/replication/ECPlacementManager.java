@@ -69,7 +69,7 @@ public class ECPlacementManager<G> {
     for (ContainerReplica replica : replicaSources) {
       G placementGroup = placementPolicy.getPlacementGroup(
               replica.getDatanodeDetails());
-      if (placementGroupReplicaIndexMap.containsKey(placementGroup)) {
+      if (!placementGroupReplicaIndexMap.containsKey(placementGroup)) {
         placementGroupReplicaIndexMap.put(placementGroup, new HashSet<>());
       }
       placementGroupReplicaIndexMap.get(placementGroup)

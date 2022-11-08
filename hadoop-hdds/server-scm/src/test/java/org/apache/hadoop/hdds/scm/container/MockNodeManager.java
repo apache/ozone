@@ -127,6 +127,11 @@ public class MockNodeManager implements NodeManager {
     this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
   }
 
+  public void addNode(DatanodeDetails dd, int idx) {
+    register(dd, null, null);
+    populateNodeMetric(dd, idx);
+  }
+
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
                          boolean initializeFakeNodes, int nodeCount) {
@@ -134,15 +139,13 @@ public class MockNodeManager implements NodeManager {
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
         DatanodeDetails node = nodes.get(x);
-        register(node, null, null);
-        populateNodeMetric(node, x);
+        addNode(node, x);
       }
     }
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-        register(dd, null, null);
-        populateNodeMetric(dd, x);
+        addNode(dd, x);
       }
     }
     safemode = false;

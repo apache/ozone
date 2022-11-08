@@ -411,8 +411,7 @@ public class ECUnderReplicationHandler<G>
           ContainerHealthResult.UnderReplicatedHealthResult
                   containerHealthResult)
           throws IOException {
-    if (containerHealthResult.isSufficientlyReplicatedAfterPending() &&
-            containerHealthResult.getMisreplicationCountAfterPending()
+    if (containerHealthResult.getMisreplicationCountAfterPending()
                     <= excludedIndexes.size()) {
       return Collections.emptyMap();
     }

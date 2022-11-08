@@ -99,8 +99,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithMissingParityIndex5() throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 0, 0, policy);
@@ -108,8 +108,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithMissingIndex34() throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(3, 4),
         availableReplicas, 0, 0, policy);
@@ -117,8 +117,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithMissingIndex2345() throws IOException {
-    Set<ContainerReplica> availableReplicas =
-        ReplicationTestUtil.createReplicas(Pair.of(IN_SERVICE, 1));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_SERVICE, 1));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3, 4, 5),
         availableReplicas, 0, 0, policy);
   }
@@ -132,8 +132,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithDecomIndex1() throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     Map<DatanodeDetails, SCMCommand<?>> cmds =
@@ -149,10 +149,10 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderReplicationWithDecomIndex12() throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(DECOMMISSIONING, 1),
-            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(DECOMMISSIONING, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
         2, 0, policy);
   }
@@ -160,20 +160,19 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithMixedDecomAndMissingIndexes()
       throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(DECOMMISSIONING, 1),
-            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(DECOMMISSIONING, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 2, 0, policy);
   }
 
   @Test
   public void testUnderReplicationWithMaintenanceIndex12() throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_MAINTENANCE, 1),
-            Pair.of(IN_MAINTENANCE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
     testUnderReplicationWithMissingIndexes(Lists.emptyList(), availableReplicas,
         0, 2, policy);
   }
@@ -181,10 +180,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithMaintenanceAndMissingIndexes()
       throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_MAINTENANCE, 1),
-            Pair.of(IN_MAINTENANCE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 0, 2, policy);
   }
@@ -192,10 +190,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithMissingDecomAndMaintenanceIndexes()
       throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_MAINTENANCE, 1),
-            Pair.of(IN_MAINTENANCE, 2), Pair.of(DECOMMISSIONING, 3),
-            Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2),
+            Pair.of(DECOMMISSIONING, 3), Pair.of(IN_SERVICE, 4));
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 1, 2, policy);
   }
@@ -203,10 +200,9 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithInvalidPlacement()
           throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(DECOMMISSIONING, 1),
-                    Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
-                    Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(DECOMMISSIONING, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     PlacementPolicy mockedPolicy = Mockito.spy(policy);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             Mockito.mock(ContainerPlacementStatus.class);
@@ -233,10 +229,9 @@ public class TestECUnderReplicationHandler {
   @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
   public void testUnderReplicationUnhealthyPlacementCheck(int misreplicationCnt)
           throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1),
-                    Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-                    Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     PlacementPolicy mockedPolicy = Mockito.spy(policy);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             Mockito.mock(ContainerPlacementStatus.class);
@@ -265,17 +260,16 @@ public class TestECUnderReplicationHandler {
                     mockedPolicy, conf, nodeManager);
     testUnderReplicationWithMissingIndexes(Collections.emptyList(),
             availableReplicas, 0, 0,
-            Math.min(4, misreplicationCnt), ecURH);
+            Math.min(3, misreplicationCnt), ecURH);
   }
 
   @Test
   public void testExceptionIfNoNodesFound() {
     PlacementPolicy noNodesPolicy = ReplicationTestUtil
         .getNoNodesTestPlacementPolicy(nodeManager, conf);
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(DECOMMISSIONING, 1),
-            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(DECOMMISSIONING, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     assertThrows(SCMException.class, () ->
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
             availableReplicas, 2, 0, noNodesPolicy));
@@ -287,10 +281,9 @@ public class TestECUnderReplicationHandler {
     PlacementPolicy sameNodePolicy = ReplicationTestUtil
         .getSameNodeTestPlacementPolicy(nodeManager, conf, newDn);
     // Just have a missing index, this should return OK.
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     // Passing zero for decommIndexes, as we don't expect the decom command to
     // get created due to the placement policy returning an already used node
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
@@ -300,10 +293,9 @@ public class TestECUnderReplicationHandler {
     // placement policy should throw. It will have used up the node for
     // reconstruction, and hence no nodes will be found to fix the decommission
     // index.
-    Set<ContainerReplica> replicas = ReplicationTestUtil
-        .createReplicas(Pair.of(DECOMMISSIONING, 1),
-            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-            Pair.of(IN_SERVICE, 4));
+    Set<ContainerReplica> replicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
     assertThrows(SCMException.class, () ->
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
             replicas, 1, 0, sameNodePolicy));
@@ -311,8 +303,8 @@ public class TestECUnderReplicationHandler {
 
   @Test
   public void testUnderAndOverReplication() throws IOException {
-    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 1),
+    Set<ContainerReplica> availableReplicas = createReplicas(
+            Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 1),
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
     Map<DatanodeDetails, SCMCommand<?>> cmds =
@@ -387,5 +379,13 @@ public class TestECUnderReplicationHandler {
     Assertions.assertEquals(shouldReconstructCommandExist ? 1 : 0,
         reconstructCommand);
     return datanodeDetailsSCMCommandMap;
+  }
+
+  private Set<ContainerReplica> createReplicas(
+          Pair<HddsProtos.NodeOperationalState, Integer>... states) {
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(states);
+    replicas.stream().map(ContainerReplica::getDatanodeDetails)
+            .forEach(dn -> ((MockNodeManager)nodeManager).addNode(dn, 0));
+    return replicas;
   }
 }
