@@ -62,6 +62,8 @@ public class TestReplicationManagerMetrics {
     Mockito.when(replicationManager.getLegacyReplicationManager())
         .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
+    Mockito.when(replicationManager.getContainerReplicaPendingOps())
+        .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }
 

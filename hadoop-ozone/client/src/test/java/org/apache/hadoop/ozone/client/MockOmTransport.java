@@ -39,6 +39,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -129,6 +131,9 @@ public class MockOmTransport implements OmTransport {
     case AllocateBlock:
       return response(payload, r -> r.setAllocateBlockResponse(
           allocateBlock(payload.getAllocateBlockRequest())));
+    case GetKeyInfo:
+      return response(payload, r -> r.setGetKeyInfoResponse(
+          getKeyInfo(payload.getGetKeyInfoRequest())));
     default:
       throw new IllegalArgumentException(
           "Mock version of om call " + payload.getCmdType()
@@ -162,6 +167,15 @@ public class MockOmTransport implements OmTransport {
   private LookupKeyResponse lookupKey(LookupKeyRequest lookupKeyRequest) {
     final KeyArgs keyArgs = lookupKeyRequest.getKeyArgs();
     return LookupKeyResponse.newBuilder()
+        .setKeyInfo(
+            keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
+                .get(keyArgs.getKeyName()))
+        .build();
+  }
+
+  private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request) {
+    final KeyArgs keyArgs = request.getKeyArgs();
+    return GetKeyInfoResponse.newBuilder()
         .setKeyInfo(
             keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
                 .get(keyArgs.getKeyName()))

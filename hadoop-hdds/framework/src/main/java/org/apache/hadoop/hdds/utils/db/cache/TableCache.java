@@ -112,6 +112,12 @@ public interface TableCache<CACHEKEY extends CacheKey,
   NavigableMap<Long, Set<CACHEKEY>> getEpochEntries();
 
   /**
+   * Return the stat counters.
+   * @return
+   */
+  CacheStats getStats();
+
+  /**
    * Cache completeness.
    */
   enum CacheType {

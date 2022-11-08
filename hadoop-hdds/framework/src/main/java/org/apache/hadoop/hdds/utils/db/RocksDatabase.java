@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
@@ -152,7 +153,12 @@ public final class RocksDatabase {
   }
 
   private static void close(ColumnFamilyDescriptor d) {
-    runWithTryCatch(() -> closeDeeply(d.getOptions()), new Object() {
+    ManagedColumnFamilyOptions options =
+        (ManagedColumnFamilyOptions) d.getOptions();
+    if (options.isReused()) {
+      return;
+    }
+    runWithTryCatch(() -> closeDeeply(options), new Object() {
       @Override
       public String toString() {
         return d.getClass() + ":" + bytes2String(d.getName());

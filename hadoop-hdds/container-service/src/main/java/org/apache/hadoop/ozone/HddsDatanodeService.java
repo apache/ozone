@@ -213,7 +213,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     serviceRuntimeInfo.setStartTime();
 
     RatisDropwizardExports.
-        registerRatisMetricReporters(ratisMetricsMap);
+        registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");

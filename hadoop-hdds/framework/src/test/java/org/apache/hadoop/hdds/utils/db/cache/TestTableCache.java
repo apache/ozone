@@ -82,6 +82,18 @@ public class TestTableCache {
       Assertions.assertEquals(Integer.toString(i),
           tableCache.get(new CacheKey<>(Integer.toString(i))).getCacheValue());
     }
+
+    verifyStats(tableCache, 15, 0, 0);
+  }
+
+  private void verifyStats(TableCache<?, ?> cache,
+                           long expectedHits,
+                           long expectedMisses,
+                           long expectedIterations) {
+    CacheStats stats = cache.getStats();
+    Assertions.assertEquals(expectedHits, stats.getCacheHits());
+    Assertions.assertEquals(expectedMisses, stats.getCacheMisses());
+    Assertions.assertEquals(expectedIterations, stats.getIterationTimes());
   }
 
   @ParameterizedTest
@@ -132,6 +144,7 @@ public class TestTableCache {
       Assertions.assertEquals(3, tableCache.size());
     }
 
+    verifyStats(tableCache, 6, 0, 0);
   }
 
   @ParameterizedTest
@@ -183,7 +196,6 @@ public class TestTableCache {
             tableCache.get(new CacheKey<>(Long.toString(i))).getCacheValue());
       }
     }
-
   }
 
   @ParameterizedTest
@@ -250,7 +262,7 @@ public class TestTableCache {
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     }
 
-
+    verifyStats(tableCache, 0, 0, 0);
   }
 
   @ParameterizedTest
@@ -343,7 +355,7 @@ public class TestTableCache {
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     }
 
-
+    verifyStats(tableCache, 0, 0, 0);
   }
 
   @ParameterizedTest
@@ -428,8 +440,6 @@ public class TestTableCache {
       tableCache.evictCache(epochs);
       Assertions.assertEquals(totalCount, tableCache.size());
     }
-
-
   }
 
   @ParameterizedTest
@@ -460,6 +470,8 @@ public class TestTableCache {
 
     Assertions.assertEquals(0, tableCache.size());
     Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+
+    verifyStats(tableCache, 0, 0, 0);
   }
 
 
@@ -527,7 +539,29 @@ public class TestTableCache {
       Assertions.assertEquals(4,
           tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
     }
+  }
 
+  @ParameterizedTest
+  @EnumSource(TableCache.CacheType.class)
+  public void testTableCacheStats(TableCache.CacheType cacheType) {
+
+    createTableCache(cacheType);
+
+    tableCache.put(new CacheKey<>("0"),
+        new CacheValue<>(Optional.of("0"), 0));
+    tableCache.put(new CacheKey<>("1"),
+        new CacheValue<>(Optional.of("1"), 1));
+
+    Assertions.assertNotNull(tableCache.get(new CacheKey<>("0")));
+    Assertions.assertNotNull(tableCache.get(new CacheKey<>("0")));
+    Assertions.assertNotNull(tableCache.get(new CacheKey<>("1")));
+    Assertions.assertNull(tableCache.get(new CacheKey<>("2")));
+    Assertions.assertNull(tableCache.get(new CacheKey<>("3")));
+
+    tableCache.iterator();
+    tableCache.iterator();
+
+    verifyStats(tableCache, 3, 2, 2);
   }
 
   private int writeToCache(int count, int startVal, long sleep)

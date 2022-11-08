@@ -544,6 +544,47 @@ public class TestContainerBalancerTask {
   }
 
   @Test
+  public void balancerShouldObeyMaxSizeLeavingSourceLimit()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException {
+    conf.set("ozone.scm.container.size", "1MB");
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+
+    // no source containers should be selected when the limit is just 2 MB
+    balancerConfiguration.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
+    startBalancer(balancerConfiguration);
+
+    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+        .isEmpty());
+    Assertions.assertTrue(containerBalancerTask.getContainerToSourceMap()
+        .isEmpty());
+    stopBalancer();
+
+    // some containers should be selected when using default values
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ContainerBalancerConfiguration cbc = ozoneConfiguration.
+        getObject(ContainerBalancerConfiguration.class);
+    cbc.setBalancingInterval(1);
+    ContainerBalancer sb = new ContainerBalancer(scm);
+    containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
+        sb.getMetrics(), cbc);
+    containerBalancerTask.run();
+
+    stopBalancer();
+    // balancer should have identified unbalanced nodes
+    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+        .isEmpty());
+    Assertions.assertFalse(containerBalancerTask.getContainerToSourceMap()
+        .isEmpty());
+    Assertions.assertTrue(0 !=
+        containerBalancerTask.getSizeScheduledForMoveInLatestIteration());
+  }
+
+  @Test
   public void testMetrics()
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException {
