@@ -439,6 +439,8 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
+    INVALID_PATH = 87;
 }
 
 /**

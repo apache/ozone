@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -62,6 +63,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.response.InvalidPathClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -307,9 +309,29 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     OMClientResponse omClientResponse = null;
     omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    omClientResponse = omClientRequest
-        .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
-            ozoneManagerDoubleBuffer::add);
+    try {
+      omClientResponse = omClientRequest
+          .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
+              ozoneManagerDoubleBuffer::add);
+    } catch (InvalidPathException e) {
+      LOG.error("Got InvalidPathException while handling request: {}",
+          omRequest, e);
+      OMException omException = new OMException(e.getMessage(),
+          OMException.ResultCodes.INVALID_PATH);
+      OMResponse.Builder omResponse =
+          OmResponseUtil.getOMResponseBuilder(omRequest);
+      omResponse.setSuccess(false);
+      omResponse.setMessage(omException.getMessage());
+      omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(
+          omException));
+      omClientResponse =
+          new InvalidPathClientResponse(omResponse.build());
+      if (omClientResponse.getFlushFuture() == null) {
+        omClientResponse.setFlushFuture(
+            ozoneManagerDoubleBuffer.add(omClientResponse,
+                transactionLogIndex));
+      }
+    }
     return omClientResponse;
   }
 
