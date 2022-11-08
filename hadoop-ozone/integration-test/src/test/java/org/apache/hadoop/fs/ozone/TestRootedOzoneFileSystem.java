@@ -272,8 +272,6 @@ public class TestRootedOzoneFileSystem {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
-        ClientProtocol proxy = objectStore.getClientProxy();
-    proxy.deleteVolume("user");
   }
 
   protected OMMetrics getOMMetrics() {
