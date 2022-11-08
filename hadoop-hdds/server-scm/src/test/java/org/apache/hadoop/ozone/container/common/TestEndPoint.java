@@ -208,6 +208,9 @@ public class TestEndPoint {
           conf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+          newState);
+
       // assert that tmp dir is empty
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
           volumeSet.getVolumesList())) {
