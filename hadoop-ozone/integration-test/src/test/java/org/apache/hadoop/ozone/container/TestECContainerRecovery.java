@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.ozone.test.GenericTestUtils;
@@ -56,11 +57,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -109,8 +105,11 @@ public class TestECContainerRecovery {
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
-    conf.set("hdds.datanode.recovering.container.scrubbing.service.interval",
-            "10s");
+    DatanodeConfiguration datanodeConfiguration =
+            conf.getObject(DatanodeConfiguration.class);
+    datanodeConfiguration.setRecoveringContainerScrubInterval(
+            Duration.of(10, ChronoUnit.SECONDS));
+    conf.setFromObject(datanodeConfiguration);
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
             .getObject(

@@ -50,11 +50,18 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.*;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -158,7 +165,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     Map<Long, ContainerProtos.ContainerDataProto.State> containerStateMap =
             new HashMap<>();
     containerStateMap.putAll(createTestContainers(containerSet, 5, CLOSED)
-            .stream().collect(Collectors.toMap(i->i, i-> CLOSED)));
+            .stream().collect(Collectors.toMap(i -> i, i -> CLOSED)));
 
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
@@ -167,7 +174,7 @@ public class TestStaleRecoveringContainerScrubbingService {
 
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()
-            .collect(Collectors.toMap(i->i, i-> UNHEALTHY)));
+            .collect(Collectors.toMap(i -> i, i -> UNHEALTHY)));
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should be scrubbed since recovering timeout
@@ -183,7 +190,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     containerSet.setRecoveringTimeout(2000L);
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()
-            .collect(Collectors.toMap(i->i, i-> RECOVERING)));
+            .collect(Collectors.toMap(i -> i, i -> RECOVERING)));
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should not be scrubbed
