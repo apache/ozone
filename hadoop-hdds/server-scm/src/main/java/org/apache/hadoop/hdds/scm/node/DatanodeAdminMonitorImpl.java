@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics.ContainerStateInWorkflow;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -83,54 +84,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long trackedRecommission = 0;
   private long unhealthyContainers = 0;
   private long underReplicatedContainers = 0;
-
-  /**
-   * Inner class for snapshot of Datanode ContainerState in
-   * Decommissioning and Maintenance mode workflow.
-   */
-  public static final class ContainerStateInWorkflow {
-    private long sufficientlyReplicated = 0;
-    private long unhealthyContainers = 0;
-    private long underReplicatedContainers = 0;
-    private String host = "";
-    private long pipelinesWaitingToClose = 0;
-
-    private ContainerStateInWorkflow(String host) {
-      this.host = host;
-    }
-
-    public void setReplicationState(long sufficiently,
-                                    long under,
-                                    long unhealthy) {
-      sufficientlyReplicated = sufficiently;
-      underReplicatedContainers = under;
-      unhealthyContainers = unhealthy;
-    }
-
-    public void setPipelinesWaitingToClose(long num) {
-      pipelinesWaitingToClose = num;
-    }
-
-    public String getHost() {
-      return host;
-    }
-
-    public long getSufficientlyReplicated() {
-      return sufficientlyReplicated;
-    }
-
-    public long getPipelinesWaitingToClose() {
-      return pipelinesWaitingToClose;
-    }
-
-    public long getUnderReplicatedContainers() {
-      return underReplicatedContainers;
-    }
-
-    public long getUnhealthyContainers() {
-      return unhealthyContainers;
-    }
-  }
 
   private Map<String, ContainerStateInWorkflow> containerStateByHost;
 
@@ -371,9 +324,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     } else {
       LOG.info("Waiting for pipelines to close for {}. There are {} " +
           "pipelines", dn, pipelines.size());
-      containerStateByHost.computeIfAbsent(dn.getHostName(),
-              hostID -> new ContainerStateInWorkflow(hostID))
-          .setPipelinesWaitingToClose(pipelines.size());
+      containerStateByHost.put(dn.getHostName(),
+        new ContainerStateInWorkflow(dn.getHostName(), 0L, 0L, 0L,
+            pipelines.size()));
       pipelinesWaitingToClose += pipelines.size();
       return false;
     }
@@ -424,11 +377,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
         "unhealthy containers",
         dn, sufficientlyReplicated, underReplicated, unhealthy);
-    containerStateByHost.computeIfAbsent(dn.getHostName(),
-        hostID -> new ContainerStateInWorkflow(hostID))
-        .setReplicationState(sufficientlyReplicated,
+    containerStateByHost.put(dn.getHostName(),
+        new ContainerStateInWorkflow(dn.getHostName(),
+            sufficientlyReplicated,
             underReplicated,
-            unhealthy);
+            unhealthy,
+            0L));
     sufficientlyReplicatedContainers += sufficientlyReplicated;
     underReplicatedContainers += underReplicated;
     unhealthyContainers += unhealthy;
