@@ -2079,7 +2079,7 @@
   </property>
   <property>
     <name>hdds.x509.renew.grace.duration</name>
-    <value>28</value>
+    <value>28D</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>Duration in days within which before the certificate expiration
       date the certificate is automatically renewed. Default is 28 days.

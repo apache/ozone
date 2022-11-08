@@ -93,11 +93,6 @@ public final class HASecurityUtils {
     CertificateClient certClient =
         new SCMCertificateClient(new SecurityConfig(conf));
     InitResponse response = certClient.init();
-    if (response.equals(CertificateClient.InitResponse.REINIT)) {
-      LOG.info("Re-initialize certificate client.");
-      certClient = new SCMCertificateClient(new SecurityConfig(conf));
-      response = certClient.init();
-    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:

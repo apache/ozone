@@ -36,6 +36,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.UUID;
@@ -484,7 +485,6 @@ public class TestDefaultCertificateClient {
     omClientLog.clearOutput();
   }
 
-  @SuppressWarnings("checkstyle:LeftCurly")
   @Test
   public void testCertificateExpirationHandlingInInit() throws Exception {
     String certId = "1L";
@@ -496,7 +496,7 @@ public class TestDefaultCertificateClient {
     Path nonexistent = Paths.get("nonexistent");
     when(config.getCertificateLocation(anyString())).thenReturn(nonexistent);
     when(config.getKeyLocation(anyString())).thenReturn(nonexistent);
-    when(config.getRenewalGraceDays()).thenReturn(28);
+    when(config.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
 
     Calendar cal = Calendar.getInstance();
     cal.add(Calendar.DAY_OF_YEAR, 2);

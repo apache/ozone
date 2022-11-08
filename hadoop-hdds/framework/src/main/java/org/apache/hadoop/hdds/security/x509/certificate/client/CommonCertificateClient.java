@@ -103,7 +103,7 @@ public class CommonCertificateClient extends DefaultCertificateClient {
       } else {
         return FAILURE;
       }
-    case EXPIRES:
+    case EXPIRED_CERT:
       getLogger().info("Component certificate is about to expire. Initiating" +
           "renewal.");
       removeMaterial();

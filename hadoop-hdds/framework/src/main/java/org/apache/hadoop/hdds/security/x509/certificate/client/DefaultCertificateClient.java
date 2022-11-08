@@ -38,8 +38,8 @@ import java.security.SignatureException;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -651,7 +651,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PRIVATEKEY_CERT,
     PUBLICKEY_PRIVATEKEY,
     ALL,
-    EXPIRES
+    EXPIRED_CERT
   }
 
   /**
@@ -661,6 +661,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. Generates and stores a keypair.
    * 3. Try to recover public key if private key and certificate is present
    *    but public key is missing.
+   * 4. Checks is the certificate is about to be expired or have already been
+   *    expired, and if yes removes the key material and the certificate and
+   *    asks for re-initialization in the result.
    *
    * Truth table:
    *  +--------------+-----------------+--------------+----------------+
@@ -692,6 +695,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. When keypair (public/private key) is available but certificate is
    *    missing.
    *
+   * Returns REINIT in following case:
+   *    If it would return SUCCESS, but the certificate expiration date is
+   *    within the configured grace period or if the certificate is already
+   *    expired.
+   *    The grace period is configured by the hdds.x509.renew.grace.duration
+   *    configuration property.
+   *
    */
   @Override
   public synchronized InitResponse init() throws CertificateException {
@@ -709,25 +719,23 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       initCase = initCase | 1;
     }
 
-    Calendar shouldRenewAfter = Calendar.getInstance();
-    shouldRenewAfter
-        .add(Calendar.DAY_OF_YEAR, securityConfig.getRenewalGraceDays());
-    if (initCase == InitCase.ALL.ordinal() &&
-        handleExpiration() && certificate != null &&
-        certificate.getNotAfter().before(shouldRenewAfter.getTime())) {
-      InitCase init = InitCase.EXPIRES;
-      return handleCase(init);
+    boolean successCase =
+        initCase == InitCase.ALL.ordinal() ||
+            initCase == InitCase.PRIVATEKEY_CERT.ordinal();
+    boolean shouldRenew =
+        certificate != null &&
+            Instant.now().plus(securityConfig.getRenewalGracePeriod())
+                .isAfter(certificate.getNotAfter().toInstant());
+
+    if (successCase && shouldRenew) {
+      initCase = InitCase.EXPIRED_CERT.ordinal();
     }
 
     getLogger().info("Certificate client init case: {}", initCase);
-    Preconditions.checkArgument(initCase < 8, "Not a " +
+    Preconditions.checkArgument(initCase < InitCase.values().length, "Not a " +
         "valid case.");
     InitCase init = InitCase.values()[initCase];
     return handleCase(init);
-  }
-
-  protected boolean handleExpiration() {
-    return true;
   }
 
   /**
@@ -784,7 +792,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       } else {
         return FAILURE;
       }
-    case EXPIRES:
+    case EXPIRED_CERT:
       getLogger().info("Component certificate is about to expire. Initiating" +
           "renewal.");
       removeMaterial();
@@ -806,7 +814,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           securityConfig.getCertificateLocation(component).toFile());
       getLogger().info("Certificate renewal: certificates are removed.");
     } catch (IOException e) {
-      throw new CertificateException("Certificate renewal failed.", e);
+      throw new CertificateException("Certificate renewal failed: remove key" +
+          " material failed.", e);
     }
   }
 

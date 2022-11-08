@@ -61,11 +61,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected boolean handleExpiration() {
-    return false;
-  }
-
-  @Override
   protected InitResponse handleCase(InitCase init)
       throws CertificateException {
     // This is similar to OM.
@@ -114,6 +109,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       } else {
         return FAILURE;
       }
+    case EXPIRED_CERT:
+      LOG.error("SCM CA certificate is about to be expire!");
+      return SUCCESS;
     default:
       LOG.error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));
