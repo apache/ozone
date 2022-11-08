@@ -120,6 +120,11 @@ public abstract class
 
     // check token service (blockID or containerID)
     String service = String.valueOf(getService(cmd));
+    if (tokenId.getService().endsWith("pipelineId: ")
+        && service.contains("pipelineId: ")) {
+      // remove the pipeline as not present in token
+      service = service.substring(0, service.lastIndexOf(":") + 2);
+    }
     if (!Objects.equals(service, tokenId.getService())) {
       throw new BlockTokenException("ID mismatch. Token for ID: " +
           tokenId.getService() + " can't be used to access: " + service +
