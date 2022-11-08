@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.hdds;
 
+import com.sun.tools.javac.util.Pair;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 /**
  * Various reusable utility methods related to Java.
  */
@@ -40,5 +46,13 @@ public final class JavaUtils {
    * Private constructor.
    */
   private JavaUtils() {
+  }
+
+  public static <K, V> Map<V, Set<K>> getReverseMapSet(
+          Map<K, Set<V>>  map) {
+    return map.entrySet().stream().flatMap(e -> e.getValue().stream()
+            .map(v -> Pair.of(v, e.getKey())))
+            .collect(Collectors.groupingBy(p -> p.fst,
+                    Collectors.mapping(r -> r.snd, Collectors.toSet())));
   }
 }

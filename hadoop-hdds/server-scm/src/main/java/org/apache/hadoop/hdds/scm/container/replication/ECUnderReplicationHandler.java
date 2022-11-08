@@ -41,14 +41,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -59,18 +57,19 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  * Handles the EC Under replication processing and forming the respective SCM
  * commands.
  */
-public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
+public class ECUnderReplicationHandler<G>
+        implements UnhealthyReplicationHandler {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
   private final ECReplicationCheckHandler ecReplicationCheck;
-  private final PlacementPolicy containerPlacement;
+  private final PlacementPolicy<G> containerPlacement;
   private final long currentContainerSize;
   private final NodeManager nodeManager;
 
   public ECUnderReplicationHandler(ECReplicationCheckHandler ecReplicationCheck,
-      final PlacementPolicy containerPlacement, final ConfigurationSource conf,
-                                   NodeManager nodeManager) {
+      final PlacementPolicy<G> containerPlacement,
+      final ConfigurationSource conf, NodeManager nodeManager) {
     this.ecReplicationCheck = ecReplicationCheck;
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
@@ -418,45 +417,21 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       return Collections.emptyMap();
     }
     Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-    //HDDS-6966: Getting the placement group for each of the replica
-    // (Rack for SCMCommonPlacementPolicy).
-    // Placement group mapping to the set of replica indexes it holds
-    Map<?, Set<Integer>> placementGroupReplicaIndexMap =
-            getSourcesStream(replicas, deletionInFlight)
-            .map(Pair::getKey).collect(Collectors.groupingBy(r ->
-                            containerPlacement.getPlacementGroup(
-                                    r.getDatanodeDetails()),
-                    Collectors.mapping(
-                            ContainerReplica::getReplicaIndex,
-                            Collectors.toSet())));
-    //Filtering out the placement group containing only one index & adding that
-    //replica index to excluded Index set as it has it's own placement group.
-    //Creating a map of replica index to the number of
-    // placement groups it belongs to
-    Map<Integer, Long> replicaIndexPlacementGroupCntMap =
-            placementGroupReplicaIndexMap
-            .entrySet().stream()
-            .filter(e -> {
-              if (e.getValue().size() == 1) {
-                excludedIndexes.addAll(e.getValue());
-              }
-              return e.getValue().size() > 1;
-            }).flatMap(e -> e.getValue().stream())
-            .collect(Collectors.groupingBy(Function.identity(),
-                    Collectors.counting()));
+    List<ContainerReplica> replicaSources =
+            getSourcesStream(replicas, deletionInFlight).map(Pair::getKey)
+                    .collect(Collectors.toList());
+
     //Sorting the replica indexes based on the
     // number of placement groups it belongs to.
     // This would be iterated
     // to create replica to reduce misreplication
-    List<Integer> sortedReplicaIdx = replicaIndexPlacementGroupCntMap
-            .entrySet().stream()
-            .sorted(Comparator.comparingLong(Map.Entry::getValue))
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
+    List<Integer> sortedReplicaIdx =
+            new ECPlacementManager<>(containerPlacement)
+                    .getMisreplicatedIndexes(replicaSources, excludedIndexes);
 
     int additionalCopiesForPlacementStatus =
-            containerHealthResult.getMisreplicationCountAfterPending()
-                    - excludedIndexes.size();
+            Math.min(containerHealthResult.getMisreplicationCountAfterPending()
+                    - excludedIndexes.size(), sortedReplicaIdx.size());
     List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
             additionalCopiesForPlacementStatus);
     excludedNodes.addAll(targets);
