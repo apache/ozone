@@ -96,6 +96,9 @@ public class TestOverReplicatedProcessor {
     // correct indexes.
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(container.containerID());
+    //Check InFlight Deletion
+    Assert.assertEquals(pendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE), 1);
     Assert.assertEquals(1, ops.size());
     for (ContainerReplicaOp op : ops) {
       Assert.assertEquals(5, op.getReplicaIndex());
