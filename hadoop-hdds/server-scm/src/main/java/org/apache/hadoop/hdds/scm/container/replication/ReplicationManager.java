@@ -240,6 +240,7 @@ public class ReplicationManager implements SCMService {
       running = true;
       metrics = ReplicationManagerMetrics.create(this);
       legacyReplicationManager.setMetrics(metrics);
+      containerReplicaPendingOps.setReplicationMetrics(metrics);
       replicationMonitor = new Thread(this::run);
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
@@ -877,6 +878,10 @@ public class ReplicationManager implements SCMService {
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     return new ECContainerReplicaCount(
         containerInfo, replicas, pendingOps, maintenanceRedundancy);
+  }
+  
+  public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
+    return containerReplicaPendingOps;
   }
 
   /**

@@ -114,6 +114,11 @@ public class OverReplicatedProcessor implements Runnable {
       DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
       pendingOps.scheduleDeleteReplica(containerID, targetDatanode,
           rcc.getReplicaIndex());
+      if (rcc.getReplicaIndex() > 0) {
+        replicationManager.getMetrics().incrEcDeletionCmdsSentTotal();
+      } else if (rcc.getReplicaIndex() == 0) {
+        replicationManager.getMetrics().incrNumDeletionCmdsSent();
+      }
     } else {
       throw new IOException("Unexpected command type " + cmd.getType());
     }
