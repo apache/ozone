@@ -110,7 +110,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         return FAILURE;
       }
     case EXPIRED_CERT:
-      LOG.error("SCM CA certificate is about to be expire!");
+      LOG.warn("SCM CA certificate is about to be expire!");
       return SUCCESS;
     default:
       LOG.error("Unexpected case: {} (private/public/cert)",
