@@ -44,22 +44,22 @@ public final class NodeDecommissionMetrics implements MetricsSource {
           .class.getSimpleName();
 
   @Metric("Number of nodes tracked for decommissioning and maintenance.")
-  private MutableGaugeLong trackedDecommissioningMaintenanceNodesTotal;
+  private MutableGaugeLong decommissioningMaintenanceNodesTotal;
 
   @Metric("Number of nodes tracked for recommissioning.")
-  private MutableGaugeLong trackedRecommissionNodesTotal;
+  private MutableGaugeLong recommissionNodesTotal;
 
   @Metric("Number of nodes tracked with pipelines waiting to close.")
-  private MutableGaugeLong trackedPipelinesWaitingToCloseTotal;
+  private MutableGaugeLong pipelinesWaitingToCloseTotal;
 
   @Metric("Number of containers under replicated in tracked nodes.")
-  private MutableGaugeLong trackedContainersUnderReplicatedTotal;
+  private MutableGaugeLong containersUnderReplicatedTotal;
 
   @Metric("Number of containers unhealthy in tracked nodes.")
-  private MutableGaugeLong trackedContainersUnhealthyTotal;
+  private MutableGaugeLong containersUnhealthyTotal;
 
   @Metric("Number of containers sufficiently replicated in tracked nodes.")
-  private MutableGaugeLong trackedContainersSufficientlyReplicatedTotal;
+  private MutableGaugeLong containersSufficientlyReplicatedTotal;
 
   /**
    * Inner class for snapshot of Datanode ContainerState in
@@ -73,26 +73,26 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     private long pipelinesWaitingToClose = 0;
 
     private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
-        "TrackedUnderReplicatedDN",
+        "UnderReplicatedDN",
         "Number of under-replicated containers "
             + "for host in decommissioning and "
             + "maintenance mode");
 
     private static final MetricsInfo HOST_PIPELINES_TO_CLOSE = Interns.info(
-        "TrackedPipelinesWaitingToCloseDN",
+        "PipelinesWaitingToCloseDN",
         "Number of pipelines waiting to close for "
             + "host in decommissioning and "
             + "maintenance mode");
 
     private static final MetricsInfo HOST_SUFFICIENTLY_REPLICATED = Interns
         .info(
-            "TrackedSufficientlyReplicatedDN",
+            "SufficientlyReplicatedDN",
         "Number of sufficiently replicated containers "
             + "for host in decommissioning and "
             + "maintenance mode");
 
     private static final MetricsInfo HOST_UNHEALTHY_CONTAINERS = Interns.info(
-        "TrackedUnhealthyContainersDN",
+        "UnhealthyContainersDN",
         "Number of unhealthy containers "
             + "for host in decommissioning and "
             + "maintenance mode");
@@ -162,12 +162,12 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector
         .addRecord(METRICS_SOURCE_NAME);
-    trackedDecommissioningMaintenanceNodesTotal.snapshot(builder, all);
-    trackedRecommissionNodesTotal.snapshot(builder, all);
-    trackedPipelinesWaitingToCloseTotal.snapshot(builder, all);
-    trackedContainersUnderReplicatedTotal.snapshot(builder, all);
-    trackedContainersUnhealthyTotal.snapshot(builder, all);
-    trackedContainersSufficientlyReplicatedTotal.snapshot(builder, all);
+    decommissioningMaintenanceNodesTotal.snapshot(builder, all);
+    recommissionNodesTotal.snapshot(builder, all);
+    pipelinesWaitingToCloseTotal.snapshot(builder, all);
+    containersUnderReplicatedTotal.snapshot(builder, all);
+    containersUnhealthyTotal.snapshot(builder, all);
+    containersSufficientlyReplicatedTotal.snapshot(builder, all);
 
     MetricsRecordBuilder recordBuilder = builder;
     for (Map.Entry<String, ContainerStateInWorkflow> e :
@@ -195,63 +195,63 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
-  public synchronized void setTrackedDecommissioningMaintenanceNodesTotal(
+  public synchronized void setDecommissioningMaintenanceNodesTotal(
             long numNodesTracked) {
-    trackedDecommissioningMaintenanceNodesTotal
+    decommissioningMaintenanceNodesTotal
         .set(numNodesTracked);
   }
 
-  public synchronized void setTrackedRecommissionNodesTotal(
+  public synchronized void setRecommissionNodesTotal(
           long numNodesTrackedRecommissioned) {
-    trackedRecommissionNodesTotal.set(numNodesTrackedRecommissioned);
+    recommissionNodesTotal.set(numNodesTrackedRecommissioned);
   }
 
-  public synchronized void setTrackedPipelinesWaitingToCloseTotal(
+  public synchronized void setPipelinesWaitingToCloseTotal(
           long numTrackedPipelinesWaitToClose) {
-    trackedPipelinesWaitingToCloseTotal
+    pipelinesWaitingToCloseTotal
         .set(numTrackedPipelinesWaitToClose);
   }
 
-  public synchronized void setTrackedContainersUnderReplicatedTotal(
+  public synchronized void setContainersUnderReplicatedTotal(
           long numTrackedUnderReplicated) {
-    trackedContainersUnderReplicatedTotal
+    containersUnderReplicatedTotal
         .set(numTrackedUnderReplicated);
   }
 
-  public synchronized void setTrackedContainersUnhealthyTotal(
+  public synchronized void setContainersUnhealthyTotal(
           long numTrackedUnhealthy) {
-    trackedContainersUnhealthyTotal
+    containersUnhealthyTotal
         .set(numTrackedUnhealthy);
   }
 
-  public synchronized void setTrackedContainersSufficientlyReplicatedTotal(
+  public synchronized void setContainersSufficientlyReplicatedTotal(
           long numTrackedSufficientlyReplicated) {
-    trackedContainersSufficientlyReplicatedTotal
+    containersSufficientlyReplicatedTotal
         .set(numTrackedSufficientlyReplicated);
   }
 
-  public synchronized long getTrackedDecommissioningMaintenanceNodesTotal() {
-    return trackedDecommissioningMaintenanceNodesTotal.value();
+  public synchronized long getDecommissioningMaintenanceNodesTotal() {
+    return decommissioningMaintenanceNodesTotal.value();
   }
 
-  public synchronized long getTrackedRecommissionNodesTotal() {
-    return trackedRecommissionNodesTotal.value();
+  public synchronized long getRecommissionNodesTotal() {
+    return recommissionNodesTotal.value();
   }
 
-  public synchronized long getTrackedPipelinesWaitingToCloseTotal() {
-    return trackedPipelinesWaitingToCloseTotal.value();
+  public synchronized long getPipelinesWaitingToCloseTotal() {
+    return pipelinesWaitingToCloseTotal.value();
   }
 
-  public synchronized long getTrackedContainersUnderReplicatedTotal() {
-    return trackedContainersUnderReplicatedTotal.value();
+  public synchronized long getContainersUnderReplicatedTotal() {
+    return containersUnderReplicatedTotal.value();
   }
 
-  public synchronized long getTrackedContainersUnhealthyTotal() {
-    return trackedContainersUnhealthyTotal.value();
+  public synchronized long getContainersUnhealthyTotal() {
+    return containersUnhealthyTotal.value();
   }
 
-  public synchronized long getTrackedContainersSufficientlyReplicatedTotal() {
-    return trackedContainersSufficientlyReplicatedTotal.value();
+  public synchronized long getContainersSufficientlyReplicatedTotal() {
+    return containersSufficientlyReplicatedTotal.value();
   }
 
   public synchronized void metricRecordOfContainerStateByHost(
@@ -261,28 +261,28 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   }
 
   @VisibleForTesting
-  public Long getTrackedPipelinesWaitingToCloseByHost(String host) {
+  public Long getPipelinesWaitingToCloseByHost(String host) {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
         workflowMetrics.getPipelinesWaitingToClose();
   }
 
   @VisibleForTesting
-  public Long getTrackedSufficientlyReplicatedByHost(String host) {
+  public Long getSufficientlyReplicatedByHost(String host) {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
         workflowMetrics.getSufficientlyReplicated();
   }
 
   @VisibleForTesting
-  public Long getTrackedUnderReplicatedByHost(String host) {
+  public Long getUnderReplicatedByHost(String host) {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
         workflowMetrics.getUnderReplicatedContainers();
   }
 
   @VisibleForTesting
-  public Long getTrackedUnhealthyContainersByHost(String host) {
+  public Long getUnhealthyContainersByHost(String host) {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
         workflowMetrics.getUnhealthyContainers();

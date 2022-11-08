@@ -90,7 +90,7 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(1,
-        metrics.getTrackedDecommissioningMaintenanceNodesTotal());
+        metrics.getDecommissioningMaintenanceNodesTotal());
   }
 
   /**
@@ -110,9 +110,9 @@ public class TestNodeDecommissionMetrics {
     monitor.stopMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(0,
-        metrics.getTrackedDecommissioningMaintenanceNodesTotal());
+        metrics.getDecommissioningMaintenanceNodesTotal());
     Assertions.assertEquals(1,
-        metrics.getTrackedRecommissionNodesTotal());
+        metrics.getRecommissionNodesTotal());
   }
 
   /**
@@ -135,12 +135,12 @@ public class TestNodeDecommissionMetrics {
     // Ensure a StartAdmin event was fired
     eventQueue.processAll(20000);
     Assertions.assertEquals(2,
-        metrics.getTrackedPipelinesWaitingToCloseTotal());
+        metrics.getPipelinesWaitingToCloseTotal());
 
     // should have host specific metric collected
     // for datanode_host1
     Assertions.assertEquals(2,
-        metrics.getTrackedPipelinesWaitingToCloseByHost(
+        metrics.getPipelinesWaitingToCloseByHost(
             "datanode_host1"));
     // Clear the pipelines and the metric collected for
     // datanode_host1 should clear
@@ -148,7 +148,7 @@ public class TestNodeDecommissionMetrics {
     monitor.run();
     eventQueue.processAll(20000);
     Assertions.assertEquals(0,
-        metrics.getTrackedPipelinesWaitingToCloseByHost(
+        metrics.getPipelinesWaitingToCloseByHost(
             "datanode_host1"));
   }
 
@@ -185,12 +185,12 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn1);
     monitor.run();
     Assertions.assertEquals(1,
-        metrics.getTrackedContainersUnderReplicatedTotal());
+        metrics.getContainersUnderReplicatedTotal());
 
     // should have host specific metric collected
     // for datanode_host1
     Assertions.assertEquals(1,
-        metrics.getTrackedUnderReplicatedByHost("datanode_host1"));
+        metrics.getUnderReplicatedByHost("datanode_host1"));
   }
 
   /**
@@ -224,12 +224,12 @@ public class TestNodeDecommissionMetrics {
     // expect dn in decommissioning workflow with container
     // sufficiently replicated
     Assertions.assertEquals(1,
-        metrics.getTrackedContainersSufficientlyReplicatedTotal());
+        metrics.getContainersSufficientlyReplicatedTotal());
 
     // should have host specific metric collected
     // for datanode_host1
     Assertions.assertEquals(1,
-        metrics.getTrackedSufficientlyReplicatedByHost("datanode_host1"));
+        metrics.getSufficientlyReplicatedByHost("datanode_host1"));
   }
 
   /**
@@ -259,12 +259,12 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(1,
-        metrics.getTrackedContainersUnhealthyTotal());
+        metrics.getContainersUnhealthyTotal());
 
     // should have host specific metric collected
     // for datanode_host1
     Assertions.assertEquals(1,
-        metrics.getTrackedUnhealthyContainersByHost(
+        metrics.getUnhealthyContainersByHost(
             "datanode_host1"));
   }
 
@@ -309,7 +309,7 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(3,
-        metrics.getTrackedContainersUnderReplicatedTotal());
+        metrics.getContainersUnderReplicatedTotal());
   }
 
   /**
@@ -338,6 +338,6 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(3,
-        metrics.getTrackedPipelinesWaitingToCloseTotal());
+        metrics.getPipelinesWaitingToCloseTotal());
   }
 }

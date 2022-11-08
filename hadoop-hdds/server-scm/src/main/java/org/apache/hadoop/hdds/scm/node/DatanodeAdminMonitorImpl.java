@@ -192,15 +192,15 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   synchronized void setMetricsToGauge() {
     synchronized (metrics) {
-      metrics.setTrackedContainersUnhealthyTotal(unhealthyContainers);
-      metrics.setTrackedRecommissionNodesTotal(trackedRecommission);
-      metrics.setTrackedDecommissioningMaintenanceNodesTotal(
+      metrics.setContainersUnhealthyTotal(unhealthyContainers);
+      metrics.setRecommissionNodesTotal(trackedRecommission);
+      metrics.setDecommissioningMaintenanceNodesTotal(
           trackedDecomMaintenance);
-      metrics.setTrackedContainersUnderReplicatedTotal(
+      metrics.setContainersUnderReplicatedTotal(
           underReplicatedContainers);
-      metrics.setTrackedContainersSufficientlyReplicatedTotal(
+      metrics.setContainersSufficientlyReplicatedTotal(
           sufficientlyReplicatedContainers);
-      metrics.setTrackedPipelinesWaitingToCloseTotal(pipelinesWaitingToClose);
+      metrics.setPipelinesWaitingToCloseTotal(pipelinesWaitingToClose);
       metrics.metricRecordOfContainerStateByHost(containerStateByHost);
     }
   }
