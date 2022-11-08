@@ -559,6 +559,8 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
+    // Avoid double buffer issue
+    Thread.sleep(5000);
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
     // Get the latest db checkpoint from the leader OM.
