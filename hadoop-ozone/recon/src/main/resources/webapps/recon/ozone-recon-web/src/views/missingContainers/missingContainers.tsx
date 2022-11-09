@@ -341,7 +341,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     return <div>Loading...</div>;
   };
 
-  serachCoulmn = () => {
+  searchColumn = () => {
     return CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
       if (column.isSearchable) {
         const newColumn = {
@@ -368,7 +368,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     const generateTable = (dataSource) => {
       return <Table
         expandRowByClick dataSource={dataSource}
-        columns={this.serachCoulmn()}
+        columns={this.searchColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerID'
         expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
