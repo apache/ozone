@@ -51,6 +51,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import org.assertj.core.api.Fail;
 import org.junit.Assert;
@@ -563,6 +564,8 @@ public class TestOMRatisSnapshots {
     Thread.sleep(5000);
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
+    // allow the snapshot to be written to the info table
+    Thread.sleep(5000);
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -615,7 +618,12 @@ public class TestOMRatisSnapshots {
         .setVolumeName(volumeName)
             .setBucketName(bucketName)
                 .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
-    OmKeyInfo omKeyInfo = followerOM.lookupKey(omKeyArgs);
+    OmKeyInfo omKeyInfo = null;
+    try {
+      omKeyInfo = followerOM.lookupKey(omKeyArgs);
+    } catch (Exception e) {
+      fail("received exception: " + e);
+    }
     Assert.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 

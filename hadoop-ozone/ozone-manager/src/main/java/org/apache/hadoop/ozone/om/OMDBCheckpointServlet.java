@@ -157,6 +157,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         list.add(path);
       }
     }
+    if (list.size() == 0) {
+      LOG.error("gbj failure");
+    }
     return list;
   }
 

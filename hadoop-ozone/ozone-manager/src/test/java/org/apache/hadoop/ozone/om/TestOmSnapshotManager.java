@@ -128,6 +128,7 @@ public class TestOmSnapshotManager {
   @Test
   public void testHardLinkCreation() throws IOException {
     byte[] dummyData = {0};
+
     File dbDir = new File(testDir.toString(), OM_DB_NAME);
     File snapDir1 = new File(testDir.toString(),
         OM_SNAPSHOT_DIR + OM_KEY_PREFIX + "dir1");
@@ -136,24 +137,30 @@ public class TestOmSnapshotManager {
     File checkpointDir1 = new File(testDir.toString(),
         OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
 
+    // Create dummy files to be linked to
     dbDir.mkdirs();
     snapDir1.mkdirs();
     snapDir2.mkdirs();
     Files.write(Paths.get(dbDir.toString(), "f1"), dummyData);
     Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
+
+    // Create map of links to dummy files
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     hardLinkFiles.put(Paths.get(snapDir2.toString(), "f1"),
         Paths.get(checkpointDir1.toString(), "f1"));
     hardLinkFiles.put(Paths.get(snapDir2.toString(), "s1"),
         Paths.get(snapDir1.toString(), "s1"));
 
+    // Create link list
     Path hardLinkList =
         OmSnapshotManager.createHardLinkList(
             testDir.toString().length() + 1, hardLinkFiles);
     Files.move(hardLinkList, Paths.get(dbDir.toString(), OM_HARDLINK_FILE));
 
+    // Create links from list
     OmSnapshotManager.createHardLinks(dbDir.toPath());
 
+    // Confirm expected links
     for (Path path : hardLinkFiles.keySet()) {
       Assert.assertTrue(path.toFile().exists());
     }

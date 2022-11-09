@@ -280,6 +280,7 @@ public final class OmSnapshotManager {
     }
   }
 
+  // Create hard links listed in OM_HARDLINK_FILE
   static void createHardLinks(Path dbPath) throws IOException {
     File hardLinkFile = new File(dbPath.toString(),
         OMDBCheckpointServlet.OM_HARDLINK_FILE);
@@ -297,6 +298,7 @@ public final class OmSnapshotManager {
     }
   }
 
+  // Get the full path of OM_HARDLINK_FILE entry
   private static Path getFullPath(Path dbPath, String fileName) {
     File file = new File(fileName);
     // If there is no directory then this file belongs in the db
@@ -307,6 +309,13 @@ public final class OmSnapshotManager {
     return Paths.get(dbPath.getParent().toString(), fileName);
   }
 
+  // Create list of links to add to follower
+  // Format of entries are either:
+  // db.snapshot/dir1/fileTo fileFrom
+  //    for files in active db or:
+  // db.snapshot/dir1/fileTo parent/dir2/fileFrom
+  //    for files in another directory, (either another snapshot dir or
+  //    sst compaction backup directory)
   static Path createHardLinkList(int truncateLength,
                                   Map<Path, Path> hardLinkFiles)
       throws IOException {
