@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -58,6 +59,7 @@ import org.assertj.core.api.Fail;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -564,22 +566,24 @@ public class TestOMRatisSnapshots {
     // Avoid double buffer issue waiting for keys
     GenericTestUtils.waitFor(() -> {
         try {
-          leaderOM.getMetadataManager().getKeyTable(BucketLayout.OBJECT_STORE)
-            .getSkipCache(keys.get(keys.size()-1));
-          return true;
+          OmKeyInfo key = leaderOM.getMetadataManager()
+              .getKeyTable(ozoneBucket.getBucketLayout())
+              .getSkipCache(leaderOM.getMetadataManager().getOzoneKey(volumeName, bucketName, keys.get(0)));
+          return key != null;
         } catch (Exception e) {
           return false;
         }
-    }, 100, 3000);
+    }, 100, 10000);
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
     // allow the snapshot to be written to the info table
     GenericTestUtils.waitFor(() -> {
         try {
-          leaderOM.getMetadataManager().getSnapshotInfoTable()
-            .getSkipCache(
-                SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
-          return true;
+          SnapshotInfo snapshotInfo =
+              leaderOM.getMetadataManager().getSnapshotInfoTable()
+                  .getSkipCache(
+                      SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+          return snapshotInfo != null;
         } catch (Exception e) {
           return false;
         }
@@ -603,10 +607,9 @@ public class TestOMRatisSnapshots {
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 3s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 100, 3000);
+    GenericTestUtils.waitFor(() ->
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= leaderOMSnapshotIndex - 1, 100, 3000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -640,9 +643,9 @@ public class TestOMRatisSnapshots {
     try {
       omKeyInfo = followerOM.lookupKey(omKeyArgs);
     } catch (Exception e) {
-      fail("received exception: " + e);
+      Assertions.fail("received exception: " + e);
     }
-    Assert.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
+    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 
   private List<String> writeKeysToIncreaseLogIndex(

@@ -3604,7 +3604,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     File dbBackupDir = new File(dbDir, dbBackupName);
     if (!dbBackupDir.mkdirs()) {
       throw new IOException("Failed to make db backup dir: " +
-          dbBackupDir.toString());
+          dbBackupDir);
     }
     File dbBackup = new File(dbBackupDir, oldDB.getName());
     File dbSnapshotsDir = new File(dbDir, OM_SNAPSHOT_DIR);
