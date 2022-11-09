@@ -1231,52 +1231,44 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     loginOMUserIfSecurityEnabled(conf);
     OMStorage omStorage = new OMStorage(conf);
     StorageState state = omStorage.getState();
-    if (state != StorageState.INITIALIZED) {
-      try {
-        ScmInfo scmInfo = getScmInfo(conf);
-        String clusterId = scmInfo.getClusterId();
-        String scmId = scmInfo.getScmId();
-        if (clusterId == null || clusterId.isEmpty()) {
-          throw new IOException("Invalid Cluster ID");
-        }
-        if (scmId == null || scmId.isEmpty()) {
-          throw new IOException("Invalid SCM ID");
-        }
+    String scmId = null;
+    try {
+      ScmInfo scmInfo = getScmInfo(conf);
+      scmId = scmInfo.getScmId();
+      if (scmId == null || scmId.isEmpty()) {
+        throw new IOException("Invalid SCM ID");
+      }
+      String clusterId = scmInfo.getClusterId();
+      if (clusterId == null || clusterId.isEmpty()) {
+        throw new IOException("Invalid Cluster ID");
+      }
+
+      if (state != StorageState.INITIALIZED) {
         omStorage.setClusterId(clusterId);
-        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          initializeSecurity(conf, omStorage, scmId);
-        }
         omStorage.initialize();
         System.out.println(
             "OM initialization succeeded.Current cluster id for sd="
                 + omStorage.getStorageDir() + ";cid=" + omStorage
                 .getClusterID() + ";layoutVersion=" + omStorage
                 .getLayoutVersion());
-
-        return true;
-      } catch (IOException ioe) {
-        LOG.error("Could not initialize OM version file", ioe);
-        return false;
+      } else {
+        System.out.println(
+            "OM already initialized.Reusing existing cluster id for sd="
+                + omStorage.getStorageDir() + ";cid=" + omStorage
+                .getClusterID() + ";layoutVersion=" + omStorage
+                .getLayoutVersion());
       }
-    } else {
-      if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
-          omStorage.getOmCertSerialId() == null) {
-        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
-        String scmId = scmInfo.getScmId();
-        if (scmId == null || scmId.isEmpty()) {
-          throw new IOException("Invalid SCM ID");
-        }
-        LOG.info("OM storage is already initialized. Initializing security");
-        initializeSecurity(conf, omStorage, scmId);
-        omStorage.persistCurrentState();
-      }
-      System.out.println(
-          "OM already initialized.Reusing existing cluster id for sd="
-              + omStorage.getStorageDir() + ";cid=" + omStorage
-              .getClusterID() + ";layoutVersion=" + omStorage
-              .getLayoutVersion());
-      return true;
+    } catch (IOException ioe) {
+      LOG.error("Could not initialize OM version file", ioe);
+      return false;
     }
+
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      LOG.info("OM storage initialized. Initializing security");
+      initializeSecurity(conf, omStorage, scmId);
+    }
+    omStorage.persistCurrentState();
+    return true;
   }
 
   /**
@@ -1292,6 +1284,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         new OMCertificateClient(new SecurityConfig(conf),
             omStore.getOmCertSerialId());
     CertificateClient.InitResponse response = certClient.init();
+    if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      LOG.info("Re-initialize certificate client.");
+      omStore.unsetOmCertSerialId();
+      omStore.persistCurrentState();
+      certClient = new OMCertificateClient(new SecurityConfig(conf));
+      response = certClient.init();
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:

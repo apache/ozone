@@ -185,6 +185,16 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_DEFAULT_DURATION_DEFAULT = "P365D";
 
   /**
+   * Duration of the grace period within which a certificate should be
+   * renewed before the current one expires.
+   * Default is 28 days.
+   */
+  public static final String HDDS_X509_RENEW_GRACE_DURATION =
+      "hdds.x509.renew.grace.duration";
+
+  public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
+
+  /**
    * Do not instantiate.
    */
   private HddsConfigKeys() {
