@@ -17,8 +17,6 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -26,11 +24,11 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,20 +42,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 /**
  * Class for handling FSO specific tasks.
  */
-public class NSSummaryTaskWithFSO extends NSSummaryTask {
+public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
-  @Inject
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
-                            reconNamespaceSummaryManager) {
-    super(reconNamespaceSummaryManager);
-  }
-
-  @Override
-  public String getTaskName() {
-    return "NSSummaryTaskWithFSO";
+                              reconNamespaceSummaryManager,
+                              ReconOMMetadataManager
+                              reconOMMetadataManager) {
+    super(reconNamespaceSummaryManager, reconOMMetadataManager);
   }
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
@@ -65,8 +59,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
     return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE);
   }
 
-  @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public boolean processWithFSO(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
@@ -152,7 +145,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
                 ioEx);
-        return new ImmutablePair<>(getTaskName(), false);
+        return false;
       }
     }
 
@@ -160,21 +153,17 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
       writeNSSummariesToDB(nsSummaryMap);
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), false);
+      return false;
     }
 
     LOG.info("Completed a process run of NSSummaryTaskWithFSO");
-    return new ImmutablePair<>(getTaskName(), true);
+    return true;
   }
 
-  @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      // reinit Recon RocksDB's namespace CF.
-      getReconNamespaceSummaryManager().clearNSSummaryTable();
-
       Table<String, OmDirectoryInfo> dirTable =
           omMetadataManager.getDirectoryTable();
       try (TableIterator<String,
@@ -188,7 +177,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
       }
 
       // Get fileTable used by FSO
-      Table<String, OmKeyInfo> keyTable = omMetadataManager.getFileTable();
+      Table<String, OmKeyInfo> keyTable =
+          omMetadataManager.getFileTable();
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyTableIter = keyTable.iterator()) {
@@ -202,16 +192,16 @@ public class NSSummaryTaskWithFSO extends NSSummaryTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
               ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+      return false;
     }
 
     try {
       writeNSSummariesToDB(nsSummaryMap);
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), false);
+      return false;
     }
     LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
-    return new ImmutablePair<>(getTaskName(), true);
+    return true;
   }
 }

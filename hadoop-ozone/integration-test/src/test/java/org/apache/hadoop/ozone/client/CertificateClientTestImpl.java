@@ -53,6 +53,11 @@ public class CertificateClientTestImpl implements CertificateClient {
   private final X509Certificate x509Certificate;
 
   public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
+    this(conf, true);
+  }
+
+  public CertificateClientTestImpl(OzoneConfiguration conf, boolean rootCA)
+      throws Exception {
     securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGen =
         new HDDSKeyGenerator(securityConfig.getConfiguration());
@@ -66,8 +71,10 @@ public class CertificateClientTestImpl implements CertificateClient {
             .setKey(keyPair)
             .setSubject("localhost")
             .setConfiguration(config)
-            .setScmID("TestScmId1")
-            .makeCA();
+            .setScmID("TestScmId1");
+    if (rootCA) {
+      builder.makeCA();
+    }
     X509CertificateHolder certificateHolder = null;
     certificateHolder = builder.build();
     x509Certificate = new JcaX509CertificateConverter().getCertificate(

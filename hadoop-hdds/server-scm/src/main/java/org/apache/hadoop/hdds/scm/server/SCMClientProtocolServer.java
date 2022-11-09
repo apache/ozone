@@ -763,9 +763,9 @@ public class SCMClientProtocolServer implements
         // In case, there is no ratis, there is no ratis role.
         // This will just print the hostname with ratis port as the default
         // behaviour.
-        String adddress = scm.getSCMHANodeDetails().getLocalNodeDetails()
+        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
             .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(adddress));
+        builder.setRatisPeerRoles(Arrays.asList(address));
       }
       return builder.build();
     } catch (Exception ex) {

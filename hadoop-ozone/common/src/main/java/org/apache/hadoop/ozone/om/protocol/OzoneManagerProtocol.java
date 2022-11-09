@@ -270,7 +270,9 @@ public interface OzoneManagerProtocol
    * @param args the args of the key.
    * @return OmKeyInfo instance that client uses to talk to container.
    * @throws IOException
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Deprecated
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
 
   /**
@@ -757,7 +759,9 @@ public interface OzoneManagerProtocol
    *                     if bucket does not exist
    * @throws IOException if there is error in the db
    *                     invalid arguments
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Deprecated
   OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
 
   /**

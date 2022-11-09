@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 
 /**
@@ -102,6 +103,11 @@ public class CommonCertificateClient extends DefaultCertificateClient {
       } else {
         return FAILURE;
       }
+    case EXPIRED_CERT:
+      getLogger().info("Component certificate is about to expire. Initiating" +
+          "renewal.");
+      removeMaterial();
+      return REINIT;
     default:
       log.error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));

@@ -64,12 +64,10 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -255,8 +253,6 @@ public class TestRootedOzoneFileSystem {
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
-    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-        TrashPolicy.class);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
@@ -1523,39 +1519,6 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(volume1.setOwner(prevOwner));
   }
 
-  /**
-   * Check that  files are moved to trash since it is enabled by
-   * fs.rename(src, dst, options).
-   */
-  @Test
-  @Flaky({"HDDS-5819", "HDDS-6451"})
-  public void testRenameToTrashEnabled() throws IOException {
-    // Create a file
-    String testKeyName = "testKey2";
-    Path path = new Path(bucketPath, testKeyName);
-    try (FSDataOutputStream stream = fs.create(path)) {
-      stream.write(1);
-    }
-
-    // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(path);
-
-    // Construct paths
-    String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
-    Path userTrashCurrent = new Path(userTrash, "Current");
-    String key = path.toString().substring(1);
-    Path trashPath = new Path(userTrashCurrent, key);
-    // Trash Current directory should still have been created.
-    Assert.assertTrue(ofs.exists(userTrashCurrent));
-    // Check under trash, the key should be present
-    Assert.assertTrue(ofs.exists(trashPath));
-
-    // Cleanup
-    ofs.delete(trashRoot, true);
-  }
-
   @Test
   public void testFileDelete() throws Exception {
     Path grandparent = new Path(bucketPath, "testBatchDelete");
@@ -1600,7 +1563,6 @@ public class TestRootedOzoneFileSystem {
    * 3.Create a second Key in different bucket and verify deletion.
    * @throws Exception
    */
-  @Ignore
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
@@ -1635,21 +1597,26 @@ public class TestRootedOzoneFileSystem {
     long prevNumTrashAtomicDirRenames = getOMMetrics()
         .getNumTrashAtomicDirRenames();
 
+    // Construct paths for first key
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Construct paths for second key in different bucket
+    Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
+    Path userTrash2 = new Path(trashRoot2, username);
+    Path trashPath2 = new Path(userTrashCurrent, testKeyName + "1");
+
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(keyPath1);
     // for key in second bucket
     trash.moveToTrash(keyPath2);
 
-    // Construct paths for first key
-    String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
-    Path trashPath = getTrashKeyPath(keyPath1, userTrash);
-
-    // Construct paths for second key in different bucket
-    Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
-    Path userTrash2 = new Path(trashRoot2, username);
-    Path trashPath2 = getTrashKeyPath(keyPath2, userTrash2);
+    // key should either be present in Current or checkpointDir
+    Assert.assertTrue(ofs.exists(trashPath)
+        || ofs.listStatus(ofs.listStatus(userTrash)[0].getPath()).length > 0);
 
 
     // Wait until the TrashEmptier purges the keys

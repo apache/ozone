@@ -83,7 +83,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocess() {
+  public void testReprocess() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     // Mock 5 rows in each table and test the count
     for (String tableName: tableCountTask.getTaskTables()) {

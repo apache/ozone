@@ -212,6 +212,6 @@ public class TestCertificateClientInit {
 
   private X509Certificate getX509Certificate() throws Exception {
     return KeyStoreTestUtil.generateCertificate(
-        "CN=Test", keyPair, 10, securityConfig.getSignatureAlgo());
+        "CN=Test", keyPair, 365, securityConfig.getSignatureAlgo());
   }
 }

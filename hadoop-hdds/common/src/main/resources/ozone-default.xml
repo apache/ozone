@@ -2078,6 +2078,14 @@
       PnDTnHnMn.nS</description>
   </property>
   <property>
+    <name>hdds.x509.renew.grace.duration</name>
+    <value>P28D</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Duration of the grace period within which a certificate should be
+      * renewed before the current one expires. Default is 28 days.
+    </description>
+  </property>
+  <property>
     <name>hdds.x509.dir.name</name>
     <value>certs</value>
     <tag>OZONE, HDDS, SECURITY</tag>
@@ -2274,6 +2282,16 @@
       Iterate batch size of delete when use BasicOzoneFileSystem.
     </description>
   </property>
+
+  <property>
+    <name>fs.trash.classname</name>
+    <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+    <tag>OZONE, OZONEFS, CLIENT</tag>
+    <description>
+      Trash Policy to be used.
+    </description>
+  </property>
+
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
@@ -3358,5 +3376,25 @@
     </description>
   </property>
 
+  <property>
+    <name>ozone.fs.listing.page.size</name>
+    <value>1024</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Listing page size value used by client for listing number of items on fs related sub-commands output.
+      Kindly set this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
 
+  <property>
+    <name>ozone.fs.listing.page.size.max</name>
+    <value>5000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum listing page size value enforced by server for listing items on fs related sub-commands output. Kindly set
+      this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
 </configuration>

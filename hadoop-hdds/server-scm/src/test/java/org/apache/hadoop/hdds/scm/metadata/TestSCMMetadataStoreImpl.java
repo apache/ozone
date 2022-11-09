@@ -30,7 +30,6 @@ import java.nio.file.Path;
 
 import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.apache.hadoop.test.MetricsAsserts.getStringMetric;
 
 
 /**
@@ -50,8 +49,6 @@ public class TestSCMMetadataStoreImpl {
 
   @Test
   public void testEstimatedKeyCount() {
-    Assertions.assertTrue(getString("EstimatedKeyCount")
-        .contains("\"sequenceId\":0"));
     Assertions.assertEquals(0, getGauge("SequenceIdEstimatedKeyCount"));
 
     try {
@@ -60,18 +57,11 @@ public class TestSCMMetadataStoreImpl {
       // Ignore
     }
 
-    Assertions.assertTrue(getString("EstimatedKeyCount")
-        .contains("\"sequenceId\":1"));
     Assertions.assertEquals(1, getGauge("SequenceIdEstimatedKeyCount"));
   }
 
   private long getGauge(String metricName) {
     return getLongGauge(metricName,
-        getMetrics(SCMMetadataStoreMetrics.METRICS_SOURCE_NAME));
-  }
-
-  private String getString(String metricName) {
-    return getStringMetric(metricName,
         getMetrics(SCMMetadataStoreMetrics.METRICS_SOURCE_NAME));
   }
 }
