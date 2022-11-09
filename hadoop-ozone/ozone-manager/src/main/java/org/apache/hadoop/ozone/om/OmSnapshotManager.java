@@ -64,6 +64,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
  * This class is used to manage/create OM snapshots.
  */
 public final class OmSnapshotManager {
+  public static final String OM_HARDLINK_FILE = "hardLinkFile";
   private final OzoneManager ozoneManager;
   private final SnapshotDiffManager snapshotDiffManager;
   private final LoadingCache<String, OmSnapshot> snapshotCache;
@@ -283,7 +284,7 @@ public final class OmSnapshotManager {
   // Create hard links listed in OM_HARDLINK_FILE
   static void createHardLinks(Path dbPath) throws IOException {
     File hardLinkFile = new File(dbPath.toString(),
-        OMDBCheckpointServlet.OM_HARDLINK_FILE);
+        OM_HARDLINK_FILE);
     if (hardLinkFile.exists()) {
       List<String> lines =
           Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());

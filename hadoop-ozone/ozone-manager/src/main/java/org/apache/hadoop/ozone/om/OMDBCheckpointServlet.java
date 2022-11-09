@@ -81,8 +81,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private static final String DURATION_TO_WAIT_FOR_DIRECTORY = "PT10S";
 
-  public static final String OM_HARDLINK_FILE = "hardLinkFile";
-
   @Override
   public void init() throws ServletException {
 
@@ -156,9 +154,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
         list.add(path);
       }
-    }
-    if (list.size() == 0) {
-      LOG.error("gbj failure");
     }
     return list;
   }
@@ -250,7 +245,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
     if (!hardLinkFiles.isEmpty()) {
       Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-      includeFile(hardLinkFile.toFile(), OM_HARDLINK_FILE,
+      includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
           archiveOutputStream);
     }
   }

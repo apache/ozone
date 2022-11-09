@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.hdds.ExitManager;
@@ -66,7 +67,7 @@ import org.slf4j.event.Level;
 /**
  * Tests the Ratis snapshots feature in OM.
  */
-@Timeout(5000)
+@Timeout(500)
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -560,12 +561,29 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
-    // Avoid double buffer issue
-    Thread.sleep(5000);
+    // Avoid double buffer issue waiting for keys
+    GenericTestUtils.waitFor(() -> {
+        try {
+          leaderOM.getMetadataManager().getKeyTable(BucketLayout.OBJECT_STORE)
+            .getSkipCache(keys.get(keys.size()-1));
+          return true;
+        } catch (Exception e) {
+          return false;
+        }
+    }, 100, 3000);
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
     // allow the snapshot to be written to the info table
-    Thread.sleep(5000);
+    GenericTestUtils.waitFor(() -> {
+        try {
+          leaderOM.getMetadataManager().getSnapshotInfoTable()
+            .getSkipCache(
+                SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+          return true;
+        } catch (Exception e) {
+          return false;
+        }
+    }, 100, 3000);
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
