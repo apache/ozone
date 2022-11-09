@@ -137,16 +137,17 @@ public final class RocksDatabase {
           .collect(Collectors.toList());
 
       // open RocksDB
-      columnFamilyHandles = new ArrayList<>();
+      final List<ColumnFamilyHandle> handles = new ArrayList<>();
       if (readOnly) {
         db = ManagedRocksDB.openReadOnly(dbOptions, dbFile.getAbsolutePath(),
-            descriptors, columnFamilyHandles);
+            descriptors, handles);
       } else {
         db = ManagedRocksDB.open(dbOptions, dbFile.getAbsolutePath(),
-            descriptors, columnFamilyHandles);
+            descriptors, handles);
       }
+      columnFamilyHandles = handles;
       // init a column family map.
-      for (ColumnFamilyHandle h : columnFamilyHandles) {
+      for (ColumnFamilyHandle h : handles) {
         final ColumnFamily f = new ColumnFamily(h);
         columnFamilies.put(f.getName(), f);
       }
