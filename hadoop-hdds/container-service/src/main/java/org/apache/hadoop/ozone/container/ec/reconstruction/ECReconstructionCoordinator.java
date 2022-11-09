@@ -272,20 +272,10 @@ public class ECReconstructionCoordinator implements Closeable {
         length -= readLen;
       }
 
-      int totalNodes = repConfig.getRequiredNodes();
-      int parity = repConfig.getParity();
-
       try {
         for (ECBlockOutputStream targetStream : targetBlockStreams) {
-          long replicaIndex = targetStream.getReplicationIndex();
-          //Write checksum only to parity and 1st Replica.
-          if (replicaIndex > 1 && replicaIndex <= (totalNodes - parity)) {
-            targetStream.executePutBlock(true, true,
-                blockLocationInfo.getLength());
-          } else {
-            targetStream.executePutBlock(true, true,
-                blockLocationInfo.getLength(), blockDataGroup);
-          }
+          targetStream.executePutBlock(true, true,
+              blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream,
               targetStream.getCurrentPutBlkResponseFuture());
         }

@@ -270,23 +270,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       return;
     }
 
-    ECReplicationConfig repConfig = (ECReplicationConfig)
-        getPipeline().getReplicationConfig();
-    int totalNodes = repConfig.getRequiredNodes();
-    int parity = repConfig.getParity();
-
-    for (int idx = 0; idx < blockOutputStreams.length; idx++) {
-      ECBlockOutputStream stream = blockOutputStreams[idx];
+    for (ECBlockOutputStream stream : blockOutputStreams) {
       if (stream == null) {
         continue;
       }
       try {
         // Set checksum only for 1st node and parity nodes
-        if (idx > 0 && idx < totalNodes - parity) {
-          stream.executePutBlock(isClose, true, blockGroupLength);
-        } else {
-          stream.executePutBlock(isClose, true, blockGroupLength, checksum);
-        }
+        stream.executePutBlock(isClose, true, blockGroupLength, checksum);
       } catch (Exception e) {
         stream.setIoException(e);
       }

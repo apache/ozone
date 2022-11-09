@@ -234,6 +234,10 @@ public class BlockOutputStream extends OutputStream {
     return this.containerBlockData;
   }
 
+  public Pipeline getPipeline() {
+    return this.pipeline;
+  }
+
   Token<? extends TokenIdentifier> getToken() {
     return this.token;
   }

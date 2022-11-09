@@ -98,6 +98,17 @@ public class ECBlockOutputStream extends BlockOutputStream {
       boolean force, long blockGroupLength, BlockData[] blockData)
       throws IOException {
 
+    ECReplicationConfig repConfig = (ECReplicationConfig)
+        getPipeline().getReplicationConfig();
+    int totalNodes = repConfig.getRequiredNodes();
+    int parity = repConfig.getParity();
+
+    //Write checksum only to parity and 1st Replica.
+    if (getReplicationIndex() > 1 &&
+        getReplicationIndex() <= (totalNodes - parity)) {
+      return executePutBlock(close, force, blockGroupLength);
+    }
+
     BlockData checksumBlockData = null;
     //Reverse Traversal as all parity will have checksumBytes
     for (int i = blockData.length - 1; i >= 0; i--) {
@@ -132,10 +143,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
       getContainerBlockData().clearChunks();
       getContainerBlockData().addAllChunks(newChunkList);
     } else {
-      ECReplicationConfig config = (ECReplicationConfig)
-          getXceiverClient().getPipeline().getReplicationConfig();
       throw new IOException("None of the block data have checksum " +
-          "which means " + config.getParity() + "(parity)+1 blocks are " +
+          "which means " + parity + "(parity)+1 blocks are " +
           "not present");
     }
 
@@ -146,7 +155,15 @@ public class ECBlockOutputStream extends BlockOutputStream {
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength, String checksum)
       throws IOException {
-    if (checksum != null) {
+
+    ECReplicationConfig repConfig = (ECReplicationConfig)
+        getPipeline().getReplicationConfig();
+    int totalNodes = repConfig.getRequiredNodes();
+    int parity = repConfig.getParity();
+
+    //Do not update checksum other than parity and 1st Replica.
+    if (!(getReplicationIndex() > 1 &&
+        getReplicationIndex() <= (totalNodes - parity))) {
       updateChecksum(checksum);
     }
     return executePutBlock(close, force, blockGroupLength);
@@ -173,18 +190,18 @@ public class ECBlockOutputStream extends BlockOutputStream {
   }
 
   private void updateChecksum(String checksum) {
-    List<ChunkInfo> existingChunkInfos =
-        getContainerBlockData().getChunksList();
-    ContainerProtos.KeyValue keyValue = ContainerProtos.KeyValue.newBuilder()
-        .setKey(STRIPE_CHECKSUM).setValue(checksum).build();
-    List<ChunkInfo> updatedChunks = new ArrayList<>();
-    for (ChunkInfo info: existingChunkInfos) {
-      ChunkInfo newInfo = ChunkInfo.newBuilder(info)
+    int size = getContainerBlockData().getChunksCount();
+
+    if (size > 0) {
+      ContainerProtos.KeyValue keyValue = ContainerProtos.KeyValue.newBuilder()
+          .setKey(STRIPE_CHECKSUM).setValue(checksum).build();
+
+      ChunkInfo oldInfo = getContainerBlockData().getChunks(size - 1);
+      ChunkInfo newInfo = ChunkInfo.newBuilder(oldInfo)
           .addMetadata(keyValue).build();
-      updatedChunks.add(newInfo);
+      getContainerBlockData().removeChunks(size - 1);
+      getContainerBlockData().addChunks(newInfo);
     }
-    getContainerBlockData().clearChunks();
-    getContainerBlockData().addAllChunks(updatedChunks);
   }
 
   /**
