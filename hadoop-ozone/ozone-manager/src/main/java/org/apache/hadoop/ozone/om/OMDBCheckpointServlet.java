@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletException;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
@@ -222,6 +223,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void writeFilesToArchive(HashMap<Object, Path> copyFiles,
                          HashMap<Path, Path> hardLinkFiles,
                          ArchiveOutputStream archiveOutputStream)

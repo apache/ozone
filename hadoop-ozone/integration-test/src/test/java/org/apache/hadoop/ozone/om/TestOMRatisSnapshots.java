@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -541,6 +542,8 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE",
+                        "NP_NULL_ON_SOME_PATH"})
   public void testOmSnapshots() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -643,6 +646,7 @@ public class TestOMRatisSnapshots {
     } catch (Exception e) {
       Assertions.fail("received exception: " + e);
     }
+    Assertions.assertTrue(omKeyInfo != null);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 

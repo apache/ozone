@@ -41,6 +41,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -354,6 +355,7 @@ public class TestOMDbCheckpointServlet {
         initialSnapshotSet, finalSnapshotSet);
   }
 
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private Set<String> getFiles(Path path, int truncateLength)
       throws IOException {
     Set<String> fileSet = new HashSet<>();
@@ -371,6 +373,7 @@ public class TestOMDbCheckpointServlet {
 
   // tests to see that dummy entry in hardlink file looks something like:
   //  "dir1/dummyFile  dir2/dummyFile"
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkDummyFile(String dir0, String dir1, String line,
                               String testDirName) {
     String[] files = line.split("\t");

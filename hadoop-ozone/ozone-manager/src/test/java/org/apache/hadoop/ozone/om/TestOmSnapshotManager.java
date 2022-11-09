@@ -138,9 +138,15 @@ public class TestOmSnapshotManager {
         OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
 
     // Create dummy files to be linked to
-    dbDir.mkdirs();
-    snapDir1.mkdirs();
-    snapDir2.mkdirs();
+    if (!dbDir.mkdirs()) {
+      throw new IOException("failed to make directory: " + dbDir.toString());
+    }
+    if (!snapDir1.mkdirs()) {
+      throw new IOException("failed to make directory: " + snapDir1.toString());
+    }
+    if (!snapDir2.mkdirs()) {
+      throw new IOException("failed to make directory: " + dbDir.toString());
+    }
     Files.write(Paths.get(dbDir.toString(), "f1"), dummyData);
     Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
 

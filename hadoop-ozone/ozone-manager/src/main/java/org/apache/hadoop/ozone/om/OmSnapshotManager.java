@@ -22,6 +22,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -295,11 +296,15 @@ public final class OmSnapshotManager {
         Path fullToPath = getFullPath(dbPath, to);
         Files.createLink(fullToPath, fullFromPath);
       }
-      hardLinkFile.delete();
+      if (!hardLinkFile.delete()) {
+        throw new IOException(
+            "Failed to delete: " + hardLinkFile.toString());
+      }
     }
   }
 
   // Get the full path of OM_HARDLINK_FILE entry
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private static Path getFullPath(Path dbPath, String fileName) {
     File file = new File(fileName);
     // If there is no directory then this file belongs in the db
@@ -317,6 +322,7 @@ public final class OmSnapshotManager {
   // db.snapshot/dir1/fileTo parent/dir2/fileFrom
   //    for files in another directory, (either another snapshot dir or
   //    sst compaction backup directory)
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   static Path createHardLinkList(int truncateLength,
                                   Map<Path, Path> hardLinkFiles)
       throws IOException {
