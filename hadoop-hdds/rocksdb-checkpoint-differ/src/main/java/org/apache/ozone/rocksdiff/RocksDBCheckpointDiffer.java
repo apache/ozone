@@ -738,11 +738,11 @@ public class RocksDBCheckpointDiffer {
           SstFileReaderIterator iterator =
               sstFileReader.newIterator(new ReadOptions());
           iterator.seekToFirst();
-          String firstKey =
-              RocksDiffUtils.constructBucketKey(new String(iterator.key()));
+          String firstKey = RocksDiffUtils
+              .constructBucketKey(new String(iterator.key(), UTF_8));
           iterator.seekToLast();
-          String lastKey =
-              RocksDiffUtils.constructBucketKey(new String(iterator.key()));
+          String lastKey = RocksDiffUtils
+              .constructBucketKey(new String(iterator.key(), UTF_8));
           if (!RocksDiffUtils
               .isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
             inputFiles.remove(filename);
