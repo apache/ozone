@@ -719,15 +719,15 @@ public class RocksDBCheckpointDiffer {
       LOG.debug("{}", logSB);
     }
 
-/*    if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
-    //  filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes());
-    }*/
+    if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
+      filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes());
+    }
 
     return new ArrayList<>(fwdDAGDifferentFiles);
   }
 
   public void filterRelevantSstFiles(Set<String> inputFiles,
-      HashMap<String, String> tableToPrefixMap) {
+      Map<String, String> tableToPrefixMap) {
     for (String filename : inputFiles) {
       String filepath = getAbsoluteSstFilePath(filename);
       try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
