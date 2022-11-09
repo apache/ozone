@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,10 +83,10 @@ public class SstFilteringService extends BackgroundService {
 
   private BooleanTriFunction<String, String, String, Boolean> filterFunction =
       (first, last, prefix) -> {
-        String firstBucketKey = constructBucketKey(first);
-        String lastBucketKey = constructBucketKey(last);
-        return firstBucketKey.compareTo(prefix) <= 0
-            && prefix.compareTo(lastBucketKey) <= 0;
+        String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
+        String lastBucketKey = RocksDiffUtils.constructBucketKey(last);
+        return RocksDiffUtils
+            .isKeyWithPrefixPresent(prefix, firstBucketKey, lastBucketKey);
       };
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
@@ -99,7 +100,7 @@ public class SstFilteringService extends BackgroundService {
     snapshotFilteredCount = new AtomicLong(0);
   }
 
-  private class SSTFilteringTask implements BackgroundTask {
+  private class SstFilteringTask implements BackgroundTask {
 
     @Override
     public BackgroundTaskResult call() throws Exception {
@@ -125,39 +126,35 @@ public class SstFilteringService extends BackgroundService {
           Path filePath =
               Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
 
-          boolean isSnapshotFiltered = false;
-
           // If entry for the snapshotID is present in this file,
           // it has already undergone filtering.
           if (Files.exists(filePath)) {
             List<String> processedSnapshotIds = Files.readAllLines(filePath);
             if (processedSnapshotIds.contains(snapshotInfo.getSnapshotID())) {
-              isSnapshotFiltered = true;
+              continue;
             }
           }
 
-          if (!isSnapshotFiltered) {
-            LOG.debug("Processing snapshot {} to filter relevant SST Files",
-                snapShotTableKey);
+          LOG.debug("Processing snapshot {} to filter relevant SST Files",
+              snapShotTableKey);
 
-            List<Pair<String, String>> prefixPairs =
-                constructPrefixPairs(snapshotInfo);
+          List<Pair<String, String>> prefixPairs =
+              constructPrefixPairs(snapshotInfo);
 
-            String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+          String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
 
-            RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-                .loadDB(ozoneManager.getConfiguration(), new File(snapshotDir),
-                    dbName, true);
-            RocksDatabase db = rdbStore.getDb();
-            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+          RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
+              .loadDB(ozoneManager.getConfiguration(), new File(snapshotDir),
+                  dbName, true);
+          RocksDatabase db = rdbStore.getDb();
+          db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
 
-            // mark the snapshot as filtered by writing to the file
-            String content = snapshotInfo.getSnapshotID() + "\n";
-            Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            snapshotLimit--;
-            snapshotFilteredCount.getAndIncrement();
-          }
+          // mark the snapshot as filtered by writing to the file
+          String content = snapshotInfo.getSnapshotID() + "\n";
+          Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
+              StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+          snapshotLimit--;
+          snapshotFilteredCount.getAndIncrement();
         }
       } catch (RocksDBException | IOException e) {
         LOG.error("Error during Snapshot sst filtering ", e);
@@ -203,22 +200,12 @@ public class SstFilteringService extends BackgroundService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new SSTFilteringTask());
+    queue.add(new SstFilteringTask());
     return queue;
   }
 
   public AtomicLong getSnapshotFilteredCount() {
     return snapshotFilteredCount;
-  }
-
-  String constructBucketKey(String keyName) {
-    if (!keyName.startsWith(OM_KEY_PREFIX)) {
-      keyName = OM_KEY_PREFIX.concat(keyName);
-    }
-    String[] elements = keyName.split(OM_KEY_PREFIX);
-    String volume = elements[1];
-    String bucket = elements[2];
-    return ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
   }
 
 }

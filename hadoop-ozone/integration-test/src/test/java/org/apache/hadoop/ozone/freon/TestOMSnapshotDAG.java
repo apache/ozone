@@ -52,6 +52,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -142,7 +143,7 @@ public class TestOMSnapshotDAG {
         getTablePrefixes(omMetadataManager, volumeName, bucketName));
   }
 
-  private HashMap<String, String> getTablePrefixes(
+  private Map<String, String> getTablePrefixes(
       OMMetadataManager omMetadataManager, String volumeName, String bucketName)
       throws IOException {
     HashMap<String, String> tablePrefixes = new HashMap<>();
@@ -150,11 +151,11 @@ public class TestOMSnapshotDAG {
     String bucketId =
         String.valueOf(omMetadataManager.getBucketId(volumeName, bucketName));
     tablePrefixes.put(OmMetadataManagerImpl.KEY_TABLE,
-        "/" + volumeName + "/" + bucketName);
-    tablePrefixes
-        .put(OmMetadataManagerImpl.FILE_TABLE, "/" + volumeId + "/" + bucketId);
+        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
+    tablePrefixes.put(OmMetadataManagerImpl.FILE_TABLE,
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
     tablePrefixes.put(OmMetadataManagerImpl.DIRECTORY_TABLE,
-        "/" + volumeId + "/" + bucketId);
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
     return tablePrefixes;
   }
 

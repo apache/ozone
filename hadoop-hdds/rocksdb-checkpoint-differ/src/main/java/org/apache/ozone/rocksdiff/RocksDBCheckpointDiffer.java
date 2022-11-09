@@ -52,6 +52,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -643,10 +644,10 @@ public class RocksDBCheckpointDiffer {
     private final String dbPath;
     private final String snapshotID;
     private final long snapshotGeneration;
-    private final HashMap<String, String> tablePrefixes;
+    private final Map<String, String> tablePrefixes;
 
     public DifferSnapshotInfo(String db, String id, long gen,
-        HashMap<String, String> prefixes) {
+        Map<String, String> prefixes) {
       dbPath = db;
       snapshotID = id;
       snapshotGeneration = gen;
@@ -665,7 +666,7 @@ public class RocksDBCheckpointDiffer {
       return snapshotGeneration;
     }
 
-    public HashMap<String, String> getTablePrefixes() {
+    public Map<String, String> getTablePrefixes() {
       return tablePrefixes;
     }
 
@@ -738,10 +739,13 @@ public class RocksDBCheckpointDiffer {
           SstFileReaderIterator iterator =
               sstFileReader.newIterator(new ReadOptions());
           iterator.seekToFirst();
-          String firstKey = constructBucketKey(new String(iterator.key()));
+          String firstKey =
+              RocksDiffUtils.constructBucketKey(new String(iterator.key()));
           iterator.seekToLast();
-          String lastKey = constructBucketKey(new String(iterator.key()));
-          if (!isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
+          String lastKey =
+              RocksDiffUtils.constructBucketKey(new String(iterator.key()));
+          if (!RocksDiffUtils
+              .isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
             inputFiles.remove(filename);
           }
         } else {
@@ -752,12 +756,6 @@ public class RocksDBCheckpointDiffer {
         e.printStackTrace();
       }
     }
-  }
-
-  boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
-      String firstDbKey, String lastDbKey) {
-    return firstDbKey.compareTo(prefixForColumnFamily) <= 0
-        && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
   }
 
   /**
@@ -1052,21 +1050,6 @@ public class RocksDBCheckpointDiffer {
   @VisibleForTesting
   public static Logger getLog() {
     return LOG;
-  }
-
-  private String constructBucketKey(String keyName) {
-    if (!keyName.startsWith("/")) {
-      keyName = "/".concat(keyName);
-    }
-    String[] elements = keyName.split("/");
-    String volume = elements[1];
-    String bucket = elements[2];
-    StringBuilder builder = new StringBuilder().append("/").append(volume);
-
-    if (StringUtils.isNotBlank(bucket)) {
-      builder.append("/").append(bucket);
-    }
-    return builder.toString();
   }
 
 }

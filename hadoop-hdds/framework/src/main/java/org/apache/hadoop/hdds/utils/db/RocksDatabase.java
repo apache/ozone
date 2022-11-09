@@ -373,8 +373,7 @@ public final class RocksDatabase {
    * @throws IOException
    */
   public void flush(String cfName) throws IOException {
-    ColumnFamilyHandle handle = null;
-    handle = getColumnFamilyHandle(cfName, handle);
+    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try (ManagedFlushOptions options = new ManagedFlushOptions()) {
       options.setWaitForFlush(true);
       if (handle != null) {
@@ -413,8 +412,7 @@ public final class RocksDatabase {
    * @throws IOException
    */
   public void compactRange(String cfName) throws IOException {
-    ColumnFamilyHandle handle = null;
-    handle = getColumnFamilyHandle(cfName, handle);
+    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try {
       if (handle != null) {
         db.get().compactRange(handle);
@@ -429,20 +427,19 @@ public final class RocksDatabase {
     }
   }
 
-  private ColumnFamilyHandle getColumnFamilyHandle(String cfName,
-      ColumnFamilyHandle handle) throws IOException {
+  private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
+      throws IOException {
     for (ColumnFamilyHandle cf : getColumnFamilyHandles()) {
       try {
         if (cfName.equals(new String(cf.getName(), StandardCharsets.UTF_8))) {
-          handle = cf;
-          break;
+          return cf;
         }
       } catch (RocksDBException e) {
         closeOnError(e);
         throw toIOException(this, "columnFamilyHandle.getName", e);
       }
     }
-    return handle;
+    return null;
   }
 
   RocksCheckpoint createCheckpoint() {
@@ -608,7 +605,7 @@ public final class RocksDatabase {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * @param prefixPairs , a list of pairs (TableName,prefixUsed).
+   * @param prefixPairs, a list of pair (TableName,prefixUsed).
    * @throws RocksDBException
    */
   public void deleteFilesNotMatchingPrefix(
@@ -623,24 +620,26 @@ public final class RocksDatabase {
       for (Pair<String, String> prefixPair : prefixPairs) {
         String columnFamily = prefixPair.getKey();
         String prefixForColumnFamily = prefixPair.getValue();
-        if (sstFileColumnFamily.equals(columnFamily)) {
-          // RocksDB #deleteFile API allows only to delete the last level of
-          // SST Files. Any level < last level won't get deleted and
-          // only last file of level 0 can be deleted
-          // and will throw warning in the rocksdb manifest.
-          // Instead perform the level check here
-          // itself to avoid failed delete attempts for lower level files.
-          if (liveFileMetaData.level() == lastLevel && lastLevel != 0) {
-            String firstDbKey = new String(liveFileMetaData.smallestKey(),
-                StandardCharsets.UTF_8);
-            String lastDbKey = new String(liveFileMetaData.largestKey(),
-                StandardCharsets.UTF_8);
-            boolean isKeyWithPrefixPresent = filterFunction
-                .apply(firstDbKey, lastDbKey, prefixForColumnFamily);
-            if (!isKeyWithPrefixPresent) {
-              db.get().deleteFile(liveFileMetaData.fileName());
-            }
-          }
+        if (!sstFileColumnFamily.equals(columnFamily)) {
+          continue;
+        }
+        // RocksDB #deleteFile API allows only to delete the last level of
+        // SST Files. Any level < last level won't get deleted and
+        // only last file of level 0 can be deleted
+        // and will throw warning in the rocksdb manifest.
+        // Instead, perform the level check here
+        // itself to avoid failed delete attempts for lower level files.
+        if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
+          continue;
+        }
+        String firstDbKey =
+            new String(liveFileMetaData.smallestKey(), StandardCharsets.UTF_8);
+        String lastDbKey =
+            new String(liveFileMetaData.largestKey(), StandardCharsets.UTF_8);
+        boolean isKeyWithPrefixPresent =
+            filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
+        if (!isKeyWithPrefixPresent) {
+          db.get().deleteFile(liveFileMetaData.fileName());
         }
       }
     }
