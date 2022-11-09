@@ -286,8 +286,8 @@ public class TestOMDbCheckpointServlet {
     prepArchiveData();
 
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-        omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
-            fileOutputStream);
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
+          fileOutputStream);
     }
 
     // Untar the file into a temp folder to be examined

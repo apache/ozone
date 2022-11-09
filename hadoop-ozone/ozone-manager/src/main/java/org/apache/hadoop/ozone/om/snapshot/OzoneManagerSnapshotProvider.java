@@ -149,7 +149,7 @@ public class OzoneManagerSnapshotProvider {
     // Untar the checkpoint file.
     Path untarredDbDir = Paths.get(snapshotFilePath);
     FileUtil.unTar(targetFile, untarredDbDir.toFile());
-    // FileUtils.deleteQuietly(targetFile);
+    FileUtils.deleteQuietly(targetFile);
 
     LOG.info("Successfully downloaded latest checkpoint from leader OM: {}",
         leaderOMNodeID);

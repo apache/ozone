@@ -16,19 +16,11 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -38,7 +30,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -46,15 +37,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import org.assertj.core.api.Fail;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -65,6 +49,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests the Ratis snapshots feature in OM.
@@ -565,28 +562,29 @@ public class TestOMRatisSnapshots {
 
     // Avoid double buffer issue waiting for keys
     GenericTestUtils.waitFor(() -> {
-        try {
-          OmKeyInfo key = leaderOM.getMetadataManager()
-              .getKeyTable(ozoneBucket.getBucketLayout())
-              .getSkipCache(leaderOM.getMetadataManager().getOzoneKey(volumeName, bucketName, keys.get(0)));
-          return key != null;
-        } catch (Exception e) {
-          return false;
-        }
+      try {
+        OmKeyInfo key = leaderOM.getMetadataManager()
+            .getKeyTable(ozoneBucket.getBucketLayout())
+            .getSkipCache(leaderOM.getMetadataManager()
+            .getOzoneKey(volumeName, bucketName, keys.get(0)));
+        return key != null;
+      } catch (Exception e) {
+        return false;
+      }
     }, 100, 10000);
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
     // allow the snapshot to be written to the info table
     GenericTestUtils.waitFor(() -> {
-        try {
-          SnapshotInfo snapshotInfo =
-              leaderOM.getMetadataManager().getSnapshotInfoTable()
-                  .getSkipCache(
-                      SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
-          return snapshotInfo != null;
-        } catch (Exception e) {
-          return false;
-        }
+      try {
+        SnapshotInfo snapshotInfo =
+            leaderOM.getMetadataManager().getSnapshotInfoTable()
+                .getSkipCache(
+                    SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+        return snapshotInfo != null;
+      } catch (Exception e) {
+        return false;
+      }
     }, 100, 3000);
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =

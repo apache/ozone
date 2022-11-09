@@ -195,7 +195,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
-    OutputStream destination)
+      OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
     // Map of inodes to path
     HashMap<Object, Path> copyFiles = new HashMap<>();
