@@ -48,7 +48,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -733,7 +732,7 @@ public class RocksDBCheckpointDiffer {
       try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
         sstFileReader.open(filepath);
         TableProperties properties = sstFileReader.getTableProperties();
-        String tableName = new String(properties.getColumnFamilyName());
+        String tableName = new String(properties.getColumnFamilyName(), UTF_8);
         if (tableToPrefixMap.containsKey(tableName)) {
           String prefix = tableToPrefixMap.get(tableName);
           SstFileReaderIterator iterator =
