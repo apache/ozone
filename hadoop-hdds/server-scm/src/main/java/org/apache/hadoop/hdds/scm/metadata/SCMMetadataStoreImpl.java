@@ -267,7 +267,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   }
 
   @Override
-  public TableIterator getAllCerts(CertificateStore.CertType certType) {
+  public TableIterator getAllCerts(CertificateStore.CertType certType)
+      throws IOException {
     if (certType == CertificateStore.CertType.VALID_CERTS) {
       return validCertsTable.iterator();
     }

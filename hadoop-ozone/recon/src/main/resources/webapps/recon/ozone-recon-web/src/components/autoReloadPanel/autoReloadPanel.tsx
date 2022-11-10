@@ -41,6 +41,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
 
   render() {
     const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading} = this.props;
+    const autoReloadEnabled = sessionStorage.getItem('autoReloadEnabled') === 'false' ? false : true;
     
      const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
@@ -79,7 +80,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
     return (
       <div className='auto-reload-panel'>
         Auto Refresh
-        &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp;<Switch defaultChecked={autoReloadEnabled} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
         &nbsp; | Refreshed at {lastRefreshedText}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
         {lastUpdatedDeltaFullText}

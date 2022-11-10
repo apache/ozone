@@ -581,19 +581,23 @@ public class TestOzoneShellHA {
         getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     FileSystem fs = FileSystem.get(clientConf);
-    final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    String ofsPrefix = hostPrefix + "/volumed2t/bucket1";
+    String dir1 = "/dir1";
+    final String strDir1 = ofsPrefix + dir1;
     // Note: CURRENT is also privately defined in TrashPolicyDefault
     final Path trashCurrent = new Path("Current");
 
     final String strKey1 = strDir1 + "/key1";
     final Path pathKey1 = new Path(strKey1);
-    final Path trashPathKey1 = Path.mergePaths(new Path(
-        new OFSPath(strKey1).getTrashRoot(), trashCurrent), pathKey1);
+    final Path trashPathKey1 = Path.mergePaths(
+        new Path(new OFSPath(strKey1).getTrashRoot(), trashCurrent),
+        new Path(dir1, "key1"));
 
     final String strKey2 = strDir1 + "/key2";
     final Path pathKey2 = new Path(strKey2);
-    final Path trashPathKey2 = Path.mergePaths(new Path(
-        new OFSPath(strKey2).getTrashRoot(), trashCurrent), pathKey2);
+    final Path trashPathKey2 = Path.mergePaths(
+        new Path(new OFSPath(strKey2).getTrashRoot(), trashCurrent),
+        new Path(dir1, "key2"));
 
     int res;
     try {
@@ -659,7 +663,8 @@ public class TestOzoneShellHA {
 
     // create volume: vol1 with bucket: bucket1
     final String testVolBucket = "/vol1/bucket1";
-    final String testKey = testVolBucket + "/key1";
+    String keyName = "/key1";
+    final String testKey = testVolBucket + keyName;
 
     final String[] volBucketArgs = new String[] {"-mkdir", "-p", testVolBucket};
     final String[] keyArgs = new String[] {"-touch", testKey};
@@ -690,7 +695,7 @@ public class TestOzoneShellHA {
                                                testVolBucket + "/.Trash"};
     final Path trashPathKey1 = Path.mergePaths(new Path(
             new OFSPath(testKey).getTrashRoot(), new Path("Current")),
-            new Path(testKey));
+            new Path(keyName));
     FileSystem fs = FileSystem.get(clientConf);
 
     try {

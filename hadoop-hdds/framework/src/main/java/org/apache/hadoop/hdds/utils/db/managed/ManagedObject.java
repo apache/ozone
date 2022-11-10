@@ -27,8 +27,15 @@ import org.rocksdb.RocksObject;
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
 
+  private final StackTraceElement[] elements;
+
   ManagedObject(T original) {
     this.original = original;
+    if (ManagedRocksObjectUtils.LOG.isDebugEnabled()) {
+      this.elements = Thread.currentThread().getStackTrace();
+    } else {
+      this.elements = null;
+    }
   }
 
   public T get() {
@@ -42,7 +49,20 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(original);
+    ManagedRocksObjectUtils.assertClosed(this);
     super.finalize();
   }
+
+  public String getStackTrace() {
+    if (elements != null && elements.length > 0) {
+      StringBuilder sb = new StringBuilder();
+      for (int line = 1; line < elements.length; line++) {
+        sb.append(elements[line]);
+        sb.append("\n");
+      }
+      return sb.toString();
+    }
+    return "";
+  }
+
 }

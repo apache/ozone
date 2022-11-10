@@ -93,16 +93,13 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
-    // Bound this at a minimum of 1 byte in case a request is made for a very
-    // small size, which when divided by EC DataNum is zero.
-    long requiredSpace = Math.max(1, size / repConfig.getData());
     synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < providerConfig.getMinimumPipelines()) {
         try {
           return allocateContainer(
-              repConfig, requiredSpace, owner, excludeList);
+              repConfig, size, owner, excludeList);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
@@ -115,7 +112,7 @@ public class WritableECContainerProvider
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
-            .setSize(requiredSpace)
+            .setSize(size)
             .build();
     while (existingPipelines.size() > 0) {
       Pipeline pipeline =
@@ -129,7 +126,7 @@ public class WritableECContainerProvider
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
           if (containerInfo == null
-              || !containerHasSpace(containerInfo, requiredSpace)) {
+              || !containerHasSpace(containerInfo, size)) {
             // This is O(n), which isn't great if there are a lot of pipelines
             // and we keep finding pipelines without enough space.
             existingPipelines.remove(pipeline);
@@ -153,7 +150,7 @@ public class WritableECContainerProvider
     // allocate a new one and usePipelineManagerV2Impl.java it.
     try {
       synchronized (this) {
-        return allocateContainer(repConfig, requiredSpace, owner, excludeList);
+        return allocateContainer(repConfig, size, owner, excludeList);
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "

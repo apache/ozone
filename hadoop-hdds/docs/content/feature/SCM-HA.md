@@ -33,6 +33,13 @@ This document explains the HA setup of Storage Container Manager (SCM), please c
 
 ## Configuration
 
+> &#x26a0;&#xfe0f; **IMPORTANT** &#x26a0;&#xfe0f;
+>
+> SCM HA is currently supported only for fresh installations.
+> SCM HA must be enabled when starting the Ozone service in the beginning.
+> Once an SCM has been started in non-HA mode,
+> changing it to HA mode is unsupported.
+
 HA mode of Storage Container Manager can be enabled with the following settings in `ozone-site.xml`:
 
 ```XML

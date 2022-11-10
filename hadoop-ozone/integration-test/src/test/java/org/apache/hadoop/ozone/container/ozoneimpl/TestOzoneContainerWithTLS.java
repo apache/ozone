@@ -40,7 +40,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -68,7 +67,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
  * Tests ozone containers via secure grpc/netty.
  */
 @RunWith(Parameterized.class)
-@Ignore("TODO:HDDS-1157")
 public class TestOzoneContainerWithTLS {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneContainerWithTLS.class);
@@ -122,7 +120,7 @@ public class TestOzoneContainerWithTLS {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    caClient = new CertificateClientTestImpl(conf);
+    caClient = new CertificateClientTestImpl(conf, false);
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
         expiryTime, caClient.getCertificate().
         getSerialNumber().toString());

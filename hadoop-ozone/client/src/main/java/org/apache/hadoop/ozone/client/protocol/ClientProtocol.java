@@ -134,6 +134,27 @@ public interface ClientProtocol {
    */
   S3VolumeContext getS3VolumeContext() throws IOException;
 
+  /**
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object in S3 context.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @return OzoneKey which gives basic information about the key.
+   */
+  OzoneKey headS3Object(String bucketName, String keyName) throws IOException;
+
+  /**
+   * Get OzoneKey in S3 context.
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @return {@link OzoneKey}
+   * @throws IOException
+   */
+  OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
+      throws IOException;
+
   OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**

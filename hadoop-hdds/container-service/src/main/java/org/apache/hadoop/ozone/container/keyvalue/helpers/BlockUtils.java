@@ -129,7 +129,7 @@ public final class BlockUtils {
       if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
         DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
         Preconditions.checkNotNull(cache);
-        return cache.getDB(containerDBPath);
+        return cache.getDB(containerDBPath, conf);
       } else {
         ContainerCache cache = ContainerCache.getInstance(conf);
         Preconditions.checkNotNull(cache);
