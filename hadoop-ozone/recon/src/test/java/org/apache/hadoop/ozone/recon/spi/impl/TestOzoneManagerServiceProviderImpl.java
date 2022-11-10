@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -201,8 +202,10 @@ public class TestOzoneManagerServiceProviderImpl {
         .getOzoneManagerDBSnapshot();
     assertNotNull(checkpoint);
     assertTrue(checkpoint.getCheckpointLocation().toFile().isDirectory());
-    assertTrue(checkpoint.getCheckpointLocation().toFile()
-        .listFiles().length == 2);
+
+    File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
+    assertNotNull(files);
+    assertEquals(2, files.length);
   }
 
 
@@ -372,8 +375,7 @@ public class TestOzoneManagerServiceProviderImpl {
         ArgumentCaptor.forClass(ReconTaskStatus.class);
     verify(reconTaskStatusDaoMock, times(1))
         .update(captor.capture());
-    assertTrue(captor.getValue().getTaskName()
-        .equals(OmSnapshotRequest.name()));
+    assertEquals(OmSnapshotRequest.name(), captor.getValue().getTaskName());
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager);
     assertEquals(1, metrics.getNumSnapshotRequests().value());
@@ -411,7 +413,7 @@ public class TestOzoneManagerServiceProviderImpl {
         ArgumentCaptor.forClass(ReconTaskStatus.class);
     verify(reconTaskStatusDaoMock, times(1))
         .update(captor.capture());
-    assertTrue(captor.getValue().getTaskName().equals(OmDeltaRequest.name()));
+    assertEquals(OmDeltaRequest.name(), captor.getValue().getTaskName());
 
     verify(reconTaskControllerMock, times(1))
         .consumeOMEvents(any(OMUpdateEventBatch.class),
@@ -419,10 +421,46 @@ public class TestOzoneManagerServiceProviderImpl {
     assertEquals(0, metrics.getNumSnapshotRequests().value());
   }
 
+  @Test
+  public void testSyncDataFromOMFullSnapshotForSNNFE() throws Exception {
+
+    // Non-Empty OM DB to start with.
+    ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
+        temporaryFolder.newFolder());
+    ReconTaskStatusDao reconTaskStatusDaoMock =
+        mock(ReconTaskStatusDao.class);
+    doNothing().when(reconTaskStatusDaoMock)
+        .update(any(ReconTaskStatus.class));
+
+    ReconTaskController reconTaskControllerMock = getMockTaskController();
+    when(reconTaskControllerMock.getReconTaskStatusDao())
+        .thenReturn(reconTaskStatusDaoMock);
+    doNothing().when(reconTaskControllerMock)
+        .reInitializeTasks(omMetadataManager);
+
+    OzoneManagerProtocol protocol = getMockOzoneManagerClientWithThrow();
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new MockOzoneServiceProvider(configuration, omMetadataManager,
+            reconTaskControllerMock, new ReconUtils(), protocol);
+
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
+
+    // Should trigger full snapshot request.
+    ozoneManagerServiceProvider.syncDataFromOM();
+
+    ArgumentCaptor<ReconTaskStatus> captor =
+        ArgumentCaptor.forClass(ReconTaskStatus.class);
+    verify(reconTaskStatusDaoMock, times(1))
+        .update(captor.capture());
+    assertEquals(OmSnapshotRequest.name(), captor.getValue().getTaskName());
+    verify(reconTaskControllerMock, times(1))
+        .reInitializeTasks(omMetadataManager);
+    assertEquals(1, metrics.getNumSnapshotRequests().value());
+  }
+
   private ReconTaskController getMockTaskController() {
-    ReconTaskController reconTaskControllerMock =
-        mock(ReconTaskController.class);
-    return reconTaskControllerMock;
+    return mock(ReconTaskController.class);
   }
 
   private ReconUtils getMockReconUtils() throws IOException {
@@ -438,6 +476,17 @@ public class TestOzoneManagerServiceProviderImpl {
         mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocolMock.getDBUpdates(any(OzoneManagerProtocolProtos
         .DBUpdatesRequest.class))).thenReturn(dbUpdatesWrapper);
+    return ozoneManagerProtocolMock;
+  }
+
+  // Mock the case of SNNFE
+  private OzoneManagerProtocol getMockOzoneManagerClientWithThrow()
+      throws IOException {
+    OzoneManagerProtocol ozoneManagerProtocolMock =
+        mock(OzoneManagerProtocol.class);
+    when(ozoneManagerProtocolMock.getDBUpdates(any(OzoneManagerProtocolProtos
+        .DBUpdatesRequest.class)))
+        .thenThrow(new SequenceNumberNotFoundException());
     return ozoneManagerProtocolMock;
   }
 
@@ -467,8 +516,7 @@ class MockOzoneServiceProvider extends OzoneManagerServiceProviderImpl {
                            ReconOMMetadataManager omMetadataManager,
                            ReconTaskController reconTaskController,
                            ReconUtils reconUtils,
-                           OzoneManagerProtocol ozoneManagerClient)
-      throws IOException {
+                           OzoneManagerProtocol ozoneManagerClient) {
     super(configuration, omMetadataManager, reconTaskController, reconUtils,
         ozoneManagerClient);
   }

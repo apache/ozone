@@ -26,6 +26,7 @@ import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -46,12 +47,17 @@ public class TestContainerReplicaPendingOps {
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
+  private ReplicationManager rm;
+  private ReplicationManagerMetrics metrics;
 
   @BeforeEach
   public void setup() {
     config = new OzoneConfiguration();
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     pendingOps = new ContainerReplicaPendingOps(config, clock);
+    rm = Mockito.mock(ReplicationManager.class);
+    metrics = ReplicationManagerMetrics.create(rm);
+    pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
@@ -221,6 +227,50 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries(2500);
     ops = pendingOps.getPendingOps(new ContainerID(2));
     Assertions.assertEquals(0, ops.size());
+  }
+
+  @Test
+  public void testReplicationMetrics() {
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 1);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 2);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn2, 1);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn3, 1);
+
+    // InFlight Replication and Deletion
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(DELETE));
+    clock.fastForward(1500);
+
+    pendingOps.removeExpiredEntries(1000);
+
+    // Two Delete and Replication command should be timeout
+    Assertions.assertEquals(metrics.getEcReplicationCmdsTimeoutTotal(), 2);
+    Assertions.assertEquals(metrics.getEcDeletionCmdsTimeoutTotal(), 2);
+
+    pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2);
+    pendingOps.scheduleAddReplica(new ContainerID(3), dn1, 3);
+    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn2, 2);
+    pendingOps.scheduleAddReplica(new ContainerID(4), dn3, 4);
+
+    // InFlight Replication and Deletion. Previous Inflight should be
+    // removed as they were timed out.
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(DELETE));
+
+    pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
+    pendingOps.completeAddReplica(new ContainerID(3), dn1, 3);
+    pendingOps.completeDeleteReplica(new ContainerID(4), dn2, 2);
+    pendingOps.completeAddReplica(new ContainerID(4), dn3, 4);
+
+    Assertions.assertEquals(metrics.getEcReplicationCmdsCompletedTotal(), 2);
+    Assertions.assertEquals(metrics.getEcDeletionCmdsCompletedTotal(), 2);
+
+    pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
+    pendingOps.completeAddReplica(new ContainerID(2), dn1, 3);
+
+    // Checking pendingOpCount doesn't go below zero
+    Assertions.assertEquals(0, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(0, pendingOps.getPendingOpCount(DELETE));
   }
 
 }

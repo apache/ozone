@@ -367,7 +367,7 @@ public class KeyManagerImpl implements KeyManager {
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
-        value = getOmKeyInfo(volumeName, bucketName, keyName);
+        value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -396,8 +396,26 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
+  private OmKeyInfo getOmKeyInfoDirectoryAware(String volumeName,
+            String bucketName, String keyName) throws IOException {
+    OmKeyInfo keyInfo = getOmKeyInfo(volumeName, bucketName, keyName);
+
+    // Check if the key is a directory.
+    if (keyInfo != null) {
+      keyInfo.setFile(true);
+      return keyInfo;
+    }
+
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    OmKeyInfo dirKeyInfo = getOmKeyInfo(volumeName, bucketName, dirKey);
+    if (dirKeyInfo != null) {
+      dirKeyInfo.setFile(false);
+    }
+    return dirKeyInfo;
+  }
+
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-      String keyName) throws IOException {
+                                 String keyName) throws IOException {
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
     BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
@@ -425,6 +443,7 @@ public class KeyManagerImpl implements KeyManager {
           fileStatus.getKeyInfo().getKeyName());
       fileStatus.getKeyInfo().setKeyName(keyPath);
     }
+    fileStatus.getKeyInfo().setFile(fileStatus.isFile());
     return fileStatus.getKeyInfo();
   }
 

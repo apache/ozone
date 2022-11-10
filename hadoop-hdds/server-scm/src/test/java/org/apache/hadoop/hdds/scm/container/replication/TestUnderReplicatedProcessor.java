@@ -73,6 +73,8 @@ public class TestUnderReplicatedProcessor {
         replicationManager, pendingOps, eventPublisher,
         rmConf.getUnderReplicatedInterval());
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
+    Mockito.when(replicationManager.getMetrics())
+        .thenReturn(ReplicationManagerMetrics.create(replicationManager));
   }
 
   @Test
@@ -153,6 +155,9 @@ public class TestUnderReplicatedProcessor {
     // correct indexes.
     List<ContainerReplicaOp> ops = pendingOps
         .getPendingOps(container.containerID());
+    //Check InFlight Replication
+    Assert.assertEquals(pendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD), 1);
     Assert.assertEquals(1, ops.size());
     Assert.assertEquals(3, ops.get(0).getReplicaIndex());
   }
