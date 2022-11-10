@@ -1170,21 +1170,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           ResultCodes.BUCKET_NOT_FOUND);
     }
 
-    List<SnapshotInfo> snapshotInfos = new ArrayList<>();
+    String prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
     TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
 
-    appendSnapshotFromCacheToMap(snapshotInfoMap);
-    appendSnapshotFromDBToMap(snapshotInfoMap);
+    appendSnapshotFromCacheToMap(snapshotInfoMap, prefix);
+    appendSnapshotFromDBToMap(snapshotInfoMap, prefix);
 
-    for (Map.Entry<String, SnapshotInfo> cacheKey : snapshotInfoMap
-        .entrySet()) {
-      snapshotInfos.add(cacheKey.getValue());
-    }
-
-    return snapshotInfos;
+    return new ArrayList<>(snapshotInfoMap.values());
   }
 
-  private void appendSnapshotFromCacheToMap(TreeMap snapshotInfoMap) {
+  private void appendSnapshotFromCacheToMap(
+      TreeMap snapshotInfoMap, String prefix) {
     Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
         snapshotInfoTable.cacheIterator();
     while (iterator.hasNext()) {
@@ -1192,20 +1188,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           iterator.next();
       String snapshotKey = entry.getKey().getCacheKey();
       SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      if (snapshotInfo != null) {
+      if (snapshotInfo != null && snapshotKey.startsWith(prefix)) {
         snapshotInfoMap.put(snapshotKey, snapshotInfo);
       }
     }
   }
 
-  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap)
+  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap, String prefix)
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
       KeyValue< String, SnapshotInfo> snapshotinfo;
       while (snapshotIter.hasNext()) {
         snapshotinfo = snapshotIter.next();
-        if (snapshotinfo != null) {
+        if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix)) {
           CacheValue<SnapshotInfo> cacheValue =
               snapshotInfoTable.getCacheValue(
                   new CacheKey<>(snapshotinfo.getKey()));
@@ -1215,6 +1211,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           if (cacheValue == null) {
             snapshotInfoMap.put(snapshotinfo.getKey(), snapshotinfo.getValue());
           }
+        } else {
+          break;
         }
       }
     }
