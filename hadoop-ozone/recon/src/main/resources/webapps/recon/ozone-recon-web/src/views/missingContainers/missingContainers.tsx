@@ -24,6 +24,7 @@ import filesize from 'filesize';
 import moment from 'moment';
 import {showDataFetchError, timeFormat} from 'utils/common';
 import './missingContainers.less';
+import {ColumnSearch} from 'utils/columnSearch';
 
 const size = filesize.partial({standard: 'iec'});
 const {TabPane} = Tabs;
@@ -122,6 +123,7 @@ const CONTAINER_TAB_COLUMNS = [
     title: 'Container ID',
     dataIndex: 'containerID',
     key: 'containerID',
+    isSearchable: true,
     sorter: (a: IContainerResponse, b: IContainerResponse) => a.containerID - b.containerID
   },
   {
@@ -320,6 +322,22 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     return <div>Loading...</div>;
   };
 
+  searchColumn = () => {
+    return CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
+      if (column.isSearchable) {
+        const newColumn = {
+          ...column,
+          ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+        };
+        filtered.push(newColumn);
+      } else {
+        filtered.push(column);
+      }
+
+      return filtered;
+    }, [])
+  };
+
   render() {
     const {missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
     const paginationConfig: PaginationConfig = {
@@ -327,6 +345,16 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
     };
+    
+    const generateTable = (dataSource) => {
+      return <Table
+        expandRowByClick dataSource={dataSource}
+        columns={this.searchColumn()}
+        loading={loading}
+        pagination={paginationConfig} rowKey='containerID'
+        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+    }
+
     return (
       <div className='missing-containers-container'>
         <div className='page-header'>
@@ -335,32 +363,16 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         <div className='content-div'>
           <Tabs defaultActiveKey='1'>
             <TabPane key='1' tab="Missing">
-              <Table
-                expandRowByClick dataSource={missingDataSource} columns={CONTAINER_TAB_COLUMNS}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(missingDataSource)}
             </TabPane>
             <TabPane key='2' tab='Under-Replicated'>
-              <Table
-                expandRowByClick dataSource={underReplicatedDataSource} columns={CONTAINER_TAB_COLUMNS}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(underReplicatedDataSource)}
             </TabPane>
             <TabPane key='3' tab='Over-Replicated'>
-              <Table
-                expandRowByClick dataSource={overReplicatedDataSource} columns={CONTAINER_TAB_COLUMNS}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(overReplicatedDataSource)}
             </TabPane>
             <TabPane key='4' tab='Mis-Replicated'>
-              <Table
-                expandRowByClick dataSource={misReplicatedDataSource} columns={CONTAINER_TAB_COLUMNS}
-                loading={loading}
-                pagination={paginationConfig} rowKey='containerID'
-                expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+              {generateTable(misReplicatedDataSource)}
             </TabPane>
           </Tabs>
         </div>
