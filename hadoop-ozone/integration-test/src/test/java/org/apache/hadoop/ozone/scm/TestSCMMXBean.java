@@ -101,22 +101,6 @@ public class TestSCMMXBean {
         "ClientRpcPort");
     assertEquals(scm.getClientRpcPort(), clientRpcPort);
 
-    ContainerStat stat = new ContainerStat(1, 2, 3, 4, 5, 6, 7);
-    TabularData data = (TabularData) mbs.getAttribute(
-        bean, "ContainerReport");
-
-    // verify report info as empty implementation
-    assertEquals(0, data.values().size());
-    for (Object obj : data.values()) {
-      assertTrue(obj instanceof CompositeData);
-      CompositeData d = (CompositeData) obj;
-      Iterator<?> it = d.values().iterator();
-      String key = it.next().toString();
-      String value = it.next().toString();
-      assertEquals("nodeID", key);
-      assertEquals(stat.toJsonString(), value);
-    }
-
     boolean inSafeMode = (boolean) mbs.getAttribute(bean,
         "InSafeMode");
     assertEquals(scm.isInSafeMode(), inSafeMode);
