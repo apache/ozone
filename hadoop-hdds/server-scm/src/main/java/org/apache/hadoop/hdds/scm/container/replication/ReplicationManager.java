@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatc
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.EmptyContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
@@ -222,6 +223,7 @@ public class ReplicationManager implements SCMService {
         .addNext(new ClosingContainerHandler(this))
         .addNext(new QuasiClosedContainerHandler(this))
         .addNext(new ClosedWithMismatchedReplicasHandler(this))
+        .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler);
@@ -238,6 +240,7 @@ public class ReplicationManager implements SCMService {
       running = true;
       metrics = ReplicationManagerMetrics.create(this);
       legacyReplicationManager.setMetrics(metrics);
+      containerReplicaPendingOps.setReplicationMetrics(metrics);
       replicationMonitor = new Thread(this::run);
       replicationMonitor.setName("ReplicationMonitor");
       replicationMonitor.setDaemon(true);
@@ -875,6 +878,10 @@ public class ReplicationManager implements SCMService {
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     return new ECContainerReplicaCount(
         containerInfo, replicas, pendingOps, maintenanceRedundancy);
+  }
+  
+  public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
+    return containerReplicaPendingOps;
   }
 
   /**

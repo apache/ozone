@@ -533,6 +533,11 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
 
+
+  public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
+  public static final String FS_TRASH_CLASSNAME_DEFAULT =
+      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+
   /**
    * There is no need to instantiate this class.
    */

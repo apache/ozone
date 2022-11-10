@@ -61,6 +61,10 @@ public final class OmKeyInfo extends WithParentObjectId {
   private ReplicationConfig replicationConfig;
   private FileEncryptionInfo encInfo;
   private FileChecksum fileChecksum;
+  /**
+   * Support OFS use-case to identify if the key is a file or a directory.
+   */
+  private boolean isFile;
 
   /**
    * Represents leaf node name. This also will be used when the keyName is
@@ -106,12 +110,13 @@ public final class OmKeyInfo extends WithParentObjectId {
             Map<String, String> metadata,
             FileEncryptionInfo encInfo, List<OzoneAcl> acls,
             long parentObjectID, long objectID, long updateID,
-            FileChecksum fileChecksum) {
+            FileChecksum fileChecksum, boolean isFile) {
     this(volumeName, bucketName, keyName, versions, dataSize,
             creationTime, modificationTime, replicationConfig, metadata,
             encInfo, acls, objectID, updateID, fileChecksum);
     this.fileName = fileName;
     this.parentObjectID = parentObjectID;
+    this.isFile = isFile;
   }
 
   public String getVolumeName() {
@@ -175,6 +180,14 @@ public final class OmKeyInfo extends WithParentObjectId {
 
   public void updateModifcationTime() {
     this.modificationTime = Time.monotonicNow();
+  }
+
+  public void setFile(boolean file) {
+    isFile = file;
+  }
+
+  public boolean isFile() {
+    return isFile;
   }
 
   /**
@@ -409,6 +422,8 @@ public final class OmKeyInfo extends WithParentObjectId {
     private long parentObjectID;
     private FileChecksum fileChecksum;
 
+    private boolean isFile;
+
     public Builder() {
       this.metadata = new HashMap<>();
       omKeyLocationInfoGroups = new ArrayList<>();
@@ -520,12 +535,17 @@ public final class OmKeyInfo extends WithParentObjectId {
       return this;
     }
 
+    public Builder setFile(boolean isAFile) {
+      this.isFile = isAFile;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
               volumeName, bucketName, keyName, fileName,
               omKeyLocationInfoGroups, dataSize, creationTime,
               modificationTime, replicationConfig, metadata, encInfo, acls,
-              parentObjectID, objectID, updateID, fileChecksum);
+              parentObjectID, objectID, updateID, fileChecksum, isFile);
     }
   }
 
@@ -627,6 +647,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
+    kb.setIsFile(isFile);
     return kb.build();
   }
 
@@ -669,6 +690,11 @@ public final class OmKeyInfo extends WithParentObjectId {
       FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
       builder.setFileChecksum(fileChecksum);
     }
+
+    if (keyInfo.hasIsFile()) {
+      builder.setFile(keyInfo.getIsFile());
+    }
+
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder.build();

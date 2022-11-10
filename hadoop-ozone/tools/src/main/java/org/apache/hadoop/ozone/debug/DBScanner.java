@@ -23,6 +23,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
@@ -48,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 /**
@@ -80,6 +83,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private static String fileName;
 
+  @CommandLine.Option(names = {"--startkey", "-sk"},
+      description = "Key from which to iterate the DB")
+  private static String startKey;
+
   @CommandLine.Option(names = {"--dnSchema", "-d"},
       description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
@@ -97,9 +104,31 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private List<Object> scannedObjects;
 
+  public static byte[] getValueObject(
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+    Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
+    if (keyType.equals(String.class)) {
+      return startKey.getBytes(StandardCharsets.UTF_8);
+    } else if (keyType.equals(ContainerID.class)) {
+      return new ContainerID(Long.parseLong(startKey)).getBytes();
+    } else if (keyType.equals(Long.class)) {
+      return Longs.toByteArray(Long.parseLong(startKey));
+    } else if (keyType.equals(PipelineID.class)) {
+      return PipelineID.valueOf(UUID.fromString(startKey)).getProtobuf()
+          .toByteArray();
+    } else {
+      throw new IllegalArgumentException(
+          "StartKey is not supported for this table.");
+    }
+  }
+
   private static List<Object> displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
+
+    if (startKey != null) {
+      iterator.get().seek(getValueObject(dbColumnFamilyDefinition));
+    }
 
     Writer fileWriter = null;
     PrintWriter printWriter = null;
@@ -298,6 +327,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return RDBParser.class;
+  }
+
+  public static void setStartKey(String startKey) {
+    DBScanner.startKey = startKey;
   }
 }
 

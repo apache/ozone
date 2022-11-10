@@ -60,6 +60,9 @@ public class NodeDecommissionManager {
   private boolean useHostnames;
   private long monitorInterval;
 
+  // Decommissioning and Maintenance mode progress related metrics.
+  private NodeDecommissionMetrics metrics;
+
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeDecommissionManager.class);
 
@@ -181,6 +184,7 @@ public class NodeDecommissionManager {
     this.scmContext = scmContext;
     this.eventQueue = eventQueue;
     this.replicationManager = rm;
+    this.metrics = null;
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
@@ -208,7 +212,8 @@ public class NodeDecommissionManager {
 
     monitor = new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager,
         replicationManager);
-
+    this.metrics = NodeDecommissionMetrics.create();
+    monitor.setMetrics(this.metrics);
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
         TimeUnit.SECONDS);
   }
@@ -373,6 +378,7 @@ public class NodeDecommissionManager {
    *  Stops the decommission monitor from running when SCM is shutdown.
    */
   public void stop() {
+    metrics.unRegister();
     if (executor != null) {
       executor.shutdown();
     }
