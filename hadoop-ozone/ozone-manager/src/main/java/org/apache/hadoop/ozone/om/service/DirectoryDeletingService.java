@@ -144,10 +144,9 @@ public class DirectoryDeletingService extends BackgroundService {
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
 
         Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
-        try {
-          TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-              deleteTableIterator = ozoneManager.getMetadataManager().
-              getDeletedDirTable().iterator();
+        try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+                 deleteTableIterator = ozoneManager.getMetadataManager().
+            getDeletedDirTable().iterator()) {
 
           long startTime = Time.monotonicNow();
           while (remainNum > 0 && deleteTableIterator.hasNext()) {

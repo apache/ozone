@@ -164,7 +164,7 @@ public class TestSecureOzoneManager {
     CertificateCodec certCodec =
         new CertificateCodec(securityConfig, COMPONENT);
     X509Certificate x509Certificate = KeyStoreTestUtil.generateCertificate(
-        "CN=Test", new KeyPair(publicKey, privateKey), 10,
+        "CN=Test", new KeyPair(publicKey, privateKey), 365,
         securityConfig.getSignatureAlgo());
     certCodec.writeCertificate(new X509CertificateHolder(
         x509Certificate.getEncoded()));

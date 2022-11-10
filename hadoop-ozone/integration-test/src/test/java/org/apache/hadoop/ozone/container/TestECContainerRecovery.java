@@ -50,6 +50,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -91,6 +93,18 @@ public class TestECContainerRecovery {
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
+
+    ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
+            .getObject(
+                    ReplicationManager.ReplicationManagerConfiguration.class);
+    //Setting all the intervals to 10 seconds current tests have timeout
+    // of 100s.
+    rmConfig.setUnderReplicatedInterval(Duration.of(10,
+            ChronoUnit.SECONDS));
+    rmConfig.setOverReplicatedInterval(Duration.of(10,
+            ChronoUnit.SECONDS));
+    rmConfig.setInterval(Duration.of(10, ChronoUnit.SECONDS));
+    conf.setFromObject(rmConfig);
 
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");

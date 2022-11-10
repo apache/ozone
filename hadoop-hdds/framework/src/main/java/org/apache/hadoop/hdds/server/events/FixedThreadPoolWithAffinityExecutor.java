@@ -18,26 +18,22 @@
 package org.apache.hadoop.hdds.server.events;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.util.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_PREFIX;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
@@ -46,7 +42,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_PO
  * @param <P> the payload type of events
  */
 @Metrics(context = "EventQueue")
-public class FixedThreadPoolWithAffinityExecutor<P>
+public class FixedThreadPoolWithAffinityExecutor<P, Q>
     implements EventExecutor<P> {
 
   private static final String EVENT_QUEUE = "EventQueue";
@@ -54,7 +50,15 @@ public class FixedThreadPoolWithAffinityExecutor<P>
   private static final Logger LOG =
       LoggerFactory.getLogger(FixedThreadPoolWithAffinityExecutor.class);
 
+  private final Map<String, FixedThreadPoolWithAffinityExecutor> executorMap;
+
   private final String name;
+
+  private final EventHandler<P> eventHandler;
+
+  private final EventPublisher eventPublisher;
+
+  private final List<BlockingQueue<Q>> workQueues;
 
   private final List<ThreadPoolExecutor> executors;
 
@@ -71,6 +75,11 @@ public class FixedThreadPoolWithAffinityExecutor<P>
   @Metric
   private MutableCounterLong scheduled;
 
+  @Metric
+  private MutableCounterLong dropped;
+
+  private final AtomicBoolean isRunning = new AtomicBoolean(true);
+
   /**
    * Create FixedThreadPoolExecutor with affinity.
    * Based on the payload's hash code, the payload will be scheduled to the
@@ -79,25 +88,41 @@ public class FixedThreadPoolWithAffinityExecutor<P>
    * @param name Unique name used in monitoring and metrics.
    */
   public FixedThreadPoolWithAffinityExecutor(
-      String name,
-      List<ThreadPoolExecutor> executors) {
+      String name, EventHandler<P> eventHandler,
+      List<BlockingQueue<Q>> workQueues, EventPublisher eventPublisher,
+      Class<P> clazz, List<ThreadPoolExecutor> executors,
+      Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
     this.name = name;
+    this.eventHandler = eventHandler;
+    this.workQueues = workQueues;
+    this.eventPublisher = eventPublisher;
+    this.executors = executors;
+    this.executorMap = executorMap;
+    executorMap.put(clazz.getName(), this);
+
+    // Add runnable which will wait for task over another queue
+    // This needs terminate canceling each task in shutdown
+    int i = 0;
+    for (BlockingQueue<Q> queue : workQueues) {
+      ThreadPoolExecutor threadPoolExecutor = executors.get(i);
+      if (threadPoolExecutor.getActiveCount() == 0) {
+        threadPoolExecutor.submit(new ContainerReportProcessTask<>(queue,
+            isRunning, executorMap));
+      }
+      ++i;
+    }
+
     DefaultMetricsSystem.instance()
         .register(EVENT_QUEUE + name,
             "Event Executor metrics ",
             this);
-    this.executors = executors;
   }
 
-  public static List<ThreadPoolExecutor> initializeExecutorPool(
-      String eventName) {
-    List<ThreadPoolExecutor> executors = new LinkedList<>();
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
-            StringUtils.camelize(eventName) + ".thread.pool.size",
-        OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
-    BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
-    for (int i = 0; i < threadPoolSize; i++) {
+  public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(
+      List<BlockingQueue<Q>> workQueues) {
+    List<ThreadPoolExecutor> executors = new ArrayList<>();
+    for (int i = 0; i < workQueues.size(); ++i) {
+      LinkedBlockingQueue<Runnable> poolQueue = new LinkedBlockingQueue<>(1);
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
           .setNameFormat("FixedThreadPoolWithAffinityExecutor-" + i + "-%d")
@@ -108,7 +133,7 @@ public class FixedThreadPoolWithAffinityExecutor<P>
           1,
           0,
           TimeUnit.SECONDS,
-          workQueue,
+          poolQueue,
           threadFactory));
     }
     return executors;
@@ -121,17 +146,13 @@ public class FixedThreadPoolWithAffinityExecutor<P>
     // For messages that need to be routed to the same thread need to
     // implement hashCode to match the messages. This should be safe for
     // other messages that implement the native hash.
-    int index = message.hashCode() & (executors.size() - 1);
-    executors.get(index).execute(() -> {
-      scheduled.incr();
-      try {
-        handler.onMessage(message, publisher);
-        done.incr();
-      } catch (Exception ex) {
-        LOG.error("Error on execution message {}", message, ex);
-        failed.incr();
-      }
-    });
+    int index = message.hashCode() & (workQueues.size() - 1);
+    BlockingQueue<Q> queue = workQueues.get(index);
+    queue.add((Q) message);
+    if (queue instanceof IQueueMetrics) {
+      dropped.incr(((IQueueMetrics) queue).getAndResetDropCount(
+          message.getClass().getSimpleName()));
+    }
   }
 
   @Override
@@ -155,14 +176,83 @@ public class FixedThreadPoolWithAffinityExecutor<P>
   }
 
   @Override
+  public long droppedEvents() {
+    return dropped.value();
+  }
+
+  @Override
   public void close() {
+    isRunning.set(false);
     for (ThreadPoolExecutor executor : executors) {
       executor.shutdown();
     }
+    executorMap.clear();
+    DefaultMetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
   }
 
   @Override
   public String getName() {
     return name;
+  }
+
+  /**
+   * Runnable class to perform execution of payload.
+   */
+  public static class ContainerReportProcessTask<P> implements Runnable {
+    private BlockingQueue<P> queue;
+    private AtomicBoolean isRunning;
+    private Map<String, FixedThreadPoolWithAffinityExecutor> executorMap;
+
+    public ContainerReportProcessTask(BlockingQueue<P> queue,
+        AtomicBoolean isRunning,
+        Map<String, FixedThreadPoolWithAffinityExecutor> executorMap) {
+      this.queue = queue;
+      this.isRunning = isRunning;
+      this.executorMap = executorMap;
+    }
+
+    @Override
+    public void run() {
+      while (isRunning.get()) {
+        try {
+          Object report = queue.poll(1, TimeUnit.MILLISECONDS);
+          if (report == null) {
+            continue;
+          }
+
+          FixedThreadPoolWithAffinityExecutor executor = executorMap.get(
+              report.getClass().getName());
+          if (null == executor) {
+            LOG.warn("Executor for report is not found");
+            continue;
+          }
+
+          executor.scheduled.incr();
+          try {
+            executor.eventHandler.onMessage(report,
+                executor.eventPublisher);
+            executor.done.incr();
+          } catch (Exception ex) {
+            LOG.error("Error on execution message {}", report, ex);
+            executor.failed.incr();
+          }
+          if (Thread.currentThread().isInterrupted()) {
+            LOG.warn("Interrupt of execution of Reports");
+            return;
+          }
+        } catch (InterruptedException e) {
+          LOG.warn("Interrupt of execution of Reports");
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Capture the metrics specific to customized queue.
+   */
+  public interface IQueueMetrics {
+    int getAndResetDropCount(String type);
   }
 }

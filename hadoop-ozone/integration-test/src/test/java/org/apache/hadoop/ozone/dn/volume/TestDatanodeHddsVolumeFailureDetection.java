@@ -38,11 +38,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.junit.After;
@@ -53,12 +56,16 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -71,7 +78,19 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 /**
  * This class tests datanode can detect failed volumes.
  */
+@RunWith(Parameterized.class)
 public class TestDatanodeHddsVolumeFailureDetection {
+  private boolean schemaV3;
+  public TestDatanodeHddsVolumeFailureDetection(boolean enableV3) {
+    this.schemaV3 = enableV3;
+  }
+
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(
+        new Object[]{false},
+        new Object[]{true});
+  }
 
   /**
    * Set a timeout for each test.
@@ -97,6 +116,9 @@ public class TestDatanodeHddsVolumeFailureDetection {
     // keep the cache size = 1, so we could trigger io exception on
     // reading on-disk db instance
     ozoneConfig.setInt(OZONE_CONTAINER_CACHE_SIZE, 1);
+    if (!schemaV3) {
+      ContainerTestUtils.disableSchemaV3(ozoneConfig);
+    }
     // set tolerated = 1
     // shorten the gap between successive checks to ease tests
     DatanodeConfiguration dnConf =
@@ -265,9 +287,19 @@ public class TestDatanodeHddsVolumeFailureDetection {
         .equals(HddsProtos.LifeCycleState.OPEN));
 
     // corrupt db by rename dir->file
-    File metadataDir = new File(c1.getContainerFile().getParent());
-    File dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
+    File dbDir;
+    if (schemaV3) {
+      dbDir = new File(((KeyValueContainerData)(c1.getContainerData()))
+          .getDbFile().getAbsolutePath());
+    } else {
+      File metadataDir = new File(c1.getContainerFile().getParent());
+      dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
+    }
     DatanodeTestUtils.injectDataDirFailure(dbDir);
+    if (schemaV3) {
+      // remove rocksDB from cache
+      DatanodeStoreCache.getInstance().shutdownCache();
+    }
 
     // simulate bad volume by removing write permission on root dir
     // refer to HddsVolume.check()

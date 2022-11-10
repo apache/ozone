@@ -72,7 +72,7 @@ public class DatanodeConfiguration {
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
 
-  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
+  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
   // one hour
@@ -294,7 +294,7 @@ public class DatanodeConfiguration {
   }
 
   @Config(key = "container.schema.v3.enabled",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
       description = "Enable use of container schema v3(one rocksdb per disk)."

@@ -305,6 +305,14 @@ public class TestHddsDispatcher {
     ContainerSet containerSet = new ContainerSet(1000);
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet.getVolumesList().stream().forEach(v -> {
+      try {
+        v.format(scmId.toString());
+        v.createWorkingDir(scmId.toString(), null);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);
