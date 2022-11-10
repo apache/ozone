@@ -226,7 +226,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
       <div className='pipelines-container'>
         <div className='page-header'>
           Pipelines ({activeTotalCount})
-          <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={activeLoading} lastRefreshed={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <div className='content-div'>
           <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
