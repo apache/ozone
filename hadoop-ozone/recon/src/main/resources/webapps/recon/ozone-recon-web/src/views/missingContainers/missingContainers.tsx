@@ -28,14 +28,6 @@ import './missingContainers.less';
 const size = filesize.partial({standard: 'iec'});
 const {TabPane} = Tabs;
 
-interface IMissingContainerResponse {
-  containerID: number;
-  keys: number;
-  replicas: IContainerReplica[];
-  missingSince: number;
-  pipelineID: string;
-}
-
 interface IContainerResponse {
   containerID: number;
   containerState: string;
@@ -63,11 +55,6 @@ export interface IContainerReplicas {
   firstSeenTime: number;
   lastSeenTime: number;
   lastBcsId: number;
-}
-
-export interface IMissingContainersResponse {
-  totalCount: number;
-  containers: IMissingContainerResponse[];
 }
 
 interface IUnhealthyContainersResponse {
@@ -144,7 +131,7 @@ const CONTAINER_TAB_COLUMNS = [
     sorter: (a: IContainerResponse, b: IContainerResponse) => a.keys - b.keys
   },
   {
-    title: 'Active/Expected Replica(s)',
+    title: 'Actual/Expected Replica(s)',
     dataIndex: 'expectedReplicaCount',
     key: 'expectedReplicaCount',
     render: (expectedReplicaCount: number, record: IContainerResponse) => {
@@ -219,7 +206,6 @@ interface IMissingContainersState {
   underReplicatedDataSource: IContainerResponse[];
   overReplicatedDataSource: IContainerResponse[];
   misReplicatedDataSource: IContainerResponse[];
-  totalCount: number;
   expandedRowData: IExpandedRow;
 }
 
@@ -232,7 +218,6 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       underReplicatedDataSource: [],
       overReplicatedDataSource: [],
       misReplicatedDataSource: [],
-      totalCount: 0,
       expandedRowData: {}
     };
   }
@@ -243,35 +228,31 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       loading: true
     });
 
-    axios.all([
-      axios.get('/api/v1/containers/unhealthy/MISSING'),
-      axios.get('/api/v1/containers/unhealthy/UNDER_REPLICATED'),
-      axios.get('/api/v1/containers/unhealthy/OVER_REPLICATED'),
-      axios.get('/api/v1/containers/unhealthy/MIS_REPLICATED')
-    ]).then(axios.spread((missingContainersResponse, underReplicatedResponse, overReplicatedResponse, misReplicatedResponse, allReplicatedResponse) => {
+    axios.get('/api/v1/containers/unhealthy').then(allContainersResponse => {
 
-      const missingContainersResponseData: IUnhealthyContainersResponse = missingContainersResponse.data;
-      const totalCount = missingContainersResponseData.missingCount;
-      const missingContainers: IContainerResponse[] = missingContainersResponseData.containers;
+      const allContainersResponseData: IUnhealthyContainersResponse = allContainersResponse.data;
+      const allContainers: IContainerResponse[] = allContainersResponseData.containers;
 
-      const underReplicatedResponseData: IUnhealthyContainersResponse = underReplicatedResponse.data;
-      const uContainers: IContainerResponse[] = underReplicatedResponseData.containers;
+      const missingContainersResponseData = allContainers && allContainers.filter(item => item.containerState === 'MISSING');
+      const mContainers: IContainerResponse[] = missingContainersResponseData;
+
+      const underReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'UNDER_REPLICATED');
+      const uContainers: IContainerResponse[] = underReplicatedResponseData;
       
-      const overReplicatedResponseData: IUnhealthyContainersResponse = overReplicatedResponse.data;
-      const oContainers: IContainerResponse[] = overReplicatedResponseData.containers;
+      const overReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'OVER_REPLICATED');
+      const oContainers: IContainerResponse[] = overReplicatedResponseData;
       
-      const misReplicatedResponseData: IUnhealthyContainersResponse = misReplicatedResponse.data;
-      const mContainers: IContainerResponse[] = misReplicatedResponseData.containers;
+      const misReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'MIS_REPLICATED');
+      const mrContainers: IContainerResponse[] = misReplicatedResponseData;
  
       this.setState({
         loading: false,
-        missingDataSource: missingContainers,
+        missingDataSource: mContainers,
         underReplicatedDataSource: uContainers,
         overReplicatedDataSource: oContainers,
-        misReplicatedDataSource: mContainers,
-        totalCount
+        misReplicatedDataSource: mrContainers
       });
-    })).catch(error => {
+    }).catch(error => {
       this.setState({
         loading: false
       });
@@ -283,7 +264,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     console.log(current, pageSize);
   };
   
-  onRowExpandClick = (expanded: boolean, record: IMissingContainerResponse) => {
+  onRowExpandClick = (expanded: boolean, record: IContainerResponse) => {
     if (expanded) {
       this.setState(({expandedRowData}) => {
         const expandedRowState: IExpandedRowState = expandedRowData[record.containerID] ?
@@ -317,7 +298,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     }
   };
 
-  expandedRowRender = (record: IMissingContainerResponse) => {
+  expandedRowRender = (record: IContainerResponse) => {
     const {expandedRowData} = this.state;
     const containerId = record.containerID;
     if (expandedRowData[containerId]) {

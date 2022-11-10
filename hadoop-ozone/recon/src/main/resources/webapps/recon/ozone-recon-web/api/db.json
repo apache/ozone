@@ -1588,5 +1588,309 @@
         ]
       }
     ]
+  },
+  "unhealthyContainers":{
+    "missingCount": 0,
+    "underReplicatedCount": 2,
+    "overReplicatedCount": 2,
+    "misReplicatedCount": 2,
+    "containers": [
+      {
+        "containerID": 1,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 1,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_misreplicated1",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 1,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_misreplicated1",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 1,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_misreplicated1",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 2,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 2,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_misreplicated2",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 2,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_misreplicated2",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 2,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_misreplicated2",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 3,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 3,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_overreplicated3",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 3,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_overreplicated3",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 3,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_overreplicated3",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 4,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 4,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_overreplicated4",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 4,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_overreplicated4",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 4,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_overreplicated4",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 5,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 5,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_underreplicated5",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_underreplicated5",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_underreplicated5",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 6,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 6,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_underreplicated6",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 6,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_underreplicated6",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 6,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_underreplicated6",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 7,
+        "containerState": "MISSING",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 7,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_missing7",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 7,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_missing7",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 7,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_missing7",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 8,
+        "containerState": "MISSING",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 8,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_missing8",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_missing8",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_missing8",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      }
+    ]
   }
 }
