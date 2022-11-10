@@ -118,20 +118,54 @@ public abstract class
       throw new BlockTokenException("Expired token for user: " + tokenUser);
     }
 
-    // check token service (blockID or containerID)
-    String service = String.valueOf(getService(cmd));
-    if (tokenId.getService().endsWith("pipelineId: ")
-        && service.contains("pipelineId: ")) {
-      // remove the pipeline as not present in token
-      service = service.substring(0, service.lastIndexOf(":") + 2);
-    }
-    if (!Objects.equals(service, tokenId.getService())) {
-      throw new BlockTokenException("ID mismatch. Token for ID: " +
-          tokenId.getService() + " can't be used to access: " + service +
-          " by user: " + tokenUser);
-    }
+    verifyTokenServiceWithPipeline(cmd, tokenId, tokenUser);
 
     verify(tokenId, cmd);
+  }
+
+  private void verifyTokenServiceWithPipeline(
+      ContainerCommandRequestProtoOrBuilder cmd, T tokenId,
+      UserGroupInformation tokenUser) throws BlockTokenException {
+    String service = String.valueOf(getService(cmd));
+    String tokenServiceId = tokenId.getService();
+    
+    // no need to verify pipeline for read operation as same toke provided
+    // for both read and write
+    if (isReadOperation(cmd)) {
+      service = removePipeline(service);
+      tokenServiceId = removePipeline(tokenServiceId);
+    }
+    // check token service (blockID or containerID)
+    if ((tokenServiceId.endsWith("pipelineId: "))) {
+      // remove the pipeline as not present in token
+      service = removePipeline(service);
+    }
+    if (!Objects.equals(service, tokenServiceId)) {
+      throw new BlockTokenException("ID mismatch. Token for ID: " +
+          tokenServiceId + " can't be used to access: " + service +
+          " by user: " + tokenUser);
+    }
+  }
+  
+  private boolean isReadOperation(ContainerCommandRequestProtoOrBuilder cmd) {
+    switch (cmd.getCmdType()) {
+    case ReadContainer:
+    case ListContainer:
+    case GetBlock:
+    case ListBlock:
+    case ReadChunk:
+    case ListChunk:
+    case GetSmallFile:
+    case GetCommittedBlockLength:
+      return true;
+    default:
+      return false;
+    }
+  }
+  
+  private String removePipeline(String id) {
+    return id.contains("pipelineId: ") ? id.substring(0,
+        id.lastIndexOf(":") + 2) : id;
   }
 
   protected SecurityConfig getConf() {

@@ -248,11 +248,15 @@ public class ECReconstructionCoordinator implements Closeable {
       for (int i = 0; i < toReconstructIndexes.size(); i++) {
         DatanodeDetails datanodeDetails =
             targetMap.get(toReconstructIndexes.get(i));
+        Pipeline pipeline = this.containerOperationClient
+            .singleNodePipeline(datanodeDetails, repConfig);
+        blockLocationInfo.setToken(tokenHelper.getBlockToken(
+            blockLocationInfo.getBlockID(),
+            blockLocationInfo.getLength(), pipeline));
         targetBlockStreams[i] =
             new ECBlockOutputStream(blockLocationInfo.getBlockID(),
                 this.containerOperationClient.getXceiverClientManager(),
-                this.containerOperationClient
-                    .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
+                pipeline, bufferPool,
                 configuration, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
@@ -352,8 +356,6 @@ public class ECReconstructionCoordinator implements Closeable {
             .setBlockID(blockID)
             .setLength(blockGroupLen)
             .setPipeline(pipeline)
-            .setToken(tokenHelper.getBlockToken(blockID, blockGroupLen,
-                pipeline))
             .build();
         blockInfoMap.put(localID, blockLocationInfo);
       }
