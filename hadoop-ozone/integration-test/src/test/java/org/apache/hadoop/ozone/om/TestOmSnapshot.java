@@ -414,7 +414,7 @@ public class TestOmSnapshot {
   }
 
   @Test
-  public void testDummyBucket()
+  public void testNonExistentBucket()
           throws Exception {
     String volume = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
