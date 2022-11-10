@@ -71,6 +71,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -311,6 +312,9 @@ public class TestBlockDeletingService {
     long chunkLength = 100;
     try {
       for (int k = 0; k < numOfChunksPerBlock; k++) {
+        // This real chunkName should be localID_chunk_chunkIndex, here is for
+        // explicit debug and the necessity of HDDS-7446 to detect the orphan
+        // chunks through the chunk file name
         final String chunkName = String.format("%d_chunk_%d_block_%d",
             blockID.getContainerBlockID().getLocalID(), k, i);
         final long offset = k * chunkLength;
@@ -510,9 +514,8 @@ public class TestBlockDeletingService {
   public void testWithUnrecordedBlocks() throws Exception {
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
     // from received TNXs will be deleted, not in BlockDeletingService
-    if (Objects.equals(schemaVersion, SCHEMA_V1)) {
-      return;
-    }
+    Assume.assumeFalse(Objects.equals(schemaVersion, SCHEMA_V1));
+
     int numOfContainers = 2;
     int numOfChunksPerBlock = 1;
     int numOfBlocksPerContainer = 3;

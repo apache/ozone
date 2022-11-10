@@ -243,6 +243,13 @@ public final class ContainerUtils {
     return new File(containerBaseDir, containerFilePath);
   }
 
+  /**
+   * Get the chunk directory from the containerData.
+   *
+   * @param containerData {@link ContainerData}
+   * @return the file of chunk directory
+   * @throws StorageContainerException
+   */
   public static File getChunkDir(ContainerData containerData)
       throws StorageContainerException {
     Preconditions.checkNotNull(containerData, "Container data can't be null");

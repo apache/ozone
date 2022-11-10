@@ -1136,6 +1136,10 @@ public class KeyValueHandler extends Handler {
     }
     String prefix = prefixBuilder.toString();
     File chunkDir = ContainerUtils.getChunkDir(container.getContainerData());
+    // chunkNames here is an array of file/dir name, so if we cannot find any
+    // matching one, it means the client did not write any chunk into the block.
+    // Since the putBlock request may fail, we don't know if the chunk exists,
+    // thus we need to check it when receiving the request to delete such blocks
     String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
     if (chunkNames.length == 0) {
       LOG.warn("Missing delete block(Container = {}, Block = {}",
