@@ -279,22 +279,27 @@ public class TestSecureContainerServer {
 
       ContainerCommandRequestProto.Builder writeChunk =
           newWriteChunkRequestBuilder(pipeline, blockID, 1024);
+      writeChunk.setPipelineID(pipeline.getId().getId().toString());
       assertRequiresToken(client, encodedToken, writeChunk);
 
       ContainerCommandRequestProto.Builder putBlock =
           newPutBlockRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      putBlock.setPipelineID(pipeline.getId().getId().toString());
       assertRequiresToken(client, encodedToken, putBlock);
 
       ContainerCommandRequestProto.Builder readChunk =
           newReadChunkRequestBuilder(pipeline, writeChunk.getWriteChunk());
+      readChunk.setPipelineID(pipeline.getId().getId().toString());
       assertRequiresToken(client, encodedToken, readChunk);
 
       ContainerCommandRequestProto.Builder getBlock =
           newGetBlockRequestBuilder(pipeline, putBlock.getPutBlock());
+      getBlock.setPipelineID(pipeline.getId().getId().toString());
       assertRequiresToken(client, encodedToken, getBlock);
 
       ContainerCommandRequestProto.Builder getCommittedBlockLength =
           newGetCommittedBlockLengthBuilder(pipeline, putBlock.getPutBlock());
+      getCommittedBlockLength.setPipelineID(pipeline.getId().getId().toString());
       assertRequiresToken(client, encodedToken, getCommittedBlockLength);
     } finally {
       stopServer.accept(pipeline);
