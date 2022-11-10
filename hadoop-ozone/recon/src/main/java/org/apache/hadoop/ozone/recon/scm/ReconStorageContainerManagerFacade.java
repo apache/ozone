@@ -217,9 +217,13 @@ public class ReconStorageContainerManagerFacade
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
+    // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
+    // .queue.wait.threshold
     long waitQueueThreshold = ozoneConfiguration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".queue.wait.threshold",
         OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT);
+    // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
+    // .execute.wait.threshold
     long execWaitThreshold = ozoneConfiguration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
         OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT);
