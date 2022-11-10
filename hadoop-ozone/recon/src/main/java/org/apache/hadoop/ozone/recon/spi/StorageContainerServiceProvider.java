@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -78,4 +79,20 @@ public interface StorageContainerServiceProvider {
    * @return DBCheckpoint from SCM.
    */
   DBCheckpoint getSCMDBSnapshot();
+
+  /**
+   * Get the list of containers from SCM. This is a RPC call.
+   * @return list of containers from SCM.
+   */
+  List<ContainerInfo> getListOfContainers() throws IOException;
+
+  /**
+   * Get the container replicas.
+   *
+   * @param containerId the container Id
+   * @return the list of replicas for a container
+   * @throws IOException
+   */
+  List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerId) throws IOException;
 }

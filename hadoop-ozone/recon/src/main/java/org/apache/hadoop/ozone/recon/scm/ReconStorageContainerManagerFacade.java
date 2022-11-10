@@ -29,20 +29,32 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
@@ -81,6 +93,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.common.MonotonicClock;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
@@ -92,6 +105,11 @@ import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
+
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -131,6 +149,10 @@ public class ReconStorageContainerManagerFacade
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+
+  private ScheduledExecutorService scheduler;
+
+  private AtomicBoolean isSyncDataFromSCMRunning;
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
@@ -184,6 +206,7 @@ public class ReconStorageContainerManagerFacade
         containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
+    this.isSyncDataFromSCMRunning = new AtomicBoolean();
 
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
@@ -306,6 +329,7 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
+    scheduler = Executors.newScheduledThreadPool(1);
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);
@@ -315,6 +339,33 @@ public class ReconStorageContainerManagerFacade
     } else {
       initializePipelinesFromScm();
     }
+    LOG.debug("Started the SCM Container Info sync scheduler.");
+    long interval = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+    long initialDelay = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    // This periodic sync with SCM container cache is needed because during
+    // the window when recon will be down and any container being added
+    // newly and went missing, that container will not be reported as missing by
+    // recon till there is a difference of container count equivalent to
+    // threshold value defined in "ozone.recon.scm.container.threshold"
+    // between SCM container cache and recon container cache.
+    scheduler.scheduleWithFixedDelay(() -> {
+      try {
+        boolean isSuccess = syncSCMContainerInfoWithReconContainerInfo();
+        if (!isSuccess) {
+          LOG.debug("SCM container info sync is already running.");
+        }
+      } catch (Throwable t) {
+        LOG.error("Unexpected exception while syncing data from SCM.", t);
+      }
+    },
+        initialDelay,
+        interval,
+        TimeUnit.MILLISECONDS);
     getDatanodeProtocolServer().start();
     this.reconScmTasks.forEach(ReconScmTask::start);
   }
@@ -400,18 +451,200 @@ public class ReconStorageContainerManagerFacade
   }
 
   public void updateReconSCMDBWithNewSnapshot() throws IOException {
-    DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
-    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-      LOG.info("Got new checkpoint from SCM : " +
-          dbSnapshot.getCheckpointLocation());
-      try {
-        initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
-      } catch (IOException e) {
-        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+      if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+        LOG.info("Got new checkpoint from SCM : " +
+            dbSnapshot.getCheckpointLocation());
+        try {
+          initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
+        } catch (IOException e) {
+          LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+        }
+      } else {
+        LOG.error("Null snapshot location got from SCM.");
       }
     } else {
-      LOG.error("Null snapshot location got from SCM.");
+      LOG.warn("SCM DB sync is already running.");
     }
+  }
+
+  public boolean syncSCMContainerInfoWithReconContainerInfo()
+      throws IOException {
+    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+      try {
+        List<ContainerInfo> containers = containerManager.getContainers();
+        List<ContainerInfo> listOfContainers = scmServiceProvider.
+            getListOfContainers();
+        if (null != listOfContainers && listOfContainers.size() > 0) {
+          LOG.info("Got list of containers frm SCM : " +
+              listOfContainers.size());
+          listOfContainers.forEach(containerInfo -> {
+            try {
+              long containerID = containerInfo.getContainerID();
+              List<HddsProtos.SCMContainerReplicaProto> containerReplicas
+                  = scmServiceProvider.getContainerReplicas(containerID);
+              boolean isContainerPresentAtRecon =
+                  containers.remove(containerID);
+              if (!isContainerPresentAtRecon) {
+                try {
+                  ContainerWithPipeline containerWithPipeline =
+                      scmServiceProvider.getContainerWithPipeline(containerID);
+                  containerManager.addNewContainer(containerWithPipeline);
+                } catch (IOException e) {
+                  LOG.error("Could not get container with pipeline " +
+                      "for container : {}", containerID);
+                } catch (TimeoutException e) {
+                  LOG.error("Could not add new container {} in Recon " +
+                      "container manager cache.", containerID);
+                }
+              }
+              synchronized (containerInfo) {
+                containerReplicas.forEach(containerReplicaProto -> {
+                  final ContainerReplica replica = buildContainerReplica(
+                      containerInfo, containerReplicaProto);
+                  try {
+                    updateContainerState(containerInfo, replica);
+                    containerManager.updateContainerReplica(
+                        containerInfo.containerID(), replica);
+                  } catch (ContainerNotFoundException e) {
+                    LOG.error("Could not update container replica as " +
+                        "container {} not found.", containerID);
+                  } catch (InvalidStateTransitionException e) {
+                    LOG.error("Invalid state transition for container {}",
+                        containerID);
+                  } catch (IOException e) {
+                    LOG.error("Could not update container {} state.",
+                        containerID);
+                  } catch (TimeoutException e) {
+                    LOG.error("Timeout while updating container {} state.",
+                        containerID);
+                  }
+                });
+              }
+            } catch (IOException e) {
+              LOG.error("Unable to get container replicas for container : {}",
+                  containerInfo.getContainerID());
+            }
+          });
+        } else {
+          LOG.debug("SCM DB sync is already running.");
+          return false;
+        }
+      } catch (IOException e) {
+        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean updateContainerState(ContainerInfo container,
+                                       ContainerReplica replica)
+      throws InvalidStateTransitionException, IOException, TimeoutException {
+    final ContainerID containerId = container.containerID();
+    boolean ignored = false;
+    switch (container.getState()) {
+    case CLOSING:
+      /*
+       * When the container is in CLOSING state the replicas can be in any
+       * of the following states:
+       *
+       * - OPEN
+       * - CLOSING
+       * - QUASI_CLOSED
+       * - CLOSED
+       *
+       * If all the replica are either in OPEN or CLOSING state, do nothing.
+       *
+       * If the replica is in QUASI_CLOSED state, move the container to
+       * QUASI_CLOSED state.
+       *
+       * If the replica is in CLOSED state, mark the container as CLOSED.
+       *
+       */
+
+      if (replica.getState() == StorageContainerDatanodeProtocolProtos.
+          ContainerReplicaProto.State.QUASI_CLOSED) {
+        containerManager.updateContainerState(containerId,
+            HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+      }
+
+      if (replica.getState() == StorageContainerDatanodeProtocolProtos.
+          ContainerReplicaProto.State.CLOSED) {
+        Preconditions.checkArgument(replica.getSequenceId()
+            == container.getSequenceId());
+        containerManager.updateContainerState(containerId,
+            HddsProtos.LifeCycleEvent.CLOSE);
+      }
+
+      break;
+    case QUASI_CLOSED:
+        /*
+         * The container is in QUASI_CLOSED state, this means that at least
+         * one of the replica was QUASI_CLOSED.
+         *
+         * Now replicas can be in any of the following state.
+         *
+         * 1. OPEN
+         * 2. CLOSING
+         * 3. QUASI_CLOSED
+         * 4. CLOSED
+         *
+         * If at least one of the replica is in CLOSED state, mark the
+         * container as CLOSED.
+         *
+         */
+      if (replica.getState() == StorageContainerDatanodeProtocolProtos.
+          ContainerReplicaProto.State.CLOSED) {
+        Preconditions.checkArgument(replica.getSequenceId()
+            == container.getSequenceId());
+        containerManager.updateContainerState(containerId,
+            HddsProtos.LifeCycleEvent.FORCE_CLOSE);
+      }
+      break;
+    case CLOSED:
+      /*
+       * The container is already in closed state. do nothing.
+       */
+      break;
+    case DELETING:
+      /*
+       * The container is under deleting. do nothing.
+       */
+      break;
+    case DELETED:
+      /*
+       * The container is deleted. delete the replica do nothing
+       *  as recon will not send any command to datanode
+       */
+      ignored = true;
+      break;
+    default:
+      break;
+    }
+    return ignored;
+  }
+
+  private static ContainerReplica buildContainerReplica(
+      ContainerInfo containerInfo,
+      HddsProtos.SCMContainerReplicaProto containerReplicaProto) {
+    final ContainerReplica replica = ContainerReplica.newBuilder()
+        .setContainerID(containerInfo.containerID())
+        .setContainerState(StorageContainerDatanodeProtocolProtos.
+            ContainerReplicaProto.State.valueOf(
+                containerReplicaProto.getState()))
+        .setDatanodeDetails(DatanodeDetails.getFromProtoBuf(
+            containerReplicaProto.getDatanodeDetails()))
+        .setOriginNodeId(UUID.fromString(
+            containerReplicaProto.getPlaceOfBirth()))
+        .setSequenceId(containerReplicaProto.getSequenceID())
+        .setKeyCount(containerReplicaProto.getKeyCount())
+        .setReplicaIndex(containerReplicaProto.hasReplicaIndex()
+            ? (int) containerReplicaProto.getReplicaIndex() : -1)
+        .setBytesUsed(containerReplicaProto.getBytesUsed())
+        .build();
+    return replica;
   }
 
   private void deleteOldSCMDB() throws IOException {

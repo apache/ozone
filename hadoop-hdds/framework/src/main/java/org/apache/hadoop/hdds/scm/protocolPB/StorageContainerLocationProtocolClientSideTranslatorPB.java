@@ -1027,4 +1027,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public void close() {
     RPC.stopProxy(rpcProxy);
   }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers() throws IOException {
+    return listContainer(0L, 1_000_000);
+  }
 }

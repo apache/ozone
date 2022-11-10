@@ -41,6 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
@@ -214,5 +215,18 @@ public class StorageContainerServiceProviderImpl
       LOG.error("Unable to obtain SCM DB Snapshot. ", e);
     }
     return null;
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers() throws IOException {
+    return scmClient.getListOfContainers();
+  }
+
+  @Override
+  public List<HddsProtos.SCMContainerReplicaProto>
+      getContainerReplicas(long containerId)
+      throws IOException {
+    return scmClient.getContainerReplicas(containerId,
+            ClientVersion.CURRENT_VERSION);
   }
 }

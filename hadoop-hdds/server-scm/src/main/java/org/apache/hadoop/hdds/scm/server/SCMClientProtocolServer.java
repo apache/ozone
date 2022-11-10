@@ -1123,6 +1123,11 @@ public class SCMClientProtocolServer implements
     return scm.getContainerManager().getContainers().size();
   }
 
+  @Override
+  public List<ContainerInfo> getListOfContainers() throws IOException {
+    return scm.getClientProtocolServer().getListOfContainers();
+  }
+
   /**
    * Queries a list of Node that match a set of statuses.
    *
