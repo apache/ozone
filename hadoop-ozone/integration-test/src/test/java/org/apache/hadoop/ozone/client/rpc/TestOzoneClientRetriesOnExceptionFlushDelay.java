@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.rpc;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
