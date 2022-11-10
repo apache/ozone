@@ -235,7 +235,7 @@ const COLUMNS = [
     title:
     <span>
     Open Containers&nbsp;
-    <Tooltip title='Number of open containers per pipeline.'>
+    <Tooltip title='The number of open containers per pipeline.'>
       <Icon type='info-circle'/>
     </Tooltip>
   </span>,
