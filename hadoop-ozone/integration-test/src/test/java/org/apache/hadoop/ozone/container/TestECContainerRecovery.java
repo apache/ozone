@@ -59,7 +59,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -93,7 +92,6 @@ public class TestECContainerRecovery {
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     conf.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");

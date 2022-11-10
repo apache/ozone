@@ -142,7 +142,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
@@ -176,7 +175,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -250,8 +248,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ObjectName scmInfoBeanName;
 
   private ReplicationManager replicationManager;
-
-  private final LeaseManager<Long> commandWatcherLeaseManager;
 
   private SCMSafeModeManager scmSafeModeManager;
   private SCMCertificateClient scmCertificateClient;
@@ -359,11 +355,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue = new EventQueue();
     serviceManager = new SCMServiceManager();
 
-    long watcherTimeout =
-        conf.getTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT,
-            HDDS_SCM_WATCHER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    commandWatcherLeaseManager = new LeaseManager<>("CommandWatcher",
-        watcherTimeout);
     initializeSystemManagers(conf, configurator);
 
     // Authenticate SCM if security is enabled, this initialization can only
@@ -1414,7 +1405,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
 
-    commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
 
     if (LOG.isInfoEnabled()) {
@@ -1517,13 +1507,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmDecommissionManager.stop();
     } catch (Exception ex) {
       LOG.error("The Datanode Admin Monitor failed to stop", ex);
-    }
-
-    try {
-      LOG.info("Stopping Lease Manager of the command watchers");
-      commandWatcherLeaseManager.shutdown();
-    } catch (Exception ex) {
-      LOG.error("Lease Manager of the command watchers stop failed");
     }
 
     try {
@@ -1766,11 +1749,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "Access denied for user " + remoteUser.getUserName() +
               ". Superuser privilege is required.");
     }
-  }
-
-  @Override
-  public Map<String, String> getContainerReport() {
-    return Collections.EMPTY_MAP;
   }
 
   /**
