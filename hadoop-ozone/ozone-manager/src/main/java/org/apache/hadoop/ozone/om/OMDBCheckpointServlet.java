@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -26,6 +27,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -58,6 +60,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.createHardLinkList;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
@@ -116,7 +119,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   private void getFilesForArchive(DBCheckpoint checkpoint,
                                   Map<Object, Path> copyFiles,
-                                  Map<Path, Path> hardLinkFiles)
+                                  Map<Path, Path> hardLinkFiles,
+                                  boolean includeSnapshotData)
       throws IOException, InterruptedException {
     Path dir = checkpoint.getCheckpointLocation();
 
@@ -128,6 +132,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         copyFiles.put(key, file);
       }
     }
+    if (!includeSnapshotData) {
+      return;
+    }
+
     for (Path snapshotDir : getSnapshotDirs(checkpoint)) {
       processDir(snapshotDir, copyFiles, hardLinkFiles);
     }
@@ -196,14 +204,16 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
+                                  HttpServletRequest request,
+                                  OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
     // Map of inodes to path
     HashMap<Object, Path> copyFiles = new HashMap<>();
     // Map of link to path
     HashMap<Path, Path> hardLinkFiles = new HashMap<>();
 
-    getFilesForArchive(checkpoint, copyFiles, hardLinkFiles);
+    getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
+        includeSnapshotData(request));
 
     try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
         .createCompressorOutputStream(CompressorStreamFactory.GZIP,
@@ -221,6 +231,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           "Can't compress the checkpoint: " +
               checkpoint.getCheckpointLocation(), e);
     }
+  }
+
+  private boolean includeSnapshotData(HttpServletRequest request) {
+    String includeParam =
+        request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
+    if (StringUtils.isNotEmpty(includeParam)) {
+      return Boolean.parseBoolean(includeParam);
+    }
+    return false;
   }
 
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})

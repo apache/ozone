@@ -174,7 +174,7 @@ public class DBCheckpointServlet extends HttpServlet {
                file.toString() + ".tgz\"");
 
       Instant start = Instant.now();
-      writeDbDataToStream(checkpoint,
+      writeDbDataToStream(checkpoint, request,
           response.getOutputStream());
       Instant end = Instant.now();
 
@@ -201,6 +201,7 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   public void writeDbDataToStream(DBCheckpoint checkpoint,
+                                  HttpServletRequest ignoredRequest,
                                   OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
     writeDBCheckpointToStream(checkpoint, destination);    

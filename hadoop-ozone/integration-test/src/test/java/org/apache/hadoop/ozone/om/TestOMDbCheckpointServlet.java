@@ -61,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
@@ -184,7 +185,7 @@ public class TestOMDbCheckpointServlet {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any());
+        .writeDbDataToStream(any(), any(), any());
   }
 
   @Test
@@ -285,9 +286,8 @@ public class TestOMDbCheckpointServlet {
   public void testWriteDbDataToStream()
       throws Exception {
     prepArchiveData();
-
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint,
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream);
     }
 
@@ -463,5 +463,10 @@ public class TestOMDbCheckpointServlet {
     dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn("true");
   }
+
+
+
 }

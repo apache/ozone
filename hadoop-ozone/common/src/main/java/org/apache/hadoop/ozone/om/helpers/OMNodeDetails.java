@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.NodeDetails;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -164,13 +165,15 @@ public final class OMNodeDetails extends NodeDetails {
       if (StringUtils.isNotEmpty(getHttpAddress())) {
         return "http://" + getHttpAddress() +
             OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
-            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
+            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true&" +
+            OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true";
       }
     } else {
       if (StringUtils.isNotEmpty(getHttpsAddress())) {
         return "https://" + getHttpsAddress() +
             OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
-            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
+            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true&" +
+            OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true";
       }
     }
     return null;
