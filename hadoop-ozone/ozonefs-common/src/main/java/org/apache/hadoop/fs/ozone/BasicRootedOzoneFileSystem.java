@@ -761,15 +761,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-<<<<<<< HEAD
-    int numEntries = LISTING_PAGE_SIZE;
+    int numEntries = listingPageSize;
     LinkedList<FileStatusAdapter> statuses = new LinkedList<>();
     List<FileStatusAdapter> tmpStatusList;
-=======
-    int numEntries = listingPageSize;
-    LinkedList<FileStatus> statuses = new LinkedList<>();
-    List<FileStatus> tmpStatusList;
->>>>>>> master
     String startPath = "";
 
     do {
