@@ -299,7 +299,8 @@ public class TestSecureContainerServer {
 
       ContainerCommandRequestProto.Builder getCommittedBlockLength =
           newGetCommittedBlockLengthBuilder(pipeline, putBlock.getPutBlock());
-      getCommittedBlockLength.setPipelineID(pipeline.getId().getId().toString());
+      getCommittedBlockLength.setPipelineID(pipeline.getId().getId()
+          .toString());
       assertRequiresToken(client, encodedToken, getCommittedBlockLength);
     } finally {
       stopServer.accept(pipeline);
