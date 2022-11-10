@@ -372,7 +372,8 @@ public final class SnapshotInfo implements Auditable {
         .setPathPreviousSnapshotID(pathPreviousSnapshotID)
         .setGlobalPreviousSnapshotID(globalPreviousSnapshotID)
         .setSnapshotPath(snapshotPath)
-        .setCheckpointDir(checkpointDir);
+        .setCheckpointDir(checkpointDir)
+        .setDbTxSequenceNumber(dbTxSequenceNumber);
     return sib.build();
   }
 
