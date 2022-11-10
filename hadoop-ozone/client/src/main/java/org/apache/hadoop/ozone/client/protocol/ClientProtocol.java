@@ -974,7 +974,7 @@ public interface ClientProtocol {
    * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
-   * @return list of snapshot name
+   * @return list of snapshots for volume/bucket snapshotpath.
    * @throws IOException
    */
   List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)

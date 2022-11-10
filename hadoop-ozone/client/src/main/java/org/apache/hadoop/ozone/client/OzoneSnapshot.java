@@ -17,20 +17,21 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 
 /**
  * A class that encapsulates OzoneSnapshot.
  */
-public class OzoneSnapshot extends WithMetadata {
+public class OzoneSnapshot {
 
   private final String volumeName;
   private final String bucketName;
   private final String name;
   private final long creationTime;
-  private final SnapshotInfo.SnapshotStatus snapshotStatus;
+  private final SnapshotStatus snapshotStatus;
   private final String snapshotID;  // UUID
   private final String snapshotPath; // snapshot mask
+  private final String checkpointDir;
 
   /**
    * Constructs OzoneSnapshot from SnapshotInfo.
@@ -41,11 +42,14 @@ public class OzoneSnapshot extends WithMetadata {
    * @param snapshotStatus Status of the snapshot.
    * @param snapshotID ID of the snapshot.
    * @param snapshotPath Path of the snapshot.
+   * @param checkpointDir Snapshot checkpoint directory.
    */
+  @SuppressWarnings("parameternumber")
   public OzoneSnapshot(String volumeName, String bucketName,
                        String name, long creationTime,
-                       SnapshotInfo.SnapshotStatus snapshotStatus,
-                       String snapshotID, String snapshotPath) {
+                       SnapshotStatus snapshotStatus,
+                       String snapshotID, String snapshotPath,
+                       String checkpointDir) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = name;
@@ -53,10 +57,11 @@ public class OzoneSnapshot extends WithMetadata {
     this.snapshotStatus = snapshotStatus;
     this.snapshotID = snapshotID;
     this.snapshotPath = snapshotPath;
+    this.checkpointDir = checkpointDir;
   }
 
   /**
-   * Returns Volume Name associated with the snapshot.
+   * Returns volume name associated with the snapshot.
    *
    * @return volumeName
    */
@@ -65,7 +70,7 @@ public class OzoneSnapshot extends WithMetadata {
   }
 
   /**
-   * Returns Bucket Name associated with the snapshot.
+   * Returns bucket name associated with the snapshot.
    *
    * @return bucketName
    */
@@ -74,7 +79,7 @@ public class OzoneSnapshot extends WithMetadata {
   }
 
   /**
-   * Returns Name associated with the snapshot.
+   * Returns name associated with the snapshot.
    *
    * @return name
    */
@@ -110,11 +115,31 @@ public class OzoneSnapshot extends WithMetadata {
   }
 
   /**
-   * Returns Path of the snapshot.
+   * Returns path of the snapshot.
    *
    * @return snapshotPath
    */
   public String getSnapshotPath() {
     return snapshotPath;
+  }
+
+  /**
+   * Return snapshot checkpoint directory.
+   *
+   * @return snapshotCheckpointDir
+   */
+  public String getCheckpointDir() {
+    return checkpointDir;
+  }
+  public static OzoneSnapshot fromSnapshotInfo(SnapshotInfo snapshotInfo) {
+    return new OzoneSnapshot(
+        snapshotInfo.getVolumeName(),
+        snapshotInfo.getBucketName(),
+        snapshotInfo.getName(),
+        snapshotInfo.getCreationTime(),
+        snapshotInfo.getSnapshotStatus(),
+        snapshotInfo.getSnapshotID(),
+        snapshotInfo.getSnapshotPath(),
+        snapshotInfo.getCheckpointDir());
   }
 }
