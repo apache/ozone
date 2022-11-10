@@ -232,7 +232,13 @@ const COLUMNS = [
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
   },
   {
-    title: 'Open Containers',
+    title:
+    <span>
+    Open Containers&nbsp;
+    <Tooltip title='The number of open containers per pipeline.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'openContainers',
     key: 'openContainers',
     isVisible: true,
