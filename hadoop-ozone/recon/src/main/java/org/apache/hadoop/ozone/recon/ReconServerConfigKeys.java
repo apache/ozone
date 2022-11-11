@@ -148,7 +148,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.snapshot.task.interval.delay";
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "10m";
+      = "24h";
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
       "ozone.recon.scm.snapshot.task.initial.delay";

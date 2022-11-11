@@ -361,6 +361,8 @@ public class ReconStorageContainerManagerFacade
         }
       } catch (Throwable t) {
         LOG.error("Unexpected exception while syncing data from SCM.", t);
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     },
         initialDelay,
@@ -447,6 +449,8 @@ public class ReconStorageContainerManagerFacade
       }
     } catch (IOException e) {
       LOG.error("Exception encountered while getting SCM DB.");
+    } finally {
+      isSyncDataFromSCMRunning.compareAndSet(true, false);
     }
   }
 
@@ -499,29 +503,27 @@ public class ReconStorageContainerManagerFacade
                       "container manager cache.", containerID);
                 }
               }
-              synchronized (containerInfo) {
-                containerReplicas.forEach(containerReplicaProto -> {
-                  final ContainerReplica replica = buildContainerReplica(
-                      containerInfo, containerReplicaProto);
-                  try {
-                    updateContainerState(containerInfo, replica);
-                    containerManager.updateContainerReplica(
-                        containerInfo.containerID(), replica);
-                  } catch (ContainerNotFoundException e) {
-                    LOG.error("Could not update container replica as " +
-                        "container {} not found.", containerID);
-                  } catch (InvalidStateTransitionException e) {
-                    LOG.error("Invalid state transition for container {}",
-                        containerID);
-                  } catch (IOException e) {
-                    LOG.error("Could not update container {} state.",
-                        containerID);
-                  } catch (TimeoutException e) {
-                    LOG.error("Timeout while updating container {} state.",
-                        containerID);
-                  }
-                });
-              }
+              containerReplicas.forEach(containerReplicaProto -> {
+                final ContainerReplica replica = buildContainerReplica(
+                    containerInfo, containerReplicaProto);
+                try {
+                  updateContainerState(containerInfo, replica);
+                  containerManager.updateContainerReplica(
+                      containerInfo.containerID(), replica);
+                } catch (ContainerNotFoundException e) {
+                  LOG.error("Could not update container replica as " +
+                      "container {} not found.", containerID);
+                } catch (InvalidStateTransitionException e) {
+                  LOG.error("Invalid state transition for container {}",
+                      containerID);
+                } catch (IOException e) {
+                  LOG.error("Could not update container {} state.",
+                      containerID);
+                } catch (TimeoutException e) {
+                  LOG.error("Timeout while updating container {} state.",
+                      containerID);
+                }
+              });
             } catch (IOException e) {
               LOG.error("Unable to get container replicas for container : {}",
                   containerInfo.getContainerID());
