@@ -54,9 +54,10 @@ public class TestOzoneFileSystemWithStreaming {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static final OzoneConfiguration conf = new OzoneConfiguration();
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
+
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   {
     try {
@@ -111,7 +112,7 @@ public class TestOzoneFileSystemWithStreaming {
 
     final Path file = new Path("/file");
 
-    try(FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(conf)) {
       runTestCreateFile(fs, file);
     }
   }
@@ -127,7 +128,7 @@ public class TestOzoneFileSystemWithStreaming {
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file");
 
-    try(FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(conf)) {
       runTestCreateFile(fs, file);
     }
   }
