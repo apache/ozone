@@ -286,6 +286,9 @@ public class TestOMDbCheckpointServlet {
   public void testWriteDbDataToStream()
       throws Exception {
     prepArchiveData();
+    // Do include snapshot data
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn("true");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream);
@@ -354,6 +357,40 @@ public class TestOMDbCheckpointServlet {
     Assert.assertEquals("found expected snapshot files",
         initialSnapshotSet, finalSnapshotSet);
   }
+
+  @Test
+  public void testWriteDbDataWithoutOmSnapshot()
+      throws Exception {
+    prepArchiveData();
+
+    // Don't include snapshot data
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn(null);
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
+          fileOutputStream);
+    }
+
+    // Untar the file into a temp folder to be examined
+    String testDirName = folder.newFolder().getAbsolutePath();
+    int testDirLength = testDirName.length() + 1;
+    FileUtil.unTar(tempFile, new File(testDirName));
+
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    int metaDirLength = metaDir.toString().length() + 1;
+    Path finalCheckpointLocation =
+        Paths.get(testDirName);
+
+    // Confirm the checkpoint directories match, (after remove extras)
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        testDirLength);
+
+    Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
+  }
+
+
 
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private Set<String> getFiles(Path path, int truncateLength)
@@ -463,8 +500,6 @@ public class TestOMDbCheckpointServlet {
     dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
-        .thenReturn("true");
   }
 
 
