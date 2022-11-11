@@ -67,7 +67,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Tests the Ratis snapshots feature in OM.
  */
-@Timeout(500)
+@Timeout(5000)
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
