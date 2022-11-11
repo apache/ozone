@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -45,7 +46,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
-import static org.apache.hadoop.ozone.OzoneConsts.STRIPE_CHECKSUM;
 
 /**
  * Handles the chunk EC writes for an EC internal block.
@@ -117,7 +117,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
         continue;
       }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.get(0).getMetadataCount() > 0) {
+      if (chunks != null && chunks.get(0).hasStripeChecksum()) {
         checksumBlockData = bd;
         break;
       }
@@ -135,8 +135,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
         ChunkInfo chunkInfo = currentChunks.get(i);
         ChunkInfo checksumChunk = checksumBlockDataChunks.get(i);
 
-        ChunkInfo newInfo = ChunkInfo.newBuilder(chunkInfo)
-            .addAllMetadata(checksumChunk.getMetadataList()).build();
+        ChunkInfo.Builder builder = ChunkInfo.newBuilder(chunkInfo);
+
+        if (chunkInfo.hasChecksumData()) {
+          builder.setStripeChecksum(checksumChunk.getStripeChecksum());
+        }
+
+        ChunkInfo newInfo =  builder.build();
         newChunkList.add(newInfo);
       }
 
@@ -153,7 +158,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   public CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
-      boolean force, long blockGroupLength, String checksum)
+      boolean force, long blockGroupLength, ByteString checksum)
       throws IOException {
 
     ECReplicationConfig repConfig = (ECReplicationConfig)
@@ -189,16 +194,13 @@ public class ECBlockOutputStream extends BlockOutputStream {
     getContainerBlockData().addAllMetadata(metadataList); // Add updated meta.
   }
 
-  private void updateChecksum(String checksum) {
+  private void updateChecksum(ByteString checksum) {
     int size = getContainerBlockData().getChunksCount();
 
     if (size > 0) {
-      ContainerProtos.KeyValue keyValue = ContainerProtos.KeyValue.newBuilder()
-          .setKey(STRIPE_CHECKSUM).setValue(checksum).build();
-
       ChunkInfo oldInfo = getContainerBlockData().getChunks(size - 1);
       ChunkInfo newInfo = ChunkInfo.newBuilder(oldInfo)
-          .addMetadata(keyValue).build();
+          .setStripeChecksum(checksum).build();
       getContainerBlockData().removeChunks(size - 1);
       getContainerBlockData().addChunks(newInfo);
     }

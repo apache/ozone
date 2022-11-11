@@ -36,10 +36,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -265,7 +263,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   void executePutBlock(boolean isClose, long blockGroupLength,
-      String checksum) {
+      ByteString checksum) {
     if (!isInitialized()) {
       return;
     }
@@ -390,7 +388,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         .filter(Objects::nonNull);
   }
 
-  public String calculateChecksum() throws IOException {
+  public ByteString calculateChecksum() throws IOException {
     if (blockOutputStreams == null) {
       throw new IOException("Block Output Stream is null");
     }
@@ -407,16 +405,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       }
     }
 
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    ByteString checksum = ByteString.EMPTY;
     for (ContainerProtos.ChunkInfo info : chunkInfos) {
-      List<ByteString> byteStrings = new ArrayList<>(info.getChecksumData()
-          .getChecksumsList());
-      for (ByteString byteString : byteStrings) {
-        out.write(byteString.toByteArray());
+      for (ByteString byteString : info.getChecksumData().getChecksumsList()) {
+        checksum = checksum.concat(byteString);
       }
     }
 
-    return new String(out.toByteArray(), StandardCharsets.ISO_8859_1);
+    return checksum;
   }
 
   /**

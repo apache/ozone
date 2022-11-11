@@ -26,13 +26,13 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.CrcComposer;
 import org.apache.hadoop.util.CrcUtil;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 
@@ -82,12 +82,10 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
 
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
-      ContainerProtos.KeyValue checksumKeyValue =
-          chunkInfo.getMetadata(0);
+      ByteString stripeChecksum = chunkInfo.getStripeChecksum();
 
-      Preconditions.checkNotNull(checksumKeyValue);
-      byte[] checksumBytes =
-          checksumKeyValue.getValue().getBytes(StandardCharsets.ISO_8859_1);
+      Preconditions.checkNotNull(stripeChecksum);
+      byte[] checksumBytes = stripeChecksum.toByteArray();
 
       Preconditions.checkArgument(checksumBytes.length % 4 == 0,
           "Checksum Bytes size does not match");
@@ -150,12 +148,10 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
         CrcComposer.newCrcComposer(dataChecksumType, bytesPerCrc);
 
     for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
-      ContainerProtos.KeyValue checksumKeyValue =
-          chunkInfo.getMetadata(0);
+      ByteString stripeChecksum = chunkInfo.getStripeChecksum();
 
-      Preconditions.checkNotNull(checksumKeyValue);
-      byte[] checksumBytes =
-          checksumKeyValue.getValue().getBytes(StandardCharsets.ISO_8859_1);
+      Preconditions.checkNotNull(stripeChecksum);
+      byte[] checksumBytes = stripeChecksum.toByteArray();
 
       Preconditions.checkArgument(checksumBytes.length % 4 == 0,
           "Checksum Bytes size does not match");

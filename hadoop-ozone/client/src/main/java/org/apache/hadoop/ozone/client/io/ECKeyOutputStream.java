@@ -45,6 +45,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -246,7 +247,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // executePutBlock for all.
     final boolean isLastStripe = streamEntry.getRemaining() <= 0 ||
         ecChunkBufferCache.getLastDataCell().limit() < ecChunkSize;
-    String checksum = streamEntry.calculateChecksum();
+    ByteString checksum = streamEntry.calculateChecksum();
     streamEntry.executePutBlock(isLastStripe,
         streamEntry.getCurrentPosition(), checksum);
 
