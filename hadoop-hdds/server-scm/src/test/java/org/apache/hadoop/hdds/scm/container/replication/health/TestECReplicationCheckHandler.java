@@ -20,9 +20,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +54,8 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 
 /**
  * Tests for the ECContainerHealthCheck class.
@@ -63,11 +68,15 @@ public class TestECReplicationCheckHandler {
   private int maintenanceRedundancy = 2;
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
-
+  private PlacementPolicy placementPolicy;
 
   @Before
   public void setup() {
-    healthCheck = new ECReplicationCheckHandler();
+    placementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(placementPolicy.validateContainerPlacement(
+        anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+    healthCheck = new ECReplicationCheckHandler(placementPolicy);
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();

@@ -34,7 +34,8 @@ public class ContainerHealthResult {
     HEALTHY,
     UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 
   private final ContainerInfo containerInfo;
@@ -265,6 +266,28 @@ public class ContainerHealthResult {
      */
     public boolean isUnrecoverable() {
       return unrecoverable;
+    }
+  }
+
+  /**
+   * Class to represent a container healthy state which is mis-Replicated. This
+   * means the container is neither over nor under replicated, but its replicas
+   * don't meet the requirements of the container placement policy. Eg the
+   * containers are not spread across enough racks.
+   */
+  public static class MisReplicatedHealthResult
+      extends ContainerHealthResult {
+
+    private final boolean misReplicatedAfterPending;
+
+    public MisReplicatedHealthResult(ContainerInfo containerInfo,
+        boolean misReplicatedAfterPending) {
+      super(containerInfo, HealthState.MIS_REPLICATED);
+      this.misReplicatedAfterPending = misReplicatedAfterPending;
+    }
+
+    public boolean isMisReplicatedAfterPending() {
+      return misReplicatedAfterPending;
     }
   }
 

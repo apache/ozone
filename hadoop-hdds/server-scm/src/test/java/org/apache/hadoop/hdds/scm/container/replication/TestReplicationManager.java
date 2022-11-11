@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -55,6 +56,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAF
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 
 /**
  * Tests for the ReplicationManager.
@@ -65,7 +68,8 @@ public class TestReplicationManager {
   private ReplicationManager replicationManager;
   private LegacyReplicationManager legacyReplicationManager;
   private ContainerManager containerManager;
-  private PlacementPolicy placementPolicy;
+  private PlacementPolicy ratisPlacementPolicy;
+  private PlacementPolicy ecPlacementPolicy;
   private EventPublisher eventPublisher;
   private SCMContext scmContext;
   private NodeManager nodeManager;
@@ -83,7 +87,11 @@ public class TestReplicationManager {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
     containerManager = Mockito.mock(ContainerManager.class);
-    placementPolicy = Mockito.mock(PlacementPolicy.class);
+    ratisPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    ecPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+        anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
     eventPublisher = Mockito.mock(EventPublisher.class);
     scmContext = Mockito.mock(SCMContext.class);
     nodeManager = Mockito.mock(NodeManager.class);
@@ -105,7 +113,8 @@ public class TestReplicationManager {
     replicationManager = new ReplicationManager(
         configuration,
         containerManager,
-        placementPolicy,
+        ratisPlacementPolicy,
+        ecPlacementPolicy,
         eventPublisher,
         scmContext,
         nodeManager,
