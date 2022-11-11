@@ -420,7 +420,6 @@ public class TestOmSnapshot {
     String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
     //create volume but not bucket
     store.createVolume(volume);
-    OzoneVolume vol = store.getVolume(volume);
 
     LambdaTestUtils.intercept(OMException.class,
             "Bucket not found",
