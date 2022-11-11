@@ -452,10 +452,12 @@ public final class KeyValueContainerUtil {
       }
 
       if (!hddsVolume.getClusterID().isEmpty()) {
-        // Initialize delete directory
-        hddsVolume.createDeleteServiceDir();
+        // Initialize tmp and delete service directories
+        hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
       } else {
-        throw new IOException("Volume has no ClusterId");
+        LOG.error("Volume hasn't been formatted " +
+            "properly and has no ClusterId. " +
+            "Unable to initialize tmp and delete service directories.");
       }
 
       ListIterator<File> leftoversListIt = getDeleteLeftovers(hddsVolume);
