@@ -272,22 +272,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      OzoneDataStreamOutput ozoneDataStreamOutput = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-
-        ReplicationConfig customReplicationConfig =
-            ReplicationConfig.adjustReplication(bucketReplicationConfig,
-                replication, config);
-        ozoneDataStreamOutput = bucket
-            .createStreamFile(key, 0, customReplicationConfig, overWrite,
-                recursive);
-      } else {
-        ozoneDataStreamOutput = bucket.createStreamFile(
-            key, 0, bucketReplicationConfig, overWrite, recursive);
-      }
-      return new OzoneFSDataStreamOutput(
-          ozoneDataStreamOutput.getByteBufStreamOutput());
+      final ReplicationConfig replicationConfig
+          = OzoneClientUtils.resolveClientSideReplicationConfig(
+          replication, clientConfiguredReplicationConfig,
+          getReplicationConfigWithRefreshCheck(), config);
+      final OzoneDataStreamOutput out = bucket.createStreamFile(
+          key, 0, replicationConfig, overWrite, recursive);
+      return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
