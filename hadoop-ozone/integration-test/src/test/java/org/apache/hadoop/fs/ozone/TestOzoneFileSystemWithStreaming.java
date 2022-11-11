@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -27,24 +26,26 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.junit.Assert.fail;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 
 /**
  * Ozone file system tests with Streaming.
@@ -53,21 +54,15 @@ public class TestOzoneFileSystemWithStreaming {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static final Logger LOG
-      = LoggerFactory.getLogger(TestOzoneFileSystemWithStreaming.class);
-
-  private static final BucketLayout BUCKET_LAYOUT
-      = BucketLayout.FILE_SYSTEM_OPTIMIZED;
-
+  private static final OzoneConfiguration conf = new OzoneConfiguration();
   private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
+  private static OzoneBucket bucket;
 
   {
     try {
       init();
     } catch (Exception e) {
-      LOG.info("Unexpected exception", e);
-      fail("Unexpected exception:" + e.getMessage());
+      throw new IllegalStateException(e);
     }
   }
 
@@ -76,14 +71,12 @@ public class TestOzoneFileSystemWithStreaming {
     final int flushSize = 2 * chunkSize;
     final int maxFlushSize = 2 * flushSize;
     final int blockSize = 2 * maxFlushSize;
+    final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-        true);
-    conf.setBoolean(OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BUCKET_LAYOUT.name());
+    conf.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    conf.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
+    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -99,15 +92,7 @@ public class TestOzoneFileSystemWithStreaming {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    final OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(
-        cluster, BUCKET_LAYOUT);
-
-    // Set the fs.defaultFS
-    final String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-
-    fs = FileSystem.get(conf);
+    bucket = TestDataUtil.createVolumeAndBucket(cluster, layout);
   }
 
   @AfterClass
@@ -115,15 +100,42 @@ public class TestOzoneFileSystemWithStreaming {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @Test
-  public void testCreateFile() throws IOException {
+  public void testO3fsCreateFile() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s.%s/",
+        OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final Path file = new Path("/file");
+
+    try(FileSystem fs = FileSystem.get(conf)) {
+      runTestCreateFile(fs, file);
+    }
+  }
+
+  @Test
+  public void testOfsCreateFile() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file");
+
+    try(FileSystem fs = FileSystem.get(conf)) {
+      runTestCreateFile(fs, file);
+    }
+  }
+
+  static void runTestCreateFile(FileSystem fs, Path file) throws Exception {
     final byte[] bytes = new byte[1 << 20];
     ThreadLocalRandom.current().nextBytes(bytes);
 
-    final Path file = new Path("/file");
     ContractTestUtils.createFile(fs, file, true, bytes);
 
     final byte[] buffer = new byte[4 << 10];

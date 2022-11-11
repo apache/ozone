@@ -276,11 +276,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           = OzoneClientUtils.resolveClientSideReplicationConfig(
           replication, clientConfiguredReplicationConfig,
           getReplicationConfigWithRefreshCheck(), config);
-      final OzoneDataStreamOutput ozoneDataStreamOutput
-          = bucket.createStreamFile(key, 0, replicationConfig,
-          overWrite, recursive);
-      return new OzoneFSDataStreamOutput(
-          ozoneDataStreamOutput.getByteBufStreamOutput());
+      final OzoneDataStreamOutput out = bucket.createStreamFile(
+          key, 0, replicationConfig, overWrite, recursive);
+      return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
