@@ -488,6 +488,21 @@ public class ReplicationManager implements SCMService {
     return scmContext.getTermOfLeader();
   }
 
+  /**
+   * Notify ReplicationManager that the command counts on a datanode have been
+   * updated via a heartbeat received. This will allow RM to consider the node
+   * for container operations if it was previously excluded due to load.
+   * @param datanodeDetails The datanode for which the commands have been
+   *                        updated.
+   */
+  public void datanodeCommandCountUpdated(DatanodeDetails datanodeDetails) {
+    // For now this is a NOOP, as the plan is to use this notification in a
+    // future change to limit the number of commands scheduled against a DN by
+    // RM.
+    LOG.debug("Received a notification that the DN command count " +
+        "has been updated for {}", datanodeDetails);
+  }
+
   protected void processContainer(ContainerInfo containerInfo,
       ReplicationQueue repQueue, ReplicationManagerReport report)
       throws ContainerNotFoundException {
