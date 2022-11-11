@@ -199,7 +199,7 @@ public class TestKeyValueStreamDataChannel {
 
     @Override
     public CompletableFuture<DataStreamReply> writeAsync(
-        ByteBuffer src, WriteOption... writeOptions) {
+        ByteBuffer src, Iterable<WriteOption> writeOptions) {
       final int written;
       try {
         written = writeBuffers(
