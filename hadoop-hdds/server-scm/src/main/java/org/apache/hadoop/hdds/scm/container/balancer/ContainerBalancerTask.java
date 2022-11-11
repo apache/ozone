@@ -462,7 +462,6 @@ public class ContainerBalancerTask implements Runnable {
     // loop
     //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
     // source and target
-    findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
     List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
     findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
