@@ -377,7 +377,6 @@ public class TestOMDbCheckpointServlet {
     FileUtil.unTar(tempFile, new File(testDirName));
 
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    int metaDirLength = metaDir.toString().length() + 1;
     Path finalCheckpointLocation =
         Paths.get(testDirName);
 
