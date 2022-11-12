@@ -55,19 +55,21 @@ import org.slf4j.LoggerFactory;
 
 /**
  * OmRatisSnapshotProvider downloads the latest checkpoint from the
- * leader OM and loads the checkpoint into State Machine.
- * In addtion to the latest checkpoint, it also downloads any previous omSnapshots
- * the leader has created.
+ * leader OM and loads the checkpoint into State Machine.  In addtion
+ * to the latest checkpoint, it also downloads any previous
+ * omSnapshots the leader has created.
  *
- * The term "snapshot" has two related but slightly different meanings in ozone.
- * An "omSnapshot" is a copy of the om's metadata at a point in time.  It is created
- * by users through the "ozone sh snapshot create" cli.
+ * The term "snapshot" has two related but slightly different meanings
+ * in ozone.  An "omSnapshot" is a copy of the om's metadata at a
+ * point in time.  It is created by users through the "ozone sh
+ * snapshot create" cli.
  *
- * A "ratisSnapshot", (provided by this class), is used by om followers to bootstrap
- * themselves to the current state of the om leader.  ratisSnapshots will contain
- * copies of all the individual "omSnapshot"s that exist on the leader at the time
- * of the bootstrap.  The follower needs these copies to respond the users snapshot
- * requests when it becomes the leader.
+ * A "ratisSnapshot", (provided by this class), is used by om
+ * followers to bootstrap themselves to the current state of the om
+ * leader.  ratisSnapshots will contain copies of all the individual
+ * "omSnapshot"s that exist on the leader at the time of the
+ * bootstrap.  The follower needs these copies to respond the users
+ * snapshot requests when it becomes the leader.
  */
 public class OmRatisSnapshotProvider {
 
@@ -81,7 +83,7 @@ public class OmRatisSnapshotProvider {
   private final URLConnectionFactory connectionFactory;
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
-                                 File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
+      File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
 
     LOG.info("Initializing OM Snapshot Provider");
     this.omSnapshotDir = omRatisSnapshotDir;

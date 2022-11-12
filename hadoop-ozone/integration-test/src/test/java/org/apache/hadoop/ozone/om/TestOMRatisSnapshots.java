@@ -543,7 +543,7 @@ public class TestOMRatisSnapshots {
 
   @Test
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE",
-                        "NP_NULL_ON_SOME_PATH"})
+      "NP_NULL_ON_SOME_PATH"})
   public void testOmSnapshots() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
