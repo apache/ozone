@@ -40,12 +40,18 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   private boolean isRenameDirectory;
+  private OmKeyInfo fromKeyParent;
+  private OmKeyInfo toKeyParent;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse,
-      String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo,
+      String fromDBKey, String toDBKey, OmKeyInfo fromKeyParent,
+      OmKeyInfo toKeyParent, @Nonnull OmKeyInfo renameKeyInfo,
       boolean isRenameDirectory, BucketLayout bucketLayout) {
-    super(omResponse, fromKeyName, toKeyName, renameKeyInfo, bucketLayout);
+    super(omResponse, fromDBKey, toDBKey, renameKeyInfo, bucketLayout);
     this.isRenameDirectory = isRenameDirectory;
+    this.fromKeyParent = fromKeyParent;
+    this.toKeyParent = toKeyParent;
   }
 
   /**
@@ -60,26 +66,46 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
                            BatchOperation batchOperation) throws IOException {
-
+    long volumeId = omMetadataManager.getVolumeId(
+        getRenameKeyInfo().getVolumeName());
+    long bucketId = omMetadataManager.getBucketId(
+        getRenameKeyInfo().getVolumeName(), getRenameKeyInfo().getBucketName());
     if (isRenameDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
-              getFromKeyName());
-
+              getFromDBKey());
       OmDirectoryInfo renameDirInfo =
               OMFileRequest.getDirectoryInfo(getRenameKeyInfo());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
-              getToKeyName(), renameDirInfo);
-
+              getToDBKey(), renameDirInfo);
     } else {
       omMetadataManager.getKeyTable(getBucketLayout())
-          .deleteWithBatch(batchOperation, getFromKeyName());
+          .deleteWithBatch(batchOperation, getFromDBKey());
       omMetadataManager.getKeyTable(getBucketLayout())
-          .putWithBatch(batchOperation, getToKeyName(), getRenameKeyInfo());
+          .putWithBatch(batchOperation, getToDBKey(), getRenameKeyInfo());
+    }
+    if (fromKeyParent != null) {
+      addDirToDBBatch(omMetadataManager, fromKeyParent,
+          volumeId, bucketId, batchOperation);
+    }
+    if (toKeyParent != null) {
+      addDirToDBBatch(omMetadataManager, toKeyParent,
+          volumeId, bucketId, batchOperation);
     }
   }
 
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  private void addDirToDBBatch(OMMetadataManager metadataManager,
+      OmKeyInfo keyInfo, long volumeId, long bucketId, BatchOperation batch)
+      throws IOException {
+    String dbKey = metadataManager.getOzonePathKey(volumeId, bucketId,
+        keyInfo.getParentObjectID(), keyInfo.getFileName());
+    OmDirectoryInfo keyDirInfo =
+        OMFileRequest.getDirectoryInfo(keyInfo);
+    metadataManager.getDirectoryTable().putWithBatch(batch,
+        dbKey, keyDirInfo);
   }
 }

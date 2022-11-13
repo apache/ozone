@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -27,84 +28,89 @@ import org.junit.Test;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import static  org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
 /**
  * Tests OMKeyRenameResponse.
  */
+@SuppressWarnings("checkstyle:VisibilityModifier")
 public class TestOMKeyRenameResponse extends TestOMKeyResponse {
+  protected OmKeyInfo formKeyParent;
+  protected OmKeyInfo toKeyParent;
   @Test
   public void testAddToDBBatch() throws Exception {
-
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
-
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setRenameKeyResponse(
+    OMResponse omResponse =
+        OMResponse.newBuilder().setRenameKeyResponse(
             OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
             .build();
 
     String toKeyName = UUID.randomUUID().toString();
+    OmKeyInfo toKeyInfo = getOmKeyInfo(toKeyName);
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(keyName);
+    String dbFromKey = addKeyToTable(fromKeyInfo);
+    String dbToKey = getDBKeyName(toKeyInfo);
 
-    OMKeyRenameResponse omKeyRenameResponse = new OMKeyRenameResponse(
-        omResponse, keyName, toKeyName, omKeyInfo, getBucketLayout());
+    OMKeyRenameResponse omKeyRenameResponse =
+        getOMKeyRenameResponse(omResponse, dbFromKey, dbToKey, toKeyInfo);
 
-    String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    String ozoneToKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        toKeyName);
-
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
-
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
-    Assert.assertFalse(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbFromKey));
+    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbToKey));
+    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+          .isExist(formKeyParent.getPath()));
+      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+          .isExist(toKeyParent.getPath()));
+    }
 
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertFalse(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
+    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbFromKey));
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbToKey));
+    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      Assert.assertTrue(omMetadataManager.getDirectoryTable()
+          .isExist(formKeyParent.getPath()));
+      Assert.assertTrue(omMetadataManager.getDirectoryTable()
+          .isExist(toKeyParent.getPath()));
+    }
   }
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
-
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setRenameKeyResponse(
+    OMResponse omResponse = OMResponse.newBuilder().setRenameKeyResponse(
             OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
-            .setStatus(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND)
-            .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .build();
+        .setStatus(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND)
+        .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+        .build();
 
     String toKeyName = UUID.randomUUID().toString();
+    OmKeyInfo toKeyInfo = getOmKeyInfo(toKeyName);
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(keyName);
+    String dbFromKey = addKeyToTable(fromKeyInfo);
+    String dbToKey = getDBKeyName(toKeyInfo);
 
-    OMKeyRenameResponse omKeyRenameResponse = new OMKeyRenameResponse(
-        omResponse, keyName, toKeyName, omKeyInfo, getBucketLayout());
+    OMKeyRenameResponse omKeyRenameResponse = getOMKeyRenameResponse(
+        omResponse, dbFromKey, dbToKey, toKeyInfo);
 
-    String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    String ozoneToKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        toKeyName);
-
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
-
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
-    Assert.assertFalse(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbFromKey));
+    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbToKey));
+    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+          .isExist(formKeyParent.getPath()));
+      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+          .isExist(toKeyParent.getPath()));
+    }
 
     omKeyRenameResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -112,47 +118,45 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse has error, it is a no-op. So, no changes should happen.
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
-    Assert.assertFalse(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneToKey));
-
+    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbFromKey));
+    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+        .isExist(dbToKey));
+    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+          .isExist(formKeyParent.getPath()));
+      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+          .isExist(toKeyParent.getPath()));
+    }
   }
 
-  @Test
-  public void testAddToDBBatchWithSameKeyName() throws Exception {
+  protected OmKeyInfo getOmKeyInfo(String keyName) {
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationType, replicationFactor, 0L);
+  }
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+  protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
+    OMRequestTestUtils.addKeyToTable(false, false, keyInfo, clientID, 0L,
+        omMetadataManager);
+    return getDBKeyName(keyInfo);
+  }
 
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setRenameKeyResponse(
-            OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
-            .setStatus(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND)
-            .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .build();
+  protected String getDBKeyName(OmKeyInfo keyName)  throws Exception {
+    return omMetadataManager.getOzoneKey(keyName.getVolumeName(),
+        keyName.getBucketName(), keyName.getKeyName());
+  }
 
+  protected OMKeyRenameResponse getOMKeyRenameResponse(OMResponse response,
+      String fromKeyName, String toKeyName, OmKeyInfo omKeyInfo) {
+    return new OMKeyRenameResponse(response, fromKeyName, toKeyName, omKeyInfo);
+  }
 
-    // Passing toKeyName also same as KeyName.
-    OMKeyRenameResponse omKeyRenameResponse = new OMKeyRenameResponse(
-        omResponse, keyName, keyName, omKeyInfo, getBucketLayout());
-
-    String ozoneFromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
-
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
-
-    omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
-
-    // Do manual commit and see whether addToBatch is successful or not.
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneFromKey));
-
+  protected void createParentKey() {
+    String formKeyParentName = UUID.randomUUID().toString();
+    String toKeyParentName = UUID.randomUUID().toString();
+    formKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, formKeyParentName, replicationType, replicationFactor);
+    toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, toKeyParentName, replicationType, replicationFactor);
   }
 }

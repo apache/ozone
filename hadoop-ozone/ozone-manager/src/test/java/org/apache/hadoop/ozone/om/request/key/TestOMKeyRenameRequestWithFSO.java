@@ -18,22 +18,76 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.Random;
 import java.util.UUID;
 
 /**
  * Tests RenameKeyWithFSO request.
  */
-public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRequest {
+public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
+  @Override
+  @Before
+  public void createParentKey() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+    String formKeyParentName = UUID.randomUUID().toString();
+    String toKeyParentName = UUID.randomUUID().toString();
+    formKeyName = new Path(formKeyParentName, "formKey").toString();
+    toKeyName = new Path(toKeyParentName, "toKey").toString();
+    formKeyParentInfo = getOmKeyInfo(formKeyParentName);
+    formKeyParentInfo.setParentObjectID(bucketId);
+    toKeyParentInfo = getOmKeyInfo(toKeyParentName);
+    toKeyParentInfo.setParentObjectID(bucketId);
+    formKeyInfo = getOmKeyInfo(formKeyName);
+    formKeyInfo.setParentObjectID(formKeyParentInfo.getObjectID());
+    OMRequestTestUtils.addDirKeyToDirTable(false,
+        OMFileRequest.getDirectoryInfo(formKeyParentInfo), volumeName,
+        bucketName, txnLogId, omMetadataManager);
+    OMRequestTestUtils.addDirKeyToDirTable(false,
+        OMFileRequest.getDirectoryInfo(toKeyParentInfo), volumeName,
+        bucketName, txnLogId, omMetadataManager);
+    dbToKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+        toKeyParentInfo.getObjectID(), "toKey");
+  }
+
+  @Override
+  @Test
+  public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
+    String invalidToKeyName = "";
+    Assert.assertThrows(
+        OMException.class, () -> doPreExecute(createRenameKeyRequest(
+            volumeName, bucketName, formKeyName, invalidToKeyName)));  }
+
+  @Override
+  @Test
+  public void testValidateAndUpdateCacheWithFromKeyInvalid() throws Exception {
+    String invalidFromKeyName = "";
+    Assert.assertThrows(
+        OMException.class, () -> doPreExecute(createRenameKeyRequest(
+            volumeName, bucketName, invalidFromKeyName, toKeyName)));
+  }
 
   @Test
   public void testPreExecuteWithUnNormalizedPath() throws Exception {
@@ -90,6 +144,35 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRequest {
         .getKeyArgs().getModificationTime() > 0);
 
     return modifiedOmRequest;
+  }
+
+  @Override
+  protected OmKeyInfo getOmKeyInfo(String keyName) {
+    long bucketId = Math.abs(new Random().nextLong());
+    return OMRequestTestUtils.createOmKeyInfo(
+        volumeName, bucketName, keyName,
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+        bucketId + 100L, bucketId + 101L, 0L, Time.now());
+  }
+
+  @Override
+  protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
+    OMRequestTestUtils.addFileToKeyTable(false, false,
+        keyInfo.getFileName(), keyInfo, clientID, txnLogId, omMetadataManager);
+    return getDBKeyName(keyInfo);
+  }
+
+  @Override
+  protected OMKeyRenameRequest getOMKeyRenameRequest(OMRequest omRequest) {
+    return new OMKeyRenameRequestWithFSO(omRequest, getBucketLayout());
+  }
+
+  @Override
+  protected String getDBKeyName(OmKeyInfo keyInfo) throws IOException {
+    return omMetadataManager.getOzonePathKey(
+        omMetadataManager.getVolumeId(volumeName),
+        omMetadataManager.getBucketId(volumeName, bucketName),
+        keyInfo.getParentObjectID(), keyInfo.getKeyName());
   }
 
   @Override
