@@ -37,7 +37,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.Random;
 import java.util.UUID;
 
 /**
@@ -148,7 +147,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
   @Override
   protected OmKeyInfo getOmKeyInfo(String keyName) {
-    long bucketId = Math.abs(new Random().nextLong());
+    long bucketId = random.nextLong();
     return OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName,
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,

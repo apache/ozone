@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
-import java.util.Random;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -35,7 +34,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo(String keyName) {
-    long bucketId = Math.abs(new Random().nextLong());
+    long bucketId = random.nextLong();
     return OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName,
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
