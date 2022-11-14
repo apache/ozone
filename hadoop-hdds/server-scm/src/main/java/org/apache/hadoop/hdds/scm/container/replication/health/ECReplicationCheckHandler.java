@@ -80,7 +80,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       }
       // TODO - if it is unrecoverable, should we return false to other
       //        handlers can be tried?
-      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
+      if (!underHealth.isReplicatedOkAfterPending() &&
           !underHealth.isUnrecoverable()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
@@ -91,7 +91,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.OVER_REPLICATED, containerID);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
       return true;

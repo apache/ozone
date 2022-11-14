@@ -145,7 +145,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
         ((ContainerHealthResult.UnderReplicatedHealthResult)
             currentUnderRepRes);
-    if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
+    if (containerHealthResult.isReplicatedOkAfterPending()) {
       LOG.info("The container {} with replicas {} is sufficiently replicated",
           container.getContainerID(), replicaCount.getReplicas());
       return emptyMap();

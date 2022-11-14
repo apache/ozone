@@ -118,7 +118,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(request));
@@ -145,7 +145,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertTrue(result.isReplicatedOkAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(request));
@@ -173,7 +173,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(2, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
     Assert.assertTrue(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(request));
@@ -204,7 +204,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(2, result.getRemainingRedundancy());
-    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertTrue(result.isReplicatedOkAfterPending());
     Assert.assertTrue(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(request));
@@ -235,7 +235,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(request));
@@ -259,7 +259,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(-1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
     Assert.assertTrue(result.isUnrecoverable());
 
@@ -363,7 +363,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
     Assert.assertEquals(2, result.getExcessRedundancy());
-    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
 
     Assert.assertTrue(healthCheck.handle(request));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
@@ -396,7 +396,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
     Assert.assertEquals(2, result.getExcessRedundancy());
-    Assert.assertTrue(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertTrue(result.isReplicatedOkAfterPending());
 
     Assert.assertTrue(healthCheck.handle(request));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());

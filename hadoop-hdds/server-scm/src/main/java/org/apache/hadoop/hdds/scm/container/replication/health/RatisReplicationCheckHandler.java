@@ -85,7 +85,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       // TODO - if it is unrecoverable, should we return false to other
       //        handlers can be tried?
       if (!underHealth.isUnrecoverable() &&
-          !underHealth.isSufficientlyReplicatedAfterPending()) {
+          !underHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
       return true;
@@ -98,7 +98,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           container.containerID());
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
       return true;
