@@ -153,7 +153,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     if (!placement.isPolicySatisfied()) {
       ContainerPlacementStatus placementAfterPending = getPlacementStatus(
           replicas, container.getReplicationConfig().getRequiredNodes(),
-          Collections.emptyList());
+          request.getPendingOps());
       return new ContainerHealthResult.MisReplicatedHealthResult(
           container, placementAfterPending.isPolicySatisfied());
     }
