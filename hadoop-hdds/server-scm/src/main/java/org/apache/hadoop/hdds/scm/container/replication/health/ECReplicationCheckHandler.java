@@ -101,11 +101,10 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.MIS_REPLICATED, containerID);
       ContainerHealthResult.MisReplicatedHealthResult misRepHealth
           = ((ContainerHealthResult.MisReplicatedHealthResult) health);
-      // TODO - enqueue the container
-      //if (!misRepHealth.isMisReplicatedAfterPending()) {
-      //  // add to the queue, but ATM the queue expects an over or under rep
-      //  // health state so we need to change that.
-      //}
+      if (!misRepHealth.isReplicatedOkAfterPending()) {
+        request.getReplicationQueue().enqueue(misRepHealth);
+      }
+      return true;
     }
     // Should not get here, but incase it does the container is not healthy,
     // but is also not under or over replicated.
@@ -156,7 +155,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           replicas, container.getReplicationConfig().getRequiredNodes(),
           Collections.emptyList());
       return new ContainerHealthResult.MisReplicatedHealthResult(
-          container, !placementAfterPending.isPolicySatisfied());
+          container, placementAfterPending.isPolicySatisfied());
     }
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);
