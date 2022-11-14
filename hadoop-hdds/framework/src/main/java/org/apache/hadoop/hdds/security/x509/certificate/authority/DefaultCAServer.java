@@ -536,10 +536,10 @@ public class DefaultCAServer implements CertificateServer {
   private void generateRootCertificate(SecurityConfig securityConfig,
       KeyPair key) throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-    LocalDate endDate =
-        temp.plus(securityConfig.getMaxCertificateDuration()).toLocalDate();
+    LocalDateTime beginDate =
+        LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
+    LocalDateTime endDate =
+        beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
         .setSubject(this.subject)
         .setScmID(this.scmID)
