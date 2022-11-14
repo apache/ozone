@@ -246,7 +246,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(reconScm, globalStatsDao, containerHealthSchemaManager);
+        new ClusterStateEndpoint(reconScm, globalStatsDao,
+            containerHealthSchemaManager);
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
     metricsProxyEndpoint =
@@ -593,6 +594,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(0, clusterStateResponse.getKeys());
     Assertions.assertEquals(2, clusterStateResponse.getTotalDatanodes());
     Assertions.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    Assertions.assertEquals(0, clusterStateResponse.getMissingContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = clusterStateEndpoint.getClusterState();

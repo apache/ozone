@@ -202,6 +202,10 @@ public final class ClusterStateResponse {
     return volumes;
   }
 
+  public int getMissingContainers() {
+    return missingContainers;
+  }
+
   public long getBuckets() {
     return buckets;
   }
