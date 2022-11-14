@@ -61,15 +61,14 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(formKeyParent.getPath()));
+          .isExist(getDBKeyName(formKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(toKeyParent.getPath()));
+          .isExist(getDBKeyName(toKeyParent)));
     }
 
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
@@ -78,9 +77,9 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
-          .isExist(formKeyParent.getPath()));
+          .isExist(getDBKeyName(formKeyParent)));
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
-          .isExist(toKeyParent.getPath()));
+          .isExist(getDBKeyName(toKeyParent)));
     }
   }
 
@@ -107,9 +106,9 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(formKeyParent.getPath()));
+          .isExist(getDBKeyName(formKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(toKeyParent.getPath()));
+          .isExist(getDBKeyName(toKeyParent)));
     }
 
     omKeyRenameResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
@@ -124,9 +123,9 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(formKeyParent.getPath()));
+          .isExist(getDBKeyName(formKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(toKeyParent.getPath()));
+          .isExist(getDBKeyName(toKeyParent)));
     }
   }
 
@@ -149,14 +148,5 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   protected OMKeyRenameResponse getOMKeyRenameResponse(OMResponse response,
       String fromKeyName, String toKeyName, OmKeyInfo omKeyInfo) {
     return new OMKeyRenameResponse(response, fromKeyName, toKeyName, omKeyInfo);
-  }
-
-  protected void createParentKey() {
-    String formKeyParentName = UUID.randomUUID().toString();
-    String toKeyParentName = UUID.randomUUID().toString();
-    formKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, formKeyParentName, replicationType, replicationFactor);
-    toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, toKeyParentName, replicationType, replicationFactor);
   }
 }

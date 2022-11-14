@@ -21,10 +21,12 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -64,7 +66,23 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
         fromKeyName, toKeyName, formKeyParent, toKeyParent, omKeyInfo,
         false, getBucketLayout());
   }
-
+  protected void createParentKey() {
+    long bucketId = random.nextLong();
+    String formKeyParentName = UUID.randomUUID().toString();
+    String toKeyParentName = UUID.randomUUID().toString();
+    formKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, formKeyParentName, replicationType, replicationFactor,
+        bucketId + 100L);
+    toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, toKeyParentName, replicationType, replicationFactor,
+        bucketId + 101L);
+    formKeyParent.setParentObjectID(bucketId);
+    toKeyParent.setParentObjectID(bucketId);
+    formKeyParent.setFileName(OzoneFSUtils.getFileName(
+        formKeyParent.getKeyName()));
+    toKeyParent.setFileName(OzoneFSUtils.getFileName(
+        formKeyParent.getKeyName()));
+  }
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
