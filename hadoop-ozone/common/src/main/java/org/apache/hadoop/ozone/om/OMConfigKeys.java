@@ -275,10 +275,6 @@ public final class OMConfigKeys {
   public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT =
       ReplicationType.RATIS.toString();
 
-  // For FSO bucket, does the modification time match the semantics of the
-  // filesystem.
-  // such as: for rename operation, will change renamed file modification
-  // time of parent directory instead of itself.
   public static final String
       OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY =
       "ozone.om.fso.filesystem.modification.time.enabled";

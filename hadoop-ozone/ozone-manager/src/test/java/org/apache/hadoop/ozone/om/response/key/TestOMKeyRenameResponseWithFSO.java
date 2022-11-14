@@ -81,7 +81,7 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
     formKeyParent.setFileName(OzoneFSUtils.getFileName(
         formKeyParent.getKeyName()));
     toKeyParent.setFileName(OzoneFSUtils.getFileName(
-        formKeyParent.getKeyName()));
+        toKeyParent.getKeyName()));
   }
   @Override
   public BucketLayout getBucketLayout() {
