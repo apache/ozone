@@ -180,7 +180,7 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @Override
-  @Test
+  @Ignore
   public void testDeleteVolumeAndBucket() throws IOException {
     String volumeStr1 = getRandomNonExistVolumeName();
     Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
