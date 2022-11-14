@@ -18,11 +18,15 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -31,30 +35,26 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.ratis.helpers.DoubleBufferEntry;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
@@ -194,11 +194,10 @@ public final class OzoneManagerDoubleBuffer {
     this.indexToTerm = indexToTerm;
 
     isRunning.set(true);
-    // Daemon thread which runs in back ground and flushes transactions to DB.
+    // Daemon thread which runs in background and flushes transactions to DB.
     daemon = new Daemon(this::flushTransactions);
     daemon.setName("OMDoubleBufferFlushThread");
     daemon.start();
-
   }
 
   /**
@@ -210,8 +209,8 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   *Releases the given number of permits,
-   *returning them to the unFlushedTransactions.
+   * Releases the given number of permits,
+   * returning them to the unFlushedTransactions.
    */
   public void releaseUnFlushedTransactions(int n) {
     unFlushedTransactions.release(n);
@@ -220,7 +219,7 @@ public final class OzoneManagerDoubleBuffer {
   // TODO: pass the trace id further down and trace all methods of DBStore.
 
   /**
-   * add to write batch with trace span if tracing is enabled.
+   * Add to write batch with trace span if tracing is enabled.
    */
   private Void addToBatchWithTrace(OMResponse omResponse,
       SupplierWithIOException<Void> supplier) throws IOException {
@@ -234,7 +233,7 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   * flush write batch with trace span if tracing is enabled.
+   * Flush write batch with trace span if tracing is enabled.
    */
   private Void flushBatchWithTrace(String parentName, int batchSize,
       SupplierWithIOException<Void> supplier) throws IOException {
@@ -265,115 +264,41 @@ public final class OzoneManagerDoubleBuffer {
   private void flushTransactions() {
     while (isRunning.get()) {
       try {
-        if (canFlush()) {
-          Map<String, List<Long>> cleanupEpochs = new HashMap<>();
+        // Wait till there is some transaction to flush.
+        canFlush();
 
-          setReadyBuffer();
-          List<Long> flushedEpochs = null;
-          try (BatchOperation batchOperation = omMetadataManager.getStore()
-              .initBatchOperation()) {
+        setReadyBuffer();
 
-            AtomicReference<String> lastTraceId = new AtomicReference<>();
-            readyBuffer.iterator().forEachRemaining((entry) -> {
-              try {
-                OMResponse omResponse = entry.getResponse().getOMResponse();
-                lastTraceId.set(omResponse.getTraceID());
-                addToBatchWithTrace(omResponse,
-                    (SupplierWithIOException<Void>) () -> {
-                      entry.getResponse().checkAndUpdateDB(omMetadataManager,
-                          batchOperation);
-                      return null;
-                    });
+        // For snapshot, we want including all the keys that were committed
+        // before the snapshot `create` command was executed. To achieve
+        // the behaviour, we spilt the request buffer at snapshot create
+        // request and flush the buffer in batches split at snapshot create
+        // request.
+        // For example, if requestBuffer is [request1, request2,
+        // snapshotCreateRequest1, request3, snapshotCreateRequest2, request4].
+        //
+        // Split requestBuffer would be.
+        // bufferQueues = [[request1, request2], [snapshotRequest1, request3],
+        //     [snapshotRequest2, request4]].
+        // And we flush the bufferQueue in following order:
+        // Flush #1: [request1, request2]
+        // Flush #2: [snapshotRequest1, request3]
+        // Flush #3: [snapshotRequest2, request4]
+        List<Queue<DoubleBufferEntry<OMClientResponse>>> bufferQueues =
+            splitRequestsAtCreateSnapshot(readyBuffer);
 
-                addCleanupEntry(entry, cleanupEpochs);
-
-              } catch (IOException ex) {
-                // During Adding to RocksDB batch entry got an exception.
-                // We should terminate the OM.
-                terminate(ex);
-              }
-            });
-
-            // Commit transaction info to DB.
-            flushedEpochs = readyBuffer.stream().map(
-                DoubleBufferEntry::getTrxLogIndex)
-                .sorted().collect(Collectors.toList());
-            long lastRatisTransactionIndex = flushedEpochs.get(
-                flushedEpochs.size() - 1);
-            long term = isRatisEnabled ?
-                indexToTerm.apply(lastRatisTransactionIndex) : -1;
-
-            addToBatchTransactionInfoWithTrace(lastTraceId.get(),
-                lastRatisTransactionIndex,
-                (SupplierWithIOException<Void>) () -> {
-                  omMetadataManager.getTransactionInfoTable().putWithBatch(
-                      batchOperation, TRANSACTION_INFO_KEY,
-                      new TransactionInfo.Builder()
-                          .setTransactionIndex(lastRatisTransactionIndex)
-                          .setCurrentTerm(term).build());
-                  return null;
-                });
-
-            long startTime = Time.monotonicNow();
-            flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
-                () -> {
-                  omMetadataManager.getStore().commitBatchOperation(
-                      batchOperation);
-                  return null;
-                });
-            ozoneManagerDoubleBufferMetrics.updateFlushTime(
-                Time.monotonicNow() - startTime);
-          }
-
-          // Complete futures first and then do other things. So, that
-          // handler threads will be released.
-          if (!isRatisEnabled) {
-            // Once all entries are flushed, we can complete their future.
-            readyFutureQueue.iterator().forEachRemaining((entry) -> {
-              entry.complete(null);
-            });
-
-            readyFutureQueue.clear();
-          }
-
-          int flushedTransactionsSize = readyBuffer.size();
-          flushedTransactionCount.addAndGet(flushedTransactionsSize);
-          flushIterations.incrementAndGet();
-
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Sync Iteration {} flushed transactions in this " +
-                    "iteration {}", flushIterations.get(),
-                flushedTransactionsSize);
-          }
-
-          // When non-HA do the sort step here, as the sorted list is not
-          // required for flush to DB. As in non-HA we want to complete
-          // futures as quick as possible after flush to DB, to release rpc
-          // handler threads.
-          if (!isRatisEnabled) {
-            flushedEpochs =
-                readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                    .sorted().collect(Collectors.toList());
-          }
-
-
-          // Clean up committed transactions.
-
-          cleanupCache(cleanupEpochs);
-
-          readyBuffer.clear();
-
-          if (isRatisEnabled) {
-            releaseUnFlushedTransactions(flushedTransactionsSize);
-          }
-
-          // update the last updated index in OzoneManagerStateMachine.
-          ozoneManagerRatisSnapShot.updateLastAppliedIndex(
-              flushedEpochs);
-
-          // set metrics.
-          updateMetrics(flushedTransactionsSize);
+        for (Queue<DoubleBufferEntry<OMClientResponse>> buffer : bufferQueues) {
+          flushBatch(buffer);
         }
+
+        if (!isRatisEnabled) {
+          // Once all entries are flushed, we can complete their future.
+          readyFutureQueue.iterator()
+              .forEachRemaining((entry) -> entry.complete(null));
+          readyFutureQueue.clear();
+        }
+
+        readyBuffer.clear();
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         if (isRunning.get()) {
@@ -395,6 +320,128 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
+  private void flushBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer)
+      throws IOException {
+    Map<String, List<Long>> cleanupEpochs = new HashMap<>();
+    List<Long> flushedEpochs;
+
+    try (BatchOperation batchOperation = omMetadataManager.getStore()
+        .initBatchOperation()) {
+
+      String lastTraceId = addToBatch(batchOperation);
+
+      buffer.iterator().forEachRemaining(
+          entry -> addCleanupEntry(entry, cleanupEpochs));
+
+      // Commit transaction info to DB.
+      flushedEpochs = buffer.stream()
+          .map(DoubleBufferEntry::getTrxLogIndex)
+          .sorted()
+          .collect(Collectors.toList());
+
+      long lastRatisTransactionIndex = flushedEpochs.get(
+          flushedEpochs.size() - 1);
+
+      long term = isRatisEnabled ?
+          indexToTerm.apply(lastRatisTransactionIndex) : -1;
+
+      addToBatchTransactionInfoWithTrace(lastTraceId,
+          lastRatisTransactionIndex,
+          () -> {
+            omMetadataManager.getTransactionInfoTable().putWithBatch(
+                batchOperation, TRANSACTION_INFO_KEY,
+                new TransactionInfo.Builder()
+                    .setTransactionIndex(lastRatisTransactionIndex)
+                    .setCurrentTerm(term)
+                    .build());
+            return null;
+          });
+
+      long startTime = Time.monotonicNow();
+      flushBatchWithTrace(lastTraceId, buffer.size(),
+          () -> {
+            omMetadataManager.getStore()
+                .commitBatchOperation(batchOperation);
+            return null;
+          });
+
+      ozoneManagerDoubleBufferMetrics.updateFlushTime(
+          Time.monotonicNow() - startTime);
+    }
+
+    int flushedTransactionsSize = buffer.size();
+    flushedTransactionCount.addAndGet(flushedTransactionsSize);
+    flushIterations.incrementAndGet();
+
+    LOG.debug("Sync iteration {} flushed transactions in this iteration {}",
+        flushIterations.get(),
+        flushedTransactionsSize);
+
+    // Clean up committed transactions.
+    cleanupCache(cleanupEpochs);
+
+    if (isRatisEnabled) {
+      releaseUnFlushedTransactions(flushedTransactionsSize);
+    }
+    // update the last updated index in OzoneManagerStateMachine.
+    ozoneManagerRatisSnapShot.updateLastAppliedIndex(flushedEpochs);
+
+    // set metrics.
+    updateMetrics(flushedTransactionsSize);
+  }
+
+  private String addToBatch(BatchOperation batchOperation) {
+    String lastTraceId = null;
+
+    while (readyBuffer.iterator().hasNext()) {
+      DoubleBufferEntry<OMClientResponse> entry = readyBuffer.iterator().next();
+
+      OMResponse omResponse = entry.getResponse().getOMResponse();
+      lastTraceId = omResponse.getTraceID();
+
+      try {
+        addToBatchWithTrace(omResponse,
+            () -> {
+              entry.getResponse()
+                  .checkAndUpdateDB(omMetadataManager, batchOperation);
+              return null;
+            });
+      } catch (IOException ex) {
+        // During Adding to RocksDB batch entry got an exception.
+        // We should terminate the OM.
+        terminate(ex);
+      }
+    }
+
+    return lastTraceId;
+  }
+
+  /**
+   * Splits the readyBuffer around the create snapshot request.
+   * Returns, the list of queue split by snapshot requests.
+   * e.g. requestBuffer = [request1, request2, snapshotRequest1,
+   * request3, snapshotRequest2, request4]
+   * response = [[request1, request2], [snapshotRequest1, request3],
+   * [snapshotRequest2, request4]]
+   */
+  @VisibleForTesting
+  List<Queue<DoubleBufferEntry<OMClientResponse>>> splitRequestsAtCreateSnapshot(
+      Queue<DoubleBufferEntry<OMClientResponse>> requestBuffer
+  ) {
+    List<Queue<DoubleBufferEntry<OMClientResponse>>> response =
+        new ArrayList<>();
+
+    requestBuffer.iterator().forEachRemaining(entry -> {
+      OMResponse omResponse = entry.getResponse().getOMResponse();
+      if (omResponse.getCreateSnapshotResponse() != null || response.isEmpty()) {
+        response.add(new LinkedList<>());
+      }
+
+      response.get(response.size() - 1).add(entry);
+    });
+
+    return response;
+  }
 
   private void addCleanupEntry(DoubleBufferEntry entry, Map<String,
       List<Long>> cleanupEpochs) {
@@ -417,7 +464,7 @@ public final class OzoneManagerDoubleBuffer {
             .add(entry.getTrxLogIndex());
       }
     } else {
-      // This is to catch early errors, when an new response class missed to
+      // This is to catch early errors, when a new response class missed to
       // add CleanupTableInfo annotation.
       throw new RuntimeException("CleanupTableInfo Annotation is missing " +
           "for" + responseClass);
@@ -437,8 +484,7 @@ public final class OzoneManagerDoubleBuffer {
    * Update OzoneManagerDoubleBuffer metrics values.
    * @param flushedTransactionsSize
    */
-  private void updateMetrics(
-      int flushedTransactionsSize) {
+  private void updateMetrics(int flushedTransactionsSize) {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
     ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
         flushedTransactionsSize);
@@ -510,7 +556,8 @@ public final class OzoneManagerDoubleBuffer {
   public synchronized CompletableFuture<Void> add(OMClientResponse response,
       long transactionIndex) {
     currentBuffer.add(new DoubleBufferEntry<>(transactionIndex, response));
-    notify();
+    if (! (response instanceof OMKeyCommitResponse))
+      notify();
 
     if (!isRatisEnabled) {
       CompletableFuture<Void> future = new CompletableFuture<>();
@@ -524,20 +571,16 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   * Check can we flush transactions or not. This method wait's until
+   * Check if we can flush transactions or not. This method wait's until
    * currentBuffer size is greater than zero, once currentBuffer size is
-   * greater than zero it gets notify signal, and it returns true
-   * indicating that we are ready to flush.
-   *
-   * @return boolean
+   * greater than zero it gets notify signal.
    */
-  private synchronized boolean canFlush() throws InterruptedException {
+  private synchronized void canFlush() throws InterruptedException {
     // When transactions are added to buffer it notifies, then we check if
     // currentBuffer size once and return from this method.
     while (currentBuffer.size() == 0) {
       wait(Long.MAX_VALUE);
     }
-    return true;
   }
 
   /**
