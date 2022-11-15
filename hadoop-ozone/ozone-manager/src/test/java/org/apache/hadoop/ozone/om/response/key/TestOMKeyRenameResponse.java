@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -53,7 +54,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String dbToKey = getDBKeyName(toKeyInfo);
 
     OMKeyRenameResponse omKeyRenameResponse =
-        getOMKeyRenameResponse(omResponse, dbFromKey, dbToKey, toKeyInfo);
+        getOMKeyRenameResponse(omResponse, fromKeyInfo, toKeyInfo);
 
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbFromKey));
@@ -98,7 +99,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String dbToKey = getDBKeyName(toKeyInfo);
 
     OMKeyRenameResponse omKeyRenameResponse = getOMKeyRenameResponse(
-        omResponse, dbFromKey, dbToKey, toKeyInfo);
+        omResponse, fromKeyInfo, toKeyInfo);
 
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbFromKey));
@@ -146,7 +147,8 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   }
 
   protected OMKeyRenameResponse getOMKeyRenameResponse(OMResponse response,
-      String fromKeyName, String toKeyName, OmKeyInfo omKeyInfo) {
-    return new OMKeyRenameResponse(response, fromKeyName, toKeyName, omKeyInfo);
+      OmKeyInfo fromKeyInfo, OmKeyInfo toKeyInfo) throws IOException {
+    return new OMKeyRenameResponse(response, fromKeyInfo.getKeyName(),
+        toKeyInfo.getKeyName(), toKeyInfo);
   }
 }

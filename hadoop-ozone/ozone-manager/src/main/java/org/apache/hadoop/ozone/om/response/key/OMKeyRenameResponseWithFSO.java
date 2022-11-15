@@ -72,16 +72,18 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
         getRenameKeyInfo().getVolumeName(), getRenameKeyInfo().getBucketName());
     if (isRenameDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
-              getFromDBKey());
+              getFromKeyName());
+
       OmDirectoryInfo renameDirInfo =
               OMFileRequest.getDirectoryInfo(getRenameKeyInfo());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
-              getToDBKey(), renameDirInfo);
+              getToKeyName(), renameDirInfo);
+
     } else {
       omMetadataManager.getKeyTable(getBucketLayout())
-          .deleteWithBatch(batchOperation, getFromDBKey());
+          .deleteWithBatch(batchOperation, getFromKeyName());
       omMetadataManager.getKeyTable(getBucketLayout())
-          .putWithBatch(batchOperation, getToDBKey(), getRenameKeyInfo());
+          .putWithBatch(batchOperation, getToKeyName(), getRenameKeyInfo());
     }
     if (fromKeyParent != null) {
       addDirToDBBatch(omMetadataManager, fromKeyParent,

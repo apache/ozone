@@ -60,10 +60,10 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
 
   @Override
   protected OMKeyRenameResponse getOMKeyRenameResponse(OMResponse response,
-      String fromKeyName, String toKeyName, OmKeyInfo omKeyInfo) {
+      OmKeyInfo fromKeyInfo, OmKeyInfo toKeyInfo) throws IOException {
     createParentKey();
-    return new OMKeyRenameResponseWithFSO(response,
-        fromKeyName, toKeyName, formKeyParent, toKeyParent, omKeyInfo,
+    return new OMKeyRenameResponseWithFSO(response, getDBKeyName(fromKeyInfo),
+        getDBKeyName(toKeyInfo), formKeyParent, toKeyParent, toKeyInfo,
         false, getBucketLayout());
   }
   protected void createParentKey() {

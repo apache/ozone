@@ -37,15 +37,15 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 @CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMKeyRenameResponse extends OmKeyResponse {
 
-  private String fromDBKey;
-  private String toDBKey;
+  private String fromKeyName;
+  private String toKeyName;
   private OmKeyInfo renameKeyInfo;
 
   public OMKeyRenameResponse(@Nonnull OMResponse omResponse,
-      String fromDBKey, String toDBKey, @Nonnull OmKeyInfo renameKeyInfo) {
+      String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo) {
     super(omResponse);
-    this.fromDBKey = fromDBKey;
-    this.toDBKey = toDBKey;
+    this.fromKeyName = fromKeyName;
+    this.toKeyName = toKeyName;
     this.renameKeyInfo = renameKeyInfo;
   }
 
@@ -53,8 +53,8 @@ public class OMKeyRenameResponse extends OmKeyResponse {
       String toKeyName, @Nonnull OmKeyInfo renameKeyInfo,
       BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
-    this.fromDBKey = fromKeyName;
-    this.toDBKey = toKeyName;
+    this.fromKeyName = fromKeyName;
+    this.toKeyName = toKeyName;
     this.renameKeyInfo = renameKeyInfo;
   }
 
@@ -71,21 +71,26 @@ public class OMKeyRenameResponse extends OmKeyResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
+    String volumeName = renameKeyInfo.getVolumeName();
+    String bucketName = renameKeyInfo.getBucketName();
     omMetadataManager.getKeyTable(getBucketLayout())
-        .deleteWithBatch(batchOperation, fromDBKey);
-    omMetadataManager.getKeyTable(getBucketLayout()).putWithBatch(
-            batchOperation, toDBKey, renameKeyInfo);
+        .deleteWithBatch(batchOperation,
+            omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation,
+            omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+            renameKeyInfo);
   }
 
   public OmKeyInfo getRenameKeyInfo() {
     return renameKeyInfo;
   }
 
-  public String getFromDBKey() {
-    return fromDBKey;
+  public String getFromKeyName() {
+    return fromKeyName;
   }
 
-  public String getToDBKey() {
-    return toDBKey;
+  public String getToKeyName() {
+    return toKeyName;
   }
 }
