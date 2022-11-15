@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
@@ -159,13 +160,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // "ozone.default.bucket.layout" configured value for the newer ozone
     // client and LEGACY for an older ozone client.
     if (!bucketInfo.hasBucketLayout()) {
-      BucketLayout defaultBucketLayout =
-          getDefaultBucketLayout(ozoneManager, volumeName, bucketName);
+      BucketLayout defaultBuckLayout = ozoneManager.getOMDefaultBucketLayout();
       omBucketInfo =
-          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
+          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBuckLayout);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
     }
+
     if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
       omMetrics.incNumFSOBucketCreates();
     }
@@ -278,35 +279,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
   private boolean isECBucket(BucketInfo bucketInfo) {
     return bucketInfo.hasDefaultReplicationConfig() && bucketInfo
         .getDefaultReplicationConfig().hasEcReplicationConfig();
-  }
-
-  private BucketLayout getDefaultBucketLayout(OzoneManager ozoneManager,
-      String volumeName, String bucketName) {
-
-    if (getOmRequest().getVersion() <
-        ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
-
-      // Older client will default bucket layout to LEGACY to
-      // make its operations backward compatible.
-      LOG.info("Bucket Layout not present for volume/bucket = {}/{}, "
-              + "initialising with default bucket layout" +
-              ": {} as client is an older version: {}", volumeName,
-          bucketName, BucketLayout.LEGACY, getOmRequest().getVersion());
-      return BucketLayout.LEGACY;
-    } else {
-      // Newer client will default to the configured value.
-      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
-      BucketLayout defaultBuckLayout =
-          BucketLayout.fromString(omDefaultBucketLayout);
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
-                + "initialising with default bucket layout" + ": {}",
-            volumeName, bucketName, omDefaultBucketLayout);
-      }
-
-      return defaultBuckLayout;
-    }
   }
 
 
@@ -459,5 +431,34 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
     }
     return req;
+  }
+
+
+  /**
+   * When a client that does not support bucket layout types issues a create
+   * bucket command, it will leave the bucket layout field empty. For these
+   * old clients, they should create legacy buckets so that they can read and
+   * write to them, instead of using the server default which may be in a layout
+   * they do not understand.
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
+      ValidationContext ctx) {
+    if (req.getVersion() < ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
+      // Older client will default bucket layout to LEGACY to
+      // make its operations backward compatible.
+      CreateBucketRequest createBucketRequest = req.getCreateBucketRequest();
+      BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
+          .setBucketLayout(BucketLayoutProto.LEGACY).build();
+      CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
+          .setBucketInfo(newBucketInfo).build();
+      return req.toBuilder().setCreateBucketRequest(newCreateRequest).build();
+    } else {
+      return req;
+    }
   }
 }
