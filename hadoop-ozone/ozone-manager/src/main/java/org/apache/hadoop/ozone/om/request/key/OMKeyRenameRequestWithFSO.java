@@ -56,8 +56,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -250,12 +248,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       OmKeyInfo fromKeyValue, String fromKeyName, boolean isRenameDirectory,
       long modificationTime, OzoneManager ozoneManager,
       OMResponse.Builder omResponse, long trxnLogIndex) throws IOException {
-
-    final boolean compatibleFileSystemMtime =
-        ozoneManager.getConfiguration().getBoolean(
-            OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY,
-            OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_DEFAULT);
-
     final OMMetadataManager ommm = ozoneManager.getMetadataManager();
     final long volumeId = ommm.getVolumeId(fromKeyValue.getVolumeName());
     final long bucketId = ommm.getBucketId(fromKeyValue.getVolumeName(),
@@ -282,31 +274,25 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       fromKeyValue.setParentObjectID(omBucketInfo.getObjectID());
     }
     // Set modification time
-    if (compatibleFileSystemMtime) {
-      // For Filesystem. rename will change renamed file parent directory
-      // modification time but not change its modification time.
-      //For Object. rename will change renamed file modification time only.
-      if (toKeyParent != null) {
-        toKeyParent.setModificationTime(modificationTime);
-        String dbToKeyParent = ommm.getOzonePathKey(volumeId, bucketId,
-            toKeyParent.getParentObjectID(), toKeyParent.getFileName());
-        dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
-            new CacheValue<>(Optional.of(OMFileRequest
-                .getDirectoryInfo(toKeyParent)), trxnLogIndex));
-      }
-      fromKeyParent = OMFileRequest.getKeyParentDir(
-          fromKeyValue.getVolumeName(), fromKeyValue.getBucketName(),
-          fromKeyName, metadataMgr);
-      if (fromKeyParent != null) {
-        fromKeyParent.setModificationTime(modificationTime);
-        String dbFromKeyParent = ommm.getOzonePathKey(volumeId, bucketId,
-            fromKeyParent.getParentObjectID(), fromKeyParent.getFileName());
-        dirTable.addCacheEntry(new CacheKey<>(dbFromKeyParent),
-            new CacheValue<>(Optional.of(OMFileRequest
-                .getDirectoryInfo(fromKeyParent)), trxnLogIndex));
-      }
-    } else {
-      fromKeyValue.setModificationTime(modificationTime);
+    // For Filesystem. rename will change renamed file parent directory
+    // modification time but not change its modification time.
+    if (toKeyParent != null) {
+      toKeyParent.setModificationTime(modificationTime);
+      String dbToKeyParent = ommm.getOzonePathKey(volumeId, bucketId,
+          toKeyParent.getParentObjectID(), toKeyParent.getFileName());
+      dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
+          new CacheValue<>(Optional.of(OMFileRequest
+              .getDirectoryInfo(toKeyParent)), trxnLogIndex));
+    }
+    fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
+        fromKeyValue.getBucketName(), fromKeyName, metadataMgr);
+    if (fromKeyParent != null) {
+      fromKeyParent.setModificationTime(modificationTime);
+      String dbFromKeyParent = ommm.getOzonePathKey(volumeId, bucketId,
+          fromKeyParent.getParentObjectID(), fromKeyParent.getFileName());
+      dirTable.addCacheEntry(new CacheKey<>(dbFromKeyParent),
+          new CacheValue<>(Optional.of(OMFileRequest
+              .getDirectoryInfo(fromKeyParent)), trxnLogIndex));
     }
 
     // destination dbKeyName

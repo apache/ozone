@@ -24,8 +24,6 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -49,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -354,12 +351,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @Test
   public void testRenameParentDirModificationTime() throws IOException {
-    MiniOzoneCluster cluster = getCluster();
-    OzoneConfiguration conf = cluster.getConf();
-    conf.set(OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY,
-        String.valueOf(true));
-    cluster.setConf(conf);
-
     Path dir1 = new Path(getFs().getUri().toString(), "/dir1");
     Path file1 = new Path(dir1, "file1");
     Path dir2 = new Path(getFs().getUri().toString(), "/dir2");
@@ -377,26 +368,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     long dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
     long file1AfterMTime = getFs().getFileStatus(renamedFile1)
         .getModificationTime();
-    // Renaming should change the parent directory of source and object files
+    // rename should change the parent directory of source and object files
     // modification time but not change modification time of the renamed file
     assertTrue(dir1BeforeMTime < dir1AfterMTime);
     assertTrue(dir2BeforeMTime < dir2AfterMTime);
     assertEquals(file1BeforeMTime, file1AfterMTime);
-
-    conf.set(OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY,
-        String.valueOf(false));
-    cluster.setConf(conf);
-    // mv "/dir2/file1" to "/dir1/file1"
-    getFs().rename(renamedFile1, file1);
-    long dir1AfterMTime2 = getFs().getFileStatus(dir1).getModificationTime();
-    long dir2AfterMTime2 = getFs().getFileStatus(dir2).getModificationTime();
-    long file1AfterMTime2 = getFs().getFileStatus(file1)
-        .getModificationTime();
-    // Renaming should change the modification time of the renamed file if
-    // OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY is disabled
-    assertEquals(dir1AfterMTime, dir1AfterMTime2);
-    assertEquals(dir2AfterMTime2, dir1AfterMTime2);
-    assertTrue(file1AfterMTime < file1AfterMTime2);
   }
 
   @Override

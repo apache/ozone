@@ -275,12 +275,6 @@ public final class OMConfigKeys {
   public static final String OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT =
       ReplicationType.RATIS.toString();
 
-  public static final String
-      OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_KEY =
-      "ozone.om.fso.filesystem.modification.time.enabled";
-  public static final boolean
-      OZONE_OM_FSO_FILESYSTEM_MODIFICATION_TIME_ENABLED_DEFAULT = false;
-
   public static final String OZONE_OM_HA_PREFIX = "ozone.om.ha";
 
   public static final String OZONE_FS_TRASH_INTERVAL_KEY =

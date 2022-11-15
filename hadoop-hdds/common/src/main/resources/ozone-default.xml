@@ -2963,19 +2963,6 @@
   </property>
 
   <property>
-    <name>ozone.om.fso.filesystem.modification.time.enabled</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>
-      For FSO bucket, does the modification time match the semantics of the
-      filesystem.
-      such as:
-      for rename operation, will change renamed file modification
-      time of parent directory instead of itself.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.key.path.lock.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
