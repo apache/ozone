@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -36,19 +37,23 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Rule;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test FileChecksum API.
@@ -65,8 +70,8 @@ public class TestOzoneFileChecksum {
   private static BasicRootedOzoneClientAdapterImpl adapter;
   private static String rootPath;
 
-  @BeforeAll
-  public static void setup() throws IOException,
+  @BeforeEach
+  public void setup() throws IOException,
       InterruptedException, TimeoutException {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -81,8 +86,8 @@ public class TestOzoneFileChecksum {
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
   }
 
-  @AfterAll
-  public static void teardown() {
+  @AfterEach
+  public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -93,13 +98,35 @@ public class TestOzoneFileChecksum {
    *  Test EC checksum with Replicated checksum.
    */
   @ParameterizedTest
-  @ValueSource(doubles = {0.5, 1, 1.5, 2, 3, 7, 8})
-  public void testFileChecksum(double size) throws IOException {
+  @MethodSource("dataSizeMissingIndexes")
+  public void testEcFileChecksum(double size, List<Integer> missingIndexes)
+      throws IOException {
 
     // Size in multiples of MB
     int dataLen = (int) (1024 * 1024 * size);
     byte[] data = RandomStringUtils.randomAlphabetic(dataLen)
         .getBytes(UTF_8);
+
+    BucketArgs omBucketArgs1 = BucketArgs.newBuilder()
+        .setStorageType(StorageType.DISK)
+        .setBucketLayout(BucketLayout.LEGACY)
+        .build();
+
+    String vol2 = UUID.randomUUID().toString();
+    String legacyBucket = UUID.randomUUID().toString();
+    TestDataUtil.createVolumeAndBucket(cluster, vol2,
+        legacyBucket, BucketLayout.LEGACY, omBucketArgs1);
+
+    try (OzoneFSOutputStream file = adapter.createFile(vol2 +
+        "/" + legacyBucket + "/test", (short) 3, true, false)) {
+      file.write(data);
+    }
+
+    Path parent1 = new Path("/" + vol2 + "/" + legacyBucket + "/");
+    Path replicatedKey = new Path(parent1, "test");
+    FileChecksum replicatedChecksum =  fs.getFileChecksum(replicatedKey);
+    String replicatedChecksumString = StringUtils.byteToHexString(
+        replicatedChecksum.getBytes(), 0, replicatedChecksum.getLength());
 
     BucketArgs omBucketArgs = BucketArgs.newBuilder()
         .setStorageType(StorageType.DISK)
@@ -123,33 +150,28 @@ public class TestOzoneFileChecksum {
       file.write(data);
     }
 
+    // Fail DataNodes
+    for (int index: missingIndexes) {
+      cluster.shutdownHddsDatanode(index);
+    }
+
+    // Compute checksum after failed DNs
     Path parent = new Path("/" + vol + "/" + ecBucket + "/");
     Path ecKey = new Path(parent, "test");
     FileChecksum ecChecksum = fs.getFileChecksum(ecKey);
     String ecChecksumString = StringUtils.byteToHexString(
         ecChecksum.getBytes(), 0, ecChecksum.getLength());
 
-    BucketArgs omBucketArgs1 = BucketArgs.newBuilder()
-        .setStorageType(StorageType.DISK)
-        .setBucketLayout(BucketLayout.LEGACY)
-        .build();
-
-    String vol2 = UUID.randomUUID().toString();
-    String legacyBucket = UUID.randomUUID().toString();
-    TestDataUtil.createVolumeAndBucket(cluster, vol2,
-        legacyBucket, BucketLayout.LEGACY, omBucketArgs1);
-
-    try (OzoneFSOutputStream file = adapter.createFile(vol2 +
-        "/" + legacyBucket + "/test", (short) 3, true, false)) {
-      file.write(data);
-    }
-
-    Path parent1 = new Path("/" + vol2 + "/" + legacyBucket + "/");
-    Path replicatedKey = new Path(parent1, "test");
-    FileChecksum replicatedChecksum =  fs.getFileChecksum(replicatedKey);
-    String replicatedChecksumString = StringUtils.byteToHexString(
-        replicatedChecksum.getBytes(), 0, replicatedChecksum.getLength());
-
     Assertions.assertEquals(replicatedChecksumString, ecChecksumString);
+  }
+
+  public static Stream<Arguments> dataSizeMissingIndexes() {
+    return Stream.of(
+        arguments(0.5, ImmutableList.of(0, 1)),
+        arguments(1, ImmutableList.of(1, 2)),
+        arguments(1.5, ImmutableList.of(2, 3)),
+        arguments(2, ImmutableList.of(3, 4)),
+        arguments(7, ImmutableList.of(0, 3)),
+        arguments(8, ImmutableList.of(0, 4)));
   }
 }

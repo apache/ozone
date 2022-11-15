@@ -398,10 +398,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     int currentIdx = blockOutputStreams[0]
         .getContainerBlockData().getChunksCount();
     for (ECBlockOutputStream stream: blockOutputStreams) {
-      List<ContainerProtos.ChunkInfo> chunks =
-          stream.getContainerBlockData().getChunksList();
-      if (chunks.size() > currentIdx - 1) {
-        chunkInfos.add(chunks.get(currentIdx - 1));
+      if (stream.getContainerBlockData().getChunksCount() > currentIdx - 1) {
+        chunkInfos.add(stream.getContainerBlockData()
+            .getChunksList().get(currentIdx - 1));
       }
     }
 
