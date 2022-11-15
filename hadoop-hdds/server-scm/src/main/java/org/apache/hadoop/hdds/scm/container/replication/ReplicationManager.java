@@ -469,6 +469,11 @@ public class ReplicationManager implements SCMService {
         containerID);
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
+
+    // remove unhealthy replicas because they are unavailable and should
+    // be a reason for under replication
+    replicas.removeIf(containerReplica -> containerReplica.getState() ==
+        ContainerReplicaProto.State.UNHEALTHY);
     return ecUnderReplicationHandler.processAndCreateCommands(replicas,
         pendingOps, result, maintenanceRedundancy);
   }
@@ -480,6 +485,11 @@ public class ReplicationManager implements SCMService {
         containerID);
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
+
+    // remove unhealthy replicas because they are unavailable and should
+    // NOT be a reason for over replication
+    replicas.removeIf(containerReplica -> containerReplica.getState() ==
+        ContainerReplicaProto.State.UNHEALTHY);
     return ecOverReplicationHandler.processAndCreateCommands(replicas,
         pendingOps, result, maintenanceRedundancy);
   }
