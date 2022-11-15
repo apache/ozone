@@ -143,7 +143,7 @@ public class FSOBucketHandler extends BucketHandler {
         }
         OmKeyInfo keyInfo = kv.getValue();
         if (keyInfo != null) {
-          totalDU += getKeySizeWithReplication(keyInfo);
+          totalDU += keyInfo.getReplicatedSize();
         }
       }
     }
@@ -212,7 +212,7 @@ public class FSOBucketHandler extends BucketHandler {
           diskUsage.setSize(keyInfo.getDataSize());
 
           if (withReplica) {
-            long keyDU = getKeySizeWithReplication(keyInfo);
+            long keyDU = keyInfo.getReplicatedSize();
             keyDataSizeWithReplica += keyDU;
             diskUsage.setSizeWithReplica(keyDU);
           }

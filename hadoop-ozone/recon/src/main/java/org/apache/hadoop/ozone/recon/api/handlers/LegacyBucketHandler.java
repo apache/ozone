@@ -163,7 +163,7 @@ public class LegacyBucketHandler extends BucketHandler {
         if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
           continue;
         }
-        totalDU += getKeySizeWithReplication(keyInfo);
+        totalDU += keyInfo.getReplicatedSize();
       }
     }
 
@@ -248,7 +248,7 @@ public class LegacyBucketHandler extends BucketHandler {
         diskUsage.setSize(keyInfo.getDataSize());
 
         if (withReplica) {
-          long keyDU = getKeySizeWithReplication(keyInfo);
+          long keyDU = keyInfo.getReplicatedSize();
           keyDataSizeWithReplica += keyDU;
           diskUsage.setSizeWithReplica(keyDU);
         }

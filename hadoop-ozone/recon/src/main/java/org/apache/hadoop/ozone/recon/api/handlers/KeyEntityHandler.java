@@ -64,8 +64,7 @@ public class KeyEntityHandler extends EntityHandler {
 
     duResponse.setSize(keyInfo.getDataSize());
     if (withReplica) {
-      long keySizeWithReplica = getBucketHandler()
-              .getKeySizeWithReplication(keyInfo);
+      long keySizeWithReplica = keyInfo.getReplicatedSize();
       duResponse.setSizeWithReplica(keySizeWithReplica);
     }
     return duResponse;
