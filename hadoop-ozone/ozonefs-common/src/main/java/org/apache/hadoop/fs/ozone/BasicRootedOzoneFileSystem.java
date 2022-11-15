@@ -747,7 +747,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return convertFileStatusArr(listStatusAdapter(f));
   }
 
-  private FileStatus[] convertFileStatusArr(List<FileStatusAdapter> adapterArr) {
+  private FileStatus[] convertFileStatusArr(
+          List<FileStatusAdapter> adapterArr) {
     FileStatus[] fileStatuses = new FileStatus[adapterArr.size()];
     int index = 0;
     for (FileStatusAdapter statusAdapter : adapterArr) {
