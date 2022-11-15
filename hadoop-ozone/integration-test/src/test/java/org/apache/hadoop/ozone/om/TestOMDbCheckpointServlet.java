@@ -60,7 +60,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -310,7 +310,7 @@ public class TestOMDbCheckpointServlet {
         checkpointLocation.toString().length() + 1);
     Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
         testDirLength);
-    finalCheckpointSet.remove(OM_SNAPSHOT_DIR);
+    finalCheckpointSet.remove(OM_SNAPSHOT_CHECKPOINT_DIR);
 
     Assert.assertTrue("hardlink file exists in checkpoint dir",
         finalCheckpointSet.contains(OM_HARDLINK_FILE));

@@ -47,7 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 
 /**
  * RocksDB Store that supports creating Tables in DB.
@@ -140,7 +140,7 @@ public class RDBStore implements DBStore {
 
       //create snapshot directory if does not exist.
       snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_DIR).toString();
+          OM_SNAPSHOT_CHECKPOINT_DIR).toString();
       File snapshotsDir = new File(snapshotsParentDir);
       if (!snapshotsDir.exists()) {
         boolean success = snapshotsDir.mkdir();

@@ -45,7 +45,7 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.mockito.Mockito.mock;
@@ -131,9 +131,9 @@ public class TestOmSnapshotManager {
 
     File dbDir = new File(testDir.toString(), OM_DB_NAME);
     File snapDir1 = new File(testDir.toString(),
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + "dir1");
+        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
     File snapDir2 = new File(testDir.toString(),
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + "dir2");
+        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir2");
     File checkpointDir1 = new File(testDir.toString(),
         OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
 

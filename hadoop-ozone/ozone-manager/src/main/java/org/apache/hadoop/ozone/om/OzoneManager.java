@@ -231,7 +231,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -3605,8 +3605,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           dbBackupDir);
     }
     File dbBackup = new File(dbBackupDir, oldDB.getName());
-    File dbSnapshotsDir = new File(dbDir, OM_SNAPSHOT_DIR);
-    File dbSnapshotsBackup = new File(dbBackupDir, OM_SNAPSHOT_DIR);
+    File dbSnapshotsDir = new File(dbDir, OM_SNAPSHOT_CHECKPOINT_DIR);
+    File dbSnapshotsBackup = new File(dbBackupDir, OM_SNAPSHOT_CHECKPOINT_DIR);
     try {
       Files.move(oldDB.toPath(), dbBackup.toPath());
       if (dbSnapshotsDir.exists()) {
@@ -3654,7 +3654,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // move the new snapshot directory into place and create hard links
   private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
       throws IOException {
-    Path incomingSnapshotsDir = Paths.get(dbPath.toString(), OM_SNAPSHOT_DIR);
+    Path incomingSnapshotsDir = Paths.get(dbPath.toString(),
+        OM_SNAPSHOT_CHECKPOINT_DIR);
     if (incomingSnapshotsDir.toFile().exists()) {
       Files.move(incomingSnapshotsDir, dbSnapshotsDir);
       OmSnapshotManager.createHardLinks(dbPath);

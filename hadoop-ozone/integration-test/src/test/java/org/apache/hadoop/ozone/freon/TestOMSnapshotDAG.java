@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -112,7 +112,7 @@ public class TestOMSnapshotDAG {
 
   private String getDBCheckpointAbsolutePath(SnapshotInfo snapshotInfo) {
     return metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX +
+        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
         OM_DB_NAME + snapshotInfo.getCheckpointDirName();
   }
 

@@ -103,7 +103,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
@@ -328,7 +328,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static OmMetadataManagerImpl createSnapshotMetadataManager(
       OzoneConfiguration conf, String snapshotDirName) throws IOException {
     File snapshotDir = new File(OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_DIR);
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR);
     OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
         snapshotDir, OM_DB_NAME + snapshotDirName);
     return smm;
