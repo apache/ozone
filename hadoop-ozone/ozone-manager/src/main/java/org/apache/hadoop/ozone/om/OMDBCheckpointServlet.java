@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -36,12 +33,13 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
-
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -50,20 +48,19 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.HashMap;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.createHardLinkList;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -96,7 +93,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    OzoneConfiguration conf = om.getConfiguration();
+    OzoneConfiguration conf = getConf();
     // Only Ozone Admins and Recon are allowed
     Collection<String> allowedUsers =
             new LinkedHashSet<>(om.getOmAdminUsernames());
@@ -123,32 +120,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   boolean includeSnapshotData)
       throws IOException, InterruptedException {
     Path dir = checkpoint.getCheckpointLocation();
-
-    try (Stream<Path> files = Files.list(dir)) {
-      for (Path file : files.collect(Collectors.toList())) {
-        // get the inode
-        Object key = Files.readAttributes(
-            file, BasicFileAttributes.class).fileKey();
-        copyFiles.put(key, file);
-      }
-    }
+    processDir(dir, copyFiles, hardLinkFiles);
     if (!includeSnapshotData) {
       return;
     }
 
-    for (Path snapshotDir : getSnapshotDirs(checkpoint)) {
-      processDir(snapshotDir, copyFiles, hardLinkFiles);
-    }
+    waitForSnapshotDirs(checkpoint);
+    Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
+        OM_SNAPSHOT_DIR);
+    processDir(snapshotDir, copyFiles, hardLinkFiles);
   }
 
-  private List<Path> getSnapshotDirs(DBCheckpoint checkpoint)
-      throws IOException {
-    ArrayList<Path> list = new ArrayList<>();
-
+  private void waitForSnapshotDirs(DBCheckpoint checkpoint)
+      throws IOException, InterruptedException {
     // get snapshotInfo entries
-    OzoneConfiguration conf = ((OzoneManager) getServletContext()
-        .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
-        .getConfiguration();
+    OzoneConfiguration conf = getConf();
 
     OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
@@ -157,14 +143,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         iterator = checkpointMetadataManager
         .getSnapshotInfoTable().iterator()) {
 
-      // add each entries directory to the list
+      // wait for each directory
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        list.add(path);
+        waitForDirToExist(path);
       }
     }
-    return list;
   }
 
   private void waitForDirToExist(Path dir)
@@ -185,23 +170,29 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private void processDir(Path dir, Map<Object, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles)
       throws IOException, InterruptedException {
-    waitForDirToExist(dir);
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
-        // get the inode
-        Object key = Files.readAttributes(
-            file, BasicFileAttributes.class).fileKey();
-        // If we already have the inode, store as hard link
-        if (copyFiles.containsKey(key)) {
-          hardLinkFiles.put(file, copyFiles.get(key));
-        } else {
-          copyFiles.put(key, file);
+        if (file.toFile().isDirectory()) {
+          processDir(file, copyFiles, hardLinkFiles);
+         } else {
+          processFile(file, copyFiles, hardLinkFiles);
         }
       }
     }
-
   }
 
+  private void processFile(Path file, Map<Object, Path> copyFiles,
+                           Map<Path, Path> hardLinkFiles) throws IOException {
+    // get the inode
+    Object key = Files.readAttributes(
+        file, BasicFileAttributes.class).fileKey();
+    // If we already have the inode, store as hard link
+    if (copyFiles.containsKey(key)) {
+      hardLinkFiles.put(file, copyFiles.get(key));
+    } else {
+      copyFiles.put(key, file);
+    }
+  }
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
@@ -248,11 +239,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                          ArchiveOutputStream archiveOutputStream)
       throws IOException {
 
-    OzoneConfiguration conf = ((OzoneManager) getServletContext()
-        .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
-        .getConfiguration();
-
-    File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+    File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
     int truncateLength = metaDirPath.toString().length() + 1;
 
     for (Path file : copyFiles.values()) {
@@ -271,4 +258,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
+  private OzoneConfiguration getConf() {
+    return ((OzoneManager) getServletContext()
+        .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .getConfiguration();
+  }
 }
