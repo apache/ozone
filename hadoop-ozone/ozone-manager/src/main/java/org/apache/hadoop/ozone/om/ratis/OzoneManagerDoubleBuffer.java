@@ -322,13 +322,14 @@ public final class OzoneManagerDoubleBuffer {
 
   private void flushBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer)
       throws IOException {
+
     Map<String, List<Long>> cleanupEpochs = new HashMap<>();
     List<Long> flushedEpochs;
 
     try (BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation()) {
 
-      String lastTraceId = addToBatch(batchOperation);
+      String lastTraceId = addToBatch(buffer, batchOperation);
 
       buffer.iterator().forEachRemaining(
           entry -> addCleanupEntry(entry, cleanupEpochs));
@@ -390,11 +391,13 @@ public final class OzoneManagerDoubleBuffer {
     updateMetrics(flushedTransactionsSize);
   }
 
-  private String addToBatch(BatchOperation batchOperation) {
+  private String addToBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer,
+                            BatchOperation batchOperation) {
     String lastTraceId = null;
 
-    while (readyBuffer.iterator().hasNext()) {
-      DoubleBufferEntry<OMClientResponse> entry = readyBuffer.iterator().next();
+    Iterator<DoubleBufferEntry<OMClientResponse>> iterator = buffer.iterator();
+    while (iterator.hasNext()) {
+      DoubleBufferEntry<OMClientResponse> entry = iterator.next();
 
       OMResponse omResponse = entry.getResponse().getOMResponse();
       lastTraceId = omResponse.getTraceID();
@@ -556,8 +559,7 @@ public final class OzoneManagerDoubleBuffer {
   public synchronized CompletableFuture<Void> add(OMClientResponse response,
       long transactionIndex) {
     currentBuffer.add(new DoubleBufferEntry<>(transactionIndex, response));
-    if (! (response instanceof OMKeyCommitResponse))
-      notify();
+    notify();
 
     if (!isRatisEnabled) {
       CompletableFuture<Void> future = new CompletableFuture<>();
