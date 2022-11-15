@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.cert;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
@@ -61,7 +62,7 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
   private CommandLine.Model.CommandSpec spec;
 
   @Override
-  public Void call() throws Exception {
+  public Void call() {
     GenericParentCommand parent =
         (GenericParentCommand) spec.root().userObject();
 
@@ -72,26 +73,35 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
-    DBStore dbStore = HAUtils.loadDB(
-        configuration, new File(dbDirectory), dbName, new SCMDBDefinition());
-
-    Table<BigInteger, X509Certificate> certsTable = SCMDBDefinition.VALID_CERTS.getTable(dbStore);
-    removeExpiredCertificates(certsTable.iterator());
-    dbStore.close();
+    //DBStore mockolás, inkább ezt adjuk a removeExpCertnek ++ hibakezelés (nincs certstable)
+    try (DBStore dbStore = HAUtils.loadDB(
+        configuration, new File(dbDirectory), dbName, new SCMDBDefinition())) {
+      removeExpiredCertificates(dbStore);
+    } catch (IOException e) {
+      System.out.println("Error trying to open" + dbName +
+          " at: " + dbDirectory);
+    }
     return null;
   }
 
-  private void removeExpiredCertificates(
-      TableIterator<?, ? extends Table.KeyValue<?, ?>> certs)
-      throws IOException {
-    while (certs.hasNext()) {
-      Table.KeyValue<?, ?> certPair = certs.next();
-      X509Certificate certificate = (X509Certificate) certPair.getValue();
-      if (Instant.now().isAfter(certificate.getNotAfter().toInstant())) {
-        System.out.println("Certificate with id " + certPair.getKey() +
-            " and value: " + certificate + "will be deleted");
-        certs.removeFromDB();
+  @VisibleForTesting
+  void removeExpiredCertificates(DBStore dbStore) {
+    try {
+      Table<BigInteger, X509Certificate> certsTable =
+          SCMDBDefinition.VALID_CERTS.getTable(dbStore);
+      TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
+          X509Certificate>> tableIterator = certsTable.iterator();
+      while (tableIterator.hasNext()) {
+        Table.KeyValue<?, ?> certPair = tableIterator.next();
+        X509Certificate certificate = (X509Certificate) certPair.getValue();
+        if (Instant.now().isAfter(certificate.getNotAfter().toInstant())) {
+          System.out.println("Certificate with id " + certPair.getKey() +
+              " and value: " + certificate + "will be deleted");
+          tableIterator.removeFromDB();
+        }
       }
+    } catch (IOException e) {
+      System.out.println("Error when trying to open certificate table from db");
     }
   }
 
