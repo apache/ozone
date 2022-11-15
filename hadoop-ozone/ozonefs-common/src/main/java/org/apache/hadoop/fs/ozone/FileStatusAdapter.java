@@ -147,19 +147,19 @@ public final class FileStatusAdapter {
     StringBuilder sb = new StringBuilder();
     sb.append(getClass().getSimpleName())
         .append("{")
-        .append("path=" + path)
-        .append("; isDirectory=" + isdir);
+        .append("path=").append(path)
+        .append("; isDirectory=").append(isdir);
     if (isFile()) {
-      sb.append("; length=" + length)
-              .append("; diskConsumed= " + getDiskConsumed())
-          .append("; blockReplication=" + blockReplication)
-          .append("; blocksize=" + blocksize);
+      sb.append("; length=").append(length)
+              .append("; diskConsumed= ").append(getDiskConsumed())
+          .append("; blockReplication=").append(blockReplication)
+          .append("; blocksize=").append(blocksize);
     }
-    sb.append("; accessTime=" + accessTime)
-        .append("; owner=" + owner)
-        .append("; group=" + group)
-        .append("; permission=" + permission)
-        .append("; isSymlink=" + getSymlink())
+    sb.append("; accessTime=").append(accessTime)
+        .append("; owner=").append(owner)
+        .append("; group=").append(group)
+        .append("; permission=").append(permission)
+        .append("; isSymlink=").append(getSymlink())
         .append("}");
     
     return sb.toString();

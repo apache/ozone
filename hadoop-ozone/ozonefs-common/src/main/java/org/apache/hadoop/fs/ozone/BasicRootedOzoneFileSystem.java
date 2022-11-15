@@ -747,7 +747,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return convertFileStatusArr(listStatusAdapter(f));
   }
 
-  private FileStatus[] convertFileStatusArr(FileStatusAdapter[] adapterArr) {
+  private FileStatus[] convertFileStatusArr(List<FileStatusAdapter> adapterArr) {
     FileStatus[] fileStatuses = new FileStatus[adapterArr.length];
     int index = 0;
     for (FileStatusAdapter statusAdapter : adapterArr) {
@@ -757,7 +757,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   
-  public FileStatusAdapter[] listStatusAdapter(Path f) throws IOException {
+  public List<FileStatusAdapter> listStatusAdapter(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
@@ -787,7 +787,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // exhausted.
     } while (tmpStatusList.size() == numEntries);
 
-    return statuses.toArray(new FileStatusAdapter[0]);
+    return statuses;
   }
 
   @Override
@@ -1245,7 +1245,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         String ofsPathPrefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         if (isFSO) {
-          FileStatusAdapter[] fileStatuses;
+          List<FileStatusAdapter> fileStatuses;
           fileStatuses = listStatusAdapter(path);
           for (FileStatusAdapter fileStatus : fileStatuses) {
             String keyName =
