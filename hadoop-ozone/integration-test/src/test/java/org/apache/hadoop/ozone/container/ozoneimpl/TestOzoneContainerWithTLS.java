@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.security.cert.CertificateExpiredException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -119,7 +120,7 @@ public class TestOzoneContainerWithTLS {
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
     conf.setInt(HDDS_KEY_LEN, 1024);
-    conf.set(HDDS_X509_DEFAULT_DURATION, "PT10S"); // 10s
+    conf.set(HDDS_X509_DEFAULT_DURATION, "PT5S"); // 5s
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
@@ -130,6 +131,13 @@ public class TestOzoneContainerWithTLS {
     secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
         expiryTime, caClient.getCertificate().
         getSerialNumber().toString());
+  }
+
+  @Test(expected = CertificateExpiredException.class)
+  public void testCertificateLifetime() throws Exception {
+    // Sleep to wait for certificate expire
+    Thread.sleep(5000);
+    caClient.getCertificate().checkValidity();
   }
 
   @Test
@@ -162,13 +170,10 @@ public class TestOzoneContainerWithTLS {
       if (containerTokenEnabled) {
         secretManager.start(caClient);
         client.connect();
-        int count = 200;
-        for (int i = 0; i < count; i++, containerId++) {
-          createSecureContainerForTesting(client, containerId,
-              secretManager.generateToken(
-                  UserGroupInformation.getCurrentUser().getUserName(),
-                  ContainerID.valueOf(containerId)));
-        }
+        createSecureContainerForTesting(client, containerId,
+            secretManager.generateToken(
+                UserGroupInformation.getCurrentUser().getUserName(),
+                ContainerID.valueOf(containerId)));
       } else {
         client.connect();
         createContainerForTesting(client, containerId);
