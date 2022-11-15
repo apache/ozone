@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
@@ -226,7 +227,8 @@ public class ReplicationManager implements SCMService {
         .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
         .addNext(ecReplicationCheckHandler)
-        .addNext(ratisReplicationCheckHandler);
+        .addNext(ratisReplicationCheckHandler)
+        .addNext(new ClosedWithUnhealthyReplicasHandler(this));
     start();
   }
 
@@ -469,11 +471,6 @@ public class ReplicationManager implements SCMService {
         containerID);
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
-
-    // remove unhealthy replicas because they are unavailable and should
-    // be a reason for under replication
-    replicas.removeIf(containerReplica -> containerReplica.getState() ==
-        ContainerReplicaProto.State.UNHEALTHY);
     return ecUnderReplicationHandler.processAndCreateCommands(replicas,
         pendingOps, result, maintenanceRedundancy);
   }
@@ -485,11 +482,6 @@ public class ReplicationManager implements SCMService {
         containerID);
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
-
-    // remove unhealthy replicas because they are unavailable and should
-    // NOT be a reason for over replication
-    replicas.removeIf(containerReplica -> containerReplica.getState() ==
-        ContainerReplicaProto.State.UNHEALTHY);
     return ecOverReplicationHandler.processAndCreateCommands(replicas,
         pendingOps, result, maintenanceRedundancy);
   }

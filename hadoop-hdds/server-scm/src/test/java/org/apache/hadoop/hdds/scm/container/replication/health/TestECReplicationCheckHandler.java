@@ -265,20 +265,24 @@ public class TestECReplicationCheckHandler {
   }
 
   /**
-   * Tests that a closed EC 3-2 container with 4 closed and 1 unhealthy
-   * replica is under replicated.
+   * Tests that a closed EC 3-2 container with 3 closed and 2 unhealthy
+   * replicas is under replicated.
    */
   @Test
   public void testUnderReplicatedDueToUnhealthyReplicas() {
     ContainerInfo container = createContainerInfo(repConfig, 1, CLOSED);
 
-    // create 4 closed and 1 unhealthy replica
+    // create 3 closed and 2 unhealthy replicas
     Set<ContainerReplica> containerReplicas =
         ReplicationTestUtil.createReplicas(container.containerID(),
-            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerReplica unhealthyIndex4 =
+        createContainerReplica(container.containerID(), 4,
+            IN_MAINTENANCE, ContainerReplicaProto.State.UNHEALTHY);
     ContainerReplica unhealthyIndex5 =
         createContainerReplica(container.containerID(), 5,
             IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    containerReplicas.add(unhealthyIndex4);
     containerReplicas.add(unhealthyIndex5);
 
     ContainerCheckRequest request = requestBuilder
@@ -289,7 +293,7 @@ public class TestECReplicationCheckHandler {
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
+    Assert.assertEquals(0, result.getRemainingRedundancy());
     Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
 

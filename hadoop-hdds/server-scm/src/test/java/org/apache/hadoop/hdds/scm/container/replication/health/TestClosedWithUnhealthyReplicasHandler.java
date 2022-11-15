@@ -169,4 +169,26 @@ public class TestClosedWithUnhealthyReplicasHandler {
 
     Assert.assertFalse(handler.handle(request));
   }
+
+  @Test
+  public void testUnderReplicatedContainerReturnsFalse() {
+    ContainerInfo container =
+        createContainerInfo(ecReplicationConfig, 1, CLOSED);
+
+    // make it under replicated by having only UNHEALTHY replica for index 2
+    Set<ContainerReplica> containerReplicas =
+        ReplicationTestUtil.createReplicas(container.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 3, 4, 5);
+    ContainerReplica unhealthyIndex2 =
+        createContainerReplica(container.containerID(), 2,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    containerReplicas.add(unhealthyIndex2);
+
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(containerReplicas)
+        .setContainerInfo(container)
+        .build();
+
+    Assert.assertFalse(handler.handle(request));
+  }
 }

@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -30,6 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 
 /**
  * Handler to process containers EC which are closed but have some replicas that
@@ -77,25 +79,28 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
     }
 
     Set<ContainerReplica> replicas = request.getContainerReplicas();
+    // create a set of indexes that are closed
+    Set<Integer> closedIndexes = replicas.stream()
+        .filter(replica -> replica.getState() == State.CLOSED)
+        .map(ContainerReplica::getReplicaIndex)
+        .collect(Collectors.toSet());
+
     boolean foundUnhealthy = false;
     // send delete commands for unhealthy replicas
     for (ContainerReplica replica : replicas) {
-      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        foundUnhealthy = true;
-        LOG.debug("Trying to delete unhealthy replica with index {} for " +
-            "container {} on datanode {}", replica.getReplicaIndex(),
-            containerInfo.containerID(),
-            replica.getDatanodeDetails().getUuidString());
-        try {
-          replicationManager.sendDeleteCommand(containerInfo,
-              replica.getReplicaIndex(), replica.getDatanodeDetails());
-        } catch (NotLeaderException e) {
-          LOG.warn("Failed to delete unhealthy replica with index {} for " +
-                  "container {} on datanode {}",
-              replica.getReplicaIndex(),
-              containerInfo.containerID(),
-              replica.getDatanodeDetails().getUuidString(), e);
+      if (replica.getState() == State.UNHEALTHY) {
+        /* Sanity check to ensure this index is not under replicated: verify
+        that a closed replica with this index is also present.
+         */
+        if (!closedIndexes.contains(replica.getReplicaIndex())) {
+          LOG.warn("Not handling container {} because replica index {} is " +
+                  "under replicated. Not deleting UNHEALTHY replica [{}].",
+              containerInfo.containerID(), replica.getReplicaIndex(), replica);
+          return false;
         }
+
+        foundUnhealthy = true;
+        sendDeleteCommand(containerInfo, replica);
       }
     }
 
@@ -107,5 +112,16 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
           containerInfo.containerID());
     }
     return foundUnhealthy;
+  }
+
+  private void sendDeleteCommand(ContainerInfo containerInfo,
+      ContainerReplica replica) {
+    LOG.debug("Trying to delete UNHEALTHY replica [{}]", replica);
+    try {
+      replicationManager.sendDeleteCommand(containerInfo,
+          replica.getReplicaIndex(), replica.getDatanodeDetails());
+    } catch (NotLeaderException e) {
+      LOG.warn("Failed to delete UNHEALTHY replica [{}]", replica, e);
+    }
   }
 }

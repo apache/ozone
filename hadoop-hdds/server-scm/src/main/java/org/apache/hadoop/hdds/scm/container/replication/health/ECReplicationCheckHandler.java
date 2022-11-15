@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -96,24 +95,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
     Set<ContainerReplica> replicas = request.getContainerReplicas();
-
-    /*
-    Remove UNHEALTHY replicas because they are unavailable. They could be a
-    reason for under replication but should not be a reason for over
-    replication.
-
-    For example, consider the following set of replicas for an EC 3-2 container:
-    Replica Index 1: Closed
-    Replica Index 2: Closed
-    Replica Index 3: Closed, Unhealthy (2 replicas for this index)
-    Replica Index 4: Unhealthy
-    Replica Index 5: Closed
-
-    This is a case of under replication because index 4 is unavailable. Index
-    3 is not considered over replicated because its second copy is unhealthy.
-     */
-    replicas.removeIf(containerReplica -> containerReplica.getState() ==
-        ContainerReplicaProto.State.UNHEALTHY);
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
     ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, replicaPendingOps,
