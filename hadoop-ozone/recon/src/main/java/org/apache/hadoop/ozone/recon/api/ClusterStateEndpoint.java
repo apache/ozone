@@ -58,7 +58,7 @@ public class ClusterStateEndpoint {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ClusterStateEndpoint.class);
-  public static final int LIMIT = 1001;
+  public static final int MISSING_CONTAINER_COUNT_LIMIT = 1001;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -93,9 +93,10 @@ public class ClusterStateEndpoint {
     List<UnhealthyContainers> unhealthyContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-            0, LIMIT);
-    int totalMissingContainerCount = unhealthyContainers.size() == LIMIT ?
-        LIMIT : unhealthyContainers.size();
+            0, MISSING_CONTAINER_COUNT_LIMIT);
+    int totalMissingContainerCount = unhealthyContainers.size() ==
+        MISSING_CONTAINER_COUNT_LIMIT ?
+        MISSING_CONTAINER_COUNT_LIMIT : unhealthyContainers.size();
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
