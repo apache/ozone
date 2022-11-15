@@ -63,12 +63,12 @@ public class TestOzoneFileChecksum {
   @Rule
   public Timeout timeout = Timeout.seconds(100);
 
-  private static OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster = null;
-  private static FileSystem fs;
-  private static RootedOzoneFileSystem ofs;
-  private static BasicRootedOzoneClientAdapterImpl adapter;
-  private static String rootPath;
+  private OzoneConfiguration conf;
+  private MiniOzoneCluster cluster = null;
+  private FileSystem fs;
+  private RootedOzoneFileSystem ofs;
+  private BasicRootedOzoneClientAdapterImpl adapter;
+  private String rootPath;
 
   @BeforeEach
   public void setup() throws IOException,
