@@ -1283,10 +1283,17 @@ public class TestNSSummaryEndpointWithLegacy {
         .thenReturn(containerReplicas6);
 
     when(reconSCM.getContainerManager()).thenReturn(containerManager);
+    ReconNodeManager mockReconNodeManager = mock(ReconNodeManager.class);
+    when(mockReconNodeManager.getStats()).thenReturn(getMockSCMRootStat());
+    when(reconSCM.getScmNodeManager()).thenReturn(mockReconNodeManager);
     return reconSCM;
   }
 
   private static BucketLayout getBucketLayout() {
     return BucketLayout.LEGACY;
+  }
+
+  private static SCMNodeStat getMockSCMRootStat() {
+    return new SCMNodeStat(ROOT_QUOTA,ROOT_DATA_SIZE,ROOT_QUOTA - ROOT_DATA_SIZE);
   }
 }

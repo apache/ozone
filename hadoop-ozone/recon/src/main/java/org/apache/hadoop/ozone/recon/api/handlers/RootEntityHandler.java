@@ -129,23 +129,10 @@ public class RootEntityHandler extends EntityHandler {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     List<OmVolumeArgs> volumes = listVolumes();
     List<OmBucketInfo> buckets = listBucketsUnderVolume(null);
-    long quotaInBytes = 0L;
-    long quotaUsedInBytes = 0L;
 
-    for (OmVolumeArgs volume: volumes) {
-      final long quota = volume.getQuotaInBytes();
-      assert (quota >= -1L);
-      if (quota == -1L) {
-        // If one volume has unlimited quota, the "root" quota is unlimited.
-        quotaInBytes = -1L;
-        break;
-      }
-      quotaInBytes += quota;
-    }
-    for (OmBucketInfo bucket: buckets) {
-      long bucketObjectId = bucket.getObjectID();
-      quotaUsedInBytes += getTotalSize(bucketObjectId);
-    }
+    SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
+    long quotaInBytes = stats.getCapacity().get();
+    long quotaUsedInBytes = stats.getScmUsed().get();
 
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
