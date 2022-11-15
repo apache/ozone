@@ -42,8 +42,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public class TestOMKeyRenameRequest extends TestOMKeyRequest {
-  protected OmKeyInfo formKeyParentInfo;
-  protected OmKeyInfo toKeyParentInfo;
   protected OmKeyInfo formKeyInfo;
   protected String formKeyName;
   protected String toKeyName;
@@ -53,14 +51,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   public void createParentKey() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
-    String formKeyParentName = UUID.randomUUID().toString();
-    String toKeyParentName = UUID.randomUUID().toString();
-    formKeyParentInfo = getOmKeyInfo(formKeyParentName);
-    toKeyParentInfo = getOmKeyInfo(toKeyParentName);
-    addKeyToTable(formKeyParentInfo);
-    formKeyName = new Path(formKeyParentName, "formKey").toString();
-    toKeyName = new Path(toKeyParentName, "toKey").toString();
-    addKeyToTable(toKeyParentInfo);
+    formKeyName = new Path("formKey").toString();
+    toKeyName = new Path("toKey").toString();
     formKeyInfo = getOmKeyInfo(formKeyName);
     dbToKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
   }
@@ -96,12 +88,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     Assert.assertNotNull(toKeyInfo);
 
-    // For new key modification time should be updated.
-
     KeyArgs keyArgs = modifiedOmRequest.getRenameKeyRequest().getKeyArgs();
 
-    Assert.assertEquals(keyArgs.getModificationTime(),
-        toKeyInfo.getModificationTime());
+    assertModificationTime(keyArgs.getModificationTime());
   }
 
   @Test
@@ -269,5 +258,13 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   protected String getDBKeyName(OmKeyInfo keyName) throws IOException {
     return omMetadataManager.getOzoneKey(keyName.getVolumeName(),
         keyName.getBucketName(), keyName.getKeyName());
+  }
+
+  protected void assertModificationTime(long except)
+      throws IOException {
+    // For new key modification time should be updated.
+    OmKeyInfo toKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
+    Assert.assertEquals(except, toKeyInfo.getModificationTime());
   }
 }

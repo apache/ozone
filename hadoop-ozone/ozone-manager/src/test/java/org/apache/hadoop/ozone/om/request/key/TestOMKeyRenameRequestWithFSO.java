@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -43,6 +44,8 @@ import java.util.UUID;
  * Tests RenameKeyWithFSO request.
  */
 public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
+  private OmKeyInfo formKeyParentInfo;
+  private OmKeyInfo toKeyParentInfo;
   @Override
   @Before
   public void createParentKey() throws Exception {
@@ -172,6 +175,19 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         omMetadataManager.getVolumeId(volumeName),
         omMetadataManager.getBucketId(volumeName, bucketName),
         keyInfo.getParentObjectID(), keyInfo.getKeyName());
+  }
+
+  @Override
+  protected void assertModificationTime(long except)
+      throws IOException {
+    // For filesystem should change the modification time for
+    // both the parents directory
+    OmDirectoryInfo updatedFormKeyParentInfo = omMetadataManager
+        .getDirectoryTable().get(getDBKeyName(formKeyParentInfo));
+    OmDirectoryInfo updatedToKeyParentInfo = omMetadataManager
+        .getDirectoryTable().get(getDBKeyName(toKeyParentInfo));
+    Assert.assertEquals(except, updatedFormKeyParentInfo.getModificationTime());
+    Assert.assertEquals(except, updatedToKeyParentInfo.getModificationTime());
   }
 
   @Override
