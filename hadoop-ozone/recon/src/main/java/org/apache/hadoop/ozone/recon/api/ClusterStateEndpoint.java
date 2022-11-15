@@ -58,7 +58,7 @@ public class ClusterStateEndpoint {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ClusterStateEndpoint.class);
-  public static final int LIMIT = 1001;
+  public static final int MISSING_CONTAINER_COUNT_LIMIT = 1001;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
