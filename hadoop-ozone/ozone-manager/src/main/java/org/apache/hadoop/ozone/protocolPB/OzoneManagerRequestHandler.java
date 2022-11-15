@@ -314,8 +314,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
               ozoneManagerDoubleBuffer::add);
     } catch (InvalidPathException e) {
-      LOG.error("Got InvalidPathException while handling request: {}",
-          omRequest, e);
       OMException omException = new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_PATH);
       OMResponse.Builder omResponse =
