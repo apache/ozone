@@ -19,7 +19,10 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.ArrayList;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,17 +54,28 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
         .getDeletedKeysList();
-    List<String> keysToBePurgedList = new ArrayList<>();
+    List<Pair<OmBucketInfo, List<String>>> keysToBePurgedList
+        = new ArrayList<>();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
 
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
+      String volumeName = bucketWithDeleteKeys.getVolumeName();
+      String bucketName = bucketWithDeleteKeys.getBucketName();
+      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName,
+          bucketName);
+      omBucketInfo.incrUsedBytes(-bucketWithDeleteKeys.getTotalKeySize());
+      omBucketInfo.incrUsedNamespace(-bucketWithDeleteKeys.getKeysList()
+          .size());
+      List<String> keyList = new ArrayList<>();
       for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
-        keysToBePurgedList.add(deletedKey);
+        keyList.add(deletedKey);
       }
+      keysToBePurgedList.add(Pair.of(omBucketInfo, keyList));
     }
 
     omClientResponse = new OMKeyPurgeResponse(omResponse.build(),

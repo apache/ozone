@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -250,15 +249,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   /**
    * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the key
-   * name and all its associated block IDs. A pending deletion key is stored
+   * Each entry is a {@link OmKeyInfo}, which contains the info about the key
+   * and all its associated block IDs. A pending deletion key is stored
    * with #deleting# prefix in OM DB.
    *
    * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} represent keys and blocks.
+   * @return a list of {@link OmKeyInfo} represent keys and blocks.
    * @throws IOException
    */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
+  List<OmKeyInfo> getPendingDeletionKeys(int count) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is

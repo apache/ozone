@@ -1131,6 +1131,7 @@ message DeletedKeys {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    optional uint64 totalKeySize = 4;
 }
 
 

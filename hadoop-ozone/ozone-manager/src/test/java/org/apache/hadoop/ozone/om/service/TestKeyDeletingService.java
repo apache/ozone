@@ -22,19 +22,16 @@ package org.apache.hadoop.ozone.om.service;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -252,9 +249,9 @@ public class TestKeyDeletingService {
           try {
             return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
                 .stream()
-                .map(BlockGroup::getBlockIDList)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toList()).size() == 1;
+                .mapToInt(e -> e.getKeyLocationVersions().stream()
+                    .map(OmKeyLocationInfoGroup::getLocationList).
+                    mapToInt(List::size).sum()).sum() == 1;
           } catch (IOException e) {
             e.printStackTrace();
           }
@@ -274,9 +271,9 @@ public class TestKeyDeletingService {
           try {
             return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
                 .stream()
-                .map(BlockGroup::getBlockIDList)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toList()).size() == 3;
+                .mapToInt(e -> e.getKeyLocationVersions().stream()
+                    .map(OmKeyLocationInfoGroup::getLocationList).
+                    mapToInt(List::size).sum()).sum() == 3;
           } catch (IOException e) {
             e.printStackTrace();
           }

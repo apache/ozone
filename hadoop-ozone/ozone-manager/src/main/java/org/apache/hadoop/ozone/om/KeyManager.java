@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -121,15 +120,15 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
   /**
    * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the
-   * key name and all its associated block IDs. A pending deletion key is
+   * Each entry is a {@link OmKeyInfo}, which contains the info about the
+   * key and all its associated block IDs. A pending deletion key is
    * stored with #deleting# prefix in OM DB.
    *
    * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @return a list of {@link OmKeyInfo} representing keys and blocks.
    * @throws IOException
    */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
+  List<OmKeyInfo> getPendingDeletionKeys(int count) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is

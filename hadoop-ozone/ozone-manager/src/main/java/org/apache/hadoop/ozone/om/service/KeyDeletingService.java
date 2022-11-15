@@ -25,7 +25,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.protobuf.ServiceException;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -33,6 +35,8 @@ import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -163,15 +167,16 @@ public class KeyDeletingService extends BackgroundService {
         runCount.incrementAndGet();
         try {
           long startTime = Time.monotonicNow();
-          List<BlockGroup> keyBlocksList = manager
+          List<OmKeyInfo> keyInfoList = manager
               .getPendingDeletionKeys(keyLimitPerTask);
-          if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
+          if (keyInfoList != null && !keyInfoList.isEmpty()) {
+            List<BlockGroup> keyBlocksList = getKeyBlockList(keyInfoList);
             List<DeleteBlockGroupResult> results =
                 scmClient.deleteKeyBlocks(keyBlocksList);
             if (results != null) {
               int delCount;
               if (isRatisEnabled()) {
-                delCount = submitPurgeKeysRequest(results);
+                delCount = submitPurgeKeysRequest(results, keyInfoList);
               } else {
                 // TODO: Once HA and non-HA paths are merged, we should have
                 //  only one code path here. Purge keys should go through an
@@ -192,6 +197,27 @@ public class KeyDeletingService extends BackgroundService {
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
+    }
+
+    private List<BlockGroup> getKeyBlockList(List<OmKeyInfo> keyInfoList) {
+      List<BlockGroup> keyBlocksList = new ArrayList<>();
+      // Add all blocks from all versions of the key to the deletion list
+      for (OmKeyInfo info : keyInfoList) {
+        String ozoneKey = manager.getMetadataManager().getOzoneKey(
+            info.getVolumeName(), info.getBucketName(), info.getKeyName());
+        for (OmKeyLocationInfoGroup keyLocations :
+            info.getKeyLocationVersions()) {
+          List<BlockID> item = keyLocations.getLocationList().stream()
+              .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+              .collect(Collectors.toList());
+          BlockGroup keyBlocks = BlockGroup.newBuilder()
+              .setKeyName(ozoneKey)
+              .addAllBlockIDs(item)
+              .build();
+          keyBlocksList.add(keyBlocks);
+        }
+      }
+      return keyBlocksList;
     }
 
     /**
@@ -229,9 +255,12 @@ public class KeyDeletingService extends BackgroundService {
     /**
      * Submits PurgeKeys request for the keys whose blocks have been deleted
      * by SCM.
-     * @param results DeleteBlockGroups returned by SCM.
+     *
+     * @param results     DeleteBlockGroups returned by SCM.
+     * @param keyInfoList
      */
-    public int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results) {
+    public int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
+                                      List<OmKeyInfo> keyInfoList) {
       Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
           new HashMap<>();
 
@@ -250,6 +279,14 @@ public class KeyDeletingService extends BackgroundService {
         }
       }
 
+      Map<Pair<String, String>, Long> purgeBucketSizeMap = new HashMap<>();
+      for (OmKeyInfo info : keyInfoList) {
+        Pair<String, String> volBucketPair = Pair.of(info.getVolumeName(),
+            info.getBucketName());
+        purgeBucketSizeMap.put(volBucketPair, purgeBucketSizeMap.getOrDefault(
+            volBucketPair, 0L) + info.getReplicatedSize());
+      }
+
       PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder();
 
       // Add keys to PurgeKeysRequest bucket wise.
@@ -260,6 +297,8 @@ public class KeyDeletingService extends BackgroundService {
             .setVolumeName(volumeBucketPair.getLeft())
             .setBucketName(volumeBucketPair.getRight())
             .addAllKeys(entry.getValue())
+            .setTotalKeySize(purgeBucketSizeMap.getOrDefault(
+                volumeBucketPair, 0L))
             .build();
         purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
       }

@@ -32,7 +32,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -47,7 +46,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
@@ -69,7 +67,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -1231,9 +1228,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<BlockGroup> getPendingDeletionKeys(final int keyCount)
+  public List<OmKeyInfo> getPendingDeletionKeys(final int keyCount)
       throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    List<OmKeyInfo> keyInfoList = Lists.newArrayList();
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              keyIter = getDeletedTable().iterator()) {
       int currentCount = 0;
@@ -1242,24 +1239,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
-            // Add all blocks from all versions of the key to the deletion list
-            for (OmKeyLocationInfoGroup keyLocations :
-                info.getKeyLocationVersions()) {
-              List<BlockID> item = keyLocations.getLocationList().stream()
-                  .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
-                  .collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder()
-                  .setKeyName(kv.getKey())
-                  .addAllBlockIDs(item)
-                  .build();
-              keyBlocksList.add(keyBlocks);
-            }
+            keyInfoList.add(info);
             currentCount++;
           }
         }
       }
     }
-    return keyBlocksList;
+    return keyInfoList;
   }
 
   @Override
