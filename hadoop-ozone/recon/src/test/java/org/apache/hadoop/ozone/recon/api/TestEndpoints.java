@@ -152,6 +152,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
 
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
+
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
@@ -241,8 +243,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         globalStatsDao, sqlConfiguration, reconOMMetadataManager);
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    containerHealthSchemaManager =
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(reconScm, globalStatsDao);
+        new ClusterStateEndpoint(reconScm, globalStatsDao,
+            containerHealthSchemaManager);
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
     metricsProxyEndpoint =
@@ -589,6 +594,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(0, clusterStateResponse.getKeys());
     Assertions.assertEquals(2, clusterStateResponse.getTotalDatanodes());
     Assertions.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    Assertions.assertEquals(0, clusterStateResponse.getMissingContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = clusterStateEndpoint.getClusterState();
