@@ -151,7 +151,7 @@ public class ECContainerOperationClient implements Closeable {
       } else {
         LOG.warn("Container {} will not be deleted as current state " +
                 "not in acceptable states. Current state: {}, " +
-                "Acceptable State: {}", containerID, currentState,
+                "Acceptable States: {}", containerID, currentState,
                 acceptableStates);
       }
     } finally {

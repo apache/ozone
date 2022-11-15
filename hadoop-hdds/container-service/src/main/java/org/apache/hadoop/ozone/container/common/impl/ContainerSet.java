@@ -86,9 +86,6 @@ public class ContainerSet {
     return recoveringTimeout;
   }
 
-
-
-
   /**
    * Add Container to container map.
    * @param container container to be added

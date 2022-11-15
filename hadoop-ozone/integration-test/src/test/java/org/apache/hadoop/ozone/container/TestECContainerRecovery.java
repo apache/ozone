@@ -219,7 +219,7 @@ public class TestECContainerRecovery {
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
-    // Shutting sown DN triggers close pipeline and close container.
+    // Shutting down DN triggers close pipeline and close container.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
     // Make sure container closed.
@@ -315,7 +315,7 @@ public class TestECContainerRecovery {
               Mockito.any());
     }
 
-    // Shutting sown DN triggers close pipeline and close container.
+    // Shutting down DN triggers close pipeline and close container.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
 
