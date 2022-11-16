@@ -54,17 +54,11 @@ import static org.mockito.Mockito.when;
  */
 class TestOzoneManagerDoubleBuffer {
 
-  private OzoneManager ozoneManager;
-  private OMMetrics omMetrics;
-  private AuditLogger auditLogger;
-  private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
-  private OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot;
-  private volatile long lastAppliedIndex;
-  private long term = 1L;
-  private final CreateSnapshotResponse snapshotResponse1 =
+  private final long term = 1L;
+  private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
-  private final CreateSnapshotResponse snapshotResponse2 =
+  private CreateSnapshotResponse snapshotResponse2 =
       mock(CreateSnapshotResponse.class);
   private OMResponse omKeyResponse = mock(OMResponse.class);
   private OMResponse omBucketResponse = mock(OMResponse.class);
@@ -83,20 +77,20 @@ class TestOzoneManagerDoubleBuffer {
 
   @BeforeEach
   public void setup() throws IOException {
-    omMetrics = OMMetrics.create();
+    OMMetrics omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
-    ozoneManager = mock(OzoneManager.class);
+    OMMetadataManager omMetadataManager =
+        new OmMetadataManagerImpl(ozoneConfiguration);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index.get(index.size() - 1);
+    OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
     };
 
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()

@@ -431,7 +431,7 @@ public final class OzoneManagerDoubleBuffer {
    * [snapshotRequest2], [request4]]
    */
   private List<Queue<DoubleBufferEntry<OMClientResponse>>>
-  splitReadyBufferAtCreateSnapshot() {
+      splitReadyBufferAtCreateSnapshot() {
     List<Queue<DoubleBufferEntry<OMClientResponse>>> response =
         new ArrayList<>();
 
@@ -439,7 +439,7 @@ public final class OzoneManagerDoubleBuffer {
         readyBuffer.iterator();
 
     OMResponse previousOmResponse = null;
-    while(iterator.hasNext()) {
+    while (iterator.hasNext()) {
       DoubleBufferEntry<OMClientResponse> entry = iterator.next();
       OMResponse omResponse = entry.getResponse().getOMResponse();
       // New queue gets created in three conditions:
@@ -449,7 +449,7 @@ public final class OzoneManagerDoubleBuffer {
       if (response.isEmpty() ||
           omResponse.getCreateSnapshotResponse() != null ||
           (previousOmResponse != null &&
-          previousOmResponse.getCreateSnapshotResponse() != null)) {
+              previousOmResponse.getCreateSnapshotResponse() != null)) {
         response.add(new LinkedList<>());
       }
 
