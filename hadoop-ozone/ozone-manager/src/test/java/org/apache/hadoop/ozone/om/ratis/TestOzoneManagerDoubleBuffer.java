@@ -137,12 +137,12 @@ class TestOzoneManagerDoubleBuffer {
                 omSnapshotCreateResponse1,
                 omBucketCreateResponse,
                 omSnapshotCreateResponse2),
-            3L, 4L, 9L, 12L, 2L, 1.333F),
+            4L, 4L, 10L, 12L, 1L, 1.200F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omSnapshotCreateResponse1,
                 omSnapshotCreateResponse2,
                 omBucketCreateResponse),
-            3L, 4L, 12L, 16L, 2L, 1.333F)
+            4L, 4L, 14L, 16L, 1L, 1.142F)
     );
   }
 

@@ -173,14 +173,12 @@ public final class OzoneManagerDoubleBuffer {
       Function<Long, Long> indexToTerm, int maxUnFlushedTransactions) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
-
     this.isRatisEnabled = isRatisEnabled;
     this.isTracingEnabled = isTracingEnabled;
     if (!isRatisEnabled) {
       this.currentFutureQueue = new ConcurrentLinkedQueue<>();
       this.readyFutureQueue = new ConcurrentLinkedQueue<>();
     }
-
     this.unFlushedTransactions = new Semaphore(maxUnFlushedTransactions);
     this.omMetadataManager = omMetadataManager;
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
@@ -264,7 +262,7 @@ public final class OzoneManagerDoubleBuffer {
 
         setReadyBuffer();
 
-        // For snapshot, we want including all the keys that were committed
+        // For snapshot, we want to include all the keys that were committed
         // before the snapshot `create` command was executed. To achieve
         // the behaviour, we spilt the request buffer at snapshot create
         // request and flush the buffer in batches split at snapshot create
@@ -273,14 +271,16 @@ public final class OzoneManagerDoubleBuffer {
         // snapshotCreateRequest1, request3, snapshotCreateRequest2, request4].
         //
         // Split requestBuffer would be.
-        // bufferQueues = [[request1, request2], [snapshotRequest1, request3],
-        //     [snapshotRequest2, request4]].
-        // And we flush the bufferQueue in following order:
+        // bufferQueues = [[request1, request2], [snapshotRequest1], [request3],
+        //     [snapshotRequest2], [request4]].
+        // And bufferQueues will be flushed in following order:
         // Flush #1: [request1, request2]
-        // Flush #2: [snapshotRequest1, request3]
-        // Flush #3: [snapshotRequest2, request4]
+        // Flush #2: [snapshotRequest1]
+        // Flush #3: [request3]
+        // Flush #4: [snapshotRequest2]
+        // Flush #5: [request4]
         List<Queue<DoubleBufferEntry<OMClientResponse>>> bufferQueues =
-            splitRequestsAtCreateSnapshot(readyBuffer);
+            splitReadyBufferAtCreateSnapshot();
 
         for (Queue<DoubleBufferEntry<OMClientResponse>> buffer : bufferQueues) {
           flushBatch(buffer);
@@ -415,29 +415,47 @@ public final class OzoneManagerDoubleBuffer {
 
   /**
    * Splits the readyBuffer around the create snapshot request.
-   * Returns, the list of queue split by snapshot requests.
+   * Returns, the list of queue split by create snapshot requests.
+   *
+   * CreateSnapshot is used as barrier because the checkpoint creation happens
+   * in RocksDB callback flush. If multiple operations are flushed in one
+   * specific batch, we are not sure at the flush of which specific operation
+   * the callback is coming.
+   * There could be a possibility of race condition that is exposed to rocksDB
+   * behaviour for the batch.
+   * Hence, we treat createSnapshot as separate batch flush.
+   *
    * e.g. requestBuffer = [request1, request2, snapshotRequest1,
    * request3, snapshotRequest2, request4]
-   * response = [[request1, request2], [snapshotRequest1, request3],
-   * [snapshotRequest2, request4]]
+   * response = [[request1, request2], [snapshotRequest1], [request3],
+   * [snapshotRequest2], [request4]]
    */
-
   private List<Queue<DoubleBufferEntry<OMClientResponse>>>
-      splitRequestsAtCreateSnapshot(
-      Queue<DoubleBufferEntry<OMClientResponse>> requestBuffer
-  ) {
+  splitReadyBufferAtCreateSnapshot() {
     List<Queue<DoubleBufferEntry<OMClientResponse>>> response =
         new ArrayList<>();
 
-    requestBuffer.iterator().forEachRemaining(entry -> {
+    Iterator<DoubleBufferEntry<OMClientResponse>> iterator =
+        readyBuffer.iterator();
+
+    OMResponse previousOmResponse = null;
+    while(iterator.hasNext()) {
+      DoubleBufferEntry<OMClientResponse> entry = iterator.next();
       OMResponse omResponse = entry.getResponse().getOMResponse();
-      if (omResponse.getCreateSnapshotResponse() != null ||
-          response.isEmpty()) {
+      // New queue gets created in three conditions:
+      // 1. It is first element in the response,
+      // 2. Current request is createSnapshot request.
+      // 3. Previous request was createSnapshot request.
+      if (response.isEmpty() ||
+          omResponse.getCreateSnapshotResponse() != null ||
+          (previousOmResponse != null &&
+          previousOmResponse.getCreateSnapshotResponse() != null)) {
         response.add(new LinkedList<>());
       }
 
       response.get(response.size() - 1).add(entry);
-    });
+      previousOmResponse = omResponse;
+    }
 
     return response;
   }
