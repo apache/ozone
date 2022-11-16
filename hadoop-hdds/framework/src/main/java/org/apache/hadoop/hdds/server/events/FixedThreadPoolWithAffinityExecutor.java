@@ -36,8 +36,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
@@ -89,8 +89,10 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   private MutableCounterLong longTimeExecution;
 
   private final AtomicBoolean isRunning = new AtomicBoolean(true);
-  private long queueWaitThreshold = OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT;
-  private long execWaitThreshold = OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT;
+  private long queueWaitThreshold
+      = OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+  private long execWaitThreshold
+      = OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 
   /**
    * Create FixedThreadPoolExecutor with affinity.

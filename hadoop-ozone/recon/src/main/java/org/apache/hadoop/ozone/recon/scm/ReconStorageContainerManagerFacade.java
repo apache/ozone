@@ -89,8 +89,8 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
@@ -221,12 +221,12 @@ public class ReconStorageContainerManagerFacade
     // .queue.wait.threshold
     long waitQueueThreshold = ozoneConfiguration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".queue.wait.threshold",
-        OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_DEFAULT);
+        OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT);
     // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
     // .execute.wait.threshold
     long execWaitThreshold = ozoneConfiguration.getInt(
         ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
-        OZONE_SCM_EVENT_REPORT_EXEC_WAIT_DEFAULT);
+        OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT);
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(ozoneConfiguration);
     List<ThreadPoolExecutor> executors
