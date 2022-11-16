@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -39,8 +40,9 @@ public final class ContainerCheckRequest {
 
   private ContainerCheckRequest(Builder builder) {
     this.containerInfo = builder.containerInfo;
-    this.containerReplicas = builder.containerReplicas;
-    this.pendingOps = builder.pendingOps;
+    this.containerReplicas =
+        Collections.unmodifiableSet(builder.containerReplicas);
+    this.pendingOps = Collections.unmodifiableList(builder.pendingOps);
     this.maintenanceRedundancy = builder.maintenanceRedundancy;
     this.report = builder.report;
     this.replicationQueue = builder.replicationQueue;

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.He
 
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,6 +41,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
@@ -46,6 +49,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 
 /**
@@ -258,6 +262,78 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+  }
+
+  /**
+   * Tests that a closed EC 3-2 container with 3 closed and 2 unhealthy
+   * replicas is under replicated.
+   */
+  @Test
+  public void testUnderReplicatedDueToUnhealthyReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig, 1, CLOSED);
+
+    // create 3 closed and 2 unhealthy replicas
+    Set<ContainerReplica> containerReplicas =
+        ReplicationTestUtil.createReplicas(container.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerReplica unhealthyIndex4 =
+        createContainerReplica(container.containerID(), 4,
+            IN_MAINTENANCE, ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica unhealthyIndex5 =
+        createContainerReplica(container.containerID(), 5,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    containerReplicas.add(unhealthyIndex4);
+    containerReplicas.add(unhealthyIndex5);
+
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(containerReplicas)
+        .setContainerInfo(container)
+        .build();
+
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(request);
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(0, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+
+    Assert.assertTrue(healthCheck.handle(request));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * Tests that a closed EC 3-2 container with 5 closed replicas and 1 more
+   * unhealthy replica for an index is sufficiently replicated. This is not over
+   * replication because the unhealthy replica is unavailable and should not be
+   * considered.
+   */
+  @Test
+  public void testSufficientlyReplicatedDespiteUnhealthyReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig, 1, CLOSED);
+
+    // create 5 closed replicas and 1 unhealthy replica for index 5
+    Set<ContainerReplica> containerReplicas =
+        ReplicationTestUtil.createReplicas(container.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+    ContainerReplica unhealthyIndex5 =
+        createContainerReplica(container.containerID(), 5,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    containerReplicas.add(unhealthyIndex5);
+
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(containerReplicas)
+        .setContainerInfo(container)
+        .build();
+
+    ContainerHealthResult result = healthCheck.checkHealth(request);
+    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+
+    Assert.assertFalse(healthCheck.handle(request));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
