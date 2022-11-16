@@ -67,7 +67,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -90,6 +89,8 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
@@ -216,22 +217,34 @@ public class ReconStorageContainerManagerFacade
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
+    // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
+    // .queue.wait.threshold
+    long waitQueueThreshold = ozoneConfiguration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".queue.wait.threshold",
+        OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT);
+    // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
+    // .execute.wait.threshold
+    long execWaitThreshold = ozoneConfiguration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
+        OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT);
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(ozoneConfiguration);
     List<ThreadPoolExecutor> executors
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
-    EventExecutor<ContainerReportFromDatanode>
-        containerReportExecutors =
+    FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
+        ContainerReport> containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
                 containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
             reportExecutorMap);
-    EventExecutor<IncrementalContainerReportFromDatanode>
-        incrementalReportExecutors =
+    containerReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
+    containerReportExecutors.setExecWaitThreshold(execWaitThreshold);
+    FixedThreadPoolWithAffinityExecutor<IncrementalContainerReportFromDatanode,
+        ContainerReport> incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(
                 SCMEvents.INCREMENTAL_CONTAINER_REPORT,
@@ -239,6 +252,8 @@ public class ReconStorageContainerManagerFacade
             icrHandler, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
             reportExecutorMap);
+    incrementalReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
+    incrementalReportExecutors.setExecWaitThreshold(execWaitThreshold);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
