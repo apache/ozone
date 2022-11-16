@@ -68,7 +68,7 @@ The following configuration can be configured in `ozone-site.xml` to define the 
 if the client has not specified the bucket layout argument.
 Supported values are `OBJECT_STORE`, `FILE_SYSTEM_OPTIMIZED` and `LEGACY`.
 
-By default, this config value is empty. Ozone will default to `LEGACY` bucket layout if it finds an empty config value.
+By default, this config value is empty. Ozone will default to `FILE_SYSTEM_OPTIMIZED` bucket layout if it finds an empty config value.
 
 ```XML
 
