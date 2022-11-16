@@ -33,6 +33,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -124,10 +125,11 @@ public class ObjectStore {
    * @param bucketName - S3 bucket Name.
    * @throws IOException - On failure, throws an exception like Bucket exists.
    */
-  public void createS3Bucket(String bucketName) throws
-      IOException {
+  public void createS3Bucket(String bucketName) throws IOException {
     OzoneVolume volume = getS3Volume();
-    volume.createBucket(bucketName);
+    volume.createBucket(bucketName,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
