@@ -59,8 +59,10 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -297,20 +299,26 @@ public class TestOMDbCheckpointServlet {
     // Untar the file into a temp folder to be examined
     String testDirName = folder.newFolder().getAbsolutePath();
     int testDirLength = testDirName.length() + 1;
-    FileUtil.unTar(tempFile, new File(testDirName));
+    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
+    int newDbDirLength = newDbDirName.length() + 1;
+    File newDbDir = new File(newDbDirName);
+    newDbDir.mkdirs();
+    FileUtil.unTar(tempFile, newDbDir);
+    // Move snapshot dir to correct location
+    new File(newDbDirName, OM_SNAPSHOT_DIR)
+        .renameTo(new File(newDbDir.getParent().toString(), OM_SNAPSHOT_DIR));
 
 
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     int metaDirLength = metaDir.toString().length() + 1;
     Path finalCheckpointLocation =
-        Paths.get(testDirName);
+        Paths.get(newDbDirName);
 
     // Confirm the checkpoint directories match, (after remove extras)
     Set<String> initialCheckpointSet = getFiles(checkpointLocation,
         checkpointLocation.toString().length() + 1);
     Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
-        testDirLength);
-    finalCheckpointSet.remove(OM_SNAPSHOT_CHECKPOINT_DIR);
+        newDbDirLength);
 
     Assert.assertTrue("hardlink file exists in checkpoint dir",
         finalCheckpointSet.contains(OM_HARDLINK_FILE));
@@ -328,15 +336,15 @@ public class TestOMDbCheckpointServlet {
         Paths.get(finalSnapshotLocation.toString(),
         "CURRENT").toFile().exists());
 
-    Set<String> initialSnapshotSet =
-        getFiles(Paths.get(snapshotDirName), metaDirLength);
-    Set<String> finalSnapshotSet =
-        getFiles(finalSnapshotLocation, testDirLength);
+    Set<String> initialFullSet =
+        getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
+    Set<String> finalFullSet =
+        getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
     Assert.assertTrue("snapshot manifest found",
-        finalSnapshotSet.stream().anyMatch(s -> s.contains("MANIFEST")));
+        finalFullSet.stream().anyMatch(s -> s.contains("MANIFEST")));
 
     // check each line in the hard link file
-    Stream<String> lines = Files.lines(Paths.get(testDirName,
+    Stream<String> lines = Files.lines(Paths.get(newDbDirName,
         OM_HARDLINK_FILE));
     boolean dummyLinkFound = false;
     for (String line: lines.collect(Collectors.toList())) {
@@ -348,14 +356,14 @@ public class TestOMDbCheckpointServlet {
             testDirName);
       } else {
         checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
-        if (line.startsWith(shortSnapshotLocation)) {
-          finalSnapshotSet.add(line.split("\t")[0]);
+        if (line.startsWith(OM_SNAPSHOT_DIR)) {
+          finalFullSet.add(line.split("\t")[0]);
         }
       }
     }
     Assert.assertTrue("dummy link found", dummyLinkFound);
     Assert.assertEquals("found expected snapshot files",
-        initialSnapshotSet, finalSnapshotSet);
+        initialFullSet, finalFullSet);
   }
 
   @Test
@@ -376,6 +384,7 @@ public class TestOMDbCheckpointServlet {
     int testDirLength = testDirName.length() + 1;
     FileUtil.unTar(tempFile, new File(testDirName));
 
+
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     Path finalCheckpointLocation =
         Paths.get(testDirName);
@@ -395,9 +404,17 @@ public class TestOMDbCheckpointServlet {
   private Set<String> getFiles(Path path, int truncateLength)
       throws IOException {
     Set<String> fileSet = new HashSet<>();
+    return getFiles(path, truncateLength, fileSet);
+  }
+
+  private Set<String> getFiles(Path path, int truncateLength, Set<String> fileSet)
+      throws IOException {
     try (Stream<Path> files = Files.list(path)) {
       for (Path file : files.collect(Collectors.toList())) {
         if (file != null) {
+          if (file.toFile().isDirectory()) {
+            getFiles(file, truncateLength, fileSet);
+          }
           if (!file.getFileName().toString().equals("dummyFile")) {
             fileSet.add(truncateFileName(truncateLength, file));
           }

@@ -35,6 +35,7 @@ import org.rocksdb.SstFileReader;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -149,11 +150,12 @@ public class RocksDBCheckpointDiffer {
 
     setCompactionLogDir(metadataDir, compactionLogDirName);
 
-    this.sstBackupDir = Paths.get(metadataDir, sstBackupDir) + "/";
+    this.sstBackupDir = Paths.get(metadataDir,
+        OzoneConsts.OM_SNAPSHOT_DIFF_DIR, sstBackupDir) + "/";
 
     // Create the directory if SST backup path does not already exist
     File dir = new File(this.sstBackupDir);
-    if (!dir.exists() && !dir.mkdir()) {
+    if (!dir.exists() && !dir.mkdirs()) {
       final String errorMsg = "Failed to create SST file backup directory. "
           + "Check if OM has write permission.";
       LOG.error(errorMsg);
@@ -167,16 +169,17 @@ public class RocksDBCheckpointDiffer {
   private void setCompactionLogDir(String metadataDir,
       String compactionLogDirName) {
 
-    final File parentDir = new File(metadataDir);
+    final File parentDir = new File(metadataDir,
+        OzoneConsts.OM_SNAPSHOT_DIFF_DIR);
     if (!parentDir.exists()) {
-      if (!parentDir.mkdir()) {
+      if (!parentDir.mkdirs()) {
         LOG.error("Error creating compaction log parent dir.");
         return;
       }
     }
 
     this.compactionLogDir =
-        Paths.get(metadataDir, compactionLogDirName).toString();
+        Paths.get(parentDir.toString(), compactionLogDirName).toString();
     File clDir = new File(compactionLogDir);
     if (!clDir.exists() && !clDir.mkdir()) {
       LOG.error("Error creating compaction log dir.");

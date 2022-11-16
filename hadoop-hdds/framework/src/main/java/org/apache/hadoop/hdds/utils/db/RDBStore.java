@@ -143,7 +143,7 @@ public class RDBStore implements DBStore {
           OM_SNAPSHOT_CHECKPOINT_DIR).toString();
       File snapshotsDir = new File(snapshotsParentDir);
       if (!snapshotsDir.exists()) {
-        boolean success = snapshotsDir.mkdir();
+        boolean success = snapshotsDir.mkdirs();
         if (!success) {
           throw new IOException(
               "Unable to create RocksDB snapshot directory: " +
