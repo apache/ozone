@@ -154,11 +154,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest());
     OmBucketInfo omBucketInfo = null;
 
-    // bucketInfo.hasBucketLayout() would be true when user sets bucket layout.
-    // Now, OM will create bucket with the user specified bucket layout.
-    // When the value is not specified by the user, OM will use
-    // "ozone.default.bucket.layout" configured value for the newer ozone
-    // client and LEGACY for an older ozone client.
+    // bucketInfo.hasBucketLayout() would be true when the request proto
+    // specifies a bucket layout.
+    // When the value is not specified in the proto, OM will use
+    // "ozone.default.bucket.layout".
     if (!bucketInfo.hasBucketLayout()) {
       BucketLayout defaultBuckLayout = ozoneManager.getOMDefaultBucketLayout();
       omBucketInfo =
