@@ -31,16 +31,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -62,6 +65,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_BACKUP_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
@@ -105,6 +110,7 @@ public class TestOMDbCheckpointServlet {
   private File metaDir;
   private String snapshotDirName;
   private String snapshotDirName2;
+  private Path compactionDirPath;
   private DBCheckpoint dbCheckpoint;
 
   @Rule
@@ -143,6 +149,7 @@ public class TestOMDbCheckpointServlet {
         fileOutputStream.write(b);
       }
     };
+
   }
 
   /**
@@ -329,6 +336,8 @@ public class TestOMDbCheckpointServlet {
         truncateFileName(metaDirLength, Paths.get(snapshotDirName));
     String shortSnapshotLocation2 =
         truncateFileName(metaDirLength, Paths.get(snapshotDirName2));
+    String shortCompactionDirLocation =
+        truncateFileName(metaDirLength, compactionDirPath);
     Path finalSnapshotLocation =
         Paths.get(testDirName, shortSnapshotLocation);
 
@@ -346,22 +355,20 @@ public class TestOMDbCheckpointServlet {
     // check each line in the hard link file
     Stream<String> lines = Files.lines(Paths.get(newDbDirName,
         OM_HARDLINK_FILE));
-    boolean dummyLinkFound = false;
+    List<String> dummyLinkLines = new ArrayList<>();
     for (String line: lines.collect(Collectors.toList())) {
       Assert.assertFalse("CURRENT file is not a hard link",
           line.contains("CURRENT"));
       if (line.contains("dummyFile")) {
-        dummyLinkFound = true;
-        checkDummyFile(shortSnapshotLocation, shortSnapshotLocation2, line,
-            testDirName);
+        dummyLinkLines.add(line);
       } else {
         checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
-        if (line.startsWith(OM_SNAPSHOT_DIR)) {
-          finalFullSet.add(line.split("\t")[0]);
-        }
+        finalFullSet.add(line.split("\t")[0]);
       }
     }
-    Assert.assertTrue("dummy link found", dummyLinkFound);
+    Set<String> directories = Sets.newHashSet(
+        shortSnapshotLocation, shortSnapshotLocation2, shortCompactionDirLocation);
+    checkDummyFile(directories, dummyLinkLines, testDirName);
     Assert.assertEquals("found expected snapshot files",
         initialFullSet, finalFullSet);
   }
@@ -427,29 +434,36 @@ public class TestOMDbCheckpointServlet {
   // tests to see that dummy entry in hardlink file looks something like:
   //  "dir1/dummyFile  dir2/dummyFile"
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  private void checkDummyFile(String dir0, String dir1, String line,
+  private void checkDummyFile(Set<String> directories, List<String> lines,
                               String testDirName) {
-    String[] files = line.split("\t");
-    Assert.assertTrue("dummy entry contains first directory",
-        files[0].startsWith(dir0) || files[1].startsWith(dir0));
-    Assert.assertTrue("dummy entry contains second directory",
-        files[0].startsWith(dir1) || files[1].startsWith(dir1));
-    Path path0 = Paths.get(files[0]);
-    Path path1 = Paths.get(files[1]);
-    Assert.assertNotEquals("dummy entry parent directories differ",
-        path0.getParent(), path1.getParent());
-    Assert.assertTrue("dummy entries contains dummyFile name",
-        path0.getFileName().toString().equals("dummyFile") &&
-        path1.getFileName().toString().equals("dummyFile"));
-    int dummyFileCount = 0;
-    if (Paths.get(testDirName, dir0, "dummyFile").toFile().exists()) {
-      dummyFileCount++;
+      // find the real file
+      String realDir = null;
+      for (String dir: directories) {
+        if (Paths.get(testDirName, dir, "dummyFile").toFile().exists()) {
+          directories.remove(dir);
+          realDir = dir;
+        }
+      }
+
+    Assert.assertEquals("Exactly one copy of the file existed in the tarball",
+        directories.size(), 2);
+
+    String dir0 = (String)directories.toArray()[0];
+    String dir1 = (String)directories.toArray()[1];
+    Assert.assertNotEquals("link directories are different", dir0, dir1);
+
+    for (String line : lines) {
+      String[] files = line.split("\t");
+      Assert.assertTrue("dummy entry contains first directory",
+          files[0].startsWith(dir0) || files[0].startsWith(dir1));
+      Assert.assertTrue("dummy entry contains real dir",
+          files[1].startsWith(realDir));
+      Path path0 = Paths.get(files[0]);
+      Path path1 = Paths.get(files[1]);
+      Assert.assertTrue("dummy entries contains dummyFile name",
+          path0.getFileName().toString().equals("dummyFile") &&
+              path1.getFileName().toString().equals("dummyFile"));
     }
-    if (Paths.get(testDirName, dir1, "dummyFile").toFile().exists()) {
-      dummyFileCount++;
-    }
-    Assert.assertEquals("exactly one dummy file exists in the output dir",
-        dummyFileCount, 1);
   }
 
   // tests line in hard link file looks something like:
@@ -510,14 +524,22 @@ public class TestOMDbCheckpointServlet {
     //  they are not in the checkpoint directory
     Path dummyFile = Paths.get(snapshotDirName, "dummyFile");
     Path dummyLink = Paths.get(snapshotDirName2, "dummyFile");
+
+    compactionDirPath = Paths.get(metaDir.toString(),
+                                   OM_SNAPSHOT_DIFF_DIR, OM_COMPACTION_BACKUP_DIR);
+    Path dummyLink2 = Paths.get(compactionDirPath.toString(), "dummyFile");
     Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
     Files.createLink(dummyLink, dummyFile);
+    Files.createLink(dummyLink2, dummyFile);
+    Path currentFile = Paths.get(folder.newFolder().getAbsolutePath(),
+                                    OM_DB_NAME, "CURRENT");
+    Path currentLink = Paths.get(compactionDirPath.toString(), "CURRENT");
+    Files.createLink(currentLink, currentFile);
 
     dbCheckpoint = cluster.getOzoneManager()
         .getMetadataManager().getStore()
         .getCheckpoint(true);
+
   }
-
-
 
 }

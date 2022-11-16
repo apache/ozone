@@ -47,6 +47,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_BACKUP_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 
 /**
@@ -65,16 +67,6 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
-  /**
-   * Name of the SST file backup directory placed under metadata dir.
-   * Can be made configurable later.
-   */
-  private final String dbCompactionSSTBackupDirName = "compaction-sst-backup";
-  /**
-   * Name of the compaction log directory placed under metadata dir.
-   * Can be made configurable later.
-   */
-  private final String dbCompactionLogDirName = "compaction-log";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
@@ -100,8 +92,8 @@ public class RDBStore implements DBStore {
     try {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), dbCompactionSSTBackupDirName,
-            dbCompactionLogDirName, dbLocation);
+            dbLocation.getParent(), OM_COMPACTION_BACKUP_DIR,
+            OM_COMPACTION_LOG_DIR, dbLocation);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
