@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.om.ratis.helpers.DoubleBufferEntry;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
@@ -110,8 +109,6 @@ public final class OzoneManagerDoubleBuffer {
    * function which will get term associated with the transaction index.
    */
   private Function<Long, Long> indexToTerm;
-
-
 
   /**
    *  Builder for creating OzoneManagerDoubleBuffer.
@@ -182,10 +179,8 @@ public final class OzoneManagerDoubleBuffer {
     if (!isRatisEnabled) {
       this.currentFutureQueue = new ConcurrentLinkedQueue<>();
       this.readyFutureQueue = new ConcurrentLinkedQueue<>();
-    } else {
-      this.currentFutureQueue = null;
-      this.readyFutureQueue = null;
     }
+
     this.unFlushedTransactions = new Semaphore(maxUnFlushedTransactions);
     this.omMetadataManager = omMetadataManager;
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
@@ -398,15 +393,14 @@ public final class OzoneManagerDoubleBuffer {
     Iterator<DoubleBufferEntry<OMClientResponse>> iterator = buffer.iterator();
     while (iterator.hasNext()) {
       DoubleBufferEntry<OMClientResponse> entry = iterator.next();
-
-      OMResponse omResponse = entry.getResponse().getOMResponse();
+      OMClientResponse response = entry.getResponse();
+      OMResponse omResponse = response.getOMResponse();
       lastTraceId = omResponse.getTraceID();
 
       try {
         addToBatchWithTrace(omResponse,
             () -> {
-              entry.getResponse()
-                  .checkAndUpdateDB(omMetadataManager, batchOperation);
+              response.checkAndUpdateDB(omMetadataManager, batchOperation);
               return null;
             });
       } catch (IOException ex) {
@@ -427,8 +421,9 @@ public final class OzoneManagerDoubleBuffer {
    * response = [[request1, request2], [snapshotRequest1, request3],
    * [snapshotRequest2, request4]]
    */
-  @VisibleForTesting
-  List<Queue<DoubleBufferEntry<OMClientResponse>>> splitRequestsAtCreateSnapshot(
+
+  private List<Queue<DoubleBufferEntry<OMClientResponse>>>
+      splitRequestsAtCreateSnapshot(
       Queue<DoubleBufferEntry<OMClientResponse>> requestBuffer
   ) {
     List<Queue<DoubleBufferEntry<OMClientResponse>>> response =
@@ -436,7 +431,8 @@ public final class OzoneManagerDoubleBuffer {
 
     requestBuffer.iterator().forEachRemaining(entry -> {
       OMResponse omResponse = entry.getResponse().getOMResponse();
-      if (omResponse.getCreateSnapshotResponse() != null || response.isEmpty()) {
+      if (omResponse.getCreateSnapshotResponse() != null ||
+          response.isEmpty()) {
         response.add(new LinkedList<>());
       }
 
