@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -172,6 +173,9 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
         // total number of keys created.
         numKeysCreated = missingParentInfos.size() + 1;
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
+        omBucketInfo.incrUsedNamespace(numKeysCreated);
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =

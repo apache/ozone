@@ -104,6 +104,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1172,6 +1173,58 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
   }
 
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testBucketUsedNamespace(BucketLayout layout) throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(layout)
+        .build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    String keyName = UUID.randomUUID().toString();
+    store.getVolume(volumeName).getBucket(bucketName);
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    bucket.deleteKey(keyName);
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    RpcClient client = new RpcClient(cluster.getConf(), null);
+    String directoryName = UUID.randomUUID().toString();
+
+    client.createDirectory(volumeName, bucketName, directoryName);
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    client.createDirectory(volumeName, bucketName, directoryName);
+    Assert.assertEquals(1L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    client.deleteKey(volumeName, bucketName,
+        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName), false);
+    Assert.assertEquals(0L,
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+
+    String multiComponentsDir = "a/b/c/d";
+    client.createDirectory(volumeName, bucketName, multiComponentsDir);
+    Assert.assertEquals(OzoneFSUtils.getFileCount(multiComponentsDir),
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+  }
+
   @Test
   public void testVolumeUsedNamespace() throws IOException {
     String volumeName = UUID.randomUUID().toString();
@@ -1224,7 +1277,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testBucketUsedNamespace() throws IOException {
+  public void testBucketQuotaInNamespace() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String key1 = UUID.randomUUID().toString();
