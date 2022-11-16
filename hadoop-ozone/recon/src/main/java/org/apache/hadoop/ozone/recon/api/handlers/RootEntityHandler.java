@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -132,7 +134,7 @@ public class RootEntityHandler extends EntityHandler {
 
     SCMNodeStat stats = getReconSCM().getScmNodeManager().getStats();
     long quotaInBytes = stats.getCapacity().get();
-    long quotaUsedInBytes = stats.getScmUsed().get();
+    long quotaUsedInBytes = getDuResponse(true, true).getSizeWithReplica();
 
     quotaUsageResponse.setQuota(quotaInBytes);
     quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);

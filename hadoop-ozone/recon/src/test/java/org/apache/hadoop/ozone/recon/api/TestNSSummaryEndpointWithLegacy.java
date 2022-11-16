@@ -1294,6 +1294,7 @@ public class TestNSSummaryEndpointWithLegacy {
   }
 
   private static SCMNodeStat getMockSCMRootStat() {
-    return new SCMNodeStat(ROOT_QUOTA,ROOT_DATA_SIZE,ROOT_QUOTA - ROOT_DATA_SIZE);
+    return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE, 
+        ROOT_QUOTA - ROOT_DATA_SIZE);
   }
 }

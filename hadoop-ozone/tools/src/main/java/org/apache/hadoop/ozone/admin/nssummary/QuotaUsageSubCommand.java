@@ -85,7 +85,7 @@ public class QuotaUsageSubCommand implements Callable {
         printBucketReminder();
       }
 
-      printWithUnderline("Quota", true);
+      printWithUnderline("Quota (Whole file system)", true);
       long quotaAllowed = (long)(double)quotaResponse.get("allowed");
       long quotaUsed = (long)(double)quotaResponse.get("used");
       printSpaces(2);

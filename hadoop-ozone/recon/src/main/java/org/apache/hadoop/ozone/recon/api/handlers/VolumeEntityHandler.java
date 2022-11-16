@@ -117,21 +117,16 @@ public class VolumeEntityHandler extends EntityHandler {
   public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-    String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
-    String volKey = getOmMetadataManager().getVolumeKey(names[0]);
-    OmVolumeArgs volumeArgs =
-            getOmMetadataManager().getVolumeTable().getSkipCache(volKey);
-    long quotaInBytes = volumeArgs.getQuotaInBytes();
-    long quotaUsedInBytes = 0L;
+    RootEntityHandler rootEntityHandler = new RootEntityHandler(
+      getReconNamespaceSummaryManager(),
+      getOmMetadataManager(),
+      getReconSCM(),
+      "/"
+    );
+    QuotaUsageResponse rootQuotaUsageResponse = rootEntityHandler.getQuotaResponse();
 
-    // Get the total data size used by all buckets
-    for (OmBucketInfo bucketInfo: buckets) {
-      long bucketObjectId = bucketInfo.getObjectID();
-      quotaUsedInBytes += getTotalSize(bucketObjectId);
-    }
-    quotaUsageResponse.setQuota(quotaInBytes);
-    quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
+    quotaUsageResponse.setQuota(rootQuotaUsageResponse.getQuota());
+    quotaUsageResponse.setQuotaUsed(rootQuotaUsageResponse.getQuotaUsed());
     return quotaUsageResponse;
   }
 

@@ -126,15 +126,16 @@ public class BucketEntityHandler extends EntityHandler {
   public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-    String[] names = getNames();
-    String bucketKey = getOmMetadataManager().getBucketKey(names[0], names[1]);
-    OmBucketInfo bucketInfo = getOmMetadataManager()
-            .getBucketTable().getSkipCache(bucketKey);
-    long bucketObjectId = bucketInfo.getObjectID();
-    long quotaInBytes = bucketInfo.getQuotaInBytes();
-    long quotaUsedInBytes = getTotalSize(bucketObjectId);
-    quotaUsageResponse.setQuota(quotaInBytes);
-    quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
+    RootEntityHandler rootEntityHandler = new RootEntityHandler(
+      getReconNamespaceSummaryManager(),
+      getOmMetadataManager(),
+      getReconSCM(),
+      "/"
+    );
+    QuotaUsageResponse rootQuotaUsageResponse= rootEntityHandler.getQuotaResponse();
+
+    quotaUsageResponse.setQuota(rootQuotaUsageResponse.getQuota());
+    quotaUsageResponse.setQuotaUsed(rootQuotaUsageResponse.getQuotaUsed());
     return quotaUsageResponse;
   }
 
