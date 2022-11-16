@@ -78,8 +78,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.MISSING, containerID);
       }
-      // TODO - if it is unrecoverable, should we return false to other
-      //        handlers can be tried?
       if (!underHealth.isReplicatedOkAfterPending() &&
           !underHealth.isUnrecoverable()) {
         request.getReplicationQueue().enqueue(underHealth);

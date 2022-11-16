@@ -480,8 +480,6 @@ public class TestECReplicationCheckHandler {
     ContainerHealthResult result = healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
 
-    // Under-replicated takes precedence and the over-replication is ignored
-    // for now.
     Assert.assertTrue(healthCheck.handle(request));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
@@ -503,7 +501,7 @@ public class TestECReplicationCheckHandler {
         Mockito.anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
-      // If the number of DNs is 3 or less make it be mis-replicated
+      // If the number of DNs is 5 or less make it be mis-replicated
       if (dns.size() <= 5) {
         return new ContainerPlacementStatusDefault(4, 5, 9);
       } else {
