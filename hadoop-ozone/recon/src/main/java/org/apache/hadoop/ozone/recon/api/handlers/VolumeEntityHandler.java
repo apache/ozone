@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -118,12 +117,13 @@ public class VolumeEntityHandler extends EntityHandler {
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     RootEntityHandler rootEntityHandler = new RootEntityHandler(
-      getReconNamespaceSummaryManager(),
-      getOmMetadataManager(),
-      getReconSCM(),
-      "/"
+        getReconNamespaceSummaryManager(),
+        getOmMetadataManager(),
+        getReconSCM(),
+        "/"
     );
-    QuotaUsageResponse rootQuotaUsageResponse = rootEntityHandler.getQuotaResponse();
+    QuotaUsageResponse rootQuotaUsageResponse = 
+        rootEntityHandler.getQuotaResponse();
 
     quotaUsageResponse.setQuota(rootQuotaUsageResponse.getQuota());
     quotaUsageResponse.setQuotaUsed(rootQuotaUsageResponse.getQuotaUsed());
