@@ -304,7 +304,7 @@ public class TestECReplicationCheckHandler {
         healthCheck.checkHealth(request);
     Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     Assert.assertEquals(0, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isSufficientlyReplicatedAfterPending());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(request));
