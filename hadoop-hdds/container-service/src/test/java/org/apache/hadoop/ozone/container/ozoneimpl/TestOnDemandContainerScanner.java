@@ -105,8 +105,10 @@ public class TestOnDemandContainerScanner {
     OnDemandContainerScanner.init(conf, controller);
     //Given a container that has not finished scanning
     CountDownLatch latch = new CountDownLatch(1);
-    Mockito.lenient().when(corruptData.scanMetaData()).thenAnswer(
-        (Answer<Boolean>) invocation -> {
+    Mockito.lenient().when(corruptData.scanData(
+            OnDemandContainerScanner.getThrottler(),
+            OnDemandContainerScanner.getCanceler()))
+        .thenAnswer((Answer<Boolean>) invocation -> {
           latch.await();
           return false;
         });

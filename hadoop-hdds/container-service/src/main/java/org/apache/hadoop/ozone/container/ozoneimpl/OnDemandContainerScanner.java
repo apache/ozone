@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -134,6 +135,16 @@ public final class OnDemandContainerScanner {
 
   public static OnDemandScannerMetrics getMetrics() {
     return instance.metrics;
+  }
+
+  @VisibleForTesting
+  public static DataTransferThrottler getThrottler() {
+    return instance.throttler;
+  }
+
+  @VisibleForTesting
+  public static Canceler getCanceler() {
+    return instance.canceler;
   }
 
   public static synchronized void shutdown() {
