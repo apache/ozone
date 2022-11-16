@@ -28,16 +28,12 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 
 import static org.junit.Assert.assertNull;
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -74,34 +70,6 @@ public class TestOzoneClientUtils {
             clientProtocol);
 
     assertNull(checksum);
-  }
-
-  @Test
-  public void testGetFileChecksumForECFileShouldReturnNull()
-      throws IOException {
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
-    ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    OzoneManagerProtocol ozoneManagerProtocol =
-        mock(OzoneManagerProtocol.class);
-    try {
-      OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
-          .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024K"))
-          .setVolumeName("vol").setBucketName("bucket").setKeyName("mykey")
-          .setDataSize(10).setCreationTime(1).setModificationTime(1).build();
-      Mockito.when(clientProtocol.getOzoneManagerClient())
-          .thenReturn(ozoneManagerProtocol);
-      Mockito.when(ozoneManagerProtocol.lookupKey(any())).thenReturn(omKeyInfo);
-      FileChecksum checksum = OzoneClientUtils
-          .getFileChecksumWithCombineMode(volume, bucket, "test", 1,
-              OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC, clientProtocol);
-      assertNull(checksum);
-    } finally {
-      Mockito.reset(volume);
-      Mockito.reset(bucket);
-      Mockito.reset(clientProtocol);
-      Mockito.reset(ozoneManagerProtocol);
-    }
   }
 
   @Test

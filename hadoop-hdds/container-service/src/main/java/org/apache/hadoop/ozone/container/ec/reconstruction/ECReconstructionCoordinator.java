@@ -154,9 +154,12 @@ public class ECReconstructionCoordinator implements Closeable {
       }
 
       // 2. Reconstruct and transfer to targets
-      for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap
-          .values()) {
-        reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
+      for (Map.Entry<Long, BlockLocationInfo> blockLocationInfoEntry
+          : blockLocationInfoMap.entrySet()) {
+        Long key = blockLocationInfoEntry.getKey();
+        BlockLocationInfo blockLocationInfo = blockLocationInfoEntry.getValue();
+        reconstructECBlockGroup(blockLocationInfo, repConfig,
+            targetNodeMap, blockDataMap.get(key));
       }
 
       // 3. Close containers
@@ -198,7 +201,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
   void reconstructECBlockGroup(BlockLocationInfo blockLocationInfo,
       ECReplicationConfig repConfig,
-      SortedMap<Integer, DatanodeDetails> targetMap)
+      SortedMap<Integer, DatanodeDetails> targetMap, BlockData[] blockDataGroup)
       throws IOException {
     long safeBlockGroupLength = blockLocationInfo.getLength();
     List<Integer> missingContainerIndexes = new ArrayList<>(targetMap.keySet());
@@ -251,8 +254,9 @@ public class ECReconstructionCoordinator implements Closeable {
         targetBlockStreams[i] =
             new ECBlockOutputStream(blockLocationInfo.getBlockID(),
                 this.containerOperationClient.getXceiverClientManager(),
-                this.containerOperationClient
-                    .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
+                this.containerOperationClient.
+                    singleNodePipeline(datanodeDetails, repConfig,
+                    toReconstructIndexes.get(i)), bufferPool,
                 configuration, blockLocationInfo.getToken(), clientMetrics);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
@@ -277,8 +281,8 @@ public class ECReconstructionCoordinator implements Closeable {
 
       try {
         for (ECBlockOutputStream targetStream : targetBlockStreams) {
-          targetStream
-              .executePutBlock(true, true, blockLocationInfo.getLength());
+          targetStream.executePutBlock(true, true,
+              blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream,
               targetStream.getCurrentPutBlkResponseFuture());
         }
