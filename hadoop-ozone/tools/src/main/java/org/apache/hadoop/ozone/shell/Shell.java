@@ -38,7 +38,7 @@ public abstract class Shell extends GenericCli {
       "Service id provides a logical name for multiple hosts and it is  " +
       "defined in the property ozone.om.service.ids." +
       "Example of a full URI with host name and port number for a key:" +
-      "\no3://omhostname/vol1/bucket1/key1\n" +
+      "\no3://omhostname:9862/vol1/bucket1/key1\n" +
       "With a service id for a volume:" +
       "\no3://omserviceid/vol1/\n" +
       "Short URI should start from the volume.\n" +
