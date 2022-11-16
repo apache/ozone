@@ -39,7 +39,7 @@ import java.time.Instant;
 import java.util.concurrent.Callable;
 
 /**
- * This is the handler to clean SCM database from expired certificates
+ * This is the handler to clean SCM database from expired certificates.
  */
 @CommandLine.Command(
     name = "clean",
@@ -73,7 +73,6 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
       return null;
     }
 
-    //DBStore mockolás, inkább ezt adjuk a removeExpCertnek ++ hibakezelés (nincs certstable)
     try (DBStore dbStore = HAUtils.loadDB(
         configuration, new File(dbDirectory), dbName, new SCMDBDefinition())) {
       removeExpiredCertificates(dbStore);
