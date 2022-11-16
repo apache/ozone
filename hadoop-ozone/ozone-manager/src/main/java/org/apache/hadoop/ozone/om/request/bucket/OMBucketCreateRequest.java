@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -50,7 +51,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
@@ -159,9 +159,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // When the value is not specified in the proto, OM will use
     // "ozone.default.bucket.layout".
     if (!bucketInfo.hasBucketLayout()) {
-      BucketLayout defaultBuckLayout = ozoneManager.getOMDefaultBucketLayout();
+      BucketLayout defaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
       omBucketInfo =
-          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBuckLayout);
+          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
     }
@@ -413,20 +413,29 @@ public class OMBucketCreateRequest extends OMClientRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket
   )
-  public static OMRequest disallowCreateBucketWithBucketLayoutDuringPreFinalize(
+  public static OMRequest handleCreateBucketWithBucketLayoutDuringPreFinalize(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
       if (req.getCreateBucketRequest()
-          .getBucketInfo().hasBucketLayout()
-          &&
-          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
-              .getBucketLayout()).isLegacy()) {
-        throw new OMException("Cluster does not have the Bucket Layout"
-            + " support feature finalized yet, but the request contains"
-            + " a non LEGACY bucket type. Rejecting the request,"
-            + " please finalize the cluster upgrade and then try again.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+          .getBucketInfo().hasBucketLayout()) {
+        // If the client explicitly specified a bucket layout while OM is
+        // pre-finalized, reject the request.
+        if (!BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
+            .getBucketLayout()).isLegacy()) {
+          throw new OMException("Cluster does not have the Bucket Layout"
+              + " support feature finalized yet, but the request contains"
+              + " a non LEGACY bucket type. Rejecting the request,"
+              + " please finalize the cluster upgrade and then try again.",
+              ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+        }
+      } else {
+        // The client did not specify a bucket layout, meaning the OM's
+        // default bucket layout would be used.
+        // Since the OM is pre-finalized for bucket layout support,
+        // explicitly override the server default by specifying this request
+        // as a legacy bucket.
+        return changeBucketLayout(req, BucketLayout.LEGACY);
       }
     }
     return req;
@@ -447,17 +456,25 @@ public class OMBucketCreateRequest extends OMClientRequest {
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {
-    if (req.getVersion() < ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
+    if (ClientVersion.fromProtoValue(req.getVersion())
+        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0) {
       // Older client will default bucket layout to LEGACY to
       // make its operations backward compatible.
-      CreateBucketRequest createBucketRequest = req.getCreateBucketRequest();
-      BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
-          .setBucketLayout(BucketLayoutProto.LEGACY).build();
-      CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
-          .setBucketInfo(newBucketInfo).build();
-      return req.toBuilder().setCreateBucketRequest(newCreateRequest).build();
+      return changeBucketLayout(req, BucketLayout.LEGACY);
     } else {
       return req;
     }
+  }
+
+  private static OMRequest changeBucketLayout(OMRequest originalRequest,
+      BucketLayout newLayout) {
+    CreateBucketRequest createBucketRequest =
+        originalRequest.getCreateBucketRequest();
+    BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
+        .setBucketLayout(newLayout.toProto()).build();
+    CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
+        .setBucketInfo(newBucketInfo).build();
+    return originalRequest.toBuilder()
+        .setCreateBucketRequest(newCreateRequest).build();
   }
 }

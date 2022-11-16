@@ -77,6 +77,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -521,6 +522,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (bucketLayoutValid) {
       this.defaultBucketLayout =
           BucketLayout.fromString(defaultBucketLayoutString);
+
+      if (!defaultBucketLayout.isLegacy() &&
+          !versionManager.isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+        LOG.warn("{} configured to non-legacy bucket layout {} when Ozone " +
+            "Manager is pre-finalized for bucket layout support. Legacy " +
+            "buckets will be created by default until Ozone Manager is " +
+            "finalized.", OZONE_DEFAULT_BUCKET_LAYOUT, defaultBucketLayout);
+      }
     } else {
       throw new ConfigurationException(defaultBucketLayoutString +
           " is not a valid default bucket layout. Supported values are " +
