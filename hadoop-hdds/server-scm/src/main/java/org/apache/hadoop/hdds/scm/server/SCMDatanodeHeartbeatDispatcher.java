@@ -42,10 +42,12 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.IEventInfo;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import com.google.protobuf.Message;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -310,7 +312,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public static class ContainerReportFromDatanode
       extends ReportFromDatanode<ContainerReportsProto>
-      implements ContainerReport {
+      implements ContainerReport, IEventInfo {
+    private long createTime = Time.monotonicNow();
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
@@ -330,6 +333,17 @@ public final class SCMDatanodeHeartbeatDispatcher {
     public ContainerReportType getType() {
       return ContainerReportType.FCR;
     }
+    
+    @Override
+    public long getCreateTime() {
+      return createTime;
+    }
+
+    @Override
+    public String getEventId() {
+      return getDatanodeDetails().toString() + ", {type: " + getType()
+          + ", size: " + getReport().getReportsList().size() + "}";
+    }
   }
 
   /**
@@ -337,8 +351,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   public static class IncrementalContainerReportFromDatanode
       extends ReportFromDatanode<IncrementalContainerReportProto>
-      implements ContainerReport {
-
+      implements ContainerReport, IEventInfo {
+    private long createTime = Time.monotonicNow();
+    
     public IncrementalContainerReportFromDatanode(
         DatanodeDetails datanodeDetails,
         IncrementalContainerReportProto report) {
@@ -357,6 +372,17 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public ContainerReportType getType() {
       return ContainerReportType.ICR;
+    }
+
+    @Override
+    public long getCreateTime() {
+      return createTime;
+    }
+    
+    @Override
+    public String getEventId() {
+      return getDatanodeDetails().toString() + ", {type: " + getType()
+          + ", size: " + getReport().getReportList().size() + "}";
     }
   }
 

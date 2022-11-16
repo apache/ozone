@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +35,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
@@ -77,8 +81,18 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   @Metric
   private MutableCounterLong dropped;
+  
+  @Metric
+  private MutableCounterLong longWaitInQueue;
+  
+  @Metric
+  private MutableCounterLong longTimeExecution;
 
   private final AtomicBoolean isRunning = new AtomicBoolean(true);
+  private long queueWaitThreshold
+      = OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+  private long execWaitThreshold
+      = OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 
   /**
    * Create FixedThreadPoolExecutor with affinity.
@@ -116,6 +130,14 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
         .register(EVENT_QUEUE + name,
             "Event Executor metrics ",
             this);
+  }
+  
+  public void setQueueWaitThreshold(long queueWaitThreshold) {
+    this.queueWaitThreshold = queueWaitThreshold;
+  }
+
+  public void setExecWaitThreshold(long execWaitThreshold) {
+    this.execWaitThreshold = execWaitThreshold;
   }
 
   public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(
@@ -180,6 +202,14 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     return dropped.value();
   }
 
+  public long longWaitInQueueEvents() {
+    return longWaitInQueue.value();
+  }
+  
+  public long longTimeExecutionEvents() {
+    return longTimeExecution.value();
+  }
+
   @Override
   public void close() {
     isRunning.set(false);
@@ -226,12 +256,34 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
             LOG.warn("Executor for report is not found");
             continue;
           }
+          
+          long createTime = 0;
+          String eventId = "";
+          if (report instanceof IEventInfo) {
+            createTime = ((IEventInfo) report).getCreateTime();
+            eventId = ((IEventInfo) report).getEventId();
+          }
+          
+          long curTime = Time.monotonicNow();
+          if (createTime != 0
+              && ((curTime - createTime) > executor.queueWaitThreshold)) {
+            executor.longWaitInQueue.incr();
+            LOG.warn("Event remained in queue for long time {} millisec, {}",
+                (curTime - createTime), eventId);
+          }
 
           executor.scheduled.incr();
           try {
             executor.eventHandler.onMessage(report,
                 executor.eventPublisher);
             executor.done.incr();
+            curTime = Time.monotonicNow();
+            if (createTime != 0
+                && (curTime - createTime) > executor.execWaitThreshold) {
+              executor.longTimeExecution.incr();
+              LOG.warn("Event taken long execution time {} millisec, {}",
+                  (curTime - createTime), eventId);
+            }
           } catch (Exception ex) {
             LOG.error("Error on execution message {}", report, ex);
             executor.failed.incr();
