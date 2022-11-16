@@ -490,7 +490,16 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_EVENT_CONTAINER_REPORT_THREAD_POOL_SIZE =
       OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";
   public static final int OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT = 10;
-
+  /**
+  SCM Event Report queue default queue wait time in millisec, i.e. 1 minute.
+   */
+  public static final int OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT
+      = 60000;
+  /**
+  SCM Event Report queue execution time wait in millisec, i.e. 2 minute.
+   */
+  public static final int OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT
+      = 120000;
   public static final int OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT 
       = 100000;
 
