@@ -97,7 +97,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
           truststoreReloadInterval);
     }
 
-    trustManagers = new TrustManager[]{trustManager};
+    trustManagers = new TrustManager[] {trustManager};
   }
 
   /**
@@ -125,8 +125,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
           keystoreReloadInterval);
     }
 
-    keyManagers = new KeyManager[1];
-    keyManagers[0] = keystoreManager;
+    keyManagers = new KeyManager[] {keystoreManager};
   }
 
   /**
@@ -140,7 +139,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    * @throws GeneralSecurityException thrown if the keystores could not be
    * initialized due to a security error.
    */
-  public void init(SSLFactory.Mode mode, boolean requireClientAuth)
+  public synchronized void init(SSLFactory.Mode mode, boolean requireClientAuth)
       throws IOException, GeneralSecurityException {
 
     monitoringTimer = new Timer(caClient.getComponentName() + "-"
@@ -186,7 +185,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    */
   @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
-  public KeyManager[] getKeyManagers() {
+  public synchronized KeyManager[] getKeyManagers() {
     return keyManagers;
   }
 
@@ -195,7 +194,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    */
   @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
-  public TrustManager[] getTrustManagers() {
+  public synchronized TrustManager[] getTrustManagers() {
     return trustManagers;
   }
 }
