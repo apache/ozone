@@ -17,6 +17,7 @@
 */
 package org.apache.hadoop.hdds.security.ssl;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -63,8 +64,8 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
   private KeyManager[] keyManagers;
   private TrustManager[] trustManagers;
   private Timer monitoringTimer;
-  private CertificateClient caClient;
-  private SecurityConfig secConfig;
+  private final CertificateClient caClient;
+  private final SecurityConfig secConfig;
 
   public PemFileBasedKeyStoresFactory(SecurityConfig securityConfig,
       CertificateClient client) {
@@ -124,7 +125,8 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
           keystoreReloadInterval);
     }
 
-    keyManagers = new KeyManager[] { keystoreManager };
+    keyManagers = new KeyManager[1];
+    keyManagers[0] = keystoreManager;
   }
 
   /**
@@ -139,7 +141,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    * initialized due to a security error.
    */
   public void init(SSLFactory.Mode mode, boolean requireClientAuth)
-    throws IOException, GeneralSecurityException {
+      throws IOException, GeneralSecurityException {
 
     monitoringTimer = new Timer(caClient.getComponentName() + "-"
         + SSL_MONITORING_THREAD_NAME, true);
@@ -182,6 +184,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
   /**
    * Returns the keymanagers for owned certificates.
    */
+  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public KeyManager[] getKeyManagers() {
     return keyManagers;
@@ -190,6 +193,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
   /**
    * Returns the trustmanagers for trusted certificates.
    */
+  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public TrustManager[] getTrustManagers() {
     return trustManagers;

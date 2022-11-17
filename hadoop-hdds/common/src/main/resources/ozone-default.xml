@@ -2402,6 +2402,22 @@
     </description>
   </property>
   <property>
+    <name>hdds.security.ssl.keystore.reload.interval</name>
+    <value>60000</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the keystore
+      certificates file has changed and needs reloading. Default is 60s.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.ssl.truststore.reload.interval</name>
+    <value>60000</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the truststore
+      certificates file has changed and needs reloading. Default is 60s.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.security.client.protocol.acl</name>
     <value>*</value>
     <tag>SECURITY</tag>
