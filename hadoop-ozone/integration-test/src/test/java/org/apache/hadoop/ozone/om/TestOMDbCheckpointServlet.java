@@ -34,6 +34,7 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.List;
@@ -64,7 +65,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -149,7 +149,6 @@ public class TestOMDbCheckpointServlet {
         fileOutputStream.write(b);
       }
     };
-
   }
 
   /**
@@ -436,20 +435,19 @@ public class TestOMDbCheckpointServlet {
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkDummyFile(Set<String> directories, List<String> lines,
                               String testDirName) {
-      // find the real file
-      String realDir = null;
-      for (String dir: directories) {
-        if (Paths.get(testDirName, dir, "dummyFile").toFile().exists()) {
-          directories.remove(dir);
-          realDir = dir;
-        }
+    // find the real file
+    String realDir = null;
+    for (String dir: directories) {
+      if (Paths.get(testDirName, dir, "dummyFile").toFile().exists()) {
+        Assert.assertNull("Exactly one copy of the file existed in the tarball", realDir);
+        realDir = dir;
       }
+    }
 
-    Assert.assertEquals("Exactly one copy of the file existed in the tarball",
-        directories.size(), 2);
-
-    String dir0 = (String)directories.toArray()[0];
-    String dir1 = (String)directories.toArray()[1];
+    directories.remove(realDir);
+    Iterator<String> directoryIterator = directories.iterator();
+    String dir0 = directoryIterator.next();
+    String dir1 = directoryIterator.next();
     Assert.assertNotEquals("link directories are different", dir0, dir1);
 
     for (String line : lines) {

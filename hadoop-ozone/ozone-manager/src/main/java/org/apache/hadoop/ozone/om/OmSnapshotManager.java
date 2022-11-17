@@ -130,7 +130,7 @@ public final class OmSnapshotManager {
         = notification -> {
           try {
             // close snapshot's rocksdb on eviction
-            Objects.requireNonNull(notification.getValue()).close();
+            notification.getValue().close();
           } catch (IOException e) {
             LOG.error("Failed to close snapshot: {} {}",
                 notification.getKey(), e);
@@ -280,48 +280,19 @@ public final class OmSnapshotManager {
       throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
           " should be older than to toSnapshot:" + toSnapshot.getName());
     }
-  }
 
-  // Create hard links listed in OM_HARDLINK_FILE
-  static void createHardLinks(Path dbPath) throws IOException {
-    File hardLinkFile = new File(dbPath.toString(),
-        OM_HARDLINK_FILE);
-    if (hardLinkFile.exists()) {
-      List<String> lines =
-          Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());
-      for (String l : lines) {
-        String from = l.split("\t")[1];
-        String to = l.split("\t")[0];
-        Path fullFromPath = getFullPath(dbPath, from);
-        Path fullToPath = getFullPath(dbPath, to);
-        Files.createLink(fullToPath, fullFromPath);
-      }
-      if (!hardLinkFile.delete()) {
-        throw new IOException(
-            "Failed to delete: " + hardLinkFile.toString());
-      }
-    }
-  }
-
-  // Get the full path of OM_HARDLINK_FILE entry
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  private static Path getFullPath(Path dbPath, String fileName) {
-    File file = new File(fileName);
-    // If there is no directory then this file belongs in the db
-    if (file.getName().equals(fileName)) {
-      return Paths.get(dbPath.toString(), fileName);
-    }
-    // else this file belong in a directory parallel to the db
-    return Paths.get(dbPath.getParent().toString(), fileName);
-  }
-
-  // Create list of links to add to follower
-  // Format of entries are either:
-  // db.snapshot/dir1/fileTo fileFrom
-  //    for files in active db or:
-  // db.snapshot/dir1/fileTo parent/dir2/fileFrom
-  //    for files in another directory, (either another snapshot dir or
-  //    sst compaction backup directory)
+  /**
+   * Create file of links to add to tarball
+   * Format of entries are either:
+   * dir1/fileTo fileFrom
+   *    for files in active db or:
+   * dir1/fileTo dir2/fileFrom
+   *    for files in another directory, (either another snapshot dir or
+   *    sst compaction backup directory)
+   * @param truncateLength length of initial path to trim in file path
+   * @param hardLinkFiles a map of link->file paths
+   * @return Path to the file of links created
+   */
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   static Path createHardLinkList(int truncateLength,
                                   Map<Path, Path> hardLinkFiles)
@@ -343,7 +314,46 @@ public final class OmSnapshotManager {
     return data;
   }
 
+  // get the filename without the introductory metadata directory
   static String truncateFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
   }
+
+  // Create hard links listed in OM_HARDLINK_FILE
+  static void createHardLinks(Path dbPath) throws IOException {
+    File hardLinkFile = new File(dbPath.toString(),
+        OM_HARDLINK_FILE);
+    if (hardLinkFile.exists()) {
+      // Read file
+      List<String> lines =
+          Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());
+
+      // Create a link for each line
+      for (String l : lines) {
+        String from = l.split("\t")[1];
+        String to = l.split("\t")[0];
+        Path fullFromPath = getFullPath(dbPath, from);
+        Path fullToPath = getFullPath(dbPath, to);
+        Files.createLink(fullToPath, fullFromPath);
+      }
+      if (!hardLinkFile.delete()) {
+        throw new IOException(
+            "Failed to delete: " + hardLinkFile.toString());
+      }
+    }
+  }
+
+
+  // Prepend the full path to the hard link entry entry
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
+  private static Path getFullPath(Path dbPath, String fileName) {
+    File file = new File(fileName);
+    // If there is no directory then this file belongs in the db
+    if (file.getName().equals(fileName)) {
+      return Paths.get(dbPath.toString(), fileName);
+    }
+    // else this file belong in a directory parallel to the db
+    return Paths.get(dbPath.getParent().toString(), fileName);
+  }
+
 }
