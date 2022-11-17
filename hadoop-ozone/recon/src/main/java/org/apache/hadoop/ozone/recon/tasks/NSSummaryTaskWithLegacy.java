@@ -185,12 +185,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             ioEx);
         return false;
       }
+      if (!checkAndCallFlushToDB(nsSummaryMap)) {
+        return false;
+      }
     }
 
-    try {
-      writeNSSummariesToDB(nsSummaryMap);
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+    // flush and commit left out entries at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
 
@@ -241,6 +242,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           } else {
             handlePutKeyEvent(keyInfo, nsSummaryMap);
           }
+          if (!checkAndCallFlushToDB(nsSummaryMap)) {
+            return false;
+          }
         }
       }
     } catch (IOException ioEx) {
@@ -249,10 +253,8 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       return false;
     }
 
-    try {
-      writeNSSummariesToDB(nsSummaryMap);
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+    // flush and commit left out entries at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
     LOG.info("Completed a reprocess run of NSSummaryTaskWithLegacy");

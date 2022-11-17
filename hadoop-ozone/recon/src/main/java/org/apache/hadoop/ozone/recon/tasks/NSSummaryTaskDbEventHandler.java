@@ -40,6 +40,7 @@ public class NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
+  public static final long NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD = 150 * 1000L;
 
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -193,5 +194,25 @@ public class NSSummaryTaskDbEventHandler {
 
     nsSummary.removeChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
+  }
+
+  protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
+    try {
+      writeNSSummariesToDB(nsSummaryMap);
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return false;
+    }
+    return true;
+  }
+
+  protected boolean checkAndCallFlushToDB(
+      Map<Long, NSSummary> nsSummaryMap) {
+    // if map contains more than entries, flush to DB and clear the map
+    if (null != nsSummaryMap && nsSummaryMap.size() ==
+        NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD) {
+      return flushAndCommitNSToDB(nsSummaryMap);
+    }
+    return true;
   }
 }

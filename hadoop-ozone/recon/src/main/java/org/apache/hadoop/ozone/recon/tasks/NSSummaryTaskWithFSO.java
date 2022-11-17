@@ -110,6 +110,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
             LOG.debug("Skipping DB update event : {}",
                     omdbUpdateEvent.getAction());
           }
+
         } else {
           // directory update on DirTable
           OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
@@ -147,12 +148,13 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
                 ioEx);
         return false;
       }
+      if (!checkAndCallFlushToDB(nsSummaryMap)) {
+        return false;
+      }
     }
 
-    try {
-      writeNSSummariesToDB(nsSummaryMap);
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+    // flush and commit left out entries at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
 
@@ -173,6 +175,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
           OmDirectoryInfo directoryInfo = kv.getValue();
           handlePutDirEvent(directoryInfo, nsSummaryMap);
+          if (!checkAndCallFlushToDB(nsSummaryMap)) {
+            return false;
+          }
         }
       }
 
@@ -186,6 +191,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
           handlePutKeyEvent(keyInfo, nsSummaryMap);
+          if (!checkAndCallFlushToDB(nsSummaryMap)) {
+            return false;
+          }
         }
       }
 
@@ -194,14 +202,13 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
               ioEx);
       return false;
     }
-
-    try {
-      writeNSSummariesToDB(nsSummaryMap);
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+    // flush and commit left out keys at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
     LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
+
+
 }
