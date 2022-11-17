@@ -64,8 +64,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName,
-              bucketName);
+          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+              volumeName, bucketName);
           omBucketInfo.incrUsedNamespace(-1L);
           volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
               omBucketInfo);
@@ -76,8 +76,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName,
-              bucketName);
+          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+              volumeName, bucketName);
           omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
           omBucketInfo.incrUsedNamespace(-1L);
           volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
