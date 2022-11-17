@@ -21,7 +21,6 @@ import {Row, Col, Icon, Tooltip} from 'antd';
 import OverviewCard from 'components/overviewCard/overviewCard';
 import axios from 'axios';
 import {IStorageReport} from 'types/datanode.types';
-import {IMissingContainersResponse} from '../missingContainers/missingContainers';
 import moment from 'moment';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
@@ -32,6 +31,7 @@ import './overview.less';
 const size = filesize.partial({round: 1});
 
 interface IClusterStateResponse {
+  missingContainers: number;
   totalDatanodes: number;
   healthyDatanodes: number;
   pipelines: number;
@@ -90,14 +90,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     });
     axios.all([
       axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/containers/missing'),
       axios.get('/api/v1/task/status')
-    ]).then(axios.spread((clusterStateResponse, missingContainersResponse,taskstatusResponse) => {
+    ]).then(axios.spread((clusterStateResponse, taskstatusResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
-      const missingContainers: IMissingContainersResponse = missingContainersResponse.data;     
       const taskStatus = taskstatusResponse.data;
-      const missingContainersCount = missingContainers.totalCount;
+      const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
     
@@ -146,7 +144,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     const duLink = '/DiskUsage';
     const containersElement = missingContainersCount > 0 ? (
       <span>
-        <Tooltip placement='bottom' title={`${missingContainersCount} ${containersTooltip}`}>
+        <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing. For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
           <Icon type='exclamation-circle' theme='filled' className='icon-failure icon-small'/>
         </Tooltip>
         <span className='padded-text'>{containers - missingContainersCount}/{containers}</span>
