@@ -230,6 +230,10 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
       .build();
   }
 
+  public String getName() {
+    return snapshotName;
+  }
+
   @Override
   public void close() throws IOException {
     omMetadataManager.getStore().close();

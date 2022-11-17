@@ -165,6 +165,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <allowedImport>org.rocksdb.RocksDBException</allowedImport>
                     <allowedImport>org.rocksdb.SstFileReader</allowedImport>
                     <allowedImport>org.rocksdb.TableProperties</allowedImport>
+                    <allowedImport>org.rocksdb.ReadOptions</allowedImport>
+                    <allowedImport>org.rocksdb.SstFileReaderIterator</allowedImport>
                   </allowedImports>
                   <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                 </RestrictImports>
