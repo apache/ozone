@@ -99,7 +99,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
     ContainerHealthResult.OverReplicatedHealthResult containerHealthResult =
         ((ContainerHealthResult.OverReplicatedHealthResult)
             currentUnderRepRes);
-    if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
+    if (containerHealthResult.isReplicatedOkAfterPending()) {
       LOG.info("The container {} with replicas {} will be corrected " +
               "by the pending delete", container.getContainerID(), replicas);
       return emptyMap();
