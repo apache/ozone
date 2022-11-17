@@ -197,12 +197,14 @@ public class SecurityConfig {
       }
     }
 
-    this.keystoreReloadInterval = this.configuration.getLong(
+    this.keystoreReloadInterval = this.configuration.getTimeDuration(
         HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
-        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT);
-    this.truststoreReloadInterval = this.configuration.getLong(
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.truststoreReloadInterval = this.configuration.getTimeDuration(
         HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
-        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT);
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   /**

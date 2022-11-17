@@ -215,18 +215,17 @@ public final class HddsConfigKeys {
   public static final boolean HDDS_GRPC_TLS_TEST_CERT_DEFAULT = false;
 
   /**
-   * The default time interval in milliseconds used to check if either
-   * of the truststore or keystore certificates file has changed and needs
-   * reloading.
+   * The default time interval used to check if either of the truststore or
+   * keystore certificates file has changed and needs reloading.
    */
   public static final String HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL =
       "hdds.security.ssl.keystore.reload.interval";
   public static final String HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL =
       "hdds.security.ssl.truststore.reload.interval";
-  public static final long
-      HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT = 60000;
-  public static final long
-      HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT = 60000;
+  public static final String
+      HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
+  public static final String
+      HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
 
   // Comma separated acls (users, groups) allowing clients accessing
   // datanode container protocol

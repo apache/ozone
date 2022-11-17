@@ -2403,18 +2403,20 @@
   </property>
   <property>
     <name>hdds.security.ssl.keystore.reload.interval</name>
-    <value>60000</value>
+    <value>60s</value>
     <tag>SECURITY</tag>
     <description>The time interval in milliseconds used to check if the keystore
-      certificates file has changed and needs reloading. Default is 60s.
+      certificates file has changed and needs reloading. Default is 60s. Unit could be
+      defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>
     <name>hdds.security.ssl.truststore.reload.interval</name>
-    <value>60000</value>
+    <value>60s</value>
     <tag>SECURITY</tag>
     <description>The time interval in milliseconds used to check if the truststore
-      certificates file has changed and needs reloading. Default is 60s.
+      certificates file has changed and needs reloading. Default is 60s. Unit could
+      be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>
