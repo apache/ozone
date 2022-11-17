@@ -1,15 +1,15 @@
 {
   "clusterState": {
+    "pipelines": 32,
     "totalDatanodes": 24,
     "healthyDatanodes": 24,
-    "pipelines": 32,
     "storageReport": {
-      "capacity": 32985348833280,
-      "used": 15942918602752,
-      "remaining": 12094627905536
+      "capacity": 202114732032,
+      "used": 16384,
+      "remaining": 182447632384
     },
     "containers": 3230,
-    "openContainers": 3210,
+    "missingContainers": 1002,
     "volumes": 5,
     "buckets": 156,
     "keys": 253000
