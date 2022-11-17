@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -31,6 +32,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+
 /**
  * Class for holding all NSSummaryTask methods
  * related to DB operations so that they can commonly be
@@ -40,17 +44,22 @@ public class NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
-  public static final long NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD = 150 * 1000L;
-
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+
+  private final long nsSummaryFlushToDBMaxThreshold;
 
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
-                                     reconOMMetadataManager) {
+                                     reconOMMetadataManager,
+                                     OzoneConfiguration
+                                     ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -209,8 +218,8 @@ public class NSSummaryTaskDbEventHandler {
   protected boolean checkAndCallFlushToDB(
       Map<Long, NSSummary> nsSummaryMap) {
     // if map contains more than entries, flush to DB and clear the map
-    if (null != nsSummaryMap && nsSummaryMap.size() ==
-        NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD) {
+    if (null != nsSummaryMap && nsSummaryMap.size() >=
+        nsSummaryFlushToDBMaxThreshold) {
       return flushAndCommitNSToDB(nsSummaryMap);
     }
     return true;

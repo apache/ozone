@@ -17,6 +17,7 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -50,8 +51,11 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
-                              reconOMMetadataManager) {
-    super(reconNamespaceSummaryManager, reconOMMetadataManager);
+                              reconOMMetadataManager,
+                              OzoneConfiguration
+                              ozoneConfiguration) {
+    super(reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
   }
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
