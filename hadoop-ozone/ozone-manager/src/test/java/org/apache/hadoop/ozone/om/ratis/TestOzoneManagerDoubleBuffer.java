@@ -55,7 +55,6 @@ import static org.mockito.Mockito.when;
 class TestOzoneManagerDoubleBuffer {
 
   private OzoneManagerDoubleBuffer doubleBuffer;
-  private final long term = 1L;
   private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =
@@ -98,7 +97,7 @@ class TestOzoneManagerDoubleBuffer {
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
-        .setIndexToTerm((i) -> term)
+        .setIndexToTerm((i) -> 1L)
         .build();
 
     doNothing().when(omKeyCreateResponse).checkAndUpdateDB(any(), any());

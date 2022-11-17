@@ -286,14 +286,7 @@ public final class OzoneManagerDoubleBuffer {
           flushBatch(buffer);
         }
 
-        if (!isRatisEnabled) {
-          // Once all entries are flushed, we can complete their future.
-          readyFutureQueue.iterator()
-              .forEachRemaining((entry) -> entry.complete(null));
-          readyFutureQueue.clear();
-        }
-
-        readyBuffer.clear();
+        clearReadyBuffer();
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         if (isRunning.get()) {
@@ -488,7 +481,15 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
-
+  private synchronized void clearReadyBuffer() {
+    if (!isRatisEnabled) {
+      // Once all entries are flushed, we can complete their future.
+      readyFutureQueue.iterator()
+          .forEachRemaining((entry) -> entry.complete(null));
+      readyFutureQueue.clear();
+    }
+    readyBuffer.clear();
+  }
 
   private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
     cleanupEpochs.forEach((tableName, epochs) -> {
