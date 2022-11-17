@@ -1194,7 +1194,7 @@ public abstract class TestOzoneRpcClientAbstract {
     writeKey(bucket, keyName, ONE, value, valueLength);
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
-
+    // Test create a file twice will not increase usedNamespace twice
     writeKey(bucket, keyName, ONE, value, valueLength);
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
@@ -1209,7 +1209,7 @@ public abstract class TestOzoneRpcClientAbstract {
     client.createDirectory(volumeName, bucketName, directoryName);
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
-
+    // Test create a directory twice will not increase usedNamespace twice
     client.createDirectory(volumeName, bucketName, directoryName);
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
