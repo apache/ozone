@@ -538,8 +538,9 @@ public class ObjectStore {
 
   /**
    * Create snapshot.
-   * @param name name to be used
-   * @param snapshotPath snapshotPath to be used
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
    * @return name used
    * @throws IOException
    */
