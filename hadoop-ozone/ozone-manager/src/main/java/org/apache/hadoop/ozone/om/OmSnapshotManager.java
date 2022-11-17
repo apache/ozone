@@ -289,7 +289,7 @@ public final class OmSnapshotManager {
       throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
           " should be older than to toSnapshot:" + toSnapshot.getName());
     }
-
+  }
   /**
    * Create file of links to add to tarball
    * Format of entries are either:
