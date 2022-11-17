@@ -60,6 +60,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertTrue;
@@ -161,6 +162,8 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
+    createSnapshot(leaderOM, keys);
+
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -231,6 +234,20 @@ public class TestOMRatisSnapshots {
         getDefaultBucketLayout()).get(followerOMMetaMngr.getOzoneKey(
         volumeName, bucketName, newKeys.get(0))));
      */
+
+    // read back data from the snapshot
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+                .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
+    OmKeyInfo omKeyInfo = null;
+    try {
+      omKeyInfo = followerOM.lookupKey(omKeyArgs);
+    } catch (Exception e) {
+      Assertions.fail("received exception: " + e);
+    }
+    Assertions.assertTrue(omKeyInfo != null);
+    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 
   @Ignore("Enable this unit test after RATIS-1481 used")
@@ -541,28 +558,8 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(msg));
   }
 
-  @Test
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE",
-      "NP_NULL_ON_SOME_PATH"})
-  public void testOmSnapshots() throws Exception {
-    // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
-
-    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
-    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
-
-    // Find the inactive OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
-    if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
-    }
-    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
-
-    // Do some transactions so that the log index increases
-    List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
-
+  private void createSnapshot(OzoneManager leaderOM, List<String> keys)
+      throws TimeoutException, InterruptedException, IOException {
     // Avoid double buffer issue waiting for keys
     GenericTestUtils.waitFor(() -> {
       try {
@@ -589,65 +586,6 @@ public class TestOMRatisSnapshots {
         return false;
       }
     }, 100, 3000);
-    // Get the latest db checkpoint from the leader OM.
-    TransactionInfo transactionInfo =
-        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
-    TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(transactionInfo.getTerm(),
-            transactionInfo.getTransactionIndex());
-    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
-    long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
-
-
-
-    // Start the inactive OM. Checkpoint installation will happen spontaneously.
-    cluster.startInactiveOM(followerNodeId);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
-
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 3s
-    GenericTestUtils.waitFor(() ->
-        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-            >= leaderOMSnapshotIndex - 1, 100, 3000);
-
-    long followerOMLastAppliedIndex =
-        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
-
-    // After the new checkpoint is installed, the follower OM
-    // lastAppliedIndex must >= the snapshot index of the checkpoint. It
-    // could be great than snapshot index if there is any conf entry from ratis.
-    followerOMLastAppliedIndex = followerOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
-
-    // Verify RPC server is running
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.isOmRpcServerRunning();
-    }, 100, 5000);
-
-    // Verify checkpoint installation was happened.
-    String msg = "Reloaded OM state";
-    Assert.assertTrue(logCapture.getOutput().contains(msg));
-
-    // read back data from the snapshot
-    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-                .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
-    OmKeyInfo omKeyInfo = null;
-    try {
-      omKeyInfo = followerOM.lookupKey(omKeyArgs);
-    } catch (Exception e) {
-      Assertions.fail("received exception: " + e);
-    }
-    Assertions.assertTrue(omKeyInfo != null);
-    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 
   private List<String> writeKeysToIncreaseLogIndex(
