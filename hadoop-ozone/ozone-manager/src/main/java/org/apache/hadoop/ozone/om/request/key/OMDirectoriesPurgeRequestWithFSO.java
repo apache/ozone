@@ -18,8 +18,15 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -48,12 +55,47 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
+    Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
+    try {
+      OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+      for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
+        for (OzoneManagerProtocolProtos.KeyInfo key :
+            path.getMarkDeletedSubDirsList()) {
+          OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
+          String volumeName = keyInfo.getVolumeName();
+          String bucketName = keyInfo.getBucketName();
+          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName,
+              bucketName);
+          omBucketInfo.incrUsedNamespace(-1L);
+          volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
+              omBucketInfo);
+        }
+
+        for (OzoneManagerProtocolProtos.KeyInfo key :
+            path.getDeletedSubFilesList()) {
+          OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
+          String volumeName = keyInfo.getVolumeName();
+          String bucketName = keyInfo.getBucketName();
+          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName,
+              bucketName);
+          omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
+          omBucketInfo.incrUsedNamespace(-1L);
+          volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
+              omBucketInfo);
+        }
+      }
+    } catch (IOException ex) {
+      // Case of IOException for fromProtobuf will not hanppen
+      // as this is created and send within OM
+      // only case of upgrade where compatibility is broken can have
+      throw new IllegalStateException(ex);
+    }
+
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout());
+            getBucketLayout(), volBucketInfoMap);
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);
 
