@@ -43,8 +43,8 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tests OMDirectoryCreateResponse.
@@ -83,8 +83,8 @@ public class TestOMDirectoryCreateResponse {
         bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
 
-    Random random = new Random();
-    long usedNamespace = Math.abs(random.nextLong());
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, bucketName);
     omBucketInfo = omBucketInfo.toBuilder()

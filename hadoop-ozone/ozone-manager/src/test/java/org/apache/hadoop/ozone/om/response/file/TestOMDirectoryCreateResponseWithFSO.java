@@ -45,8 +45,8 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tests OMDirectoryCreateResponseWithFSO - prefix layout.
@@ -89,8 +89,8 @@ public class TestOMDirectoryCreateResponseWithFSO {
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
             .build();
-    Random random = new Random();
-    long usedNamespace = Math.abs(random.nextLong());
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, bucketName);
     omBucketInfo = omBucketInfo.toBuilder()
