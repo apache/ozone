@@ -46,7 +46,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
@@ -56,7 +55,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.createHardLinkList;
@@ -223,8 +221,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private void processFile(Path file, Map<Object, Path> copyFiles,
                            Map<Path, Path> hardLinkFiles) throws IOException {
     // get the inode
-    Object key = Files.readAttributes(
-        file, BasicFileAttributes.class).fileKey();
+    Object key = OmSnapshotManager.getINode(file);
     // If we already have the inode, store as hard link
     if (copyFiles.containsKey(key)) {
       hardLinkFiles.put(file, copyFiles.get(key));

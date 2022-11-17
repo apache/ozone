@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -46,6 +47,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -174,6 +176,13 @@ public final class OmSnapshotManager {
     dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
 
     return dbCheckpoint;
+  }
+
+  @VisibleForTesting
+  static Object getINode(Path file) throws IOException {
+    Object key = Files.readAttributes(
+        file, BasicFileAttributes.class).fileKey();
+    return key;
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
