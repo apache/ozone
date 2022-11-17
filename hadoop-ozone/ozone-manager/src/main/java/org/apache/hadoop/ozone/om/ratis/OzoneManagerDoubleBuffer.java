@@ -622,4 +622,8 @@ public final class OzoneManagerDoubleBuffer {
     return ozoneManagerDoubleBufferMetrics;
   }
 
+  @VisibleForTesting
+  public AtomicBoolean isRunning() {
+    return isRunning;
+  }
 }

@@ -170,10 +170,15 @@ class TestOzoneManagerDoubleBuffer {
       float expectedAvgFlushTransactionsInMetric
   ) throws InterruptedException {
 
+    // Disable the daemon till we add all the responses to the buffer.
+    doubleBuffer.isRunning().compareAndSet(true, false);
+
     for (int i = 0; i < omClientResponses.size(); i++) {
       doubleBuffer.add(omClientResponses.get(i), i);
     }
 
+    // Enable the daemon after adding all the responses to the buffer.
+    doubleBuffer.isRunning().compareAndSet(false, true);
     // To make sure that daemon thread is executed.
     Thread.sleep(1000L);
 
