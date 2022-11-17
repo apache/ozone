@@ -66,9 +66,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           String bucketName = keyInfo.getBucketName();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
-          omBucketInfo.incrUsedNamespace(-1L);
-          volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
-              omBucketInfo);
+          // bucketInfo can be null in case of delete volume or bucket
+          if (null != omBucketInfo) {
+            omBucketInfo.incrUsedNamespace(-1L);
+            volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
+                omBucketInfo);
+          }
         }
 
         for (OzoneManagerProtocolProtos.KeyInfo key :
@@ -78,10 +81,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           String bucketName = keyInfo.getBucketName();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
-          omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
-          omBucketInfo.incrUsedNamespace(-1L);
-          volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
-              omBucketInfo);
+          // bucketInfo can be null in case of delete volume or bucket
+          if (null != omBucketInfo) {
+            omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
+            omBucketInfo.incrUsedNamespace(-1L);
+            volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
+                omBucketInfo);
+          }
         }
       }
     } catch (IOException ex) {
