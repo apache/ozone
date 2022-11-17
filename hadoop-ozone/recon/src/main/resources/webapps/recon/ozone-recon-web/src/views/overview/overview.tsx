@@ -144,7 +144,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     const duLink = '/DiskUsage';
     const containersElement = missingContainersCount > 0 ? (
       <span>
-        <Tooltip placement='bottom' title={ missingContainersCount > 1000 ? `1000+ Containers are missing,  for more information go to Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
+        <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing, For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
           <Icon type='exclamation-circle' theme='filled' className='icon-failure icon-small'/>
         </Tooltip>
         <span className='padded-text'>{containers - missingContainersCount}/{containers}</span>
