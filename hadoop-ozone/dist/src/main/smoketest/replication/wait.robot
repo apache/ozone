@@ -17,7 +17,7 @@
 Documentation       Wait for replication to succeed
 Library             BuiltIn
 Resource            ../commonlib.robot
-Test Timeout        5 minutes
+Test Timeout        10 minutes
 
 *** Variables ***
 ${container}    1
