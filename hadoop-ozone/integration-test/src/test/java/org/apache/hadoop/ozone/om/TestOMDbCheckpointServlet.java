@@ -293,10 +293,12 @@ public class TestOMDbCheckpointServlet {
   @Test
   public void testWriteDbDataToStream()
       throws Exception {
-    prepArchiveData();
-    // Do include snapshot data
+    prepSnapshotData();
+    // set http param to include snapshot data
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
+
+    // get the tarball
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream);
@@ -310,19 +312,17 @@ public class TestOMDbCheckpointServlet {
     File newDbDir = new File(newDbDirName);
     newDbDir.mkdirs();
     FileUtil.unTar(tempFile, newDbDir);
+
     // Move snapshot dir to correct location
     new File(newDbDirName, OM_SNAPSHOT_DIR)
         .renameTo(new File(newDbDir.getParent().toString(), OM_SNAPSHOT_DIR));
 
 
-    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    int metaDirLength = metaDir.toString().length() + 1;
-    Path finalCheckpointLocation =
-        Paths.get(newDbDirName);
-
     // Confirm the checkpoint directories match, (after remove extras)
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     Set<String> initialCheckpointSet = getFiles(checkpointLocation,
         checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(newDbDirName);
     Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
         newDbDirLength);
 
@@ -331,6 +331,7 @@ public class TestOMDbCheckpointServlet {
     finalCheckpointSet.remove(OM_HARDLINK_FILE);
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
+    int metaDirLength = metaDir.toString().length() + 1;
     String shortSnapshotLocation =
         truncateFileName(metaDirLength, Paths.get(snapshotDirName));
     String shortSnapshotLocation2 =
@@ -340,34 +341,32 @@ public class TestOMDbCheckpointServlet {
     Path finalSnapshotLocation =
         Paths.get(testDirName, shortSnapshotLocation);
 
-    Assert.assertTrue("CURRENT file exists",
-        Paths.get(finalSnapshotLocation.toString(),
-        "CURRENT").toFile().exists());
-
-    Set<String> initialFullSet =
-        getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
     Set<String> finalFullSet =
         getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
-    Assert.assertTrue("snapshot manifest found",
-        finalFullSet.stream().anyMatch(s -> s.contains("MANIFEST")));
 
     // check each line in the hard link file
     Stream<String> lines = Files.lines(Paths.get(newDbDirName,
         OM_HARDLINK_FILE));
-    List<String> dummyLinkLines = new ArrayList<>();
+
+    List<String> fabricatedLinkLines = new ArrayList<>();
     for (String line: lines.collect(Collectors.toList())) {
       Assert.assertFalse("CURRENT file is not a hard link",
           line.contains("CURRENT"));
-      if (line.contains("dummyFile")) {
-        dummyLinkLines.add(line);
+      if (line.contains("fabricatedFile")) {
+        fabricatedLinkLines.add(line);
       } else {
         checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
+        // add links to the final set
         finalFullSet.add(line.split("\t")[0]);
       }
     }
+
     Set<String> directories = Sets.newHashSet(
         shortSnapshotLocation, shortSnapshotLocation2, shortCompactionDirLocation);
-    checkDummyFile(directories, dummyLinkLines, testDirName);
+    checkFabricatedLines(directories, fabricatedLinkLines, testDirName);
+
+    Set<String> initialFullSet =
+        getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
     Assert.assertEquals("found expected snapshot files",
         initialFullSet, finalFullSet);
   }
@@ -375,11 +374,13 @@ public class TestOMDbCheckpointServlet {
   @Test
   public void testWriteDbDataWithoutOmSnapshot()
       throws Exception {
-    prepArchiveData();
+    prepSnapshotData();
 
-    // Don't include snapshot data
+    // set http param to exclude snapshot data
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn(null);
+
+    // get the tarball
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream);
@@ -390,14 +391,11 @@ public class TestOMDbCheckpointServlet {
     int testDirLength = testDirName.length() + 1;
     FileUtil.unTar(tempFile, new File(testDirName));
 
-
+    // Confirm the checkpoint directories match
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    Path finalCheckpointLocation =
-        Paths.get(testDirName);
-
-    // Confirm the checkpoint directories match, (after remove extras)
     Set<String> initialCheckpointSet = getFiles(checkpointLocation,
         checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(testDirName);
     Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
         testDirLength);
 
@@ -406,103 +404,13 @@ public class TestOMDbCheckpointServlet {
 
 
 
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  private Set<String> getFiles(Path path, int truncateLength)
-      throws IOException {
-    Set<String> fileSet = new HashSet<>();
-    return getFiles(path, truncateLength, fileSet);
-  }
-
-  private Set<String> getFiles(Path path, int truncateLength, Set<String> fileSet)
-      throws IOException {
-    try (Stream<Path> files = Files.list(path)) {
-      for (Path file : files.collect(Collectors.toList())) {
-        if (file != null) {
-          if (file.toFile().isDirectory()) {
-            getFiles(file, truncateLength, fileSet);
-          }
-          if (!file.getFileName().toString().equals("dummyFile")) {
-            fileSet.add(truncateFileName(truncateLength, file));
-          }
-        }
-      }
-    }
-    return fileSet;
-  }
-
-  // tests to see that dummy entry in hardlink file looks something like:
-  //  "dir1/dummyFile  dir2/dummyFile"
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  private void checkDummyFile(Set<String> directories, List<String> lines,
-                              String testDirName) {
-    // find the real file
-    String realDir = null;
-    for (String dir: directories) {
-      if (Paths.get(testDirName, dir, "dummyFile").toFile().exists()) {
-        Assert.assertNull("Exactly one copy of the file existed in the tarball", realDir);
-        realDir = dir;
-      }
-    }
-
-    directories.remove(realDir);
-    Iterator<String> directoryIterator = directories.iterator();
-    String dir0 = directoryIterator.next();
-    String dir1 = directoryIterator.next();
-    Assert.assertNotEquals("link directories are different", dir0, dir1);
-
-    for (String line : lines) {
-      String[] files = line.split("\t");
-      Assert.assertTrue("dummy entry contains first directory",
-          files[0].startsWith(dir0) || files[0].startsWith(dir1));
-      Assert.assertTrue("dummy entry contains real dir",
-          files[1].startsWith(realDir));
-      Path path0 = Paths.get(files[0]);
-      Path path1 = Paths.get(files[1]);
-      Assert.assertTrue("dummy entries contains dummyFile name",
-          path0.getFileName().toString().equals("dummyFile") &&
-              path1.getFileName().toString().equals("dummyFile"));
-    }
-  }
-
-  // tests line in hard link file looks something like:
-  //  "dir1/x.sst x.sst"
-  private void checkLine(String shortSnapshotLocation,
-                            String shortSnapshotLocation2,
-                            String line) {
-    String[] files = line.split("\t");
-    Assert.assertTrue("hl entry starts with valid snapshot dir",
-        files[0].startsWith(shortSnapshotLocation) ||
-        files[0].startsWith(shortSnapshotLocation2));
-
-    String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
-    String file1 = files[1];
-    Assert.assertEquals("hl filenames are the same", file0, file1);
-  }
-
-  private String createSnapshot(String vname, String bname)
-      throws IOException, InterruptedException, TimeoutException {
-    final OzoneManager om = cluster.getOzoneManager();
-    String snapshotName = UUID.randomUUID().toString();
-    OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
-        .getClientProxy().getOzoneManagerClient();
-
-    writeClient.createSnapshot(vname, bname, snapshotName);
-    SnapshotInfo snapshotInfo = om
-        .getMetadataManager().getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
-    String snapshotPath = getSnapshotPath(conf, snapshotInfo)
-        + OM_KEY_PREFIX;
-    GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
-        100, 2000);
-    return snapshotPath;
-  }
-
-  private void prepArchiveData() throws Exception {
-
+  private void prepSnapshotData() throws Exception {
     setupCluster();
     metaDir = OMStorage.getOmDbDir(conf);
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+
+    // Create dummy keys for snapshotting
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
         "content");
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
@@ -517,18 +425,20 @@ public class TestOMDbCheckpointServlet {
         createSnapshot(bucket.getVolumeName(), bucket.getName());
 
 
-    // create dummy link from one snapshot dir to the other
+    // create fabricated links to snapshot dirs
     //  to confirm that links are recognized even if
-    //  they are not in the checkpoint directory
-    Path dummyFile = Paths.get(snapshotDirName, "dummyFile");
-    Path dummyLink = Paths.get(snapshotDirName2, "dummyFile");
+    //  they are don't point to the checkpoint directory
+    Path fabricatedFile = Paths.get(snapshotDirName, "fabricatedFile");
+    Path fabricatedLink = Paths.get(snapshotDirName2, "fabricatedFile");
 
+    Files.write(fabricatedFile, "fabricatedData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(fabricatedLink, fabricatedFile);
+
+    // simulate links from the compaction dir
     compactionDirPath = Paths.get(metaDir.toString(),
                                    OM_SNAPSHOT_DIFF_DIR, OM_COMPACTION_BACKUP_DIR);
-    Path dummyLink2 = Paths.get(compactionDirPath.toString(), "dummyFile");
-    Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
-    Files.createLink(dummyLink, dummyFile);
-    Files.createLink(dummyLink2, dummyFile);
+    Path fabricatedLink2 = Paths.get(compactionDirPath.toString(), "fabricatedFile");
+    Files.createLink(fabricatedLink2, fabricatedFile);
     Path currentFile = Paths.get(metaDir.toString(),
                                     OM_DB_NAME, "CURRENT");
     Path currentLink = Paths.get(compactionDirPath.toString(), "CURRENT");
@@ -538,6 +448,100 @@ public class TestOMDbCheckpointServlet {
         .getMetadataManager().getStore()
         .getCheckpoint(true);
 
+  }
+
+  private String createSnapshot(String vname, String bname)
+      throws IOException, InterruptedException, TimeoutException {
+    final OzoneManager om = cluster.getOzoneManager();
+    String snapshotName = UUID.randomUUID().toString();
+    OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
+
+    writeClient.createSnapshot(vname, bname, snapshotName);
+    SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
+    String snapshotPath = getSnapshotPath(conf, snapshotInfo)
+        + OM_KEY_PREFIX;
+    GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
+        100, 2000);
+    return snapshotPath;
+  }
+
+  private Set<String> getFiles(Path path, int truncateLength)
+      throws IOException {
+    return getFiles(path, truncateLength, new HashSet<>());
+  }
+
+  // Get all files below path, recursively, (skipping fabricated files)
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
+  private Set<String> getFiles(Path path, int truncateLength, Set<String> fileSet)
+      throws IOException {
+    try (Stream<Path> files = Files.list(path)) {
+      for (Path file : files.collect(Collectors.toList())) {
+        if (file.toFile().isDirectory()) {
+          getFiles(file, truncateLength, fileSet);
+        }
+        if (!file.getFileName().toString().equals("fabricatedFile")) {
+          fileSet.add(truncateFileName(truncateLength, file));
+        }
+      }
+    }
+    return fileSet;
+  }
+
+  // tests to see that fabricated link lines in hardlink file are properly formatted
+  //  "dir1/fabricatedFile  dir2/fabricatedFile"
+  //
+  //  The "fabricated" files/links are ones I've created by hand to fully test the
+  //  code, (as opposed to the "natural" files/links created by the
+  //  create snapshot process.)
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
+  private void checkFabricatedLines(Set<String> directories, List<String> lines,
+                              String testDirName) {
+    // find the real file
+    String realDir = null;
+    for (String dir: directories) {
+      if (Paths.get(testDirName, dir, "fabricatedFile").toFile().exists()) {
+        Assert.assertNull(
+            "Exactly one copy of the fabricated file exists in the tarball",
+            realDir);
+        realDir = dir;
+      }
+    }
+
+    directories.remove(realDir);
+    Iterator<String> directoryIterator = directories.iterator();
+    String dir0 = directoryIterator.next();
+    String dir1 = directoryIterator.next();
+    Assert.assertNotEquals("link directories are different", dir0, dir1);
+
+    for (String line : lines) {
+      String[] files = line.split("\t");
+      Assert.assertTrue("fabricated entry contains valid first directory",
+          files[0].startsWith(dir0) || files[0].startsWith(dir1));
+      Assert.assertTrue("fabricated entry contains correct real directory",
+          files[1].startsWith(realDir));
+      Path path0 = Paths.get(files[0]);
+      Path path1 = Paths.get(files[1]);
+      Assert.assertTrue("fabricated entries contains correct file name",
+          path0.getFileName().toString().equals("fabricatedFile") &&
+              path1.getFileName().toString().equals("fabricatedFile"));
+    }
+  }
+
+  // validates line in hard link file. should look something like:
+  //  "dir1/x.sst x.sst"
+  private void checkLine(String shortSnapshotLocation,
+                            String shortSnapshotLocation2,
+                            String line) {
+    String[] files = line.split("\t");
+    Assert.assertTrue("hl entry starts with valid snapshot dir",
+        files[0].startsWith(shortSnapshotLocation) ||
+        files[0].startsWith(shortSnapshotLocation2));
+
+    String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
+    String file1 = files[1];
+    Assert.assertEquals("hl filenames are the same", file0, file1);
   }
 
 }
