@@ -531,7 +531,7 @@ public class TestOMDbCheckpointServlet {
     Files.write(dummyFile, "dummyData".getBytes(StandardCharsets.UTF_8));
     Files.createLink(dummyLink, dummyFile);
     Files.createLink(dummyLink2, dummyFile);
-    Path currentFile = Paths.get(folder.newFolder().getAbsolutePath(),
+    Path currentFile = Paths.get(metaDir.toString(),
                                     OM_DB_NAME, "CURRENT");
     Path currentLink = Paths.get(compactionDirPath.toString(), "CURRENT");
     Files.createLink(currentLink, currentFile);
