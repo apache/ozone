@@ -67,6 +67,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private final NodeManager nodeManager;
   private final ReplicationManager replicationManager;
 
+  private static class CannotFindTargetsException extends IOException {
+    public CannotFindTargetsException(Throwable cause) {
+      super(cause);
+    }
+  }
+
   public ECUnderReplicationHandler(ECReplicationCheckHandler ecReplicationCheck,
       final PlacementPolicy containerPlacement, final ConfigurationSource conf,
       NodeManager nodeManager, ReplicationManager replicationManager) {
@@ -118,8 +124,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       final ContainerHealthResult result,
       final int remainingMaintenanceRedundancy) throws IOException {
     ContainerInfo container = result.getContainerInfo();
-    ECReplicationConfig repConfig =
-        (ECReplicationConfig) container.getReplicationConfig();
     final ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
@@ -183,14 +187,46 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                       HddsProtos.NodeOperationalState.IN_SERVICE)
               .collect(Collectors.toList());
 
-      processMissingIndexes(replicaCount, sources, availableSourceNodes,
-          excludedNodes, commands);
-
-      processDecommissioningIndexes(replicaCount, replicas,
-          availableSourceNodes, excludedNodes, commands);
-
-      processMaintenanceOnlyIndexes(replicaCount, replicas, excludedNodes,
-          commands);
+      try {
+        processMissingIndexes(replicaCount, sources, availableSourceNodes,
+            excludedNodes, commands);
+        processDecommissioningIndexes(replicaCount, replicas,
+            availableSourceNodes, excludedNodes, commands);
+        processMaintenanceOnlyIndexes(replicaCount, replicas, excludedNodes,
+            commands);
+        // TODO - we should be able to catch SCMException here and check the
+        //        result code but the RackAware topology never sets the code.
+      } catch (CannotFindTargetsException e) {
+        // If we get here, we tried to find nodes to fix the under replication
+        // issues, but were not able to find any at some stage, and the
+        // placement policy threw an exception.
+        // At this stage. If the cluster is small and there are some
+        // over replicated indexes, it could stop us finding a new node as there
+        // are no more nodes left to try.
+        // If the container is also over replicated, then hand it off to the
+        // over-rep handler, and after those over-rep indexes are cleared the
+        // under replication can be re-tried in the next iteration of RM.
+        // However we should only hand off to the over rep handler if there are
+        // no commands already created. If we have some commands, they may
+        // attempt to use sources the over-rep handler would remove. So we
+        // should let the commands we have created be processed, and then the
+        // container will be re-processed in a futher RM pass.
+        LOG.debug("Unable to located new target nodes for container {}",
+            container, e);
+        if (commands.size() > 0) {
+          LOG.debug("Some commands have already been created, so returning " +
+              "with them only");
+          return commands;
+        }
+        if (replicaCount.isOverReplicated()) {
+          LOG.debug("Container {} is both under and over replicated. Cannot " +
+              "find enough target nodes, so handing off to the " +
+              "OverReplication handler", container);
+          return replicationManager.processOverReplicatedContainer(result);
+        } else {
+          throw (SCMException)e.getCause();
+        }
+      }
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
               " container commands for {}.",
@@ -242,9 +278,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     // size may be changed smaller than origin, we should be defensive.
     final long dataSizeRequired =
         Math.max(container.getUsedBytes(), currentContainerSize);
-    return containerPlacement
-        .chooseDatanodes(excludedNodes, null, requiredNodes, 0,
-            dataSizeRequired);
+    try {
+      return containerPlacement
+          .chooseDatanodes(excludedNodes, null, requiredNodes, 0,
+              dataSizeRequired);
+    } catch (SCMException e) {
+      // SCMException can come from many places in SCM, so catch it here and
+      // throw a more specific exception instead.
+      throw new CannotFindTargetsException(e);
+    }
   }
 
   /**
@@ -272,6 +314,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
       if (validatePlacement(availableSourceNodes, selectedDatanodes)) {
         excludedNodes.addAll(selectedDatanodes);
+        // TODO - what are we adding all the selected nodes to available
+        //        sources?
         availableSourceNodes.addAll(selectedDatanodes);
         List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
             sourceDatanodesWithIndex = new ArrayList<>();

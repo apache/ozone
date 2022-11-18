@@ -265,17 +265,15 @@ public class TestECUnderReplicationHandler {
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 0, 0, sameNodePolicy);
 
-    // Now add a decommissioning index - we should get an exception as the
-    // placement policy should throw. It will have used up the node for
-    // reconstruction, and hence no nodes will be found to fix the decommission
-    // index.
+    // Now add a decommissioning index - we will not get a replicate command
+    // for it, as the placement policy will throw an exception we we catch
+    // and just return the reconstruction command.
     Set<ContainerReplica> replicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4));
-    assertThrows(SCMException.class, () ->
-        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
-            replicas, 1, 0, sameNodePolicy));
+    testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+        replicas, 0, 0, sameNodePolicy);
   }
 
   @Test
