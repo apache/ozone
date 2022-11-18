@@ -289,7 +289,7 @@ public final class OmSnapshotManager {
     }
   }
   /**
-   * Create file of links to add to tarball
+   * Create file of links to add to tarball.
    * Format of entries are either:
    * dir1/fileTo fileFrom
    *    for files in active db or:

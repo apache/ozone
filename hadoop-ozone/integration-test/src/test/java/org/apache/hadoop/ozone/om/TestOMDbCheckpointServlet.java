@@ -360,7 +360,8 @@ public class TestOMDbCheckpointServlet {
     }
 
     Set<String> directories = Sets.newHashSet(
-        shortSnapshotLocation, shortSnapshotLocation2, shortCompactionDirLocation);
+        shortSnapshotLocation, shortSnapshotLocation2,
+        shortCompactionDirLocation);
     checkFabricatedLines(directories, fabricatedLinkLines, testDirName);
 
     Set<String> initialFullSet =
@@ -429,13 +430,15 @@ public class TestOMDbCheckpointServlet {
     Path fabricatedFile = Paths.get(snapshotDirName, "fabricatedFile");
     Path fabricatedLink = Paths.get(snapshotDirName2, "fabricatedFile");
 
-    Files.write(fabricatedFile, "fabricatedData".getBytes(StandardCharsets.UTF_8));
+    Files.write(fabricatedFile,
+        "fabricatedData".getBytes(StandardCharsets.UTF_8));
     Files.createLink(fabricatedLink, fabricatedFile);
 
     // simulate links from the compaction dir
     compactionDirPath = Paths.get(metaDir.toString(),
-                                   OM_SNAPSHOT_DIFF_DIR, OM_COMPACTION_BACKUP_DIR);
-    Path fabricatedLink2 = Paths.get(compactionDirPath.toString(), "fabricatedFile");
+        OM_SNAPSHOT_DIFF_DIR, OM_COMPACTION_BACKUP_DIR);
+    Path fabricatedLink2 = Paths.get(compactionDirPath.toString(),
+        "fabricatedFile");
     Files.createLink(fabricatedLink2, fabricatedFile);
     Path currentFile = Paths.get(metaDir.toString(),
                                     OM_DB_NAME, "CURRENT");
@@ -472,8 +475,8 @@ public class TestOMDbCheckpointServlet {
 
   // Get all files below path, recursively, (skipping fabricated files)
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  private Set<String> getFiles(Path path, int truncateLength, Set<String> fileSet)
-      throws IOException {
+  private Set<String> getFiles(Path path, int truncateLength,
+      Set<String> fileSet) throws IOException {
     try (Stream<Path> files = Files.list(path)) {
       for (Path file : files.collect(Collectors.toList())) {
         if (file.toFile().isDirectory()) {
@@ -487,12 +490,12 @@ public class TestOMDbCheckpointServlet {
     return fileSet;
   }
 
-  // tests to see that fabricated link lines in hardlink file are properly formatted
-  //  "dir1/fabricatedFile  dir2/fabricatedFile"
+  // tests to see that fabricated link lines in hardlink file are
+  //  properly formatted "dir1/fabricatedFile dir2/fabricatedFile"
   //
-  //  The "fabricated" files/links are ones I've created by hand to fully test the
-  //  code, (as opposed to the "natural" files/links created by the
-  //  create snapshot process.)
+  //  The "fabricated" files/links are ones I've created by hand to
+  //  fully test the code, (as opposed to the "natural" files/links
+  //  created by the create snapshot process.)
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkFabricatedLines(Set<String> directories, List<String> lines,
                               String testDirName) {

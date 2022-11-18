@@ -211,7 +211,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       for (Path file : files.collect(Collectors.toList())) {
         if (file.toFile().isDirectory()) {
           processDir(file, copyFiles, hardLinkFiles);
-         } else {
+        } else {
           processFile(file, copyFiles, hardLinkFiles);
         }
       }
