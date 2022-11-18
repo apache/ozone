@@ -47,6 +47,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.metrics.ContainerReportMetrics;
+import org.apache.hadoop.hdds.scm.container.metrics.IncrementalContainerReportMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -65,6 +67,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
+import org.apache.hadoop.hdds.server.events.EventExecutorMetrics;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
@@ -867,14 +870,15 @@ public class TestStorageContainerManager {
         .initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
+    EventExecutorMetrics containerReportMetrics = new ContainerReportMetrics(
+        EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+            containerReportHandler));
     EventExecutor<ContainerReportFromDatanode>
         containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
-            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
-                containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, containerReportMetrics);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
@@ -909,15 +913,16 @@ public class TestStorageContainerManager {
         .initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
+    EventExecutorMetrics containerReportMetrics = new ContainerReportMetrics(
+        EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+            containerReportHandler));
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
         SCMDatanodeHeartbeatDispatcher.ContainerReport>
         containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
-            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
-                containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, containerReportMetrics);
     containerReportExecutors.setQueueWaitThreshold(1000);
     containerReportExecutors.setExecWaitThreshold(1000);
     
@@ -964,14 +969,15 @@ public class TestStorageContainerManager {
         .initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
+    EventExecutorMetrics icrMetrics = new IncrementalContainerReportMetrics(
+        EventQueue.getExecutorName(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
+            icr));
     EventExecutor<IncrementalContainerReportFromDatanode>
         containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
-            EventQueue.getExecutorName(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
-                icr),
             icr, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, icrMetrics);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
         containerReportExecutors, icr);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);

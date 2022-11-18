@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server.events;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,12 +82,13 @@ public class TestEventQueue {
     queues.add(eventQueue);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
+    String name = EventQueue.getExecutorName(EVENT1, testHandler);
+    EventExecutorMetrics metrics = new ReportMetrics(name);
     queue.addHandler(EVENT1,
         new FixedThreadPoolWithAffinityExecutor<>(
-            EventQueue.getExecutorName(EVENT1, testHandler),
             testHandler, queues, queue, Long.class,
             FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
-            queues), reportExecutorMap), testHandler);
+            queues), reportExecutorMap, metrics), testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
@@ -150,5 +152,99 @@ public class TestEventQueue {
     Assertions.assertEquals(23, result[0]);
     Assertions.assertEquals(23, result[1]);
 
+  }
+  
+  static class ReportMetrics implements EventExecutorMetrics {
+    private String name;
+    private long queued;
+    private long done;
+    private long failed;
+    private long scheduled;
+    private long dropped;
+    private long longWaitInQueue;
+    private long longTimeExecution;
+
+    ReportMetrics(String name) {
+      this.name = name;
+    }
+
+    @Override
+    public void stop() {
+    }
+
+    @Override
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public void incrFailedEvents(long delta) {
+      failed += delta;
+    }
+
+    @Override
+    public void incrSuccessfulEvents(long delta) {
+      done += delta;
+    }
+
+    @Override
+    public void incrQueuedEvents(long delta) {
+      queued += delta;
+    }
+
+    @Override
+    public void incrScheduledEvents(long delta) {
+      scheduled += delta;
+    }
+
+    @Override
+    public void incrDroppedEvents(long delta) {
+      dropped += delta;
+    }
+
+    @Override
+    public void incrLongWaitInQueueEvents(long delta) {
+      longWaitInQueue += delta;
+    }
+
+    @Override
+    public void incrLongTimeExecutionEvents(long delta) {
+      longTimeExecution += delta;
+    }
+
+    @Override
+    public long failedEvents() {
+      return failed;
+    }
+
+    @Override
+    public long successfulEvents() {
+      return done;
+    }
+
+    @Override
+    public long queuedEvents() {
+      return queued;
+    }
+
+    @Override
+    public long scheduledEvents() {
+      return scheduled;
+    }
+
+    @Override
+    public long droppedEvents() {
+      return dropped;
+    }
+
+    @Override
+    public long longWaitInQueueEvents() {
+      return longWaitInQueue;
+    }
+
+    @Override
+    public long longTimeExecutionEvents() {
+      return longTimeExecution;
+    }
   }
 }

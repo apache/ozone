@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.metrics.ContainerReportMetrics;
+import org.apache.hadoop.hdds.scm.container.metrics.IncrementalContainerReportMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
@@ -67,6 +69,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.server.events.EventExecutorMetrics;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -233,25 +236,26 @@ public class ReconStorageContainerManagerFacade
         = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
+    EventExecutorMetrics containerReportMetrics = new ContainerReportMetrics(
+        EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+            containerReportHandler));
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
         ContainerReport> containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
-            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
-                containerReportHandler),
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, containerReportMetrics);
     containerReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
     containerReportExecutors.setExecWaitThreshold(execWaitThreshold);
+    EventExecutorMetrics icrMetrics = new IncrementalContainerReportMetrics(
+        EventQueue.getExecutorName(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
+            icrHandler));
     FixedThreadPoolWithAffinityExecutor<IncrementalContainerReportFromDatanode,
         ContainerReport> incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
-            EventQueue.getExecutorName(
-                SCMEvents.INCREMENTAL_CONTAINER_REPORT,
-                icrHandler),
             icrHandler, queues, eventQueue,
             IncrementalContainerReportFromDatanode.class, executors,
-            reportExecutorMap);
+            reportExecutorMap, icrMetrics);
     incrementalReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
     incrementalReportExecutors.setExecWaitThreshold(execWaitThreshold);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
