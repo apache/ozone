@@ -126,6 +126,7 @@ enum Type {
   EchoRPC = 110;
 
   CreateSnapshot = 111;
+  ListSnapshot = 112;
 }
 
 message OMRequest {
@@ -234,6 +235,7 @@ message OMRequest {
   optional EchoRPCRequest                   EchoRPCRequest                 = 110;
 
   optional CreateSnapshotRequest            CreateSnapshotRequest          = 111;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 112;
 
 }
 
@@ -336,7 +338,7 @@ message OMResponse {
   optional EchoRPCResponse                   EchoRPCResponse               = 110;
 
   optional CreateSnapshotResponse            CreateSnapshotResponse        = 111;
-
+  optional ListSnapshotResponse              ListSnapshotResponse          = 112;
 }
 
 enum Status {
@@ -1643,6 +1645,11 @@ message CreateSnapshotRequest {
   optional string snapshotName = 3;
 }
 
+message ListSnapshotRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1682,6 +1689,10 @@ message SetRangerServiceVersionResponse {
 
 message CreateSnapshotResponse {
   required SnapshotInfo snapshotInfo = 1;
+}
+
+message ListSnapshotResponse {
+  repeated SnapshotInfo snapshotInfo = 1;
 }
 
 message DeleteTenantResponse {

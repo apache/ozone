@@ -22,12 +22,14 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
@@ -665,5 +667,42 @@ public class TestOmMetadataManager {
     Set<String> tablesInManager = omMetadataManager.listTableNames();
 
     Assert.assertEquals(tablesByDefinition, tablesInManager);
+  }
+
+  @Test
+  public void testListSnapshot() throws Exception {
+    String vol1 = "vol1";
+    String bucket1 = "bucket1";
+
+    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
+    addBucketsToCache(vol1, bucket1);
+    String snapshotName = "snapshot";
+
+    for (int i = 1; i <= 10; i++) {
+      if (i % 2 == 0) {
+        OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
+            snapshotName + i, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
+            snapshotName + i, omMetadataManager);
+      }
+    }
+
+    //Test listing snapshots with no volume name.
+    Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
+        null, null));
+
+    //Test listing snapshots with no bucket name.
+    Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
+        vol1, null));
+
+    //Test listing all snapshots.
+    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
+        bucket1);
+    Assert.assertEquals(10, snapshotInfos.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      Assert.assertTrue(snapshotInfo.getName().startsWith(snapshotName));
+    }
+
   }
 }
