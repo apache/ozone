@@ -22,7 +22,7 @@ package org.apache.hadoop.hdds.server.events;
  */
 public interface EventExecutorMetrics {
   /**
-   * get name
+   * get name.
    */
   String getName();
   

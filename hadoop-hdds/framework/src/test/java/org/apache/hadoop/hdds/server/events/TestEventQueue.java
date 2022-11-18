@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.server.events;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
