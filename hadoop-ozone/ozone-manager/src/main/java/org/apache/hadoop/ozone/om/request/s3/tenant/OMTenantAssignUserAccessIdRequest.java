@@ -261,7 +261,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           if (accessIdInfo == null) {
             LOG.error("Metadata error: accessIdInfo is null for accessId '{}'. "
                 + "Ignoring.", existingAccId);
-            throw new NullPointerException("accessIdInfo is null");
+            throw new OMException("accessIdInfo is null",
+                ResultCodes.INVALID_ACCESS_ID);
           }
           if (tenantId.equals(accessIdInfo.getTenantId())) {
             throw new OMException("The same user is not allowed to be assigned "
