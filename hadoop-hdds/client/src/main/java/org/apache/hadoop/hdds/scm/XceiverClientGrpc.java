@@ -185,6 +185,15 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
       LOG.debug("Connecting to server : {}", dn.getIpAddress());
     }
+    ManagedChannel channel = createChannel(dn, port);
+    XceiverClientProtocolServiceStub asyncStub =
+        XceiverClientProtocolServiceGrpc.newStub(channel);
+    asyncStubs.put(dn.getUuid(), asyncStub);
+    channels.put(dn.getUuid(), channel);
+  }
+
+  protected ManagedChannel createChannel(DatanodeDetails dn, int port)
+      throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
@@ -202,11 +211,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } else {
       channelBuilder.usePlaintext();
     }
-    ManagedChannel channel = channelBuilder.build();
-    XceiverClientProtocolServiceStub asyncStub =
-        XceiverClientProtocolServiceGrpc.newStub(channel);
-    asyncStubs.put(dn.getUuid(), asyncStub);
-    channels.put(dn.getUuid(), channel);
+    return channelBuilder.build();
   }
 
   /**
@@ -603,6 +608,18 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public HddsProtos.ReplicationType getPipelineType() {
     return HddsProtos.ReplicationType.STAND_ALONE;
+  }
+
+  public SecurityConfig getSecConfig() {
+    return secConfig;
+  }
+
+  public List<X509Certificate> getCaCerts() {
+    return caCerts;
+  }
+
+  public ConfigurationSource getConfig() {
+    return config;
   }
 
   @VisibleForTesting
