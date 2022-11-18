@@ -986,7 +986,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup),
-        getBucketLayout());
+        getBucketLayout(), FILE7_SIZE_WITH_REPLICA);
   }
 
   private OmKeyLocationInfoGroup getLocationInfoGroup1() {
@@ -1079,7 +1079,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-          getBucketLayout());
+          getBucketLayout(), FILE1_SIZE_WITH_REPLICA);
 
     //vol/bucket1/dir1/dir2/file2
     writeKeyToOm(reconOMMetadataManager,
@@ -1092,7 +1092,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-          getBucketLayout());
+          getBucketLayout(), FILE2_SIZE_WITH_REPLICA);
 
     //vol/bucket1/dir1/dir3/file3
     writeKeyToOm(reconOMMetadataManager,
@@ -1105,7 +1105,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-          getBucketLayout());
+          getBucketLayout(), FILE3_SIZE_WITH_REPLICA);
 
     //vol/bucket2/file4
     writeKeyToOm(reconOMMetadataManager,
@@ -1118,7 +1118,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(), FILE4_SIZE_WITH_REPLICA);
 
     //vol/bucket2/file5
     writeKeyToOm(reconOMMetadataManager,
@@ -1131,7 +1131,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(), FILE5_SIZE_WITH_REPLICA);
 
     //vol/bucket1/dir1/dir4/file6
     writeKeyToOm(reconOMMetadataManager,
@@ -1144,7 +1144,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(), FILE6_SIZE_WITH_REPLICA);
 
     //vol/bucket1/dir1/file7
     writeKeyToOm(reconOMMetadataManager,
@@ -1157,7 +1157,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(), FILE7_SIZE_WITH_REPLICA);
 
     //vol2/bucket3/file8
     writeKeyToOm(reconOMMetadataManager,
@@ -1170,7 +1170,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(), FILE8_SIZE_WITH_REPLICA);
 
     //vol2/bucket3/dir5/file9
     writeKeyToOm(reconOMMetadataManager,
@@ -1183,7 +1183,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(), FILE9_SIZE_WITH_REPLICA);
 
     //vol2/bucket3/dir5/file10
     writeKeyToOm(reconOMMetadataManager,
@@ -1196,7 +1196,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(), FILE10_SIZE_WITH_REPLICA);
 
     //vol2/bucket4/file11
     writeKeyToOm(reconOMMetadataManager,
@@ -1209,7 +1209,7 @@ public class TestNSSummaryEndpointWithLegacy {
         BUCKET_FOUR_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(), FILE11_SIZE_WITH_REPLICA);
   }
 
   /**
