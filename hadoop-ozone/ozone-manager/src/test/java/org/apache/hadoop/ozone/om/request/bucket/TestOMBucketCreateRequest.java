@@ -140,6 +140,52 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
   }
 
+  @Test
+  public void testValidateAndUpdateCacheCrossSpaceQuota() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    // create a volume with less quota
+    OmVolumeArgs omVolumeArgs =
+        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+            .setQuotaInBytes(100)
+            .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
+            .setOwnerName(UUID.randomUUID().toString()).build();
+    OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+    
+    // create a bucket require higher bucket quota
+    OzoneManagerProtocolProtos.BucketInfo bucketInfo =
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setIsVersionEnabled(false)
+            .setQuotaInBytes(99999L)
+            .setStorageType(StorageTypeProto.SSD)
+            .addAllMetadata(OMRequestTestUtils.getMetadataList()).build();
+    OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
+        OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
+    req.setBucketInfo(bucketInfo);
+    OMRequest originalRequest = OzoneManagerProtocolProtos.OMRequest
+        .newBuilder()
+        .setCreateBucketRequest(req)
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
+        .setClientId(UUID.randomUUID().toString()).build();
+
+    OMBucketCreateRequest omBucketCreateRequest =
+        new OMBucketCreateRequest(originalRequest);
+
+    OMRequest modifiedRequest = omBucketCreateRequest.preExecute(ozoneManager);
+    verifyRequest(modifiedRequest, originalRequest);
+
+    OMBucketCreateRequest testRequest =
+        new OMBucketCreateRequest(modifiedRequest);
+    OMClientResponse resp = testRequest.validateAndUpdateCache(
+        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(resp.getOMResponse().getStatus().toString(),
+        OMException.ResultCodes.QUOTA_EXCEEDED.toString());
+  }
+
   private OMBucketCreateRequest doPreExecute(String volumeName,
       String bucketName) throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
