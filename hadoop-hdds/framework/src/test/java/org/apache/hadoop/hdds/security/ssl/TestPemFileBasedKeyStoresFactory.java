@@ -60,15 +60,15 @@ public class TestPemFileBasedKeyStoresFactory {
   private OzoneConfiguration conf;
   private CertificateClientTest caClient;
   private SecurityConfig secConf;
-  private final int reloadInterval = 2000;
+  private static final int RELOAD_INTERVAL = 2000;
 
   @Before
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
-        reloadInterval);
+        RELOAD_INTERVAL);
     conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
-        reloadInterval);
+        RELOAD_INTERVAL);
     caClient = new CertificateClientTest(conf);
     secConf = new SecurityConfig(conf);
   }
@@ -140,7 +140,7 @@ public class TestPemFileBasedKeyStoresFactory {
 
       // Renew certificate
       caClient.renewKey();
-      Thread.sleep(reloadInterval);
+      Thread.sleep(RELOAD_INTERVAL);
 
       // send command again
       responseProto = sendRequest(asyncStub);
