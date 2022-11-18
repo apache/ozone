@@ -35,7 +35,6 @@ import org.rocksdb.SstFileReader;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -141,17 +140,16 @@ public class RocksDBCheckpointDiffer {
    * Constructor.
    * Note that previous compaction logs are loaded by RDBStore after this
    * object's initialization by calling loadAllCompactionLogs().
-   * @param metadataDir Ozone metadata directory.
+   * @param snapshotDiffDir parent directory for diff state
    * @param sstBackupDir Name of the SST backup dir under metadata dir.
    * @param compactionLogDirName Name of the compaction log dir.
    */
-  public RocksDBCheckpointDiffer(String metadataDir, String sstBackupDir,
+  public RocksDBCheckpointDiffer(String snapshotDiffDir, String sstBackupDir,
       String compactionLogDirName, File activeDBLocation) {
 
-    setCompactionLogDir(metadataDir, compactionLogDirName);
+    setCompactionLogDir(snapshotDiffDir, compactionLogDirName);
 
-    this.sstBackupDir = Paths.get(metadataDir,
-        OzoneConsts.OM_SNAPSHOT_DIFF_DIR, sstBackupDir) + "/";
+    this.sstBackupDir = Paths.get(snapshotDiffDir, sstBackupDir) + "/";
 
     // Create the directory if SST backup path does not already exist
     File dir = new File(this.sstBackupDir);
@@ -166,11 +164,10 @@ public class RocksDBCheckpointDiffer {
     this.activeDBLocationStr = activeDBLocation.toString() + "/";
   }
 
-  private void setCompactionLogDir(String metadataDir,
+  private void setCompactionLogDir(String snapshotDiffDir,
       String compactionLogDirName) {
 
-    final File parentDir = new File(metadataDir,
-        OzoneConsts.OM_SNAPSHOT_DIFF_DIR);
+    final File parentDir = new File(snapshotDiffDir);
     if (!parentDir.exists()) {
       if (!parentDir.mkdirs()) {
         LOG.error("Error creating compaction log parent dir.");

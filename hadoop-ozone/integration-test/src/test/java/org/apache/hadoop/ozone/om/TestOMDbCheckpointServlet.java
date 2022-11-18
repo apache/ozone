@@ -338,8 +338,6 @@ public class TestOMDbCheckpointServlet {
         truncateFileName(metaDirLength, Paths.get(snapshotDirName2));
     String shortCompactionDirLocation =
         truncateFileName(metaDirLength, compactionDirPath);
-    Path finalSnapshotLocation =
-        Paths.get(testDirName, shortSnapshotLocation);
 
     Set<String> finalFullSet =
         getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);

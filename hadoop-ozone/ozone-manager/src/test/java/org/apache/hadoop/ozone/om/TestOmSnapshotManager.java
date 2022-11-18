@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -127,6 +128,7 @@ public class TestOmSnapshotManager {
   }
 
   @Test
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH"})
   public void testHardLinkCreation() throws IOException {
     byte[] dummyData = {0};
 
@@ -172,7 +174,8 @@ public class TestOmSnapshotManager {
       Path value = entry.getValue();
       // convert checkpoint path to om.db
       if (value.toString().contains(OM_CHECKPOINT_DIR)) {
-        value = Paths.get(dbDir.toString(), value.getFileName().toString());
+        value = Paths.get(dbDir.toString(),
+                          value.getFileName().toString());
       }
       Assert.assertEquals("link matches original file",
           getINode(entry.getKey()), getINode(value));

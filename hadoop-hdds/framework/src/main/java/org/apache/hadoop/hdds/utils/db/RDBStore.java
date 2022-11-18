@@ -49,7 +49,9 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 
 /**
  * RocksDB Store that supports creating Tables in DB.
@@ -92,8 +94,8 @@ public class RDBStore implements DBStore {
     try {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), OM_COMPACTION_BACKUP_DIR,
-            OM_COMPACTION_LOG_DIR, dbLocation);
+            dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
+            OM_COMPACTION_BACKUP_DIR, OM_COMPACTION_LOG_DIR, dbLocation);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
