@@ -315,7 +315,7 @@ public class TestOMDbCheckpointServlet {
 
     // Move snapshot dir to correct location
     new File(newDbDirName, OM_SNAPSHOT_DIR)
-        .renameTo(new File(newDbDir.getParent().toString(), OM_SNAPSHOT_DIR));
+        .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR));
 
 
     // Confirm the checkpoint directories match, (after remove extras)
@@ -507,6 +507,7 @@ public class TestOMDbCheckpointServlet {
       }
     }
 
+    Assert.assertNotNull("real directory found", realDir);
     directories.remove(realDir);
     Iterator<String> directoryIterator = directories.iterator();
     String dir0 = directoryIterator.next();

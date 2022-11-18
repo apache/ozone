@@ -235,7 +235,7 @@ public class TestOMRatisSnapshots {
         volumeName, bucketName, newKeys.get(0))));
      */
 
-    // read back data from the snapshot
+    // read back data from the OM snapshot
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
             .setBucketName(bucketName)

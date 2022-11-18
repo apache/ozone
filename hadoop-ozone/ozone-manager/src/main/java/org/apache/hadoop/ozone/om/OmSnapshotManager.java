@@ -50,7 +50,6 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -180,9 +179,8 @@ public final class OmSnapshotManager {
 
   @VisibleForTesting
   static Object getINode(Path file) throws IOException {
-    Object key = Files.readAttributes(
+    return Files.readAttributes(
         file, BasicFileAttributes.class).fileKey();
-    return key;
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
@@ -347,7 +345,7 @@ public final class OmSnapshotManager {
       }
       if (!hardLinkFile.delete()) {
         throw new IOException(
-            "Failed to delete: " + hardLinkFile.toString());
+            "Failed to delete: " + hardLinkFile);
       }
     }
   }

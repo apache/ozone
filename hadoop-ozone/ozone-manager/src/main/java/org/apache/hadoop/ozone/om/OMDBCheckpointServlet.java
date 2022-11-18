@@ -206,7 +206,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   private void processDir(Path dir, Map<Object, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles)
-      throws IOException, InterruptedException {
+      throws IOException {
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
         if (file.toFile().isDirectory()) {

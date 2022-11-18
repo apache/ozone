@@ -137,14 +137,14 @@ public class TestOmSnapshotManager {
     File snapDir1 = new File(testDir.toString(),
         OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
     if (!snapDir1.mkdirs()) {
-      throw new IOException("failed to make directory: " + snapDir1.toString());
+      throw new IOException("failed to make directory: " + snapDir1);
     }
     Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
 
     File snapDir2 = new File(testDir.toString(),
         OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir2");
     if (!snapDir2.mkdirs()) {
-      throw new IOException("failed to make directory: " + snapDir2.toString());
+      throw new IOException("failed to make directory: " + snapDir2);
     }
 
     File dbDir = new File(testDir.toString(), OM_DB_NAME);
