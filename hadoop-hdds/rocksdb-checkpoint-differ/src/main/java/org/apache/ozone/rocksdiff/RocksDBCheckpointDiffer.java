@@ -223,8 +223,7 @@ public class RocksDBCheckpointDiffer {
       LOG.warn("Compaction log exists: {}. Will append", newCompactionLog);
     }
 
-    this.currentCompactionLogPath =
-        compactionLogDir + latestSequenceIdStr + COMPACTION_LOG_FILENAME_SUFFIX;
+    this.currentCompactionLogPath = newCompactionLog;
 
     // Create empty file if it doesn't exist
     appendToCurrentCompactionLog("");
