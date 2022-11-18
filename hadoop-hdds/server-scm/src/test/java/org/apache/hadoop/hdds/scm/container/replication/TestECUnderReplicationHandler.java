@@ -71,6 +71,7 @@ public class TestECUnderReplicationHandler {
   private ECReplicationConfig repConfig;
   private ContainerInfo container;
   private NodeManager nodeManager;
+  private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private static final int DATA = 3;
@@ -87,6 +88,7 @@ public class TestECUnderReplicationHandler {
             dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
       }
     };
+    replicationManager = Mockito.mock(ReplicationManager.class);
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(DATA, PARITY);
     container = ReplicationTestUtil
@@ -304,7 +306,7 @@ public class TestECUnderReplicationHandler {
       PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(replicationCheck,
-            placementPolicy, conf, nodeManager);
+            placementPolicy, conf, nodeManager, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
