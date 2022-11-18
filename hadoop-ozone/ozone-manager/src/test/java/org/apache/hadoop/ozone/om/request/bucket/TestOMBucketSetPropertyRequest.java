@@ -269,7 +269,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
     Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
-        contains("Can not update bucket spaceQuota less than used spaceQuota"));
+        contains("Cannot update bucket quota. Requested spaceQuota less than " +
+            "used spaceQuota"));
   }
 
   @Test
@@ -301,7 +302,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
     Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
-        contains("Can not update bucket namespaceQuota less " +
+        contains("Cannot update bucket quota. NamespaceQuota requested is less " +
             "than used namespaceQuota"));
   }
 }
