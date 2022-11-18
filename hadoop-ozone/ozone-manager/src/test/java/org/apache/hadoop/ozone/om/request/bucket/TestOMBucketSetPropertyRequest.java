@@ -302,7 +302,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
     Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
-        contains("Cannot update bucket quota. NamespaceQuota requested is less " +
-            "than used namespaceQuota"));
+        contains("Cannot update bucket quota. NamespaceQuota requested " +
+            "is less than used namespaceQuota"));
   }
 }
