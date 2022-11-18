@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -36,6 +38,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import java.util.List;
+
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles purging of keys from OM DB.
@@ -55,22 +59,28 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
+    Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     try {
-      OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
+          Pair<String, String> volBucketPair = Pair.of(volumeName, bucketName);
+          if (!lockSet.contains(volBucketPair)) {
+            omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+                volumeName, bucketName);
+            lockSet.add(volBucketPair);
+          }
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
           if (null != omBucketInfo) {
             omBucketInfo.incrUsedNamespace(-1L);
-            volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
-                omBucketInfo);
+            volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
 
@@ -79,14 +89,19 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
+          Pair<String, String> volBucketPair = Pair.of(volumeName, bucketName);
+          if (!lockSet.contains(volBucketPair)) {
+            omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+                volumeName, bucketName);
+            lockSet.add(volBucketPair);
+          }
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
           if (null != omBucketInfo) {
             omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
             omBucketInfo.incrUsedNamespace(-1L);
-            volBucketInfoMap.putIfAbsent(Pair.of(volumeName, bucketName),
-                omBucketInfo);
+            volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
       }
@@ -95,6 +110,14 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
       throw new IllegalStateException(ex);
+    } finally {
+      lockSet.stream().forEach(e -> omMetadataManager.getLock()
+          .releaseWriteLock(BUCKET_LOCK, e.getKey(),
+              e.getValue()));
+      for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
+          volBucketInfoMap.entrySet()) {
+        entry.setValue(entry.getValue().copyObject());
+      }
     }
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
