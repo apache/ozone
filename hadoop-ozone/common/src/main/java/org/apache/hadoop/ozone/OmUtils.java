@@ -272,6 +272,7 @@ public final class OmUtils {
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
+    case ListSnapshot:
     case EchoRPC:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
