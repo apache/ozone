@@ -55,6 +55,7 @@ interface IOverviewState {
   lastRefreshed: number;
   lastUpdatedOMDBDelta: number;
   lastUpdatedOMDBFull: number;
+  omStatus: string;
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -79,7 +80,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       missingContainersCount: 0,
       lastRefreshed: 0,
       lastUpdatedOMDBDelta: 0,
-      lastUpdatedOMDBFull: 0
+      lastUpdatedOMDBFull: 0,
+      omStatus: '',
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -121,6 +123,26 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     });
   };
 
+
+  omSyncData = () => {
+    this.setState({
+      loading: true
+    });
+
+    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {    
+      const omStatus = omstatusResponse.data;
+      this.setState({
+        loading: false,
+        omStatus: omStatus
+      });
+    }).catch(error => {
+      this.setState({
+        loading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
   componentDidMount(): void {
     this._loadData();
     this.autoReload.startPolling();
@@ -132,7 +154,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull} = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus} = this.state;
       
     const datanodesElement = (
       <span>
@@ -158,7 +180,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           Overview
           <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
-          togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData} omSyncLoad={this.omSyncData} omStatus={omStatus}/>
         </div>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
