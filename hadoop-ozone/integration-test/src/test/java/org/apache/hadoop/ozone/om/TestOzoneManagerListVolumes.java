@@ -166,26 +166,50 @@ public class TestOzoneManagerListVolumes {
     Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
+  private void checkUser(UserGroupInformation user,
+                         List<String> expectVol, boolean expectListAllSuccess)
+          throws IOException {
+    checkUser(user, expectVol, expectListAllSuccess, true);
+  }
+
   /**
    * Helper function to reduce code redundancy for test checks with each user
    * under different config combination.
    */
   private void checkUser(UserGroupInformation user,
-      List<String> expectVol, boolean expectListAllSuccess) throws IOException {
+      List<String> expectVol, boolean expectListAllSuccess,
+                         boolean expectListByUserSuccess) throws IOException {
 
     OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.
-    Iterator<? extends OzoneVolume> it = objectStore.listVolumesByUser(
-        user.getUserName(), "", "");
-    Set<String> accessibleVolumes = new HashSet<>();
-    while (it.hasNext()) {
-      OzoneVolume vol = it.next();
-      String volumeName = vol.getName();
-      accessibleVolumes.add(volumeName);
+    Iterator<? extends OzoneVolume> it;
+    try {
+      it = objectStore.listVolumesByUser(
+              user.getUserName(), "", "");
+      Set<String> accessibleVolumes = new HashSet<>();
+      while (it.hasNext()) {
+        OzoneVolume vol = it.next();
+        String volumeName = vol.getName();
+        accessibleVolumes.add(volumeName);
+      }
+      Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+    } catch (RuntimeException ex) {
+      if (expectListByUserSuccess) {
+        throw ex;
+      }
+      if (ex.getCause() instanceof OMException) {
+        // Expect PERMISSION_DENIED
+        if (((OMException) ex.getCause()).getResult() !=
+                OMException.ResultCodes.PERMISSION_DENIED) {
+          throw ex;
+        }
+      } else {
+        throw ex;
+      }
     }
-    Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+
 
     // `ozone sh volume list --all` returns all volumes,
     //  or throws exception (for non-admin if acl enabled & listall disallowed).
@@ -229,7 +253,7 @@ public class TestOzoneManagerListVolumes {
     // Login as user1, list other users' volumes
     UserGroupInformation.setLoginUser(user1);
     checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
-        "volume5"), true);
+        "volume5"), true, false);
 
     // Add "s3v" created default by OM.
     checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
@@ -255,10 +279,10 @@ public class TestOzoneManagerListVolumes {
     // Login as user1, list other users' volumes, expect failure
     UserGroupInformation.setLoginUser(user1);
     checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
-        "volume5"), false);
+        "volume5"), false, false);
     // Add "s3v" created default by OM.
     checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5", "s3v"), false);
+        "volume4", "volume5", "s3v"), false, false);
 
     // While admin should be able to list volumes just fine.
     UserGroupInformation.setLoginUser(adminUser);
