@@ -3599,6 +3599,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
         lastAppliedIndex + "_" + System.currentTimeMillis();
     File dbDir = oldDB.getParentFile();
+
+    // Backup the active fs and snapshot dirs
     File dbBackupDir = new File(dbDir, dbBackupName);
     if (!dbBackupDir.mkdirs()) {
       throw new IOException("Failed to make db backup dir: " +
