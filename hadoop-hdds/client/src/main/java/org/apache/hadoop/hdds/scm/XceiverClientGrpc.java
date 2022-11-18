@@ -185,14 +185,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
       LOG.debug("Connecting to server : {}", dn.getIpAddress());
     }
-    ManagedChannel channel = createChannel(dn, port);
+    ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub asyncStub =
         XceiverClientProtocolServiceGrpc.newStub(channel);
     asyncStubs.put(dn.getUuid(), asyncStub);
     channels.put(dn.getUuid(), channel);
   }
 
-  protected ManagedChannel createChannel(DatanodeDetails dn, int port)
+  protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
       throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
@@ -211,7 +211,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } else {
       channelBuilder.usePlaintext();
     }
-    return channelBuilder.build();
+    return channelBuilder;
   }
 
   /**
@@ -608,14 +608,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public HddsProtos.ReplicationType getPipelineType() {
     return HddsProtos.ReplicationType.STAND_ALONE;
-  }
-
-  public SecurityConfig getSecConfig() {
-    return secConfig;
-  }
-
-  public List<X509Certificate> getCaCerts() {
-    return caCerts;
   }
 
   public ConfigurationSource getConfig() {

@@ -22,13 +22,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
-import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
-import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
@@ -38,10 +33,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_ENABLE_RETRIES;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_ENABLE_RETRIES_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_MAX_RETRIES;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_MAX_RETRIES_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_RETRIES_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT;
 
 /**
  * {@link XceiverClientSpi} implementation to work specifically with EC
@@ -60,8 +55,8 @@ public class ECXceiverClientGrpc extends XceiverClientGrpc {
       ConfigurationSource config,
       List<X509Certificate> caCerts) {
     super(pipeline, config, caCerts);
-    this.enableRetries = config.getBoolean(OZONE_CLIENT_EC_ENABLE_RETRIES,
-        OZONE_CLIENT_EC_ENABLE_RETRIES_DEFAULT);
+    this.enableRetries = config.getBoolean(OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED,
+        OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT);
   }
 
   /**
@@ -81,38 +76,22 @@ public class ECXceiverClientGrpc extends XceiverClientGrpc {
   }
 
   @Override
-  protected ManagedChannel createChannel(DatanodeDetails dn, int port)
+  protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
       throws IOException {
-    NettyChannelBuilder channelBuilder =
-        NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-            .intercept(new GrpcClientInterceptor());
-    if (getSecConfig().isGrpcTlsEnabled()) {
-      SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-      if (getCaCerts() != null) {
-        sslContextBuilder.trustManager(getCaCerts());
-      }
-      if (getSecConfig().useTestCert()) {
-        channelBuilder.overrideAuthority("localhost");
-      }
-      channelBuilder.useTransportSecurity().
-          sslContext(sslContextBuilder.build());
-    } else {
-      channelBuilder.usePlaintext();
-    }
+    NettyChannelBuilder channelBuilder = super.createChannel(dn, port);
     if (enableRetries) {
-      double maxAttempts = getConfig().getInt(OZONE_CLIENT_EC_GRPC_MAX_RETRIES,
-          OZONE_CLIENT_EC_GRPC_MAX_RETRIES_DEFAULT);
+      double maxAttempts = getConfig().getInt(OZONE_CLIENT_EC_GRPC_RETRIES_MAX,
+          OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT);
 
       channelBuilder.defaultServiceConfig(createRetryServiceConfig(maxAttempts))
           .maxRetryAttempts((int) maxAttempts).enableRetry();
     }
-    return channelBuilder.build();
+    return channelBuilder;
   }
 
   private Map<String, Object> createRetryServiceConfig(double maxAttempts) {
     Map<String, Object> retryPolicy = new HashMap<>();
-    // Maximum number of RPC attempts which including the original RPC.
+    // Maximum number of RPC attempts which includes the original RPC.
     retryPolicy.put("maxAttempts", maxAttempts);
     // The initial retry attempt will occur at random(0, initialBackoff)
     retryPolicy.put("initialBackoff", "0.5s");

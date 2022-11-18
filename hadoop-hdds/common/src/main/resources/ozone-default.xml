@@ -3276,7 +3276,7 @@
   </property>
 
   <property>
-    <name>ozone.client.ec.enable.retries</name>
+    <name>ozone.client.ec.grpc.retries.enabled</name>
     <value>true</value>
     <tag>CLIENT</tag>
     <description>
@@ -3285,7 +3285,7 @@
   </property>
 
   <property>
-    <name>ozone.client.ec.grpc.max.retries</name>
+    <name>ozone.client.ec.grpc.retries.max</name>
     <value>5</value>
     <tag>CLIENT</tag>
     <description>
