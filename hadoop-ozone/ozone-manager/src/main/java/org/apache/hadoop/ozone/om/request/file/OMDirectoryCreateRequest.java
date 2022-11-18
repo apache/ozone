@@ -221,7 +221,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omBucketInfo.incrUsedNamespace(numMissingParents + 1L);
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, omBucketInfo,
+            dirKeyInfo, missingParentInfos, omBucketInfo.copyObject(),
             result, getBucketLayout());
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
