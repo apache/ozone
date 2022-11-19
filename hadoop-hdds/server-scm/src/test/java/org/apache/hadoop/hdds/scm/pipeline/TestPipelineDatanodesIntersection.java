@@ -18,24 +18,38 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
@@ -43,47 +57,61 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_C
 /**
  * Test for pipeline datanodes intersection.
  */
-@RunWith(Parameterized.class)
 public class TestPipelineDatanodesIntersection {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestPipelineDatanodesIntersection.class.getName());
 
-  private int nodeCount;
-  private int nodeHeaviness;
   private OzoneConfiguration conf;
   private boolean end;
+  private File testDir;
+  private DBStore dbStore;
 
-  @Before
-  public void initialize() {
-    conf = new OzoneConfiguration();
+  @BeforeEach
+  public void initialize() throws IOException {
+    conf = SCMTestUtils.getConf();
     end = false;
+    testDir = GenericTestUtils.getTestDir(
+        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    dbStore = DBStoreBuilder.createDBStore(
+        conf, new SCMDBDefinition());
   }
 
-  public TestPipelineDatanodesIntersection(int nodeCount, int nodeHeaviness) {
-    this.nodeCount = nodeCount;
-    this.nodeHeaviness = nodeHeaviness;
+  @AfterEach
+  public void cleanup() throws Exception {
+    if (dbStore != null) {
+      dbStore.close();
+    }
+
+    FileUtil.fullyDelete(testDir);
   }
 
-  @Parameterized.Parameters
-  public static Collection inputParams() {
-    return Arrays.asList(new Object[][] {
-        {4, 5},
-        {10, 5},
-        {20, 5},
-        {50, 5},
-        {100, 5},
-        {100, 10}
-    });
-  }
-
-  @Test
-  public void testPipelineDatanodesIntersection() {
-    NodeManager nodeManager= new MockNodeManager(true, nodeCount);
+  @ParameterizedTest
+  @CsvSource({
+      "4, 5",
+      "10, 5",
+      "20, 5",
+      "50, 5",
+      "100, 5",
+      "100, 10"
+  })
+  public void testPipelineDatanodesIntersection(int nodeCount,
+      int nodeHeaviness) throws IOException {
+    NodeManager nodeManager = new MockNodeManager(true, nodeCount);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    PipelineStateManager stateManager = new PipelineStateManager();
-    PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,
-        stateManager, conf);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+
+    PipelineStateManager stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+
+    PipelineProvider<RatisReplicationConfig> provider =
+        new MockRatisPipelineProvider(nodeManager, stateManager, conf);
 
     int healthyNodeCount = nodeManager
         .getNodeCount(NodeStatus.inServiceHealthy());
@@ -91,13 +119,16 @@ public class TestPipelineDatanodesIntersection {
     int createdPipelineCount = 0;
     while (!end && createdPipelineCount <= healthyNodeCount * nodeHeaviness) {
       try {
-        Pipeline pipeline = provider.create(HddsProtos.ReplicationFactor.THREE);
-        stateManager.addPipeline(pipeline);
+        Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE));
+        HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+            ClientVersion.CURRENT_VERSION);
+        stateManager.addPipeline(pipelineProto);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils
             .checkPipelineContainSameDatanodes(stateManager, pipeline);
 
-        if (overlapPipelines.isEmpty()){
+        if (!overlapPipelines.isEmpty()) {
           intersectionCount++;
           for (Pipeline overlapPipeline : overlapPipelines) {
             LOG.info("This pipeline: " + pipeline.getId().toString() +
@@ -113,20 +144,22 @@ public class TestPipelineDatanodesIntersection {
           }
         }
         createdPipelineCount++;
-      } catch(SCMException e) {
+      } catch (SCMException e) {
         end = true;
-      } catch (IOException e) {
+      } catch (IOException | TimeoutException e) {
         end = true;
         // Should not throw regular IOException.
-        Assert.fail();
+        Assertions.fail();
       }
     }
 
     end = false;
 
     LOG.info("Among total " +
-        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE).size() + " created pipelines" +
+        stateManager
+            .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
+            .size() + " created pipelines" +
         " with " + healthyNodeCount + " healthy datanodes and " +
         nodeHeaviness + " as node heaviness, " +
         intersectionCount + " pipelines has same set of datanodes.");

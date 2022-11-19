@@ -26,9 +26,13 @@ import moment from 'moment';
 
 interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
-  lastUpdated: number;
+  lastRefreshed: number;
+  lastUpdatedOMDBDelta: number;
+  lastUpdatedOMDBFull: number;
   isLoading: boolean;
+  omStatus: string;
   togglePolling: (isEnabled: boolean) => void;
+  omSyncLoad: () => void;
 }
 
 class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
@@ -38,21 +42,53 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   };
 
   render() {
-    const {onReload, lastUpdated, isLoading} = this.props;
-    const lastUpdatedText = lastUpdated === 0 ? 'NA' :
+    const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading, omSyncLoad, omStatus} = this.props;
+    const autoReloadEnabled = sessionStorage.getItem('autoReloadEnabled') === 'false' ? false : true;
+    
+     const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
         <Tooltip
-          placement='bottom' title={moment(lastUpdated).format('ll LTS')}
+          placement='bottom' title={moment(lastRefreshed).format('ll LTS')}
         >
-          {moment(lastUpdated).format('LTS')}
+          {moment(lastRefreshed).format('LT')}
+        </Tooltip>
+       );
+    
+     const omSyncStatusDisplay = omStatus === '' ? '' : omStatus ? <div>OM DB update is successfully triggered.</div> : <div>OM DB update is already running.</div>;
+    
+     const omDBDeltaFullToolTip = <span>
+          {omSyncStatusDisplay}
+          {'Delta Update'}: {moment(lastUpdatedOMDBDelta).fromNow()}, {moment(lastUpdatedOMDBDelta).format('LT')}
+          <br/>
+          {'Full Update'}: {moment(lastUpdatedOMDBFull).fromNow()}, {moment(lastUpdatedOMDBFull).format('LT')}
+       </span>
+
+      const lastUpdatedOMLatest = lastUpdatedOMDBDelta > lastUpdatedOMDBFull ? lastUpdatedOMDBDelta : lastUpdatedOMDBFull;
+
+      const lastUpdatedDeltaFullToolTip = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? 'NA' :
+      (
+        <Tooltip
+          placement='bottom' title={omDBDeltaFullToolTip}
+        >
+          {moment(lastUpdatedOMLatest).format('LT')}
         </Tooltip>
       );
+
+     const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? '' :
+     (
+      <>
+      &nbsp; | OM DB updated at {lastUpdatedDeltaFullToolTip}
+      &nbsp;<Button shape='circle' icon='play-circle' size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true } />
+      </>
+     );
+
     return (
       <div className='auto-reload-panel'>
-        Auto Reload
-        &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
-        &nbsp; | Last updated at {lastUpdatedText}
+        Auto Refresh
+        &nbsp;<Switch defaultChecked={autoReloadEnabled} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp; | Refreshed at {lastRefreshedText}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
+        {lastUpdatedDeltaFullText}
       </div>
     );
   }

@@ -21,6 +21,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsP
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -36,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.security.KerberosInfo;
@@ -69,19 +72,21 @@ public interface StorageContainerDatanodeProtocol {
    * @throws IOException
    */
   SCMHeartbeatResponseProto sendHeartbeat(SCMHeartbeatRequestProto heartbeat)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Register Datanode.
    * @param extendedDatanodeDetailsProto - extended Datanode Details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
+   * @param layoutInfo - Layout Version Information.
    * @return SCM Command.
    */
   SCMRegisteredResponseProto register(
       ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
-      PipelineReportsProto pipelineReports) throws IOException;
+      PipelineReportsProto pipelineReports,
+      LayoutVersionProto layoutInfo) throws IOException;
 
 }

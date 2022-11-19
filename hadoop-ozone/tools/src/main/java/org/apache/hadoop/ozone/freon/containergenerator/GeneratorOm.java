@@ -25,9 +25,10 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -124,13 +125,15 @@ public class GeneratorOm extends BaseGenerator implements
       long containerId = getContainerIdOffset() + index;
 
       int keyPerContainer = getKeysPerContainer(config);
-      BatchOperation omKeyTableBatchOperation = omDb.initBatchOperation();
-      for (long localId = 0; localId < keyPerContainer; localId++) {
-        BlockID blockId = new BlockID(containerId, localId);
-        writeOmData(localId, blockId, omKeyTableBatchOperation);
+      try (BatchOperation omKeyTableBatchOperation
+               = omDb.initBatchOperation()) {
+        for (long localId = 0; localId < keyPerContainer; localId++) {
+          BlockID blockId = new BlockID(containerId, localId);
+          writeOmData(localId, blockId, omKeyTableBatchOperation);
+        }
+        commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
+        return null;
       }
-      commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
-      return null;
     });
 
   }
@@ -151,12 +154,12 @@ public class GeneratorOm extends BaseGenerator implements
         .setObjectID(1L)
         .setUpdateID(1L)
         .setQuotaInBytes(100L)
-        .addOzoneAcls(OzoneAcl.toProtobuf(
+        .addOzoneAcls(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.WORLD, "",
-                IAccessAuthorizer.ACLType.ALL, ACCESS)))
-        .addOzoneAcls(OzoneAcl.toProtobuf(
-            new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, getUserId(),
                 IAccessAuthorizer.ACLType.ALL, ACCESS))
+        .addOzoneAcls(
+            new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, getUserId(),
+                IAccessAuthorizer.ACLType.ALL, ACCESS)
         ).build();
 
     volTable.put("/" + volumeName, omVolumeArgs);
@@ -205,8 +208,8 @@ public class GeneratorOm extends BaseGenerator implements
         .setDataSize(0)
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
-        .setReplicationFactor(ReplicationFactor.ONE)
-        .setReplicationType(ReplicationType.RATIS)
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE))
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation,
         "/" + volumeName + "/" + bucketName + "/" + keyName, l3DirInfo);
@@ -262,9 +265,8 @@ public class GeneratorOm extends BaseGenerator implements
         .setDataSize(getKeySize())
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
-        .setReplicationFactor(
-            ReplicationFactor.valueOf(ReplicationFactor.THREE_VALUE))
-        .setReplicationType(ReplicationType.STAND_ALONE)
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addOmKeyLocationInfoGroup(infoGroup)
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation, keyName, keyInfo);

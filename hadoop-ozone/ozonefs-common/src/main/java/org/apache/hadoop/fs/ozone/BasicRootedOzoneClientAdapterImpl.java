@@ -25,6 +25,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,16 +36,20 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
@@ -58,11 +63,14 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -77,10 +85,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .BUCKET_NOT_FOUND;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -98,10 +102,11 @@ public class BasicRootedOzoneClientAdapterImpl
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private ClientProtocol proxy;
-  private ReplicationType replicationType;
-  private ReplicationFactor replicationFactor;
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
+  private BucketLayout defaultOFSBucketLayout;
+  private OzoneConfiguration config;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -167,12 +172,8 @@ public class BasicRootedOzoneClientAdapterImpl
         this.securityEnabled = true;
       }
 
-      String replicationTypeConf =
-          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT);
-
-      int replicationCountConf = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION,
-          OzoneConfigKeys.OZONE_REPLICATION_DEFAULT);
+      clientConfiguredReplicationConfig =
+          OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
       if (OmUtils.isOmHAServiceId(conf, omHost)) {
         // omHost is listed as one of the service ids in the config,
@@ -188,13 +189,48 @@ public class BasicRootedOzoneClientAdapterImpl
       }
       objectStore = ozoneClient.getObjectStore();
       proxy = objectStore.getClientProxy();
-      this.replicationType = ReplicationType.valueOf(replicationTypeConf);
-      this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
+
       this.configuredDnPort = conf.getInt(
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+
+      // Fetches the bucket layout to be used by OFS.
+      initDefaultFsBucketLayout(conf);
+
+      config = conf;
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
+    }
+  }
+
+  /**
+   * Initialize the default bucket layout to be used by OFS.
+   *
+   * @param conf OzoneConfiguration
+   * @throws OMException In case of unsupported value provided in the config.
+   */
+  private void initDefaultFsBucketLayout(OzoneConfiguration conf)
+      throws OMException {
+    try {
+      this.defaultOFSBucketLayout = BucketLayout.fromString(
+          conf.get(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
+              OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT));
+    } catch (IllegalArgumentException iae) {
+      throw new OMException("Unsupported value provided for " +
+          OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+          ". Supported values are " + BucketLayout.FILE_SYSTEM_OPTIMIZED +
+          " and " + BucketLayout.LEGACY + ".",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    // Bucket Layout for buckets created with OFS cannot be OBJECT_STORE.
+    if (defaultOFSBucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new OMException(
+          "Buckets created with OBJECT_STORE layout do not support file " +
+              "system semantics. Supported values for config " +
+              OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+              " include " + BucketLayout.FILE_SYSTEM_OPTIMIZED + " and " +
+              BucketLayout.LEGACY, OMException.ResultCodes.INVALID_REQUEST);
     }
   }
 
@@ -218,7 +254,7 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean createIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
-    
+
     if (bucketStr.isEmpty()) {
       // throw FileNotFoundException in this case to make Hadoop common happy
       throw new FileNotFoundException(
@@ -228,41 +264,51 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket;
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+
+      // resolve the bucket layout in case of Link Bucket
+      BucketLayout resolvedBucketLayout =
+          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+              new HashSet<>());
+
+      OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
-      // Note: always create bucket if volumeStr matches "tmp" so -put works
       if (createIfNotExist) {
-        // Note: getBucketDetails always throws BUCKET_NOT_FOUND, even if
-        // the volume doesn't exist.
-        if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
-          OzoneVolume volume;
+        // getBucketDetails can throw VOLUME_NOT_FOUND when the parent volume
+        // doesn't exist and ACL is enabled; it can only throw BUCKET_NOT_FOUND
+        // when ACL is disabled. Both exceptions need to be handled.
+        switch (ex.getResult()) {
+        case VOLUME_NOT_FOUND:
+          // Create the volume first when the volume doesn't exist
           try {
-            volume = proxy.getVolumeDetails(volumeStr);
-          } catch (OMException getVolEx) {
-            if (getVolEx.getResult().equals(VOLUME_NOT_FOUND)) {
-              // Volume doesn't exist. Create it
-              try {
-                objectStore.createVolume(volumeStr);
-              } catch (OMException newVolEx) {
-                // Ignore the case where another client created the volume
-                if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
-                  throw newVolEx;
-                }
-              }
-            } else {
-              throw getVolEx;
+            objectStore.createVolume(volumeStr);
+          } catch (OMException newVolEx) {
+            // Ignore the case where another client created the volume
+            if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+              throw newVolEx;
             }
-            // Try get volume again
-            volume = proxy.getVolumeDetails(volumeStr);
           }
+          // No break here. Proceed to create the bucket
+        case BUCKET_NOT_FOUND:
+          // When BUCKET_NOT_FOUND is thrown, we expect the parent volume
+          // exists, so that we don't call create volume and incur
+          // unnecessary ACL checks which could lead to unwanted behavior.
+          OzoneVolume volume = proxy.getVolumeDetails(volumeStr);
           // Create the bucket
           try {
-            volume.createBucket(bucketStr);
+            // Buckets created by OFS should be in FSO layout
+            volume.createBucket(bucketStr,
+                BucketArgs.newBuilder().setBucketLayout(
+                    this.defaultOFSBucketLayout).build());
           } catch (OMException newBucEx) {
             // Ignore the case where another client created the bucket
             if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
               throw newBucEx;
             }
           }
+          break;
+        default:
+          // Throw unhandled exception
+          throw ex;
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
@@ -274,9 +320,20 @@ public class BasicRootedOzoneClientAdapterImpl
     return bucket;
   }
 
+  /**
+   * This API returns the value what is configured at client side only. It could
+   * differ from the server side default values. If no replication config
+   * configured at client, it will return 3.
+   */
   @Override
   public short getDefaultReplication() {
-    return (short) replicationFactor.getValue();
+    if (clientConfiguredReplicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -294,6 +351,7 @@ public class BasicRootedOzoneClientAdapterImpl
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
+          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
         throw new FileNotFoundException(
             ex.getResult().name() + ": " + ex.getMessage());
@@ -319,17 +377,10 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
-      OzoneOutputStream ozoneOutputStream = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-        ReplicationFactor clientReplication = ReplicationFactor
-            .valueOf(replication);
-        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            clientReplication, overWrite, recursive);
-      } else {
-        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            replicationFactor, overWrite, recursive);
-      }
+      OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
+          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
+              this.clientConfiguredReplicationConfig,
+              bucket.getReplicationConfig(), config), overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -438,10 +489,13 @@ public class BasicRootedOzoneClientAdapterImpl
    * Helper method to delete an object specified by key name in bucket.
    *
    * @param path path to a key to be deleted
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
    * @return true if the key is deleted, false otherwise
    */
   @Override
-  public boolean deleteObject(String path) {
+  public boolean deleteObject(String path, boolean recursive)
+      throws IOException {
     LOG.trace("issuing delete for path to key: {}", path);
     incrementCounter(Statistic.OBJECTS_DELETED, 1);
     OFSPath ofsPath = new OFSPath(path);
@@ -451,12 +505,23 @@ public class BasicRootedOzoneClientAdapterImpl
     }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      bucket.deleteKey(keyName);
+      bucket.deleteDirectory(keyName, recursive);
       return true;
+    } catch (OMException ome) {
+      LOG.error("delete key failed {}", ome.getMessage());
+      if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
+        throw new PathIsNotEmptyDirectoryException(ome.getMessage());
+      }
+      return false;
     } catch (IOException ioe) {
       LOG.error("delete key failed " + ioe.getMessage());
       return false;
     }
+  }
+
+  @Override
+  public boolean deleteObject(String path) throws IOException {
+    return deleteObject(path, false);
   }
 
   /**
@@ -578,7 +643,8 @@ public class BasicRootedOzoneClientAdapterImpl
     List<FileStatus> ret = new ArrayList<>();
     try {
       Iterator<? extends OzoneVolume> iterVol;
-      String username = UserGroupInformation.getCurrentUser().getUserName();
+      final String username =
+              UserGroupInformation.getCurrentUser().getShortUserName();
       if (allUsers) {
         iterVol = objectStore.listVolumes("");
       } else {
@@ -878,9 +944,11 @@ public class BasicRootedOzoneClientAdapterImpl
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
       String owner, URI defaultUri, Path workingDir, String ofsPathPrefix) {
     OmKeyInfo keyInfo = status.getKeyInfo();
-    short replication = (short) keyInfo.getFactor().getNumber();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
         new Path(ofsPathPrefix + OZONE_URI_DELIMITER + keyInfo.getKeyName())
             .makeQualified(defaultUri, workingDir),
         status.isDirectory(),
@@ -892,7 +960,9 @@ public class BasicRootedOzoneClientAdapterImpl
         owner,
         owner,
         null,
-        getBlockLocations(status)
+        getBlockLocations(status),
+        OzoneClientUtils.isKeyEncrypted(keyInfo),
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
 
@@ -983,11 +1053,10 @@ public class BasicRootedOzoneClientAdapterImpl
         UserGroupInformation.createRemoteUser(ozoneVolume.getOwner());
     String owner = ugi.getShortUserName();
     String group = getGroupName(ugi);
-    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+    return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneVolume.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, path,
-        new BlockLocation[0]
+        owner, group, path, new BlockLocation[0], false, false
     );
   }
 
@@ -1010,10 +1079,14 @@ public class BasicRootedOzoneClientAdapterImpl
               ozoneBucket.getName(), pathStr);
     }
     Path path = new Path(pathStr);
-    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+    return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, path, new BlockLocation[0]);
+        owner, group, path, new BlockLocation[0],
+        !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
+        ozoneBucket.getReplicationConfig() != null &&
+                    ozoneBucket.getReplicationConfig().getReplicationType() ==
+                    HddsProtos.ReplicationType.EC);
   }
 
   /**
@@ -1025,10 +1098,31 @@ public class BasicRootedOzoneClientAdapterImpl
     // Note that most fields are mimicked from HDFS FileStatus for root,
     //  except modification time, permission, owner and group.
     Path path = new Path(uri.toString() + OZONE_URI_DELIMITER);
-    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+    return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         System.currentTimeMillis(), 0L,
         FsPermission.getDirDefault().toShort(),
-        null, null, null, new BlockLocation[0]
-    );
+        null, null, null, new BlockLocation[0], false, false);
+  }
+
+  @Override
+  public boolean isFSOptimizedBucket() {
+    // TODO: Need to refine this part.
+    return false;
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(String keyName, long length)
+      throws IOException {
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+
+    OFSPath ofsPath = new OFSPath(keyName);
+
+    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    return OzoneClientUtils.getFileChecksumWithCombineMode(
+        volume, bucket, ofsPath.getKeyName(),
+        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
+
   }
 }

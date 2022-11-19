@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Helper to check scheduling efficiency.
@@ -67,7 +67,7 @@ public class ReplicationSupervisorScheduling {
       destinationLocks.put(i, new Object());
     }
 
-    ContainerSet cs = new ContainerSet();
+    ContainerSet cs = new ContainerSet(1000);
 
     ReplicationSupervisor rs = new ReplicationSupervisor(cs,
 
@@ -120,8 +120,8 @@ public class ReplicationSupervisorScheduling {
     rs.shutdownAfterFinish();
     final long executionTime = System.currentTimeMillis() - start;
     System.out.println(executionTime);
-    Assert.assertTrue("Execution was too slow : " + executionTime + " ms",
-        executionTime < 100_000);
+    Assertions.assertTrue(executionTime < 100_000,
+        "Execution was too slow : " + executionTime + " ms");
   }
 
 }

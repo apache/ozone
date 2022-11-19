@@ -26,10 +26,21 @@ import java.util.Map;
 public final class AuditMessage implements Message {
 
   private final String message;
+  private final String user;
+  private final String ip;
+  private final String op;
+  private final Map<String, String> params;
+  private final String ret;
   private final Throwable throwable;
 
-  private AuditMessage(String message, Throwable throwable) {
-    this.message = message;
+  private AuditMessage(String user, String ip, String op,
+      Map<String, String> params, String ret, Throwable throwable) {
+    this.user = user;
+    this.ip = ip;
+    this.op = op;
+    this.params = params;
+    this.ret = ret;
+    this.message = formMessage(user, ip, op, params, ret);
     this.throwable = throwable;
   }
 
@@ -53,6 +64,10 @@ public final class AuditMessage implements Message {
     return throwable;
   }
 
+  public String getOp() {
+    return op;
+  }
+
   /**
    * Builder class for AuditMessage.
    */
@@ -64,12 +79,12 @@ public final class AuditMessage implements Message {
     private Map<String, String> params;
     private String ret;
 
-    public Builder setUser(String usr){
+    public Builder setUser(String usr) {
       this.user = usr;
       return this;
     }
 
-    public Builder atIp(String ipAddr){
+    public Builder atIp(String ipAddr) {
       this.ip = ipAddr;
       return this;
     }
@@ -79,7 +94,7 @@ public final class AuditMessage implements Message {
       return this;
     }
 
-    public Builder withParams(Map<String, String> args){
+    public Builder withParams(Map<String, String> args) {
       this.params = args;
       return this;
     }
@@ -89,15 +104,20 @@ public final class AuditMessage implements Message {
       return this;
     }
 
-    public Builder withException(Throwable ex){
+    public Builder withException(Throwable ex) {
       this.throwable = ex;
       return this;
     }
 
-    public AuditMessage build(){
-      String message = "user=" + this.user + " | ip=" + this.ip + " | " +
-          "op=" + this.op + " " + this.params + " | " + "ret=" + this.ret;
-      return new AuditMessage(message, throwable);
+    public AuditMessage build() {
+      return new AuditMessage(user, ip, op, params, ret, throwable);
     }
+  }
+
+  private String formMessage(String userStr, String ipStr, String opStr,
+      Map<String, String> paramsMap, String retStr) {
+    return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
+        + " " + paramsMap + " | " + "ret=" + retStr;
+
   }
 }

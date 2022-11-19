@@ -17,9 +17,14 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import static org.apache.hadoop.ozone.common.Storage.STORAGE_FILE_VERSION;
+
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,6 +42,8 @@ import java.util.UUID;
  */
 @InterfaceAudience.Private
 public class StorageInfo {
+
+  public static final Logger LOG = LoggerFactory.getLogger(StorageInfo.class);
 
   private Properties properties = new Properties();
 
@@ -56,6 +63,11 @@ public class StorageInfo {
    * Property to hold the layout version.
    */
   private static final String LAYOUT_VERSION = "layoutVersion";
+
+  private static final String FIRST_UPGRADE_ACTION_LAYOUT_VERSION =
+      "firstUpgradeActionLayoutVersion";
+
+  private static final int INVALID_LAYOUT_VERSION = -1;
 
   /**
    * Constructs StorageInfo instance.
@@ -97,7 +109,7 @@ public class StorageInfo {
 
   public Long  getCreationTime() {
     String creationTime = properties.getProperty(CREATION_TIME);
-    if(creationTime != null) {
+    if (creationTime != null) {
       return Long.parseLong(creationTime);
     }
     return null;
@@ -105,7 +117,7 @@ public class StorageInfo {
 
   public int getLayoutVersion() {
     String layout = properties.getProperty(LAYOUT_VERSION);
-    if(layout != null) {
+    if (layout != null) {
       return Integer.parseInt(layout);
     }
     return 0;
@@ -114,9 +126,24 @@ public class StorageInfo {
   private void verifyLayoutVersion() {
     String layout = getProperty(LAYOUT_VERSION);
     if (layout == null) {
-      // For now, default it to "0"
+      LOG.warn("Found " + STORAGE_FILE_VERSION + " file without any layout " +
+          "version. Defaulting to 0.");
       setProperty(LAYOUT_VERSION, "0");
     }
+  }
+
+  public int getFirstUpgradeActionLayoutVersion() {
+    String upgradingTo =
+        properties.getProperty(FIRST_UPGRADE_ACTION_LAYOUT_VERSION);
+    if (upgradingTo != null) {
+      return Integer.parseInt(upgradingTo);
+    }
+    return INVALID_LAYOUT_VERSION;
+  }
+
+  public void setFirstUpgradeActionLayoutVersion(int layoutVersion) {
+    properties.setProperty(
+        FIRST_UPGRADE_ACTION_LAYOUT_VERSION, Integer.toString(layoutVersion));
   }
 
   public String getProperty(String key) {
@@ -127,15 +154,23 @@ public class StorageInfo {
     properties.setProperty(key, value);
   }
 
+  public void unsetProperty(String key) {
+    properties.remove(key);
+  }
+
   public void setClusterId(String clusterId) {
     properties.setProperty(CLUSTER_ID, clusterId);
+  }
+
+  public void setLayoutVersion(int version) {
+    properties.setProperty(LAYOUT_VERSION, Integer.toString(version));
   }
 
   private void verifyNodeType(NodeType type)
       throws InconsistentStorageStateException {
     NodeType nodeType = getNodeType();
     Preconditions.checkNotNull(nodeType);
-    if(type != nodeType) {
+    if (type != nodeType) {
       throw new InconsistentStorageStateException("Expected NodeType: " + type +
           ", but found: " + nodeType);
     }
@@ -145,7 +180,7 @@ public class StorageInfo {
       throws InconsistentStorageStateException {
     String clusterId = getClusterID();
     Preconditions.checkNotNull(clusterId);
-    if(clusterId.isEmpty()) {
+    if (clusterId.isEmpty()) {
       throw new InconsistentStorageStateException("Cluster ID not found");
     }
   }
@@ -198,7 +233,6 @@ public class StorageInfo {
    * @return new clusterID
    */
   public static String newClusterID() {
-    return "CID-" + UUID.randomUUID().toString();
+    return OzoneConsts.CLUSTER_ID_PREFIX + UUID.randomUUID().toString();
   }
-
 }

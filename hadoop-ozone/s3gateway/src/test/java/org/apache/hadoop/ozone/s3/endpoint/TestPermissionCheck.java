@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.Assert;
@@ -32,25 +33,32 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 
 /**
  * Test operation permission check result.
+ * Test-cases in this class verify that permission denied errors from OM
+ * are handled correctly by S3 endpoints.
  */
 public class TestPermissionCheck {
   private OzoneConfiguration conf;
   private OzoneClient client;
-  private ObjectStore objectStore;
+  private ClientProtocol clientProtocol;
   private OzoneBucket bucket;
+  private ObjectStore objectStore;
   private OzoneVolume volume;
   private OMException exception;
   private HttpHeaders headers;
@@ -64,11 +72,14 @@ public class TestPermissionCheck {
     objectStore = Mockito.mock(ObjectStore.class);
     bucket = Mockito.mock(OzoneBucket.class);
     volume = Mockito.mock(OzoneVolume.class);
+    when(volume.getName()).thenReturn("s3Volume");
     exception = new OMException("Permission Denied",
         OMException.ResultCodes.PERMISSION_DENIED);
     Mockito.when(client.getObjectStore()).thenReturn(objectStore);
     Mockito.when(client.getConfiguration()).thenReturn(conf);
     headers = Mockito.mock(HttpHeaders.class);
+    clientProtocol = Mockito.mock(ClientProtocol.class);
+    Mockito.when(client.getProxy()).thenReturn(clientProtocol);
   }
 
   /**
@@ -76,7 +87,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testListS3Buckets() throws IOException {
-    doThrow(exception).when(objectStore).getVolume(anyString());
+    doThrow(exception).when(objectStore).getS3Volume();
     RootEndpoint rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(client);
 
@@ -115,7 +126,7 @@ public class TestPermissionCheck {
     bucketEndpoint.setClient(client);
 
     try {
-      bucketEndpoint.put("bucketName", null);
+      bucketEndpoint.put("bucketName", null, null, null);
       Assert.fail("Should fail");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception);
@@ -162,7 +173,7 @@ public class TestPermissionCheck {
     bucketEndpoint.setClient(client);
 
     try {
-      bucketEndpoint.list("bucketName", null, null, null, 1000,
+      bucketEndpoint.get("bucketName", null, null, null, 1000,
           null, null, null, null, null, null);
       Assert.fail("Should fail");
     } catch (Exception e) {
@@ -191,16 +202,65 @@ public class TestPermissionCheck {
         response.getErrors().get(0).getCode().equals("PermissionDenied"));
   }
 
+  @Test
+  public void testGetAcl() throws Exception {
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    doThrow(exception).when(bucket).getAcls();
+
+    HttpServletRequest servletRequest = Mockito.mock(HttpServletRequest.class);
+    Map<String, String[]> parameterMap = Mockito.mock(Map.class);
+    when(servletRequest.getParameterMap()).thenReturn(parameterMap);
+
+    when(parameterMap.containsKey("acl")).thenReturn(true);
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
+    BucketEndpoint bucketEndpoint = new BucketEndpoint();
+    bucketEndpoint.setClient(client);
+    try {
+      bucketEndpoint.get("bucketName", null, null, null, 1000,
+          null, null, null, null, "acl", null);
+      Assert.fail("Expected OS3Exception with FORBIDDEN http code.");
+    } catch (OS3Exception e) {
+      Assert.assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
+    }
+  }
+
+  @Test
+  public void testSetAcl() throws Exception {
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    doThrow(exception).when(bucket).addAcl(any());
+
+    HttpServletRequest servletRequest = Mockito.mock(HttpServletRequest.class);
+    Map<String, String[]> parameterMap = Mockito.mock(Map.class);
+    when(servletRequest.getParameterMap()).thenReturn(parameterMap);
+
+    when(parameterMap.containsKey("acl")).thenReturn(true);
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
+    BucketEndpoint bucketEndpoint = new BucketEndpoint();
+    bucketEndpoint.setClient(client);
+    try {
+      bucketEndpoint.put("bucketName", "acl", headers, null);
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof OS3Exception &&
+          ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
+    }
+  }
+
   /**
    *  Object Endpoint.
    */
   @Test
   public void testGetKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).getKey(anyString());
+    Mockito.when(client.getProxy()).thenReturn(clientProtocol);
+    doThrow(exception).when(clientProtocol)
+        .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker",
@@ -215,12 +275,14 @@ public class TestPermissionCheck {
 
   @Test
   public void testPutKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any(), any());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    Mockito.when(volume.getBucket("bucketName")).thenReturn(bucket);
+    doThrow(exception).when(clientProtocol).createKey(
+            anyString(), anyString(), anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
@@ -233,11 +295,13 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).deleteKey(anyString());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
+        anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.delete("bucketName", "keyPath", null);
@@ -251,11 +315,11 @@ public class TestPermissionCheck {
   @Test
   public void testMultiUploadKey() throws IOException {
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket)
-        .initiateMultipartUpload(anyString(), any(), any());
+    doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
+    objectEndpoint.setOzoneConfiguration(conf);
 
     try {
       objectEndpoint.initializeMultipartUpload("bucketName", "keyPath");

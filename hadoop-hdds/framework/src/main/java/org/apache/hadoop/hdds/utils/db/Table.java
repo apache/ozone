@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 /**
@@ -150,8 +152,18 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * Returns the iterator for this metadata store.
    *
    * @return MetaStoreIterator
+   * @throws IOException on failure.
    */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator();
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator()
+      throws IOException;
+
+  /**
+   * Returns a prefixed iterator for this metadata store.
+   * @param prefix
+   * @return
+   */
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix)
+      throws IOException;
 
   /**
    * Returns the Name of this Table.
@@ -205,6 +217,13 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   /**
+   * Create the metrics datasource that emits table cache metrics.
+   */
+  default TableCacheMetrics createCacheMetrics() throws IOException {
+    throw new NotImplementedException("getCacheValue is not implemented");
+  }
+
+  /**
    * Returns a certain range of key value pairs as a list based on a
    * startKey or count. Further a {@link MetadataKeyFilters.MetadataKeyFilter}
    * can be added to * filter keys if necessary.
@@ -228,6 +247,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
+   * @param prefix fixed key schema specific prefix
    * @param filters customized one or more
    * {@link MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database or an empty list if the
@@ -236,7 +256,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IllegalArgumentException if count is less than 0.
    */
   List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
-          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, KEY prefix,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
 
   /**
@@ -249,6 +270,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
+   * @param prefix fixed key schema specific prefix
    * @param filters customized one or more
    * {@link MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database.
@@ -256,8 +278,35 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IllegalArgumentException
    */
   List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
-          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, KEY prefix,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
+
+  /**
+   * Deletes all keys with the specified prefix from the metadata store
+   * as part of a batch operation.
+   * @param batch
+   * @param prefix
+   * @return
+   */
+  void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
+      throws IOException;
+
+  /**
+   * Dump all key value pairs with a prefix into an external file.
+   * @param externalFile
+   * @param prefix
+   * @throws IOException
+   */
+  void dumpToFileWithPrefix(File externalFile, KEY prefix) throws IOException;
+
+  /**
+   * Load key value pairs from an external file created by
+   * dumpToFileWithPrefix.
+   * @param externalFile
+   * @throws IOException
+   */
+  void loadFromFile(File externalFile) throws IOException;
 
   /**
    * Class used to represent the key and value pair of a db entry.

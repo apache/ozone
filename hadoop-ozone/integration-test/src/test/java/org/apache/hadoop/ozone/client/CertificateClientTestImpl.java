@@ -16,14 +16,16 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,11 +33,15 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 
 /**
  * Test implementation for CertificateClient. To be used only for test
@@ -50,21 +56,34 @@ public class CertificateClientTestImpl implements CertificateClient {
   private final X509Certificate x509Certificate;
 
   public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
+    this(conf, true);
+  }
+
+  public CertificateClientTestImpl(OzoneConfiguration conf, boolean rootCA)
+      throws Exception {
     securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGen =
         new HDDSKeyGenerator(securityConfig.getConfiguration());
     keyPair = keyGen.generateKey();
     config = conf;
+    LocalDateTime start = LocalDateTime.now();
+    String certDurationString = conf.get(HDDS_X509_DEFAULT_DURATION,
+        HDDS_X509_DEFAULT_DURATION_DEFAULT);
+    Duration certDuration = Duration.parse(certDurationString);
+    LocalDateTime end = start.plus(certDuration);
+
     SelfSignedCertificate.Builder builder =
         SelfSignedCertificate.newBuilder()
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(365, ChronoUnit.DAYS))
+            .setBeginDate(start)
+            .setEndDate(end)
             .setClusterID("cluster1")
             .setKey(keyPair)
             .setSubject("localhost")
             .setConfiguration(config)
-            .setScmID("TestScmId1")
-            .makeCA();
+            .setScmID("TestScmId1");
+    if (rootCA) {
+      builder.makeCA();
+    }
     X509CertificateHolder certificateHolder = null;
     certificateHolder = builder.build();
     x509Certificate = new JcaX509CertificateConverter().getCertificate(
@@ -174,13 +193,66 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public String getSignatureAlgorithm(){
+  public String getSignatureAlgorithm() {
     return securityConfig.getSignatureAlgo();
   }
 
   @Override
-  public String getSecurityProvider(){
+  public String getSecurityProvider() {
     return securityConfig.getProvider();
+  }
+
+  @Override
+  public String getComponentName() {
+    return null;
+  }
+
+  @Override
+  public X509Certificate getRootCACertificate() {
+    return x509Certificate;
+  }
+
+  @Override
+  public void storeRootCACertificate(String pemEncodedCert, boolean force) {
+
+  }
+
+  @Override
+  public List<String> getCAList() {
+    return null;
+  }
+  @Override
+  public List<String> listCA() throws IOException  {
+    return null;
+  }
+
+  @Override
+  public List<String> updateCAList() throws IOException  {
+    return null;
+  }
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public long getLatestCrlId() throws IOException {
+    return 0;
+  }
+
+  @Override
+  public long getLocalCrlId() {
+    return 0;
+  }
+
+  @Override
+  public void setLocalCrlId(long crlId) {
+  }
+
+  @Override
+  public boolean processCrl(CRLInfo crl) {
+    return false;
   }
 
 }

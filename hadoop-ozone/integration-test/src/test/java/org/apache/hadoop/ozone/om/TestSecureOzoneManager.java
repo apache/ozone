@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.After;
 import org.junit.Assert;
@@ -48,11 +48,11 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.apache.hadoop.test.GenericTestUtils.*;
+import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import static org.apache.ozone.test.GenericTestUtils.getTempPath;
 
 /**
  * Test secure Ozone Manager operation in distributed handler scenario.
@@ -83,7 +83,6 @@ public class TestSecureOzoneManager {
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
     conf.set(OZONE_SCM_NAMES, "localhost");
@@ -116,7 +115,6 @@ public class TestSecureOzoneManager {
         LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     omLogs.clearOutput();
 
@@ -166,7 +164,7 @@ public class TestSecureOzoneManager {
     CertificateCodec certCodec =
         new CertificateCodec(securityConfig, COMPONENT);
     X509Certificate x509Certificate = KeyStoreTestUtil.generateCertificate(
-        "CN=Test", new KeyPair(publicKey, privateKey), 10,
+        "CN=Test", new KeyPair(publicKey, privateKey), 365,
         securityConfig.getSignatureAlgo());
     certCodec.writeCertificate(new X509CertificateHolder(
         x509Certificate.getEncoded()));
@@ -206,12 +204,11 @@ public class TestSecureOzoneManager {
     OzoneConfiguration config = new OzoneConfiguration(conf);
     OMStorage omStorage = new OMStorage(config);
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
     LambdaTestUtils.intercept(RuntimeException.class, "Can't get SCM signed" +
             " certificate",
-        () -> OzoneManager.initializeSecurity(config, omStorage));
+        () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
   }
 
 }

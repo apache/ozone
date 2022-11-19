@@ -105,7 +105,7 @@ public class OzoneAcl {
     Objects.requireNonNull(type);
     Objects.requireNonNull(acls);
 
-    if(acls.cardinality() > ACLType.getNoOfAcls()) {
+    if (acls.cardinality() > ACLType.getNoOfAcls()) {
       throw new IllegalArgumentException("Acl bitset passed has unexpected " +
           "size. bitset size:" + acls.cardinality() + ", bitset:"
           + acls.toString());
@@ -159,7 +159,7 @@ public class OzoneAcl {
     AclScope aclScope = AclScope.ACCESS;
 
     // Check if acl string contains scope info.
-    if(parts[2].matches(ACL_SCOPE_REGEX)) {
+    if (parts[2].matches(ACL_SCOPE_REGEX)) {
       int indexOfOpenBracket = parts[2].indexOf("[");
       bits = parts[2].substring(0, indexOfOpenBracket);
       aclScope = AclScope.valueOf(parts[2].substring(indexOfOpenBracket + 1,
@@ -194,7 +194,7 @@ public class OzoneAcl {
     }
     List<OzoneAcl> ozAcls = new ArrayList<>();
 
-    for(String acl:parts) {
+    for (String acl:parts) {
       ozAcls.add(parseAcl(acl));
     }
     return ozAcls;
@@ -289,7 +289,7 @@ public class OzoneAcl {
   }
 
   public List<ACLType> getAclList() {
-    if(aclBitSet !=  null) {
+    if (aclBitSet !=  null) {
       return aclBitSet.stream().mapToObj(a ->
           ACLType.values()[a]).collect(Collectors.toList());
     }

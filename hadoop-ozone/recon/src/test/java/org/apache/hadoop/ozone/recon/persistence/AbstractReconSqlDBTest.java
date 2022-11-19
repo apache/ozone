@@ -39,6 +39,7 @@ import org.jooq.impl.DefaultConfiguration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
@@ -79,6 +80,7 @@ public class AbstractReconSqlDBTest {
     }
   }
 
+  @BeforeEach
   @Before
   public void createReconSchemaForTest() throws IOException {
     injector = Guice.createInjector(getReconSqlDBModules());

@@ -31,7 +31,7 @@ import java.util.concurrent.Callable;
  * Chaos cluster for Ozone Manager.
  */
 @CommandLine.Command(
-    name = "ozonemanager",
+    name = "om",
     description = "run chaos cluster across Ozone Managers",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
@@ -40,7 +40,7 @@ public class TestOzoneManagerMiniChaosOzoneCluster extends
 
   @Override
   public Void call() throws Exception {
-    setNumOzoneManagers(3, true);
+    setNumManagers(3, 1, true);
     setNumDatanodes(3);
 
     addLoadClasses(AgedDirLoadGenerator.class);

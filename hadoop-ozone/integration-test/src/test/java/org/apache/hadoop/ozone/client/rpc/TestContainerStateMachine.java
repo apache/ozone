@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Container
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -52,6 +52,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_I
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.junit.After;
 import org.junit.Assert;
@@ -114,6 +115,7 @@ public class TestContainerStateMachine {
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();
+    cluster.setWaitForClusterToBeReadyTimeout(300000);
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
     //the easiest way to create an open container is creating a key

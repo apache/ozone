@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.audit;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.AfterClass;
-import org.junit.Test;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -34,8 +37,8 @@ import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.StringContains.containsString;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.hamcrest.Matcher;
 import org.hamcrest.collection.IsIterableContainingInOrder;
 
@@ -99,7 +102,16 @@ public class TestOzoneAuditLogger {
           .withResult(SUCCESS)
           .withException(null).build();
 
-  @AfterClass
+  private static final AuditMessage AUTH_FAIL_MSG =
+      new AuditMessage.Builder()
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.READ_VOLUME)
+          .withParams(PARAMS)
+          .withResult(FAILURE)
+          .withException(null).build();
+
+  @AfterAll
   public static void tearDown() {
     File file = new File("audit.log");
     if (FileUtils.deleteQuietly(file)) {
@@ -110,11 +122,16 @@ public class TestOzoneAuditLogger {
     }
   }
 
+  @BeforeEach
+  public void init() {
+    AUDIT.refreshDebugCmdSet();
+  }
+
   /**
-   * Test to verify default log level is INFO when logging success events.
+   * Test to verify default log level is INFO when logging WRITE success events.
    */
   @Test
-  public void verifyDefaultLogLevelForSuccess() throws IOException {
+  public void verifyDefaultLogLevelForWriteSuccess() throws IOException {
     AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
     String expected =
         "INFO  | OMAudit | ? | " + WRITE_SUCCESS_MSG.getFormattedMessage();
@@ -122,40 +139,74 @@ public class TestOzoneAuditLogger {
   }
 
   /**
-   * Test to verify default log level is ERROR when logging failure events.
+   * Test to verify default log level is ERROR when logging WRITE failure
+   * events.
    */
   @Test
-  public void verifyDefaultLogLevelForFailure() throws IOException {
+  public void verifyDefaultLogLevelForWriteFailure() throws IOException {
     AUDIT.logWriteFailure(WRITE_FAIL_MSG);
     String expected =
         "ERROR | OMAudit | ? | " + WRITE_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 
+  /**
+   * Test to verify default log level is INFO when logging READ success events.
+   */
+  @Test
+  public void verifyDefaultLogLevelForReadSuccess() throws IOException {
+    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
+    String expected =
+        "INFO  | OMAudit | ? | " + READ_SUCCESS_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  /**
+   * Test to verify default log level is ERROR when logging READ failure events.
+   */
+  @Test
+  public void verifyDefaultLogLevelForFailure() throws IOException {
+    AUDIT.logReadFailure(READ_FAIL_MSG);
+    String expected =
+        "ERROR | OMAudit | ? | " + READ_FAIL_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  @Test
+  public void verifyDefaultLogLevelForAuthFailure() throws IOException {
+    AUDIT.logAuthFailure(AUTH_FAIL_MSG);
+    String expected =
+        "ERROR | OMAudit | ? | " + AUTH_FAIL_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
   @Test
   public void messageIncludesAllParts() {
     String message = WRITE_FAIL_MSG.getFormattedMessage();
-    assertTrue(message, message.contains(USER));
-    assertTrue(message, message.contains(IP_ADDRESS));
-    assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
-    assertTrue(message, message.contains(PARAMS.toString()));
-    assertTrue(message, message.contains(FAILURE.getStatus()));
+    assertTrue(message.contains(USER), message);
+    assertTrue(message.contains(IP_ADDRESS), message);
+    assertTrue(message.contains(DummyAction.CREATE_VOLUME.name()), message);
+    assertTrue(message.contains(PARAMS.toString()), message);
+    assertTrue(message.contains(FAILURE.getStatus()), message);
   }
 
   /**
-   * Test to verify no READ event is logged.
+   * Test to verify no WRITE event is logged.
    */
   @Test
-  public void notLogReadEvents() throws IOException {
-    AUDIT.logReadSuccess(READ_SUCCESS_MSG);
-    AUDIT.logReadFailure(READ_FAIL_MSG);
+  public void excludedEventNotLogged() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(AuditLogger.AUDIT_LOG_DEBUG_CMD_LIST_PREFIX +
+            AuditLoggerType.OMLOGGER.getType().toLowerCase(Locale.ROOT),
+        "CREATE_VOLUME");
+    AUDIT.refreshDebugCmdSet(conf);
+    AUDIT.logWriteSuccess(WRITE_SUCCESS_MSG);
     verifyNoLog();
   }
-
+  
   /**
    * Test to verify if multiline entries can be checked.
    */
-
   @Test
   public void messageIncludesMultilineException() throws IOException {
     String exceptionMessage = "Dummy exception message";
@@ -189,7 +240,7 @@ public class TestOzoneAuditLogger {
       lines = FileUtils.readLines(file, (String)null);
       try {
         Thread.sleep(500 * (i + 1));
-      } catch(InterruptedException ie) {
+      } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
         break;
       }
@@ -212,7 +263,7 @@ public class TestOzoneAuditLogger {
     assertEquals(0, lines.size());
   }
 
-  private static class TestException extends Exception{
+  private static class TestException extends Exception {
     TestException(String message) {
       super(message);
     }

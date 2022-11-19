@@ -25,34 +25,25 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test allocate container calls.
  */
+@Timeout(300)
 public class TestAllocateContainer {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
@@ -62,9 +53,9 @@ public class TestAllocateContainer {
     xceiverClientManager = new XceiverClientManager(conf);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws InterruptedException {
-    if(cluster != null) {
+    if (cluster != null) {
       cluster.shutdown();
     }
     IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
@@ -77,16 +68,16 @@ public class TestAllocateContainer {
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf),
             OzoneConsts.OZONE);
-    Assert.assertNotNull(container);
-    Assert.assertNotNull(container.getPipeline().getFirstNode());
+    Assertions.assertNotNull(container);
+    Assertions.assertNotNull(container.getPipeline().getFirstNode());
 
   }
 
   @Test
-  public void testAllocateNull() throws Exception {
-    thrown.expect(NullPointerException.class);
-    storageContainerLocationClient.allocateContainer(
-        SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf), null);
+  public void testAllocateNull() {
+    Assertions.assertThrows(NullPointerException.class, () ->
+        storageContainerLocationClient.allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf), null));
   }
 }

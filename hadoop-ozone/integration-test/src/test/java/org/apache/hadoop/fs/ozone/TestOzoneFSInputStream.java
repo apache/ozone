@@ -18,22 +18,36 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -55,8 +69,10 @@ public class TestOzoneFSInputStream {
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
   private static FileSystem fs;
+  private static FileSystem ecFs;
   private static Path filePath = null;
   private static byte[] data = null;
+  private static OzoneConfiguration conf = null;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -67,9 +83,11 @@ public class TestOzoneFSInputStream {
    */
   @BeforeClass
   public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .setChunkSize(2) // MB
         .setBlockSize(8) // MB
         .setStreamBufferFlushSize(2) // MB
@@ -91,6 +109,23 @@ public class TestOzoneFSInputStream {
     try (FSDataOutputStream stream = fs.create(filePath)) {
       stream.write(data);
     }
+
+    // create EC bucket to be used by OzoneFileSystem
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    builder.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+                1024)));
+    BucketArgs omBucketArgs = builder.build();
+    String ecBucket = UUID.randomUUID().toString();
+    TestDataUtil.createBucket(cluster, bucket.getVolumeName(), omBucketArgs,
+        ecBucket);
+    String ecUri = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, ecUri);
+    ecFs =  FileSystem.get(conf);
   }
 
   /**
@@ -99,6 +134,7 @@ public class TestOzoneFSInputStream {
   @AfterClass
   public static void shutdown() throws IOException {
     fs.close();
+    ecFs.close();
     cluster.shutdown();
   }
 
@@ -154,5 +190,49 @@ public class TestOzoneFSInputStream {
 
       Assert.assertArrayEquals(value, buffer.array());
     }
+  }
+
+  @Test
+  public void testSequenceFileReaderSync() throws IOException {
+    File srcfile = new File("src/test/resources/testSequenceFile");
+    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+
+    // Upload test SequenceFile file
+    FSDataOutputStream output = fs.create(path);
+    IOUtils.copyBytes(input, output, 4096, true);
+    input.close();
+
+    // Start SequenceFile.Reader test
+    SequenceFile.Reader in = new SequenceFile.Reader(fs, path, conf);
+    long blockStart = -1;
+    // EOFException should not occur.
+    in.sync(0);
+    blockStart = in.getPosition();
+    // The behavior should be consistent with HDFS
+    Assert.assertEquals(srcfile.length(), blockStart);
+    in.close();
+  }
+
+  @Test
+  public void testSequenceFileReaderSyncEC() throws IOException {
+    File srcfile = new File("src/test/resources/testSequenceFile");
+    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+
+    // Upload test SequenceFile file
+    FSDataOutputStream output = ecFs.create(path);
+    IOUtils.copyBytes(input, output, 4096, true);
+    input.close();
+
+    // Start SequenceFile.Reader test
+    SequenceFile.Reader in = new SequenceFile.Reader(ecFs, path, conf);
+    long blockStart = -1;
+    // EOFException should not occur.
+    in.sync(0);
+    blockStart = in.getPosition();
+    // The behavior should be consistent with HDFS
+    Assert.assertEquals(srcfile.length(), blockStart);
+    in.close();
   }
 }

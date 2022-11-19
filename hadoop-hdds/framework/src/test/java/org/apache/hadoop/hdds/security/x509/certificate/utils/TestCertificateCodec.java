@@ -26,25 +26,22 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests the Certificate codecs.
@@ -53,12 +50,10 @@ public class TestCertificateCodec {
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static final String COMPONENT = "test";
   private SecurityConfig securityConfig;
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  @Before
-  public void init() throws IOException {
-    conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
+  @BeforeEach
+  public void init(@TempDir Path tempDir) {
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
   }
 
@@ -80,13 +75,15 @@ public class TestCertificateCodec {
       IOException, SCMSecurityException, CertificateException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())
@@ -118,18 +115,20 @@ public class TestCertificateCodec {
    * @throws CertificateException     - on Error.
    */
   @Test
-  public void testwriteCertificate() throws NoSuchProviderException,
-      NoSuchAlgorithmException, IOException, SCMSecurityException,
-      CertificateException {
+  public void testWriteCertificate(@TempDir Path basePath)
+      throws NoSuchProviderException, NoSuchAlgorithmException,
+      IOException, SCMSecurityException, CertificateException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())
@@ -137,16 +136,13 @@ public class TestCertificateCodec {
             .build();
     CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
     String pemString = codec.getPEMEncodedString(cert);
-    File basePath = temporaryFolder.newFolder();
-    if (!basePath.exists()) {
-      Assert.assertTrue(basePath.mkdirs());
-    }
-    codec.writeCertificate(basePath.toPath(), "pemcertificate.crt",
+    codec.writeCertificate(basePath, "pemcertificate.crt",
         pemString, false);
     X509CertificateHolder certHolder =
-        codec.readCertificate(basePath.toPath(), "pemcertificate.crt");
+        codec.readCertificate(basePath, "pemcertificate.crt");
     assertNotNull(certHolder);
-    assertEquals(cert.getSerialNumber(), certHolder.getSerialNumber());
+    assertEquals(cert.getSerialNumber(),
+        certHolder.getSerialNumber());
   }
 
   /**
@@ -164,13 +160,15 @@ public class TestCertificateCodec {
       NoSuchProviderException, NoSuchAlgorithmException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())
@@ -197,13 +195,15 @@ public class TestCertificateCodec {
       NoSuchProviderException, NoSuchAlgorithmException, CertificateException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())

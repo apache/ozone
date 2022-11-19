@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeleteContainerCommandProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
  * SCM command which tells the datanode to delete a container.
@@ -32,6 +33,7 @@ public class DeleteContainerCommand extends
 
   private final long containerId;
   private final boolean force;
+  private int replicaIndex = 0;
 
   /**
    * DeleteContainerCommand, to send a command for datanode to delete a
@@ -55,6 +57,15 @@ public class DeleteContainerCommand extends
     this.force = forceFlag;
   }
 
+  public DeleteContainerCommand(ContainerID containerID, boolean forceFlag) {
+    this.containerId = containerID.getId();
+    this.force = forceFlag;
+  }
+
+  public void setReplicaIndex(int index) {
+    replicaIndex = index;
+  }
+
   @Override
   public SCMCommandProto.Type getType() {
     return SCMCommandProto.Type.deleteContainerCommand;
@@ -66,6 +77,7 @@ public class DeleteContainerCommand extends
         DeleteContainerCommandProto.newBuilder();
     builder.setCmdId(getId())
         .setContainerID(getContainerID()).setForce(force);
+    builder.setReplicaIndex(replicaIndex);
     return builder.build();
   }
 
@@ -80,7 +92,17 @@ public class DeleteContainerCommand extends
   public static DeleteContainerCommand getFromProtobuf(
       DeleteContainerCommandProto protoMessage) {
     Preconditions.checkNotNull(protoMessage);
-    return new DeleteContainerCommand(protoMessage.getContainerID(),
-        protoMessage.getForce());
+
+    DeleteContainerCommand cmd =
+        new DeleteContainerCommand(protoMessage.getContainerID(),
+            protoMessage.getForce());
+    if (protoMessage.hasReplicaIndex()) {
+      cmd.setReplicaIndex(protoMessage.getReplicaIndex());
+    }
+    return cmd;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
   }
 }

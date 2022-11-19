@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Table, Tabs} from 'antd';
+import {Table, Tabs, Tooltip, Icon} from 'antd';
 import './pipelines.less';
 import {PaginationConfig} from 'antd/lib/pagination';
 import prettyMilliseconds from 'pretty-ms';
@@ -44,7 +44,7 @@ interface IPipelineResponse {
   lastLeaderElection: number;
   duration: number;
   leaderElections: number;
-  replicationFactor: number;
+  replicationFactor: string;
   containers: number;
 }
 
@@ -66,7 +66,8 @@ const COLUMNS = [
     dataIndex: 'pipelineId',
     key: 'pipelineId',
     isSearchable: true,
-    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId),
+    fixed: 'left'
   },
   {
     title: 'Replication Type & Factor',
@@ -120,11 +121,17 @@ const COLUMNS = [
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderNode.localeCompare(b.leaderNode)
   },
   {
-    title: 'Last Leader Election',
+    title:
+  <span>
+    Last Leader Election&nbsp;
+    <Tooltip title='Elapsed time since the current leader got elected. Only available if any metrics service providers like Prometheus is configured.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-      moment(lastLeaderElection).format('ll LTS') : 'NA',
+      prettyMilliseconds(lastLeaderElection, {compact: true}) + " ago" : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
@@ -135,10 +142,18 @@ const COLUMNS = [
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.duration - b.duration
   },
   {
-    title: 'No. of Elections',
+    title:
+  <span>
+    No. of Elections&nbsp;
+    <Tooltip title='Number of elections in this pipeline. Only available if any metrics service providers like Prometheus is configured.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'leaderElections',
     key: 'leaderElections',
     isSearchable: true,
+    render: (leaderElections: number) => leaderElections > 0 ?
+          leaderElections : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderElections - b.leaderElections
   }
 ];
@@ -211,11 +226,11 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
       <div className='pipelines-container'>
         <div className='page-header'>
           Pipelines ({activeTotalCount})
-          <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={activeLoading} lastRefreshed={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <div className='content-div'>
           <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
-            <TabPane key='1' tab='Active'>
+            <TabPane key='1'>
               <Table
                 dataSource={activeDataSource}
                 columns={COLUMNS.reduce<any[]>((filtered, column) => {
@@ -231,9 +246,11 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
 
                   return filtered;
                 }, [])}
-                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
+                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
+                scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+                />
             </TabPane>
-            <TabPane key='2' tab='Inactive'/>
+
           </Tabs>
         </div>
       </div>

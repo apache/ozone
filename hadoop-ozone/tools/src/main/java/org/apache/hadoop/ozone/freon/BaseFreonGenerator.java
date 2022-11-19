@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -28,18 +27,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -49,6 +44,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.codahale.metrics.ConsoleReporter;
@@ -60,7 +56,6 @@ import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
@@ -71,6 +66,7 @@ import picocli.CommandLine.ParentCommand;
 /**
  * Base class for simplified performance tests.
  */
+@SuppressWarnings("java:S2245") // no need for secure random
 public class BaseFreonGenerator {
 
   private static final Logger LOG =
@@ -214,7 +210,7 @@ public class BaseFreonGenerator {
   }
 
   private void shutdown() {
-    if (failureCounter.get() > 0 && !failAtEnd) {
+    if (failureCounter.get() > 0) {
       progressBar.terminate();
     } else {
       progressBar.shutdown();
@@ -222,8 +218,9 @@ public class BaseFreonGenerator {
     executor.shutdown();
     try {
       executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
-    } catch (Exception ex) {
-      ex.printStackTrace();
+    } catch (InterruptedException ex) {
+      LOG.error("Error attempting to shutdown", ex);
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -253,19 +250,20 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    LOG.info("Executing test with prefix {}", prefix);
+    LOG.info("Executing test with prefix {} " +
+        "and number-of-tests {}", prefix, testNo);
 
     pathSchema = new PathSchema(prefix);
 
-    Runtime.getRuntime().addShutdownHook(
-        new Thread(() -> {
+    ShutdownHookManager.get().addShutdownHook(
+        () -> {
           try {
             freonCommand.stopHttpServer();
           } catch (Exception ex) {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
-        }));
+        }, 10);
 
     executor = Executors.newFixedThreadPool(threadNo);
 
@@ -304,6 +302,11 @@ public class BaseFreonGenerator {
         Math.round((System.currentTimeMillis() - startTime) / 1000.0));
     messages.add("Failures: " + failureCounter.get());
     messages.add("Successful executions: " + successCounter.get());
+    if (failureCounter.get() > 0) {
+      messages.add("Expected " + testNo
+          + " --number-of-tests objects!, successfully executed "
+          + successCounter.get());
+    }
 
     Consumer<String> print = freonCommand.isInteractive()
         ? System.out::println
@@ -314,7 +317,7 @@ public class BaseFreonGenerator {
   /**
    * Print out reports with the given message.
    */
-  public void print(String msg){
+  public void print(String msg) {
     Consumer<String> print = freonCommand.isInteractive()
             ? System.out::println
             : LOG::info;
@@ -346,42 +349,29 @@ public class BaseFreonGenerator {
   }
 
   public StorageContainerLocationProtocol createStorageContainerLocationClient(
-      OzoneConfiguration ozoneConf)
-      throws IOException {
-
-    long version = RPC.getProtocolVersion(
-        StorageContainerLocationProtocolPB.class);
-    InetSocketAddress scmAddress =
-        getScmAddressForClients(ozoneConf);
-
-    RPC.setProtocolEngine(ozoneConf, StorageContainerLocationProtocolPB.class,
-        ProtobufRpcEngine.class);
-    StorageContainerLocationProtocol client =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                RPC.getProxy(StorageContainerLocationProtocolPB.class, version,
-                    scmAddress, UserGroupInformation.getCurrentUser(),
-                    ozoneConf,
-                    NetUtils.getDefaultSocketFactory(ozoneConf),
-                    Client.getRpcTimeout(ozoneConf))),
-            StorageContainerLocationProtocol.class, ozoneConf);
-    return client;
+      OzoneConfiguration ozoneConf) throws IOException {
+    return HAUtils.getScmContainerClient(ozoneConf);
   }
 
+  @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public static Pipeline findPipelineForTest(String pipelineId,
       StorageContainerLocationProtocol client, Logger log) throws IOException {
-    List<Pipeline> pipelines = client.listPipelines();
+    Stream<Pipeline> pipelines = client.listPipelines().stream();
     Pipeline pipeline;
+    if (log.isDebugEnabled()) {
+      pipelines = pipelines
+          .peek(p -> log.debug("Found pipeline {}", p.getId().getId()));
+    }
     if (pipelineId != null && pipelineId.length() > 0) {
-      pipeline = pipelines.stream()
+      pipeline = pipelines
           .filter(p -> p.getId().toString().equals(pipelineId))
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException(
               "Pipeline ID is defined, but there is no such pipeline: "
                   + pipelineId));
     } else {
-      pipeline = pipelines.stream()
-          .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+      pipeline = pipelines
+          .filter(p -> p.getReplicationConfig().getRequiredNodes() == 3)
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException(
               "Pipeline ID is NOT defined, and no pipeline " +
@@ -396,6 +386,13 @@ public class BaseFreonGenerator {
    */
   public String generateObjectName(long counter) {
     return pathSchema.getPath(counter);
+  }
+
+  /**
+   * Generate a bucket name based on the prefix and counter.
+   */
+  public String generateBucketName(long counter) {
+    return getPrefix() + counter;
   }
 
   /**

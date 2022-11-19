@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -28,20 +29,32 @@ import java.util.List;
  */
 public interface PlacementPolicy {
 
+  default List<DatanodeDetails> chooseDatanodes(
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequired,
+          long metadataSizeRequired, long dataSizeRequired) throws IOException {
+    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,
+            favoredNodes, nodesRequired, metadataSizeRequired,
+            dataSizeRequired);
+  }
   /**
    * Given an initial set of datanodes and the size required,
    * return set of datanodes that satisfy the nodes and size requirement.
    *
+   * @param usedNodes - List of nodes already chosen for pipeline
    * @param excludedNodes - list of nodes to be excluded.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return list of datanodes chosen.
    * @throws IOException
    */
-  List<DatanodeDetails> chooseDatanodes(List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes, int nodesRequired, long sizeRequired)
-      throws IOException;
+  List<DatanodeDetails> chooseDatanodes(List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes,
+          int nodesRequired, long metadataSizeRequired,
+          long dataSizeRequired) throws IOException;
 
   /**
    * Given a list of datanode and the number of replicas required, return

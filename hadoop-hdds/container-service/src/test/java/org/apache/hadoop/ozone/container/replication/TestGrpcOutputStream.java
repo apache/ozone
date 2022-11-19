@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.container.replication;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -34,8 +34,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -43,7 +43,7 @@ import static org.mockito.Mockito.verify;
 /**
  * Tests for {@code GrpcOutputStream}.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class TestGrpcOutputStream {
 
   private static final Random RND = new Random();
@@ -56,7 +56,7 @@ public class TestGrpcOutputStream {
 
   private OutputStream subject;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     subject = new GrpcOutputStream(observer, containerId, bufferSize);
   }
@@ -126,18 +126,18 @@ public class TestGrpcOutputStream {
   public void bufferFlushedWhenFull() throws IOException {
     byte[] bytes = getRandomBytes(bufferSize);
 
-    subject.write(bytes, 0, bufferSize-1);
-    subject.write(bytes[bufferSize-1]);
+    subject.write(bytes, 0, bufferSize - 1);
+    subject.write(bytes[bufferSize - 1]);
     verify(observer).onNext(any());
 
     subject.write(bytes[0]);
-    subject.write(bytes, 1, bufferSize-1);
+    subject.write(bytes, 1, bufferSize - 1);
     verify(observer, times(2)).onNext(any());
   }
 
   @Test
   public void singleArraySpansMultipleResponses() throws IOException {
-    byte[] bytes = writeBytes(subject, 2 * bufferSize + bufferSize/2);
+    byte[] bytes = writeBytes(subject, 2 * bufferSize + bufferSize / 2);
     subject.close();
 
     verifyResponses(bytes);

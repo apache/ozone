@@ -19,13 +19,14 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -51,8 +52,9 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
       LoggerFactory.getLogger(PartialTableCache.class);
 
   private final Map<CACHEKEY, CACHEVALUE> cache;
-  private final NavigableSet<EpochEntry<CACHEKEY>> epochEntries;
+  private final NavigableMap<Long, Set<CACHEKEY>> epochEntries;
   private ExecutorService executorService;
+  private final CacheStatsRecorder statsRecorder;
 
 
   public PartialTableCache() {
@@ -71,17 +73,21 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     // that should be guarded by concurrentHashMap guaranty.
     cache = new ConcurrentHashMap<>();
 
-    epochEntries = new ConcurrentSkipListSet<>();
+    epochEntries = new ConcurrentSkipListMap<>();
     // Created a singleThreadExecutor, so one cleanup will be running at a
     // time.
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("PartialTableCache Cleanup Thread - %d").build();
     executorService = Executors.newSingleThreadExecutor(build);
+
+    statsRecorder = new CacheStatsRecorder();
   }
 
   @Override
   public CACHEVALUE get(CACHEKEY cachekey) {
-    return cache.get(cachekey);
+    CACHEVALUE value = cache.get(cachekey);
+    statsRecorder.recordValue(value);
+    return value;
   }
 
   @Override
@@ -92,7 +98,8 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   @Override
   public void put(CACHEKEY cacheKey, CACHEVALUE value) {
     cache.put(cacheKey, value);
-    epochEntries.add(new EpochEntry<>(value.getEpoch(), cacheKey));
+    epochEntries.computeIfAbsent(value.getEpoch(), v -> new HashSet<>())
+            .add(cacheKey);
   }
 
   @Override
@@ -107,44 +114,45 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
 
   @Override
   public Iterator<Map.Entry<CACHEKEY, CACHEVALUE>> iterator() {
+    statsRecorder.recordIteration();
     return cache.entrySet().iterator();
   }
 
   @VisibleForTesting
   @Override
   public void evictCache(List<Long> epochs) {
-    EpochEntry<CACHEKEY> currentEntry;
+    Set<CACHEKEY> currentCacheKeys;
     CACHEKEY cachekey;
     long lastEpoch = epochs.get(epochs.size() - 1);
-    for (Iterator<EpochEntry<CACHEKEY>> iterator = epochEntries.iterator();
-         iterator.hasNext();) {
-      currentEntry = iterator.next();
-      cachekey = currentEntry.getCachekey();
-      long currentEpoch = currentEntry.getEpoch();
+    for (long currentEpoch : epochEntries.keySet()) {
+      currentCacheKeys = epochEntries.get(currentEpoch);
 
       // If currentEntry epoch is greater than last epoch provided, we have
       // deleted all entries less than specified epoch. So, we can break.
       if (currentEpoch > lastEpoch) {
         break;
       }
-
       // As ConcurrentHashMap computeIfPresent is atomic, there is no race
       // condition between cache cleanup and requests updating same cache entry.
       if (epochs.contains(currentEpoch)) {
-        // Remove epoch entry, as the entry is there in epoch list.
-        iterator.remove();
-        cache.computeIfPresent(cachekey, ((k, v) -> {
-          // If cache epoch entry matches with current Epoch, remove entry
-          // from cache.
-          if (v.getEpoch() == currentEpoch) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                  k.getCacheKey(), currentEpoch);
+        for (Iterator<CACHEKEY> iterator = currentCacheKeys.iterator();
+             iterator.hasNext();) {
+          cachekey = iterator.next();
+          cache.computeIfPresent(cachekey, ((k, v) -> {
+            // If cache epoch entry matches with current Epoch, remove entry
+            // from cache.
+            if (v.getEpoch() == currentEpoch) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                        k.getCacheKey(), currentEpoch);
+              }
+              return null;
             }
-            return null;
-          }
-          return v;
-        }));
+            return v;
+          }));
+        }
+        // Remove epoch entry, as the entry is there in epoch list.
+        epochEntries.remove(currentEpoch);
       }
     }
   }
@@ -153,6 +161,7 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
 
     CACHEVALUE cachevalue = cache.get(cachekey);
+    statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
       return new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST,
             null);
@@ -166,10 +175,14 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     }
   }
 
-  @Override
   @VisibleForTesting
-  public Set<EpochEntry<CACHEKEY>> getEpochEntrySet() {
+  @Override
+  public NavigableMap<Long, Set<CACHEKEY>> getEpochEntries() {
     return epochEntries;
   }
 
+  @Override
+  public CacheStats getStats() {
+    return statsRecorder.snapshot();
+  }
 }

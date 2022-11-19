@@ -8,7 +8,7 @@ Ozone is a scalable, redundant, and distributed object store for Hadoop and Clou
  * SCALABLE: Ozone is designed to scale to tens of billions of files and blocks and, in the future, even more.
  * CONSISTENT: Ozone is a strongly consistent object store. This consistency is achieved by using protocols like RAFT.
  * CLOUD-NATIVE: Ozone is designed to work well in containerized environments like YARN and Kubernetes.
- * SECURE: Ozone integrates with Kerberos infrastructure for access control and supports TDE and on-wire encryption.
+ * SECURE: Ozone integrates with Kerberos infrastructure for authentication, supports native ACLs and integrates with Ranger for access control and supports TDE and on-wire encryption.
  * HIGHLY AVAILABLE: Ozone is a fully replicated system that is designed to survive multiple failures.
 
 ## Documentation
@@ -25,7 +25,7 @@ Ozone is a top level project under the [Apache Software Foundation](https://apac
  * Mailing lists
      * For any questions use: [dev@ozone.apache.org](https://lists.apache.org/list.html?dev@ozone.apache.org)
  * Chat: You can find the #ozone channel on the official ASF slack. Invite link is [here](http://s.apache.org/slack-invite).
- * There are Open [Weekly calls](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) where you can ask anything about Ozone.
+ * There are Open [Weekly calls](https://cwiki.apache.org/confluence/display/OZONE/Ozone+Community+Calls) where you can ask anything about Ozone.
      * Past meeting notes are also available from the wiki.
  * Reporting security issues: Please consult with [SECURITY.md](./SECURITY.md) about reporting security vulnerabilities and issues.
 

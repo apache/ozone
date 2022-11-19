@@ -31,8 +31,7 @@ the current state of the cluster through REST based APIs and rich web UI.
 
 ## High Level Design
 
-{{<figure src="/concept/ReconHighLevelDesign.png" width="800px">}}
-
+![Recon High Level Design](ReconHighLevelDesign.png)
 <br/>
 
 On a high level, Recon collects and aggregates metadata from Ozone Manager (OM), 
@@ -50,8 +49,7 @@ the web UI.
 
 ## Recon and Ozone Manager
 
-{{<figure src="/concept/ReconOmDesign.png" width="800px">}}
-
+![Recon OM Design](ReconOmDesign.png)
 <br/>
 
 Recon gets a full snapshot of OM rocks db initially from the leader OM's HTTP 
@@ -68,8 +66,7 @@ further processing by OM db tasks via [Recon Task Framework](#task-framework).
 
 ## Recon and Storage Container Manager
 
-{{<figure src="/concept/ReconScmDesign.png" width="800px">}}
-
+![Recon SCM Design](ReconScmDesign.png)
 <br/>
 
 Recon also acts as a passive SCM for datanodes. When Recon is configured in the
@@ -112,7 +109,7 @@ Recon can integrate with any Prometheus instance configured to collected metrics
 and can display useful information in Recon UI in Datanodes and Pipelines pages.
 Recon also exposes a proxy endpoint ([/metrics]({{< ref "interface/ReconApi.md#metrics" >}}))
 to query Prometheus. This integration can be enabled by setting this configuration `ozone.recon.prometheus.http.endpoint` 
-to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=localhost:9090`.
+to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://prometheus:9090`.
 
 ## API Reference
 

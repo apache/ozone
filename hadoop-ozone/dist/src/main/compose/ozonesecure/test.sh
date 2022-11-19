@@ -27,7 +27,7 @@ export SECURITY_ENABLED=true
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
-start_docker_env
+start_docker_env 5
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
@@ -37,17 +37,17 @@ execute_robot_test scm basic
 
 execute_robot_test scm security
 
-for scheme in ofs o3fs; do
-  for bucket in link bucket; do
-    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
-  done
+execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
+
+exclude=""
+for bucket in encrypted link generated; do
+  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+  # some tests are independent of the bucket type, only need to be run once
+  exclude="--exclude no-bucket-type"
 done
 
-for bucket in link generated; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
-done
-
-#expects 4 pipelines, should be run before 
+#expects 4 pipelines, should be run before
 #admincli which creates STANDALONE pipeline
 execute_robot_test scm recon
 

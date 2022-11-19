@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -22,10 +22,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class responsible for scheduling the reports based on the
  * configured interval. All the ReportPublishers should extend this class.
  */
-public abstract class ReportPublisher<T extends GeneratedMessage>
+public abstract class ReportPublisher<T extends Message>
     implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -53,8 +54,8 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
                    ScheduledExecutorService executorService) {
     this.context = stateContext;
     this.executor = executorService;
-    this.executor.schedule(this,
-        getReportFrequency(), TimeUnit.MILLISECONDS);
+    this.executor.scheduleAtFixedRate(this,
+        getReportFrequency(), getReportFrequency(), TimeUnit.MILLISECONDS);
   }
 
   public void setConf(ConfigurationSource conf) {
@@ -67,11 +68,9 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
 
   @Override
   public void run() {
-    publishReport();
     if (!executor.isShutdown() &&
         (context.getState() != DatanodeStates.SHUTDOWN)) {
-      executor.schedule(this,
-          getReportFrequency(), TimeUnit.MILLISECONDS);
+      publishReport();
     }
   }
 
@@ -80,7 +79,12 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
    */
   private void publishReport() {
     try {
-      context.addReport(getReport());
+      Message report = getReport();
+      if (report instanceof CommandStatusReportsProto) {
+        context.addIncrementalReport(report);
+      } else {
+        context.refreshFullReport(report);
+      }
     } catch (IOException e) {
       LOG.error("Exception while publishing report.", e);
     }

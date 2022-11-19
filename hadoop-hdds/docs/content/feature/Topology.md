@@ -64,10 +64,10 @@ Rack information can be identified with the help of an external script:
 ```XML
 <property>
    <name>net.topology.node.switch.mapping.impl</name>
-   <value>org.apache.hadoop.net.TableMapping</value>
+   <value>org.apache.hadoop.net.ScriptBasedMapping</value>
 </property>
 <property>
-   <name>org.apache.hadoop.net.ScriptBasedMapping</name>
+   <name>net.topology.script.file.name</name>
    <value>/usr/local/bin/rack.sh</value>
 </property>
 ```
@@ -76,7 +76,7 @@ If implementing an external script, it will be specified with the `net.topology.
 
 ## Write path
 
-Placement of the closed containers can be configured with `ozone.scm.container.placement.impl` configuration key. The available container placement policies can be found in the `org.apache.hdds.scm.container.placement` [package](https://github.com/apache/hadoop-ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms). 
+Placement of the closed containers can be configured with `ozone.scm.container.placement.impl` configuration key. The available container placement policies can be found in the `org.apache.hdds.scm.container.placement` [package](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms).
 
 By default the `SCMContainerPlacementRandom` is used for topology-awareness the `SCMContainerPlacementRackAware` can be used:
 
