@@ -1063,8 +1063,9 @@ public final class OMRequestTestUtils {
 
   /**
    * Create OMRequest for Create Snapshot.
-   * @param name
-   * @param snapshotPath
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
    */
   public static OMRequest createSnapshotRequest(String volumeName,
       String bucketName, String snapshotName) {
