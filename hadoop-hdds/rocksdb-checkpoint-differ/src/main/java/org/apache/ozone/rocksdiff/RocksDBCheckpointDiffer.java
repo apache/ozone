@@ -50,6 +50,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -129,7 +130,11 @@ public class RocksDBCheckpointDiffer {
   private static final int LONG_MAX_STRLEN =
       String.valueOf(Long.MAX_VALUE).length();
 
+  /**
+   * Used during DAG reconstruction.
+   */
   private long reconstructionSnapshotGeneration;
+  private String reconstructionLastSnapshotID;
 
   /**
    * Dummy object that acts as a write lock in compaction listener.
@@ -241,7 +246,7 @@ public class RocksDBCheckpointDiffer {
 
     CompactionNode(String file, String ssId, long numKeys, long seqNum) {
       fileName = file;
-      // Retained for debuggability. Unused for now.
+      // snapshotId field added here only for improved debuggability
       snapshotId = ssId;
       totalNumberOfKeys = numKeys;
       snapshotGeneration = seqNum;
@@ -314,8 +319,10 @@ public class RocksDBCheckpointDiffer {
    * snapshot (RDB checkpoint) is taken.
    * @param sequenceNum RDB sequence number
    */
-  public void appendSequenceNumberToCompactionLog(long sequenceNum) {
-    final String line = COMPACTION_LOG_SEQNUM_LINE_PREFIX + sequenceNum + "\n";
+  public void appendSequenceNumberToCompactionLog(long sequenceNum,
+      String snapshotID) {
+    final String line = COMPACTION_LOG_SEQNUM_LINE_PREFIX + sequenceNum +
+        " " + snapshotID + "\n";
     appendToCurrentCompactionLog(line);
   }
 
@@ -437,7 +444,9 @@ public class RocksDBCheckpointDiffer {
           appendToCurrentCompactionLog(sb.toString());
 
           // Populate the DAG
-          populateCompactionDAG(inputFiles, outputFiles,
+          // TODO: Once SnapshotChainManager is put into use, set snapshotID to
+          //  snapshotChainManager.getLatestGlobalSnapshot()
+          populateCompactionDAG(inputFiles, outputFiles, null,
               db.getLatestSequenceNumber());
 /*
           if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
@@ -568,12 +577,16 @@ public class RocksDBCheckpointDiffer {
       // Skip comments
       LOG.debug("Comment line, skipped");
     } else if (line.startsWith(COMPACTION_LOG_SEQNUM_LINE_PREFIX)) {
-      // Read sequence number
-      LOG.debug("Reading sequence number as snapshot generation");
-      final String seqNumStr =
+      // Read sequence number, and snapshot ID
+      LOG.debug("Reading sequence number as snapshot generation, "
+          + "and snapshot ID");
+      final String trimmedStr =
           line.substring(COMPACTION_LOG_SEQNUM_LINE_PREFIX.length()).trim();
+      final Scanner input = new Scanner(trimmedStr);
       // This would the snapshot generation for the nodes to come
-      reconstructionSnapshotGeneration = Long.parseLong(seqNumStr);
+      reconstructionSnapshotGeneration = input.nextLong();
+      // This is the snapshotID assigned to every single CompactionNode to come
+      reconstructionLastSnapshotID = input.nextLine().trim();
     } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
       // Read compaction log entry
 
@@ -586,8 +599,8 @@ public class RocksDBCheckpointDiffer {
       }
       final String[] inputFiles = io[0].split(",");
       final String[] outputFiles = io[1].split(",");
-      populateCompactionDAG(asList(inputFiles),
-          asList(outputFiles), reconstructionSnapshotGeneration);
+      populateCompactionDAG(asList(inputFiles), asList(outputFiles),
+          reconstructionLastSnapshotID, reconstructionSnapshotGeneration);
     } else {
       LOG.error("Invalid line in compaction log: {}", line);
     }
@@ -892,14 +905,16 @@ public class RocksDBCheckpointDiffer {
    * Helper method to add a new file node to the DAG.
    * @return CompactionNode
    */
-  private CompactionNode addNodeToDAG(String file, long seqNum) {
+  private CompactionNode addNodeToDAG(String file, String snapshotID,
+      long seqNum) {
     long numKeys = 0L;
     try {
       numKeys = getSSTFileSummary(file);
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     }
-    CompactionNode fileNode = new CompactionNode(file, null, numKeys, seqNum);
+    CompactionNode fileNode = new CompactionNode(
+        file, snapshotID, numKeys, seqNum);
     forwardCompactionDAG.addNode(fileNode);
     backwardCompactionDAG.addNode(fileNode);
 
@@ -908,9 +923,14 @@ public class RocksDBCheckpointDiffer {
 
   /**
    * Populate the compaction DAG with input and output SST files lists.
+   * @param inputFiles List of compaction input files.
+   * @param outputFiles List of compaction output files.
+   * @param snapshotID Snapshot ID for debugging purpose. In fact, this can be
+   *                   arbitrary String as long as it helps debugging.
+   * @param seqNum DB transaction sequence number.
    */
   private void populateCompactionDAG(List<String> inputFiles,
-      List<String> outputFiles, long seqNum) {
+      List<String> outputFiles, String snapshotID, long seqNum) {
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Input files: {} -> Output files: {}", inputFiles, outputFiles);
@@ -918,11 +938,11 @@ public class RocksDBCheckpointDiffer {
 
     for (String outfile : outputFiles) {
       final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
-          outfile, file -> addNodeToDAG(file, seqNum));
+          outfile, file -> addNodeToDAG(file, snapshotID, seqNum));
 
       for (String infile : inputFiles) {
         final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
-            infile, file -> addNodeToDAG(file, seqNum));
+            infile, file -> addNodeToDAG(file, snapshotID, seqNum));
         // Draw the edges
         if (!outfileNode.fileName.equals(infileNode.fileName)) {
           forwardCompactionDAG.putEdge(outfileNode, infileNode);
