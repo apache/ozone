@@ -40,6 +40,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -378,6 +379,12 @@ public class RocksDBCheckpointDiffer {
             Path srcFile = Paths.get(file);
             try {
               Files.createLink(link, srcFile);
+            } catch (FileAlreadyExistsException ignored) {
+              // This could happen if a previous compaction is a "trivial move",
+              // where output SSTs files are exactly the same as input files.
+              // Those SSTs are simply moved to the next level without rewrites
+              // or renames.
+              LOG.debug("SST file already exists: {}", file);
             } catch (IOException e) {
               LOG.error("Exception in creating hard link for {}", file);
               throw new RuntimeException("Failed to create hard link", e);

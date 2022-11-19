@@ -22,9 +22,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -90,6 +92,12 @@ public class TestOMSnapshotDAG {
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
+
+    // Set DB Write Buffer to a low value so that DB flush and compaction
+    // can happen much more easily, without the test having to generate too much
+    // keys before it can happen.
+    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE,
+        "6MB");
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
