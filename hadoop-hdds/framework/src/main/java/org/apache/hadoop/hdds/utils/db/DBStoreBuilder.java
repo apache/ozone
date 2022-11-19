@@ -315,11 +315,11 @@ public final class DBStoreBuilder {
    * @return ManagedColumnFamilyOptions
    */
   private ManagedColumnFamilyOptions getDefaultCfOptions(long writeBufferSize) {
-    ManagedColumnFamilyOptions cfOptions = Optional.ofNullable(defaultCfOptions)
+    ManagedColumnFamilyOptions cfOpts = Optional.ofNullable(defaultCfOptions)
         .orElseGet(defaultCfProfile::getColumnFamilyOptions);
 
-    cfOptions.setWriteBufferSize(writeBufferSize);
-    return cfOptions;
+    cfOpts.setWriteBufferSize(writeBufferSize);
+    return cfOpts;
   }
 
   /**
