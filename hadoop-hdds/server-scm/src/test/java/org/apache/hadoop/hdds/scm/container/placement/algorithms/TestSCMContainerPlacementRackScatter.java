@@ -531,6 +531,41 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @Test
+  public void testPipeLineProviderRackScatter() throws SCMException {
+    setup(3, 1);
+    List<DatanodeDetails> usedDns = new ArrayList<>();
+    List<DatanodeDetails> excludedDns = new ArrayList<>();
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+  }
+
+  // Test for pipeline provider placement when number of racks less than
+  // number of node required and nodes cannot be scattered.  In this case
+  // the placement spreads the nodes as much as possible.  In one case
+  // 3 nodes required and 2 racks placing 2 in one 1 in another.  When
+  // only 1 rack placing all nodes in same rack.
+  @Test
+  public void testPipeLineProviderRackScatterFallback() throws SCMException {
+    setup(3, 2);
+    List<DatanodeDetails> usedDns = new ArrayList<>();
+    List<DatanodeDetails> excludedDns = new ArrayList<>();
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+
+    setup(3, 3);
+    additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+  }
+
+  // add test for pipeline engagement
+
+  @Test
   public void testValidChooseNodesWithUsedNodes() throws SCMException {
     setup(5, 2);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));

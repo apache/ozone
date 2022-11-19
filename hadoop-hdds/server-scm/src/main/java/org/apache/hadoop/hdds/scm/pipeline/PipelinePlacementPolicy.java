@@ -83,7 +83,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
-  int currentRatisThreePipelineCount(DatanodeDetails datanodeDetails) {
+  public static int currentRatisThreePipelineCount(
+      NodeManager nodeManager,
+      PipelineStateManager stateManager,
+      DatanodeDetails datanodeDetails) {
     // Safe to cast collection's size to int
     return (int) nodeManager.getPipelines(datanodeDetails).stream()
         .map(id -> {
@@ -95,11 +98,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
             return null;
           }
         })
-        .filter(this::isNonClosedRatisThreePipeline)
+        .filter(PipelinePlacementPolicy::isNonClosedRatisThreePipeline)
         .count();
   }
 
-  private boolean isNonClosedRatisThreePipeline(Pipeline p) {
+  public static boolean isNonClosedRatisThreePipeline(Pipeline p) {
     return p.getReplicationConfig()
         .equals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         && !p.isClosed();
@@ -155,7 +158,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // TODO check if sorting could cause performance issue: HDDS-3466.
     List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
-            new DnWithPipelines(d, currentRatisThreePipelineCount(d)))
+            new DnWithPipelines(d, currentRatisThreePipelineCount(nodeManager,
+                stateManager, d)))
         .filter(d ->
             (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
@@ -361,6 +365,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return results;
   }
 
+
   /**
    * Find a node from the healthy list and return it after removing it from the
    * list that we are operating on.
@@ -470,7 +475,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return REQUIRED_RACKS;
   }
 
-  private static class DnWithPipelines {
+  /**
+   * static inner utility class for datanodes with pipeline, used for
+   * pipeline engagement checking.
+   */
+  public static class DnWithPipelines {
     private DatanodeDetails dn;
     private int pipelines;
 

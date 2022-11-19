@@ -58,8 +58,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -316,6 +318,24 @@ public class TestRatisPipelineProvider {
     }
   }
 
+  @Test
+  // Test pipeline provider with RackScatter policy cannot create
+  // pipeline due to nodes with full pipeline engagement.
+  public void testFactorTHREEPipelineRacKScatterEngagement()
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+        "org.apache.hadoop.hdds.scm.container.placement" +
+            ".algorithms.SCMContainerPlacementRackScatter");
+    conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "0");
+    init(0, conf);
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+
+    Assertions.assertThrows(SCMException.class, () ->
+        provider.create(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            excludedNodes, Collections.EMPTY_LIST));
+  }
 
   @Test
   public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {

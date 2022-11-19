@@ -191,7 +191,9 @@ public final class SCMContainerPlacementRackScatter
           "than 0, but the given num is " + nodesRequiredToChoose;
       throw new SCMException(errorMsg, null);
     }
-    metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
+    if (metrics != null) {
+      metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
+    }
     int nodesRequired = nodesRequiredToChoose;
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
@@ -348,7 +350,9 @@ public final class SCMContainerPlacementRackScatter
       long metadataSizeRequired, long dataSizeRequired) {
     int maxRetry = INNER_LOOP_MAX_RETRY;
     while (true) {
-      metrics.incrDatanodeChooseAttemptCount();
+      if (metrics != null) {
+        metrics.incrDatanodeChooseAttemptCount();
+      }
       Node node = null;
       try {
         node = networkTopology.chooseRandom(scope, excludedNodes);
@@ -364,7 +368,9 @@ public final class SCMContainerPlacementRackScatter
         DatanodeDetails datanodeDetails = (DatanodeDetails) node;
         if (isValidNode(datanodeDetails, metadataSizeRequired,
             dataSizeRequired)) {
-          metrics.incrDatanodeChooseSuccessCount();
+          if (metrics != null) {
+            metrics.incrDatanodeChooseSuccessCount();
+          }
           return node;
         }
         // exclude the unavailable node for the following retries.
