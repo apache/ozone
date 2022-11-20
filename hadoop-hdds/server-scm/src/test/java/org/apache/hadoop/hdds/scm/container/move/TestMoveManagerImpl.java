@@ -172,6 +172,7 @@ public class TestMoveManagerImpl {
         .scheduleDeleteReplica(cid, dn1, 1);
     doNothing().when(containerReplicaPendingOps)
         .scheduleAddReplica(cid, dn2, 1);
+    moveManager.onLeaderReady();
 
     //1. test normal move
     CompletableFuture<MoveManager.MoveResult> ret =
