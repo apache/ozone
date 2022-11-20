@@ -174,6 +174,11 @@ public class RatisPipelineProvider
           containerSizeBytes);
       break;
     case THREE:
+      List<DatanodeDetails> excludeDueToEngagement =
+          filterPipelineEngagement();
+      if (excludeDueToEngagement.size() > 0 && excludedNodes.size() == 0) {
+        excludedNodes = excludeDueToEngagement;
+      }
       excludedNodes.addAll(filterPipelineEngagement());
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
