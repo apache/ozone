@@ -375,6 +375,16 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return indexes;
   }
 
+  /**
+   * Return true if there are more than one replica have the same index.
+   *
+   * @return false if only one replica has the given index, otherwise true.
+   */
+  @Override
+  public boolean isOverReplicatedWithIndex(int index) {
+    return overReplicatedIndexes(false).contains(index);
+  }
+
   private Map<Integer, Integer> getHealthyWithDelete(boolean includeDelete) {
     final Map<Integer, Integer> availableIndexes;
     if (includeDelete) {

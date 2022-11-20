@@ -38,13 +38,20 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -89,6 +96,7 @@ public class ContainerManagerImpl implements ContainerManager {
   // ContainerManager, we try to remove any replicas we see added or deleted
   // in case they have been created by replication / delete command
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
+  private final int maintenanceRedundancy;
 
   /**
    *
@@ -120,6 +128,9 @@ public class ContainerManagerImpl implements ContainerManager {
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
     this.containerReplicaPendingOps = containerReplicaPendingOps;
+    this.maintenanceRedundancy = ((ConfigurationSource) conf)
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class)
+        .getMaintenanceRemainingRedundancy();
   }
 
   @Override
@@ -181,6 +192,37 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public int getContainerStateCount(final LifeCycleState state) {
     return containerStateManager.getContainerIDs(state).size();
+  }
+
+  @Override
+  public ContainerReplicaCount getContainerReplicaCount(ContainerID cid)
+      throws ContainerNotFoundException {
+    ContainerInfo cif = getContainer(cid);
+    HddsProtos.ReplicationType type =
+        cif.getReplicationConfig().getReplicationType();
+    Set<ContainerReplica> replicas = getContainerReplicas(cid);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(cid);
+    switch (type) {
+    case EC:
+      return new ECContainerReplicaCount(cif, replicas,
+            pendingOps, maintenanceRedundancy);
+    default:
+      //for now, we suppose the default type is ratis.
+      //TODO, add code for STANDALONE and new type if needed.
+      int pendingAdd = 0;
+      int pendingDelete = 0;
+      for (ContainerReplicaOp op : pendingOps) {
+        if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+          pendingAdd++;
+        } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+          pendingDelete++;
+        }
+      }
+      return new RatisContainerReplicaCount(cif, replicas, pendingAdd,
+            pendingDelete, cif.getReplicationConfig().getRequiredNodes(),
+            maintenanceRedundancy);
+    }
   }
 
   @Override
@@ -303,6 +345,19 @@ public class ContainerManagerImpl implements ContainerManager {
     return Optional.ofNullable(containerStateManager
         .getContainerReplicas(id))
         .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
+  }
+
+  @Override
+  public int getContainerReplicaIndex(
+      final ContainerID id, final DatanodeDetails dn)
+      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+    Set<ContainerReplica> replicas = getContainerReplicas(id);
+    return replicas.stream().filter(r -> r.getDatanodeDetails().equals(dn))
+        //there should not be more than one replica of a container on the same
+        //datanode. handle this if found in the future.
+        .findFirst().orElseThrow(() ->
+            new ContainerReplicaNotFoundException("ID " + id + ", DN " + dn))
+        .getReplicaIndex();
   }
 
   @Override

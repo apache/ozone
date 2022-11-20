@@ -44,6 +44,8 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
+import org.apache.hadoop.hdds.scm.container.move.MoveManager;
+import org.apache.hadoop.hdds.scm.container.move.MoveManagerImpl;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
@@ -296,6 +298,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // Used to keep track of pending replication and pending deletes for
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
+  private MoveManager moveManager;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
   
   /**
@@ -700,7 +703,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
         scmContext);
 
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
+    moveManager = new MoveManagerImpl(this);
+
+    containerReplicaPendingOps =
+        new ContainerReplicaPendingOps(clock, moveManager);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
@@ -765,7 +771,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           eventQueue,
           scmContext,
           scmNodeManager,
-          clock,
+          clock, moveManager,
           legacyRM,
           containerReplicaPendingOps);
     }
@@ -1740,6 +1746,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public SCMHAManager getScmHAManager() {
     return scmHAManager;
+  }
+
+  /**
+   * Returns MoveManager.
+   */
+  public MoveManager getMoveManager() {
+    return moveManager;
+  }
+
+  /**
+   * Returns containerReplicaPendingOps.
+   */
+  public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
+    return containerReplicaPendingOps;
   }
 
   /**

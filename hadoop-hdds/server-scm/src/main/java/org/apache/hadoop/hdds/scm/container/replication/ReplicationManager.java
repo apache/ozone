@@ -36,6 +36,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.container.move.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
@@ -163,6 +165,7 @@ public class ReplicationManager implements SCMService {
   private final UnderReplicatedProcessor underReplicatedProcessor;
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
+  private final MoveManager moveManaer;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -187,7 +190,7 @@ public class ReplicationManager implements SCMService {
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
              final NodeManager nodeManager,
-             final Clock clock,
+             final Clock clock, final MoveManager moveManaer,
              final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
@@ -198,6 +201,7 @@ public class ReplicationManager implements SCMService {
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
     this.metrics = null;
+    this.moveManaer = moveManaer;
     this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -325,10 +329,22 @@ public class ReplicationManager implements SCMService {
         containerManager.getContainers();
     ReplicationManagerReport report = new ReplicationManagerReport();
     ReplicationQueue newRepQueue = new ReplicationQueue();
+    Map<ContainerID, MoveDataNodePair> pendingMoves =
+        moveManaer.getPendingMove();
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
         break;
       }
+
+      //if a container is being moved, bypass it.
+      //there may be a case that if the RM find a container is
+      //overreplicated, it may delete the replica on source
+      //datanode. but moveManger want to delete the replica on
+      //target datanode.
+      if (pendingMoves.containsKey(c.containerID())) {
+        continue;
+      }
+
       report.increment(c.getState());
       if (c.getReplicationType() != EC) {
         legacyReplicationManager.processContainer(c, report);

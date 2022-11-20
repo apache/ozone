@@ -18,9 +18,9 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.move.MoveManager;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -43,8 +43,6 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
  * operations.
  */
 public class ContainerReplicaPendingOps {
-
-  private final ConfigurationSource config;
   private final Clock clock;
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
@@ -52,11 +50,12 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<PendingOpType, AtomicLong>
       pendingOpCount = new ConcurrentHashMap<>();
   private ReplicationManagerMetrics replicationMetrics = null;
+  private MoveManager moveManager;
 
-  public ContainerReplicaPendingOps(final ConfigurationSource conf,
-      Clock clock) {
-    this.config = conf;
+  public ContainerReplicaPendingOps(
+      final Clock clock, final MoveManager moveManager) {
     this.clock = clock;
+    this.moveManager = moveManager;
     for (PendingOpType opType: PendingOpType.values()) {
       pendingOpCount.put(opType, new AtomicLong(0));
     }
@@ -189,6 +188,7 @@ public class ContainerReplicaPendingOps {
             iterator.remove();
             pendingOpCount.get(op.getOpType()).decrementAndGet();
             updateTimeoutMetrics(op);
+            moveManager.notifyContainerOpExpired(op, containerID);
           }
         }
         if (ops.size() == 0) {
@@ -248,6 +248,7 @@ public class ContainerReplicaPendingOps {
             found = true;
             iterator.remove();
             pendingOpCount.get(op.getOpType()).decrementAndGet();
+            moveManager.notifyContainerOpCompleted(op, containerID);
           }
         }
         if (ops.size() == 0) {

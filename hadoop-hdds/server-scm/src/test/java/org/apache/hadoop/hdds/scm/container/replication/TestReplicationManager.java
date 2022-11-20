@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.move.FakeMoveManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -98,7 +99,7 @@ public class TestReplicationManager {
     legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(configuration, clock);
+        new ContainerReplicaPendingOps(clock, new FakeMoveManager());
 
     Mockito.when(containerManager
         .getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
@@ -118,7 +119,7 @@ public class TestReplicationManager {
         eventPublisher,
         scmContext,
         nodeManager,
-        clock,
+        clock, new FakeMoveManager(),
         legacyReplicationManager,
         containerReplicaPendingOps);
     containerReplicaMap = new HashMap<>();
@@ -156,7 +157,7 @@ public class TestReplicationManager {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.OPEN);
     // Container is open but replicas are closed, so it is open but unhealthy.
-    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     replicationManager.processContainer(
         container, repQueue, repReport);
     Mockito.verify(eventPublisher, Mockito.times(1))

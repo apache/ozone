@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.move.FakeMoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager
     .ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -213,7 +214,8 @@ public class TestLegacyReplicationManager {
         )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
+    containerReplicaPendingOps =
+        new ContainerReplicaPendingOps(clock, new FakeMoveManager());
     createReplicationManager(new ReplicationManagerConfiguration());
   }
 
@@ -271,7 +273,7 @@ public class TestLegacyReplicationManager {
         eventQueue,
         SCMContext.emptyContext(),
         nodeManager,
-        clock,
+        clock, new FakeMoveManager(),
         legacyRM,
         containerReplicaPendingOps);
 

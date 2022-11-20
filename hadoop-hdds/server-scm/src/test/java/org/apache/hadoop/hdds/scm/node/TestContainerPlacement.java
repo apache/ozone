@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.move.FakeMoveManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -163,7 +164,8 @@ public class TestContainerPlacement {
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         new ContainerReplicaPendingOps(
-            conf, new MonotonicClock(ZoneId.systemDefault())));
+            new MonotonicClock(ZoneId.systemDefault()),
+            new FakeMoveManager()));
   }
 
   /**

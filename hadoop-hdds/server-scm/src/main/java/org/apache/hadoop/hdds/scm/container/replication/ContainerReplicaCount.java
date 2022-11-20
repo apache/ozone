@@ -66,4 +66,11 @@ public interface ContainerReplicaCount {
    * @return true if there are insufficient replicas, false otherwise.
    */
   boolean isUnrecoverable();
+
+  /**
+   * Return true if there are more than one replica have the same index.
+   *
+   * @return false if only one replica has the given index, otherwise true.
+   */
+  boolean isOverReplicatedWithIndex(int index);
 }

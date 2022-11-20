@@ -105,6 +105,16 @@ public class NodeStatus {
   }
 
   /**
+   * Returns true if the nodeStatus indicates the node is in IN_SERVICE
+   * state.
+   *
+   * @return True if the node is in IN_SERVICE state, false otherwise
+   */
+  public boolean isInService() {
+    return operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
+  }
+
+  /**
    * Returns true if the node is currently decommissioning.
    *
    * @return True if the node is decommissioning, false otherwise

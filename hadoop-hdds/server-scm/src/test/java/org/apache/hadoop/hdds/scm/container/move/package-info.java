@@ -19,4 +19,4 @@
 /**
  * Make CheckStyle happy.
  */
-package org.apache.hadoop.hdds.scm.container.closer;
+package org.apache.hadoop.hdds.scm.container.move;

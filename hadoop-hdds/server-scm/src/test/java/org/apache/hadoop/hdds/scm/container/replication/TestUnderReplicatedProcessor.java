@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.move.FakeMoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -65,7 +66,7 @@ public class TestUnderReplicatedProcessor {
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    pendingOps = new ContainerReplicaPendingOps(conf, clock);
+    pendingOps = new ContainerReplicaPendingOps(clock, new FakeMoveManager());
     replicationManager = Mockito.mock(ReplicationManager.class);
     eventPublisher = Mockito.mock(EventPublisher.class);
     repConfig = new ECReplicationConfig(3, 2);

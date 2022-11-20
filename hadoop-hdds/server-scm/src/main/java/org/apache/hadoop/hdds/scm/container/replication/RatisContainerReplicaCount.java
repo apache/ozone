@@ -347,4 +347,15 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   public boolean isUnrecoverable() {
     return getReplicas().isEmpty();
   }
+
+  /**
+   * Return true if there are more than one replica have the same index.
+   *
+   * @return false if only one replica has the given index, otherwise true.
+   */
+  @Override
+  public boolean isOverReplicatedWithIndex(int index) {
+    //all the ratis container replicas has the same index.
+    return isOverReplicated();
+  }
 }

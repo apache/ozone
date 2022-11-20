@@ -191,6 +191,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
+    scm.getMoveManager().onNotLeader();
   }
 
   /**
@@ -329,6 +330,7 @@ public class SCMStateMachine extends BaseStateMachine {
         scm.getScmContext().setLeaderReady();
         scm.getSCMServiceManager().notifyStatusChanged();
         scm.getFinalizationManager().onLeaderReady();
+        scm.getMoveManager().onLeaderReady();
       }
 
       // Means all transactions before this term have been applied.

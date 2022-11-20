@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.move.FakeMoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -156,8 +157,9 @@ public class TestBlockManager {
             sequenceIdGen,
             pipelineManager,
             scmMetadataStore.getContainerTable(),
-            new ContainerReplicaPendingOps(conf,
-                new MonotonicClock(ZoneId.systemDefault())));
+            new ContainerReplicaPendingOps(
+                new MonotonicClock(ZoneId.systemDefault()),
+                new FakeMoveManager()));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {

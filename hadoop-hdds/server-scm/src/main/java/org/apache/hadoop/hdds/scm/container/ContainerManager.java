@@ -25,8 +25,10 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -50,6 +52,13 @@ public interface ContainerManager extends Closeable {
    *
    */
   ContainerInfo getContainer(ContainerID containerID)
+      throws ContainerNotFoundException;
+
+  /**
+   * Returns ContainerReplicaCount of the container ID.
+   *
+   */
+  ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException;
 
 
@@ -122,6 +131,16 @@ public interface ContainerManager extends Closeable {
    */
   Set<ContainerReplica> getContainerReplicas(ContainerID containerID)
       throws ContainerNotFoundException;
+
+  /**
+   * Returns the index of the container replica on the given datanode.
+   *
+   * @param containerID Container ID
+   * @param dn datanode
+   * @return the index of the replica
+   */
+  int getContainerReplicaIndex(ContainerID containerID, DatanodeDetails dn)
+      throws ContainerNotFoundException, ContainerReplicaNotFoundException;
 
   /**
    * Adds a container Replica for the given Container.

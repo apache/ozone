@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.move.FakeMoveManager;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +42,6 @@ public class TestContainerReplicaPendingOps {
 
   private ContainerReplicaPendingOps pendingOps;
   private TestClock clock;
-  private ConfigurationSource config;
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
@@ -52,9 +50,8 @@ public class TestContainerReplicaPendingOps {
 
   @BeforeEach
   public void setup() {
-    config = new OzoneConfiguration();
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
-    pendingOps = new ContainerReplicaPendingOps(config, clock);
+    pendingOps = new ContainerReplicaPendingOps(clock, new FakeMoveManager());
     rm = Mockito.mock(ReplicationManager.class);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);

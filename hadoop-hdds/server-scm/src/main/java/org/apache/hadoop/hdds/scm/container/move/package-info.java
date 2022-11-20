@@ -17,7 +17,7 @@
  */
 
 /**
- * This package has class that close a container. That is move a container from
- * open state to close state.
+ * This package has class that moves a container. That is move a container from
+ * source datanode to target datanode.
  */
-package org.apache.hadoop.hdds.scm.container.closer;
+package org.apache.hadoop.hdds.scm.container.move;
