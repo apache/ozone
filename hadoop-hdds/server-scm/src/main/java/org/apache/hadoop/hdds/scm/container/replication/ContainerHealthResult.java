@@ -34,7 +34,8 @@ public class ContainerHealthResult {
     HEALTHY,
     UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 
   private final ContainerInfo containerInfo;
@@ -106,9 +107,6 @@ public class ContainerHealthResult {
     private final int remainingRedundancy;
     private final boolean dueToDecommission;
     private final boolean sufficientlyReplicatedAfterPending;
-    private boolean dueToMisReplication = false;
-    private boolean isMisReplicated = false;
-    private boolean isMisReplicatedAfterPending = false;
     private final boolean unrecoverable;
     private int requeueCount = 0;
 
@@ -120,44 +118,6 @@ public class ContainerHealthResult {
       this.dueToDecommission = dueToDecommission;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
-    }
-
-    /**
-     * Pass true to indicate the container is mis-replicated - ie it does not
-     * meet the placement policy.
-     * @param isMisRep True if the container is mis-replicated, false if not.
-     * @return this object to allow calls to be chained
-     */
-    public UnderReplicatedHealthResult
-        setMisReplicated(boolean isMisRep) {
-      this.isMisReplicated = isMisRep;
-      return this;
-    }
-
-    /**
-     * Pass true to indicate the container is mis-replicated after considering
-     * pending replicas scheduled for create or delete.
-     * @param isMisRep True if the container is mis-replicated considering
-     *                 pending replicas, or false if not.
-     * @return this object to allow calls to be chained
-     */
-    public UnderReplicatedHealthResult
-        setMisReplicatedAfterPending(boolean isMisRep) {
-      this.isMisReplicatedAfterPending = isMisRep;
-      return this;
-    }
-
-    /**
-     * If the container is ONLY under replicated due to mis-replication, pass
-     * true, otherwise pass false.
-     * @param dueToMisRep Pass true if the container has enough replicas but
-     *                    does not meet the placement policy.
-     * @return
-     */
-    public UnderReplicatedHealthResult
-        setDueToMisReplication(boolean dueToMisRep) {
-      this.dueToMisReplication = dueToMisRep;
-      return this;
     }
 
     /**
@@ -224,36 +184,8 @@ public class ContainerHealthResult {
      * @return True if the under-replication is corrected by the pending
      *         replicas. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
-    }
-
-    /**
-     * Returns true if the container is mis-replicated, ignoring any pending
-     * replicas scheduled to be created.
-     * @return True if mis-replicated, ignoring pending
-     */
-    public boolean isMisReplicated() {
-      return isMisReplicated;
-    }
-
-    /**
-     * Returns true if the container is mis-replicated after taking account of
-     * pending replicas, which are schedule to be created.
-     * @return true is mis-replicated after pending.
-     */
-    public boolean isMisReplicatedAfterPending() {
-      return isMisReplicatedAfterPending;
-    }
-
-    /**
-     * Returns true if the under replication is only due to mis-replication.
-     * In other words, the container has enough replicas, but they do not meet
-     * the placement policy.
-     * @return true if the under-replication is only due to mis-replication
-     */
-    public boolean isDueToMisReplication() {
-      return dueToMisReplication;
     }
 
     /**
@@ -265,6 +197,28 @@ public class ContainerHealthResult {
      */
     public boolean isUnrecoverable() {
       return unrecoverable;
+    }
+  }
+
+  /**
+   * Class to represent a container healthy state which is mis-Replicated. This
+   * means the container is neither over nor under replicated, but its replicas
+   * don't meet the requirements of the container placement policy. Eg the
+   * containers are not spread across enough racks.
+   */
+  public static class MisReplicatedHealthResult
+      extends ContainerHealthResult {
+
+    private final boolean replicatedOkAfterPending;
+
+    public MisReplicatedHealthResult(ContainerInfo containerInfo,
+        boolean replicatedOkAfterPending) {
+      super(containerInfo, HealthState.MIS_REPLICATED);
+      this.replicatedOkAfterPending = replicatedOkAfterPending;
+    }
+
+    public boolean isReplicatedOkAfterPending() {
+      return replicatedOkAfterPending;
     }
   }
 
@@ -304,7 +258,7 @@ public class ContainerHealthResult {
      * @return True if the over-replication is corrected by the pending
      *         deletes. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
     }
   }

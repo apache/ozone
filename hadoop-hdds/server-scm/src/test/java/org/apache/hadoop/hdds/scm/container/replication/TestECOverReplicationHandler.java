@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
@@ -52,6 +53,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 
 /**
  * Tests the ECOverReplicationHandling functionality.
@@ -63,6 +66,7 @@ public class TestECOverReplicationHandler {
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private ECReplicationCheckHandler replicationCheck;
+  private PlacementPolicy placementPolicy;
 
   @BeforeEach
   public void setup() {
@@ -82,7 +86,11 @@ public class TestECOverReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    replicationCheck = new ECReplicationCheckHandler();
+    placementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(placementPolicy.validateContainerPlacement(
+        anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+    replicationCheck = new ECReplicationCheckHandler(placementPolicy);
   }
 
   @Test
