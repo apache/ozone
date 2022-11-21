@@ -118,8 +118,11 @@ public class TestOmSnapshotManager {
     String snapshotName = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    return SnapshotInfo.newInstance(
-        volumeName, bucketName, snapshotName);
+    String snapshotId = UUID.randomUUID().toString();
+    return SnapshotInfo.newInstance(volumeName,
+        bucketName,
+        snapshotName,
+        snapshotId);
   }
 
 }

@@ -1068,13 +1068,21 @@ public final class OMRequestTestUtils {
    * @param snapshotName name to be used
    */
   public static OMRequest createSnapshotRequest(String volumeName,
-      String bucketName, String snapshotName) {
-    return OMRequest.newBuilder().setCreateSnapshotRequest(
-            OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
-                .setVolumeName(volumeName).setBucketName(bucketName)
-                .setSnapshotName(snapshotName))
+                                                String bucketName,
+                                                String snapshotName) {
+    OzoneManagerProtocolProtos.CreateSnapshotRequest createSnapshotRequest =
+        OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotId(UUID.randomUUID().toString())
+            .setSnapshotName(snapshotName)
+            .build();
+
+    return OMRequest.newBuilder()
+        .setCreateSnapshotRequest(createSnapshotRequest)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateSnapshot)
-        .setClientId(UUID.randomUUID().toString()).build();
+        .setClientId(UUID.randomUUID().toString())
+        .build();
   }
 
   /**

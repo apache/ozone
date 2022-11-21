@@ -64,6 +64,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
+  private final String snapshotId;
   private final SnapshotInfo snapshotInfo;
 
   public OMSnapshotCreateRequest(OMRequest omRequest) {
@@ -72,9 +73,13 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         .getCreateSnapshotRequest();
     volumeName = createSnapshotRequest.getVolumeName();
     bucketName = createSnapshotRequest.getBucketName();
+    snapshotId = createSnapshotRequest.getSnapshotId();
+
     String possibleName = createSnapshotRequest.getSnapshotName();
-    snapshotInfo =
-        SnapshotInfo.newInstance(volumeName, bucketName, possibleName);
+    snapshotInfo = SnapshotInfo.newInstance(volumeName,
+        bucketName,
+        possibleName,
+        snapshotId);
     snapshotName = snapshotInfo.getName();
     snapshotPath = snapshotInfo.getSnapshotPath();
   }
