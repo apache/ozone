@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.Rule;
@@ -410,6 +411,19 @@ public class TestOmSnapshot {
 
     deleteKeys(volbucket);
 
+  }
+
+  @Test
+  public void testNonExistentBucket()
+          throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    //create volume but not bucket
+    store.createVolume(volume);
+
+    LambdaTestUtils.intercept(OMException.class,
+            "Bucket not found",
+            () -> createSnapshot(volume, bucket));
   }
 
   private String createSnapshot()

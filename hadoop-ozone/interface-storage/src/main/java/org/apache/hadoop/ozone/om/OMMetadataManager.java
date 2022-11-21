@@ -223,6 +223,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return list of snapshot
+   */
+  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
    * Recover trash allows the user to recover the keys
    * that were marked as deleted, but not actually deleted by Ozone Manager.
    * @param volumeName - The volume name.

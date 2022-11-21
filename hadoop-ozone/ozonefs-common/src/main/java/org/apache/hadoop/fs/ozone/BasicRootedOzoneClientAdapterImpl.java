@@ -1118,4 +1118,13 @@ public class BasicRootedOzoneClientAdapterImpl
         length, combineMode, ozoneClient.getObjectStore().getClientProxy());
 
   }
+
+  @Override
+  public String createSnapshot(String pathStr, String snapshotName)
+          throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr);
+    return proxy.createSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(),
+            snapshotName);
+  }
 }

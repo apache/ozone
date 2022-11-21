@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -276,6 +277,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         TenantListUserResponse listUserResponse = tenantListUsers(
             request.getTenantListUserRequest());
         responseBuilder.setTenantListUserResponse(listUserResponse);
+        break;
+      case ListSnapshot:
+        OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
+            getSnapshots(request.getListSnapshotRequest());
+        responseBuilder.setListSnapshotResponse(listSnapshotResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1194,5 +1200,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   public OzoneManager getOzoneManager() {
     return impl;
+  }
+
+  private OzoneManagerProtocolProtos.ListSnapshotResponse getSnapshots(
+      OzoneManagerProtocolProtos.ListSnapshotRequest request)
+      throws IOException {
+    List<SnapshotInfo> snapshotInfos = impl.listSnapshot(
+        request.getVolumeName(), request.getBucketName());
+    List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList =
+        snapshotInfos.stream().map(SnapshotInfo::getProtobuf)
+            .collect(Collectors.toList());
+    return OzoneManagerProtocolProtos.ListSnapshotResponse.newBuilder()
+        .addAllSnapshotInfo(snapshotInfoList).build();
   }
 }

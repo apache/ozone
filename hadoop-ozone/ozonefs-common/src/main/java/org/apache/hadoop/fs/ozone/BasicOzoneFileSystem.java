@@ -74,6 +74,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
@@ -870,6 +871,14 @@ public class BasicOzoneFileSystem extends FileSystem {
     return new OzoneFileStatusIterator<>(f);
   }
 
+  @Override
+  public Path createSnapshot(Path path, String snapshotName)
+          throws IOException {
+    String snapshot = adapter.createSnapshot(pathToKey(path), snapshotName);
+    return new Path(path,
+        OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
+  }
+
   /**
    * A private class implementation for iterating list of file status.
    *
@@ -1183,5 +1192,4 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
     return new LocatedFileStatus(fileStatus, blockLocations);
   }
-
 }
