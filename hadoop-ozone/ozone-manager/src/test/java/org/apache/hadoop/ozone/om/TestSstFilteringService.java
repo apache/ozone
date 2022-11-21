@@ -180,6 +180,8 @@ public class TestSstFilteringService {
 
     store.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
 
+    List<LiveFileMetaData> allFiles = store.getDb().getSstFileList();
+
     writeClient.createSnapshot("vol1", "buck2", "snapshot1");
 
     GenericTestUtils.waitFor(
@@ -197,10 +199,15 @@ public class TestSstFilteringService {
         dbSnapshots + OM_KEY_PREFIX + OM_DB_NAME + snapshotInfo
             .getCheckpointDirName();
 
-    for (LiveFileMetaData file : nonlevelOFiles) {
+    for (LiveFileMetaData file : allFiles) {
       File sstFile =
           new File(snapshotDirName + OM_KEY_PREFIX + file.fileName());
-      Assert.assertFalse(sstFile.exists());
+      if (nonlevelOFiles.stream()
+          .anyMatch(o -> file.fileName().equals(o.fileName()))) {
+        Assert.assertFalse(sstFile.exists());
+      } else {
+        Assert.assertTrue(sstFile.exists());
+      }
     }
 
     List<String> processedSnapshotIds = Files

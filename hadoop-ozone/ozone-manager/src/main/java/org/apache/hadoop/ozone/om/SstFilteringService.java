@@ -175,7 +175,8 @@ public class SstFilteringService extends BackgroundService {
       String bucketName = snapshotInfo.getBucketName();
 
       long volumeId = ozoneManager.getMetadataManager().getVolumeId(volumeName);
-      // TODO : buckets can be deleted via ofs , handle deletion of bucket case.
+      // TODO : HDDS-6984  buckets can be deleted via ofs
+      //  handle deletion of bucket case.
       long bucketId =
           ozoneManager.getMetadataManager().getBucketId(volumeName, bucketName);
 
