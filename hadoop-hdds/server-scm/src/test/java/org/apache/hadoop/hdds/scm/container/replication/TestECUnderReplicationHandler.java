@@ -334,10 +334,7 @@ public class TestECUnderReplicationHandler {
     DatanodeDetails newNode = MockDatanodeDetails.randomDatanodeDetails();
     PlacementPolicy sameNodePolicy = ReplicationTestUtil
         .getSameNodeTestPlacementPolicy(nodeManager, conf, newNode);
-
-    ContainerReplica overRepReplica =
-        ReplicationTestUtil.createContainerReplica(container.containerID(),
-            4, IN_SERVICE, CLOSED);
+    
     ContainerReplica decomReplica =
         ReplicationTestUtil.createContainerReplica(container.containerID(),
             5, DECOMMISSIONING, CLOSED);
