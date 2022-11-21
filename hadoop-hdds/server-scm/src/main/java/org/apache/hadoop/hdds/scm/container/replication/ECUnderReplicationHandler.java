@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -68,7 +67,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private final ReplicationManager replicationManager;
 
   private static class CannotFindTargetsException extends IOException {
-    public CannotFindTargetsException(Throwable cause) {
+    CannotFindTargetsException(Throwable cause) {
       super(cause);
     }
   }
@@ -206,11 +205,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         // If the container is also over replicated, then hand it off to the
         // over-rep handler, and after those over-rep indexes are cleared the
         // under replication can be re-tried in the next iteration of RM.
-        // However we should only hand off to the over rep handler if there are
+        // However, we should only hand off to the over rep handler if there are
         // no commands already created. If we have some commands, they may
         // attempt to use sources the over-rep handler would remove. So we
         // should let the commands we have created be processed, and then the
-        // container will be re-processed in a futher RM pass.
+        // container will be re-processed in a further RM pass.
         LOG.debug("Unable to located new target nodes for container {}",
             container, e);
         if (commands.size() > 0) {
@@ -368,8 +367,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           if (decomIndexes.contains(replica.getReplicaIndex())) {
             if (!iterator.hasNext()) {
               LOG.warn("Couldn't find enough targets. Available source"
-                      + " nodes: {}, the target nodes: {}, excluded nodes: {} and"
-                      + "  the decommission indexes: {}",
+                      + " nodes: {}, the target nodes: {}, excluded nodes: {}"
+                      + "  and the decommission indexes: {}",
                   replicas, selectedDatanodes, excludedNodes, decomIndexes);
               break;
             }
