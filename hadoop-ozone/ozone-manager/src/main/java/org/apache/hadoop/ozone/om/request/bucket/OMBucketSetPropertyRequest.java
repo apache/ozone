@@ -321,7 +321,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       return false;
     }
     
-    if (quotaInNamespace < dbBucketInfo.getUsedNamespace()) {
+    if (quotaInNamespace != OzoneConsts.QUOTA_RESET
+        && quotaInNamespace < dbBucketInfo.getUsedNamespace()) {
       throw new OMException("Cannot update bucket quota. NamespaceQuota " +
           "requested is less than used namespaceQuota.",
           OMException.ResultCodes.QUOTA_ERROR);
