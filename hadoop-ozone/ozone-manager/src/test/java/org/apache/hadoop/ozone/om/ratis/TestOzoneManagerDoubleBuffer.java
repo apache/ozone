@@ -138,7 +138,7 @@ class TestOzoneManagerDoubleBuffer {
                 omBucketCreateResponse),
             1L, 2L, 1L, 2L, 2L, 2.0F),
         Arguments.of(Arrays.asList(omSnapshotCreateResponse1,
-                omSnapshotCreateResponse1),
+                omSnapshotCreateResponse2),
             2L, 2L, 3L, 4L, 1L, 1.333F),
         Arguments.of(Arrays.asList(omKeyCreateResponse,
                 omBucketCreateResponse,
@@ -158,6 +158,22 @@ class TestOzoneManagerDoubleBuffer {
     );
   }
 
+  /**
+   * Tests OzoneManagerDoubleBuffer's snapshot aware splitting and flushing
+   * logic.
+   *
+   * @param expectedFlushCounts,
+   * @param expectedFlushedTransactionCount
+   * @param expectedFlushCountsInMetric, Overall flush count, and it is not
+   *                                     same as expectedFlushCounts because
+   *                                     metric static and shared object.
+   * @param expectedFlushedTransactionCountInMetric, Overall transaction count.
+   * @param expectedMaxNumberOfTransactionsFlushedInMetric, Overall max
+   *                                                        transaction count
+   *                                                        per flush.
+   * @param expectedAvgFlushTransactionsInMetric, Overall avg transaction count
+   *                                              per flush.
+   */
   @ParameterizedTest
   @MethodSource("doubleBufferFlushCases")
   public void testOzoneManagerDoubleBuffer(

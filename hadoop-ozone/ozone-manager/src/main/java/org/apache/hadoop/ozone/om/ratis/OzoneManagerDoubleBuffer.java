@@ -358,6 +358,12 @@ public final class OzoneManagerDoubleBuffer {
           Time.monotonicNow() - startTime);
     }
 
+    // Complete futures first and then do other things.
+    // So that handler threads will be released.
+    if (!isRatisEnabled) {
+      clearReadyFutureQueue(buffer.size());
+    }
+
     int flushedTransactionsSize = buffer.size();
     flushedTransactionCount.addAndGet(flushedTransactionsSize);
     flushIterations.incrementAndGet();
@@ -481,14 +487,20 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
-  private synchronized void clearReadyBuffer() {
-    if (!isRatisEnabled) {
-      // Once all entries are flushed, we can complete their future.
-      readyFutureQueue.iterator()
-          .forEachRemaining((entry) -> entry.complete(null));
-      readyFutureQueue.clear();
+  /**
+   * Completes futures for first count element form the readyFutureQueue
+   * so that handler thread can be released asap.
+   */
+  private void clearReadyFutureQueue(int count) {
+    if (isRatisEnabled) {
+      return;
     }
-    readyBuffer.clear();
+
+    Iterator<CompletableFuture<Void>> iterator = readyFutureQueue.iterator();
+    while (iterator.hasNext() && count > 0) {
+      iterator.next().complete(null);
+      count--;
+    }
   }
 
   private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
@@ -498,6 +510,9 @@ public final class OzoneManagerDoubleBuffer {
     });
   }
 
+  private synchronized void clearReadyBuffer() {
+    readyBuffer.clear();
+  }
   /**
    * Update OzoneManagerDoubleBuffer metrics values.
    * @param flushedTransactionsSize
