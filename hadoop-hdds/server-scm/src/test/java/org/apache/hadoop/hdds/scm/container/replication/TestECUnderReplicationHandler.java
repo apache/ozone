@@ -373,10 +373,6 @@ public class TestECUnderReplicationHandler {
         availableReplicas.add(toAdd);
       }
 
-      Map<DatanodeDetails, SCMCommand<?>> expectedDelete = new HashMap<>();
-      expectedDelete.put(overRepReplica.getDatanodeDetails(),
-          createDeleteContainerCommand(container, overRepReplica));
-
       Map<DatanodeDetails, SCMCommand<?>> commands =
           ecURH.processAndCreateCommands(availableReplicas,
               Collections.emptyList(), underRep, 2);
