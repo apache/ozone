@@ -638,6 +638,7 @@ public class RpcClient implements ClientProtocol {
           .setKeyName(bucketArgs.getEncryptionKey()).build();
     }
 
+
     List<OzoneAcl> listOfAcls = getAclList();
     //ACLs from BucketArgs
     if (bucketArgs.getAcls() != null) {
@@ -668,13 +669,19 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
+    ReplicationType replicationType = defaultReplicationConfig == null ?
+        ReplicationType.RATIS : defaultReplicationConfig.getType();
+
     String layoutMsg = bucketLayout != null
         ? "with bucket layout " + bucketLayout
         : "with server-side default bucket layout";
     LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
-            "Storage Type set to {} and Encryption set to {} ",
+            "Storage Type set to {} and Encryption set to {}, " +
+            "Replication Type set to {}, Namespace Quota set to {}, Space Quota set to {} ",
         volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
-        storageType, bek != null);
+        storageType, bek != null, replicationType.toString(),
+        bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes() );
+
     ozoneManagerClient.createBucket(builder.build());
   }
 
