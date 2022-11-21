@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -470,8 +469,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK,
-            ClientVersion.DEFAULT_VERSION.toProtoValue());
+            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);

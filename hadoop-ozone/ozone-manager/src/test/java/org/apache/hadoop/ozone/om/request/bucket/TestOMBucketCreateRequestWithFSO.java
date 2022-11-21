@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -59,7 +58,7 @@ public class TestOMBucketCreateRequestWithFSO
     Assert.assertEquals(0, omMetrics.getNumFSOBucketCreates());
 
     OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
-        bucketName, ClientVersion.DEFAULT_VERSION, true);
+        bucketName, true);
 
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
@@ -71,7 +70,7 @@ public class TestOMBucketCreateRequestWithFSO
 
   /**
    * Gets the bucket layout from the ozone configuration and
-   * creates a bucket request using the latest client version.
+   * creates a bucket request with the latest client version.
    * Checking that the configuration layout is the same with
    * the one used for the request.
    * @throws Exception
@@ -95,8 +94,7 @@ public class TestOMBucketCreateRequestWithFSO
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
 
     OMBucketCreateRequest omBucketCreateRequest =
-        doPreExecute(volumeName, bucketName,
-            ClientVersion.BUCKET_LAYOUT_SUPPORT, false);
+        doPreExecute(volumeName, bucketName, false);
 
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
@@ -107,7 +105,7 @@ public class TestOMBucketCreateRequestWithFSO
   }
 
   private OMBucketCreateRequest doPreExecute(String volumeName,
-      String bucketName, ClientVersion cv, boolean layoutFSOFromCli)
+      String bucketName, boolean layoutFSOFromCli)
       throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
 
@@ -116,11 +114,11 @@ public class TestOMBucketCreateRequestWithFSO
     if (layoutFSOFromCli) {
       originalRequest =
           OMRequestTestUtils.createBucketReqFSO(bucketName, volumeName,
-              false, StorageTypeProto.SSD, cv.toProtoValue());
+              false, StorageTypeProto.SSD);
     } else {
       originalRequest = OMRequestTestUtils
           .createBucketRequest(bucketName, volumeName,
-              false, StorageTypeProto.SSD, cv.toProtoValue());
+              false, StorageTypeProto.SSD);
     }
 
     OMBucketCreateRequest omBucketCreateRequest =
