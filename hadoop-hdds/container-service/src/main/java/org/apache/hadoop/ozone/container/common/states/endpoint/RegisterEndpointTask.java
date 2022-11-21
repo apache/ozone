@@ -159,11 +159,14 @@ public final class RegisterEndpointTask implements
             nodeReport, containerReport, pipelineReportsProto, layoutInfo);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
-            "Unexpected datanode ID in the response.");
+            "Unexpected datanode ID in the response from "
+                + rpcEndPoint.getAddressString());
         Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
-            "Invalid cluster ID in the response.");
+            "Invalid cluster ID in the response from "
+                + rpcEndPoint.getAddressString());
         Preconditions.checkState(response.getErrorCode() == success,
-            "DataNode has higher Software Layout Version than SCM.");
+            "DataNode has higher Software Layout Version than Endpoint "
+                + rpcEndPoint.getAddressString());
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());

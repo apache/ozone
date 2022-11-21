@@ -374,8 +374,6 @@ public class TestSCMNodeManager {
       registerWithCapacity(nodeManager,
           LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
       registerWithCapacity(nodeManager,
-          SMALLER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
-      registerWithCapacity(nodeManager,
           LARGER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
       // Nodes with mismatched MLV can join, but should not be allowed in
       // pipelines.
