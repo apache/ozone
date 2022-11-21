@@ -268,6 +268,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
                      OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs,
                      OmBucketInfo dbBucketInfo)
       throws IOException {
+    if (!omBucketArgs.hasQuotaInBytes()) {
+      // Quota related values are not in the request, so we don't need to check
+      // them as they have not changed.
+      return false;
+    }
     long quotaInBytes = omBucketArgs.getQuotaInBytes();
 
     if (quotaInBytes == OzoneConsts.QUOTA_RESET &&
@@ -315,6 +320,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   public boolean checkQuotaNamespaceValid(OmVolumeArgs omVolumeArgs,
       OmBucketArgs omBucketArgs, OmBucketInfo dbBucketInfo)
       throws IOException {
+    if (!omBucketArgs.hasQuotaInNamespace()) {
+      // Quota related values are not in the request, so we don't need to check
+      // them as they have not changed.
+      return false;
+    }
     long quotaInNamespace = omBucketArgs.getQuotaInNamespace();
 
     if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
