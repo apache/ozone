@@ -60,8 +60,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
  * DoubleBuffer it has 2 buffers one is currentBuffer and other is
- * readyBuffer. The current OM requests will be always added to currentBuffer.
- * Flush thread will be running in background, it check's if currentBuffer has
+ * readyBuffer. The current OM requests will always be added to currentBuffer.
+ * Flush thread will be running in background, it checks if currentBuffer has
  * any entries, it swaps the buffer and creates a batch and commit to DB.
  * Adding OM request to doubleBuffer and swap of buffer are synchronized
  * methods.
@@ -255,59 +255,54 @@ public final class OzoneManagerDoubleBuffer {
    * and commit to DB.
    */
   private void flushTransactions() {
-    while (isRunning.get()) {
-      try {
-        // Wait till there is some transaction to flush.
-        canFlush();
-
-        setReadyBuffer();
-
-        // For snapshot, we want to include all the keys that were committed
-        // before the snapshot `create` command was executed. To achieve
-        // the behaviour, we spilt the request buffer at snapshot create
-        // request and flush the buffer in batches split at snapshot create
-        // request.
-        // For example, if requestBuffer is [request1, request2,
-        // snapshotCreateRequest1, request3, snapshotCreateRequest2, request4].
-        //
-        // Split requestBuffer would be.
-        // bufferQueues = [[request1, request2], [snapshotRequest1], [request3],
-        //     [snapshotRequest2], [request4]].
-        // And bufferQueues will be flushed in following order:
-        // Flush #1: [request1, request2]
-        // Flush #2: [snapshotRequest1]
-        // Flush #3: [request3]
-        // Flush #4: [snapshotRequest2]
-        // Flush #5: [request4]
-        List<Queue<DoubleBufferEntry<OMClientResponse>>> bufferQueues =
-            splitReadyBufferAtCreateSnapshot();
-
-        for (Queue<DoubleBufferEntry<OMClientResponse>> buffer : bufferQueues) {
-          flushBatch(buffer);
-        }
-
-        clearReadyBuffer();
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        if (isRunning.get()) {
-          final String message = "OMDoubleBuffer flush thread " +
-              Thread.currentThread().getName() + " encountered Interrupted " +
-              "exception while running";
-          ExitUtils.terminate(1, message, ex, LOG);
-        } else {
-          LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
-              + "exit.", Thread.currentThread().getName());
-        }
-      } catch (IOException ex) {
-        terminate(ex);
-      } catch (Throwable t) {
-        final String s = "OMDoubleBuffer flush thread " +
-            Thread.currentThread().getName() + " encountered Throwable error";
-        ExitUtils.terminate(2, s, t, LOG);
-      }
+    while (isRunning.get() && canFlush()) {
+      flushCurrentBuffer();
     }
   }
 
+  /**
+   * This is to extract out the flushing logic to make it testable.
+   * If we don't do that, there could be a race condition which could fail
+   * the unit test on different machines.
+   */
+  @VisibleForTesting
+  void flushCurrentBuffer() {
+    try {
+      swapCurrentAndReadyBuffer();
+
+      // For snapshot, we want to include all the keys that were committed
+      // before the snapshot `create` command was executed. To achieve
+      // the behaviour, we spilt the request buffer at snapshot create
+      // request and flush the buffer in batches split at snapshot create
+      // request.
+      // For example, if requestBuffer is [request1, request2,
+      // snapshotCreateRequest1, request3, snapshotCreateRequest2, request4].
+      //
+      // Split requestBuffer would be.
+      // bufferQueues = [[request1, request2], [snapshotRequest1], [request3],
+      //     [snapshotRequest2], [request4]].
+      // And bufferQueues will be flushed in following order:
+      // Flush #1: [request1, request2]
+      // Flush #2: [snapshotRequest1]
+      // Flush #3: [request3]
+      // Flush #4: [snapshotRequest2]
+      // Flush #5: [request4]
+      List<Queue<DoubleBufferEntry<OMClientResponse>>> bufferQueues =
+          splitReadyBufferAtCreateSnapshot();
+
+      for (Queue<DoubleBufferEntry<OMClientResponse>> buffer : bufferQueues) {
+        flushBatch(buffer);
+      }
+
+      clearReadyBuffer();
+    } catch (IOException ex) {
+      terminate(ex);
+    } catch (Throwable t) {
+      final String s = "OMDoubleBuffer flush thread " +
+          Thread.currentThread().getName() + " encountered Throwable error";
+      ExitUtils.terminate(2, s, t, LOG);
+    }
+  }
   private void flushBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer)
       throws IOException {
 
@@ -541,6 +536,12 @@ public final class OzoneManagerDoubleBuffer {
   // as this a normal flow of a shutdown.
   @SuppressWarnings("squid:S2142")
   public void stop() {
+    stopDaemon();
+    ozoneManagerDoubleBufferMetrics.unRegister();
+  }
+
+  @VisibleForTesting
+  public void stopDaemon() {
     if (isRunning.compareAndSet(true, false)) {
       LOG.info("Stopping OMDoubleBuffer flush thread");
       daemon.interrupt();
@@ -550,15 +551,10 @@ public final class OzoneManagerDoubleBuffer {
       } catch (InterruptedException e) {
         LOG.debug("Interrupted while waiting for daemon to exit.", e);
       }
-
-      // stop metrics.
-      ozoneManagerDoubleBufferMetrics.unRegister();
     } else {
       LOG.info("OMDoubleBuffer flush thread is not running.");
     }
-
   }
-
   private void terminate(IOException ex) {
     String message = "During flush to DB encountered error in " +
         "OMDoubleBuffer flush thread " + Thread.currentThread().getName();
@@ -603,23 +599,37 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   /**
-   * Check if we can flush transactions or not. This method wait's until
-   * currentBuffer size is greater than zero, once currentBuffer size is
-   * greater than zero it gets notify signal.
+   * Check if transactions can be flushed or not. It waits till currentBuffer
+   * size is greater than zero. When any item gets added to currentBuffer,
+   * it gets notify signal. Returns true once currentBuffer size becomes greater
+   * than zero. In case of any interruption, terminates the OM when daemon is
+   * running otherwise returns false.
    */
-  private synchronized void canFlush() throws InterruptedException {
-    // When transactions are added to buffer it notifies, then we check if
-    // currentBuffer size once and return from this method.
-    while (currentBuffer.size() == 0) {
-      wait(Long.MAX_VALUE);
+  private synchronized boolean canFlush() {
+    try {
+      while (currentBuffer.size() == 0) {
+        wait(Long.MAX_VALUE);
+      }
+      return true;
+    }  catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      if (isRunning.get()) {
+        final String message = "OMDoubleBuffer flush thread " +
+            Thread.currentThread().getName() + " encountered Interrupted " +
+            "exception while running";
+        ExitUtils.terminate(1, message, ex, LOG);
+      }
+      LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
+          + "exit.", Thread.currentThread().getName());
+      return false;
     }
   }
 
   /**
-   * Prepares the readyBuffer which is used by sync thread to flush
-   * transactions to OM DB. This method swaps the currentBuffer and readyBuffer.
+   * Swaps the currentBuffer with readyBuffer so that the readyBuffer can be
+   * used by sync thread to flush transactions to DB.
    */
-  private synchronized void setReadyBuffer() {
+  private synchronized void swapCurrentAndReadyBuffer() {
     Queue<DoubleBufferEntry<OMClientResponse>> temp = currentBuffer;
     currentBuffer = readyBuffer;
     readyBuffer = temp;
@@ -635,10 +645,5 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   public OzoneManagerDoubleBufferMetrics getOzoneManagerDoubleBufferMetrics() {
     return ozoneManagerDoubleBufferMetrics;
-  }
-
-  @VisibleForTesting
-  public AtomicBoolean isRunning() {
-    return isRunning;
   }
 }

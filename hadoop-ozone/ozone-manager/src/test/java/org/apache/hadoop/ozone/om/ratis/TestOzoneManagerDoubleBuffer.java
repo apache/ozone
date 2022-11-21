@@ -162,8 +162,9 @@ class TestOzoneManagerDoubleBuffer {
    * Tests OzoneManagerDoubleBuffer's snapshot aware splitting and flushing
    * logic.
    *
-   * @param expectedFlushCounts,
-   * @param expectedFlushedTransactionCount
+   * @param expectedFlushCounts, Total flush count per OzoneManagerDoubleBuffer.
+   * @param expectedFlushedTransactionCount, Total transaction count per
+   *                                         OzoneManagerDoubleBuffer.
    * @param expectedFlushCountsInMetric, Overall flush count, and it is not
    *                                     same as expectedFlushCounts because
    *                                     metric static and shared object.
@@ -184,19 +185,17 @@ class TestOzoneManagerDoubleBuffer {
       long expectedFlushedTransactionCountInMetric,
       long expectedMaxNumberOfTransactionsFlushedInMetric,
       float expectedAvgFlushTransactionsInMetric
-  ) throws InterruptedException {
+  ) {
 
-    // Disable the daemon till we add all the responses to the buffer.
-    doubleBuffer.isRunning().compareAndSet(true, false);
+    // Stop the daemon till to eliminate the race condition.
+    doubleBuffer.stopDaemon();
 
     for (int i = 0; i < omClientResponses.size(); i++) {
       doubleBuffer.add(omClientResponses.get(i), i);
     }
 
-    // Enable the daemon after adding all the responses to the buffer.
-    doubleBuffer.isRunning().compareAndSet(false, true);
-    // To make sure that daemon thread is executed.
-    Thread.sleep(1000L);
+    // Flush the current buffer.
+    doubleBuffer.flushCurrentBuffer();
 
     assertEquals(expectedFlushCounts, doubleBuffer.getFlushIterations());
     assertEquals(expectedFlushedTransactionCount,
