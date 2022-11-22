@@ -27,7 +27,6 @@ import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -98,8 +97,7 @@ public class ECXceiverClientGrpc extends XceiverClientGrpc {
     retryPolicy.put("maxBackoff", "3s");
     retryPolicy.put("backoffMultiplier", 1.5D);
     //Status codes for with RPC retry are attempted.
-    retryPolicy.put("retryableStatusCodes", Arrays.asList(
-        Status.Code.UNAVAILABLE.name(),
+    retryPolicy.put("retryableStatusCodes", Collections.singletonList(
         Status.Code.DEADLINE_EXCEEDED.name()));
     Map<String, Object> methodConfig = new HashMap<>();
     methodConfig.put("retryPolicy", retryPolicy);
