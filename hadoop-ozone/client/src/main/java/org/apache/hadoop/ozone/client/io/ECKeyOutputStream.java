@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
 public final class ECKeyOutputStream extends KeyOutputStream {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
+  private int chunkIndex;
   private int ecChunkSize;
   private final int numDataBlks;
   private final int numParityBlks;
@@ -105,6 +106,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     this.numParityBlks = builder.getReplicationConfig().getParity();
     ecChunkBufferCache = new ECChunkBuffers(
         ecChunkSize, numDataBlks, numParityBlks, bufferPool);
+    chunkIndex = 0;
     OmKeyInfo info = builder.getOpenHandler().getKeyInfo();
     blockOutputStreamEntryPool =
         new ECBlockOutputStreamEntryPool(config,
@@ -348,28 +350,24 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private int handleWrite(byte[] b, int off, int len) throws IOException {
-
-    blockOutputStreamEntryPool.allocateBlockIfNeeded();
-
-    int currIdx = blockOutputStreamEntryPool
-        .getCurrentStreamEntry().getCurrentStreamIdx();
-    int bufferRem = ecChunkBufferCache.dataBuffers[currIdx].remaining();
+    int bufferRem = ecChunkBufferCache.dataBuffers[chunkIndex].remaining();
     final int writeLen = Math.min(len, Math.min(bufferRem, ecChunkSize));
-    int pos = ecChunkBufferCache.addToDataBuffer(currIdx, b, off, writeLen);
+    int pos = ecChunkBufferCache.addToDataBuffer(chunkIndex, b, off, writeLen);
 
-    // if this cell is full, send data to the OutputStream
+    // if this cell is full, use next buffer
     if (pos == ecChunkSize) {
-      handleOutputStreamWrite(currIdx, pos, false);
-      blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
+      chunkIndex++;
 
       // if this is last data cell in the stripe,
-      // compute and write the parity cells
-      if (currIdx == numDataBlks - 1) {
+      // compute parity cells and write data
+      if (chunkIndex == numDataBlks) {
         generateParityCells();
+        writeDataCells();
         writeParityCells();
         if (commitStripeWrite() == StripeWriteStatus.FAILED) {
           retryStripeWrite(config.getMaxECStripeWriteRetries());
         }
+        chunkIndex = 0;
       }
     }
     return writeLen;
@@ -481,16 +479,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     try {
       // If stripe buffer is not empty, encode and flush the stripe.
       if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
-        final int index = blockOutputStreamEntryPool.getCurrentStreamEntry()
-            .getCurrentStreamIdx();
-        ByteBuffer lastCell = ecChunkBufferCache.getDataBuffers()[index];
-
-        // Finish writing the current partial cached chunk
-        if (lastCell.position() % ecChunkSize != 0) {
-          handleOutputStreamWrite(index, lastCell.position(), false);
-        }
-
         generateParityCells();
+        writeDataCells();
         writeParityCells();
         if (commitStripeWrite() == StripeWriteStatus.FAILED) {
           retryStripeWrite(config.getMaxECStripeWriteRetries());
