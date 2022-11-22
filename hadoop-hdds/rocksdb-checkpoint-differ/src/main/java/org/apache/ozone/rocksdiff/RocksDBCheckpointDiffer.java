@@ -48,9 +48,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -284,9 +282,8 @@ public class RocksDBCheckpointDiffer {
       this.cumulativeKeysReverseTraversal = cumulativeKeysReverseTraversal;
     }
 
-    public void addCumulativeKeysReverseTraversal(
-        long cumulativeKeysReverseTraversal) {
-      this.cumulativeKeysReverseTraversal += cumulativeKeysReverseTraversal;
+    public void addCumulativeKeysReverseTraversal(long diff) {
+      this.cumulativeKeysReverseTraversal += diff;
     }
   }
 
@@ -860,74 +857,6 @@ public class RocksDBCheckpointDiffer {
       LOG.debug("File '{}' cumulative keys: {}", n.fileName,
           n.cumulativeKeysReverseTraversal);
     }
-  }
-
-  @VisibleForTesting
-  public synchronized void printMutableGraphFromAGivenNode(String fileName,
-      int sstLevel, MutableGraph<CompactionNode> mutableGraph) {
-
-    CompactionNode infileNode = compactionNodeMap.get(fileName);
-    if (infileNode == null) {
-      return;
-    }
-    LOG.debug("Expanding file: {}. SST compaction level: {}",
-        fileName, sstLevel);
-    Set<CompactionNode> currentLevel = new HashSet<>();
-    currentLevel.add(infileNode);
-    int levelCounter = 1;
-    while (!currentLevel.isEmpty()) {
-      LOG.debug("DAG Level: {}", levelCounter++);
-      final Set<CompactionNode> nextLevel = new HashSet<>();
-      StringBuilder sb = new StringBuilder();
-      for (CompactionNode current : currentLevel) {
-        Set<CompactionNode> successors = mutableGraph.successors(current);
-        for (CompactionNode succNode : successors) {
-          sb.append(succNode.fileName).append(" ");
-          nextLevel.add(succNode);
-        }
-      }
-      LOG.debug("{}", sb);
-      currentLevel = nextLevel;
-    }
-  }
-
-  synchronized void printMutableGraph(String srcSnapId, String destSnapId,
-      MutableGraph<CompactionNode> mutableGraph) {
-
-    LOG.debug("Gathering all SST file nodes from src '{}' to dest '{}'",
-        srcSnapId, destSnapId);
-
-    final Queue<CompactionNode> nodeQueue = new LinkedList<>();
-    // Queue source snapshot SST file nodes
-    for (CompactionNode node : mutableGraph.nodes()) {
-      if (srcSnapId == null ||
-          node.snapshotId.compareToIgnoreCase(srcSnapId) == 0) {
-        nodeQueue.add(node);
-      }
-    }
-
-    final Set<CompactionNode> allNodesSet = new HashSet<>();
-    while (!nodeQueue.isEmpty()) {
-      CompactionNode node = nodeQueue.poll();
-      Set<CompactionNode> succSet = mutableGraph.successors(node);
-      LOG.debug("Current node: {}", node);
-      if (succSet.isEmpty()) {
-        LOG.debug("Has no successor node");
-        allNodesSet.add(node);
-        continue;
-      }
-      for (CompactionNode succNode : succSet) {
-        LOG.debug("Has successor node: {}", succNode);
-        if (srcSnapId == null ||
-            succNode.snapshotId.compareToIgnoreCase(destSnapId) == 0) {
-          allNodesSet.add(succNode);
-          continue;
-        }
-        nodeQueue.add(succNode);
-      }
-    }
-
-    LOG.debug("Files are: {}", allNodesSet);
   }
 
   public MutableGraph<CompactionNode> getForwardCompactionDAG() {
