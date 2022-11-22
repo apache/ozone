@@ -236,7 +236,7 @@ public class RocksDBCheckpointDiffer {
   }
 
   // Node in the DAG to represent an SST file
-  private static class CompactionNode {
+  static class CompactionNode {
     // Name of the SST file
     private final String fileName;
     // The last snapshot created before this node came into existence
@@ -257,6 +257,36 @@ public class RocksDBCheckpointDiffer {
     @Override
     public String toString() {
       return String.format("Node{%s}", fileName);
+    }
+
+    public String getFileName() {
+      return fileName;
+    }
+
+    public String getSnapshotId() {
+      return snapshotId;
+    }
+
+    public long getSnapshotGeneration() {
+      return snapshotGeneration;
+    }
+
+    public long getTotalNumberOfKeys() {
+      return totalNumberOfKeys;
+    }
+
+    public long getCumulativeKeysReverseTraversal() {
+      return cumulativeKeysReverseTraversal;
+    }
+
+    public void setCumulativeKeysReverseTraversal(
+        long cumulativeKeysReverseTraversal) {
+      this.cumulativeKeysReverseTraversal = cumulativeKeysReverseTraversal;
+    }
+
+    public void addCumulativeKeysReverseTraversal(
+        long cumulativeKeysReverseTraversal) {
+      this.cumulativeKeysReverseTraversal += cumulativeKeysReverseTraversal;
     }
   }
 
@@ -961,65 +991,6 @@ public class RocksDBCheckpointDiffer {
   }
 
   @VisibleForTesting
-  public synchronized void traverseGraph(
-      MutableGraph<CompactionNode> reverseMutableGraph,
-      MutableGraph<CompactionNode> fwdMutableGraph) {
-
-    List<CompactionNode> nodeList = compactionNodeMap.values().stream()
-        .sorted(new NodeComparator()).collect(Collectors.toList());
-
-    for (CompactionNode infileNode : nodeList) {
-      // fist go through fwdGraph to find nodes that don't have successors.
-      // These nodes will be the top level nodes in reverse graph
-      Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
-      if (successors.size() == 0) {
-        LOG.debug("No successors. Cumulative keys: {}, total keys: {}",
-            infileNode.cumulativeKeysReverseTraversal,
-            infileNode.totalNumberOfKeys);
-        infileNode.cumulativeKeysReverseTraversal =
-            infileNode.totalNumberOfKeys;
-      }
-    }
-
-    HashSet<CompactionNode> visited = new HashSet<>();
-    for (CompactionNode infileNode : nodeList) {
-      if (visited.contains(infileNode)) {
-        continue;
-      }
-      visited.add(infileNode);
-      LOG.debug("Visiting node '{}'", infileNode.fileName);
-      Set<CompactionNode> currentLevel = new HashSet<>();
-      currentLevel.add(infileNode);
-      int level = 1;
-      while (!currentLevel.isEmpty()) {
-        LOG.debug("BFS Level: {}. Current level has {} nodes",
-            level++, currentLevel.size());
-        final Set<CompactionNode> nextLevel = new HashSet<>();
-        for (CompactionNode current : currentLevel) {
-          LOG.debug("Expanding node: {}", current.fileName);
-          Set<CompactionNode> successors =
-              reverseMutableGraph.successors(current);
-          if (successors.isEmpty()) {
-            LOG.debug("No successors. Cumulative keys: {}",
-                current.cumulativeKeysReverseTraversal);
-            continue;
-          }
-          for (CompactionNode node : successors) {
-            LOG.debug("Adding to the next level: {}", node.fileName);
-            LOG.debug("'{}' cumulative keys: {}. parent '{}' total keys: {}",
-                node.fileName, node.cumulativeKeysReverseTraversal,
-                current.fileName, current.totalNumberOfKeys);
-            node.cumulativeKeysReverseTraversal +=
-                current.cumulativeKeysReverseTraversal;
-            nextLevel.add(node);
-          }
-        }
-        currentLevel = nextLevel;
-      }
-    }
-  }
-
-  @VisibleForTesting
   public boolean debugEnabled(Integer level) {
     return DEBUG_LEVEL.contains(level);
   }
@@ -1027,5 +998,10 @@ public class RocksDBCheckpointDiffer {
   @VisibleForTesting
   public static Logger getLog() {
     return LOG;
+  }
+
+  @VisibleForTesting
+  public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
+    return compactionNodeMap;
   }
 }

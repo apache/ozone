@@ -28,11 +28,17 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import com.google.common.graph.MutableGraph;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.CompactionNode;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotInfo;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -121,7 +127,7 @@ public class TestRocksDBCheckpointDiffer {
       printAllSnapshots();
     }
 
-    differ.traverseGraph(
+    traverseGraph(differ.getCompactionNodeMap(),
         differ.getBackwardCompactionDAG(),
         differ.getForwardCompactionDAG());
 
@@ -358,5 +364,69 @@ public class TestRocksDBCheckpointDiffer {
    */
   private String toStr(byte[] bytes) {
     return new String(bytes, UTF_8);
+  }
+
+  /**
+   * Helper that traverses the graphs for testing.
+   * @param reverseMutableGraph
+   * @param fwdMutableGraph
+   */
+  void traverseGraph(
+      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      MutableGraph<CompactionNode> reverseMutableGraph,
+      MutableGraph<CompactionNode> fwdMutableGraph) {
+
+    List<CompactionNode> nodeList = compactionNodeMap.values().stream()
+        .sorted(new NodeComparator()).collect(Collectors.toList());
+
+    for (CompactionNode infileNode : nodeList) {
+      // fist go through fwdGraph to find nodes that don't have successors.
+      // These nodes will be the top level nodes in reverse graph
+      Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
+      if (successors.size() == 0) {
+        LOG.debug("No successors. Cumulative keys: {}, total keys: {}",
+            infileNode.getCumulativeKeysReverseTraversal(),
+            infileNode.getTotalNumberOfKeys());
+        infileNode.setCumulativeKeysReverseTraversal(
+            infileNode.getTotalNumberOfKeys());
+      }
+    }
+
+    HashSet<CompactionNode> visited = new HashSet<>();
+    for (CompactionNode infileNode : nodeList) {
+      if (visited.contains(infileNode)) {
+        continue;
+      }
+      visited.add(infileNode);
+      LOG.debug("Visiting node '{}'", infileNode.getFileName());
+      Set<CompactionNode> currentLevel = new HashSet<>();
+      currentLevel.add(infileNode);
+      int level = 1;
+      while (!currentLevel.isEmpty()) {
+        LOG.debug("BFS Level: {}. Current level has {} nodes",
+            level++, currentLevel.size());
+        final Set<CompactionNode> nextLevel = new HashSet<>();
+        for (CompactionNode current : currentLevel) {
+          LOG.debug("Expanding node: {}", current.getFileName());
+          Set<CompactionNode> successors =
+              reverseMutableGraph.successors(current);
+          if (successors.isEmpty()) {
+            LOG.debug("No successors. Cumulative keys: {}",
+                current.getCumulativeKeysReverseTraversal());
+            continue;
+          }
+          for (CompactionNode node : successors) {
+            LOG.debug("Adding to the next level: {}", node.getFileName());
+            LOG.debug("'{}' cumulative keys: {}. parent '{}' total keys: {}",
+                node.getFileName(), node.getCumulativeKeysReverseTraversal(),
+                current.getFileName(), current.getTotalNumberOfKeys());
+            node.addCumulativeKeysReverseTraversal(
+                current.getCumulativeKeysReverseTraversal());
+            nextLevel.add(node);
+          }
+        }
+        currentLevel = nextLevel;
+      }
+    }
   }
 }
