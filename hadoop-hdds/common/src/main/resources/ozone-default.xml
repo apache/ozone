@@ -3286,7 +3286,7 @@
 
   <property>
     <name>ozone.client.ec.grpc.retries.max</name>
-    <value>5</value>
+    <value>3</value>
     <tag>CLIENT</tag>
     <description>
       The maximum attempts GRPC client makes before failover.

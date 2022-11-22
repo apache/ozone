@@ -125,7 +125,7 @@ public final class OzoneConfigKeys {
       = true;
   public static final String OZONE_CLIENT_EC_GRPC_RETRIES_MAX =
       "ozone.client.ec.grpc.retries.max";
-  public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 5;
+  public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
 
   /**
    * Ozone administrator users delimited by comma.
