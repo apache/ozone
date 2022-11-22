@@ -52,9 +52,14 @@ public final class DecayRpcSchedulerUtil {
    * or
    * "Caller(<callers_username>).Priority"
    * Split it and return the metric.
+   *
+   * If the recordName doesn't belong to Decay_Rpc_Scheduler,
+   * then return the metricName as it is without making
+   * any changes to it.
+   *
    * @param recordName
    * @param metricName "Caller(xyz).Volume" or "Caller(xyz).Priority"
-   * @return "Volume" or "Priority"
+   * @return "Volume" or "Priority" or metricName(unchanged)
    */
   public static String splitMetricNameIfNeeded(String recordName,
                                                String metricName) {
