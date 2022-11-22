@@ -71,6 +71,8 @@ import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -287,8 +289,10 @@ public class TestECContainerRecovery {
     ContainerInfo finalContainer = container;
     Map<HddsDatanodeService, Long> recoveryTimeoutMap = new HashMap<>();
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
-      recoveryTimeoutMap.put(dn, dn.getDatanodeStateMachine().getContainer()
-              .getContainerSet().getRecoveringTimeout());
+      recoveryTimeoutMap.put(dn, dn.getDatanodeStateMachine().getConf()
+              .getTimeDuration(OZONE_RECOVERING_CONTAINER_TIMEOUT,
+              OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT,
+              TimeUnit.MILLISECONDS));
       dn.getDatanodeStateMachine().getContainer()
               .getContainerSet().setRecoveringTimeout(100);
 

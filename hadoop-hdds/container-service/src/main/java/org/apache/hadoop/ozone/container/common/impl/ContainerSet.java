@@ -81,11 +81,6 @@ public class ContainerSet {
     this.recoveringTimeout = recoveringTimeout;
   }
 
-  @VisibleForTesting
-  public long getRecoveringTimeout() {
-    return recoveringTimeout;
-  }
-
   /**
    * Add Container to container map.
    * @param container container to be added
