@@ -54,10 +54,17 @@ Put
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         PUTFILE.txt
 
+Put with Streaming
+    ${result} =    Execute               ozone fs -D ozone.fs.datastream.enabled=true -put NOTICE.txt ${DEEP_URL}/STREAMING.txt
+                   Should Be Empty       ${result}
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
+                   Should contain        ${result}         STREAMING.txt
+
 List
     ${result} =    Execute               ozone fs -ls ${DEEP_URL}/
                    Should contain        ${result}         NOTICE.txt
                    Should contain        ${result}         PUTFILE.txt
+                   Should contain        ${result}         STREAMING.txt
 
 Move
                    Execute               ozone fs -mv ${DEEP_URL}/NOTICE.txt ${DEEP_URL}/MOVED.TXT
