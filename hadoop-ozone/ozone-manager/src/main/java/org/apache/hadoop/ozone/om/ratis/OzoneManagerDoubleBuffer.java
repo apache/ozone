@@ -303,6 +303,7 @@ public final class OzoneManagerDoubleBuffer {
       ExitUtils.terminate(2, s, t, LOG);
     }
   }
+
   private void flushBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer)
       throws IOException {
 
@@ -363,9 +364,11 @@ public final class OzoneManagerDoubleBuffer {
     flushedTransactionCount.addAndGet(flushedTransactionsSize);
     flushIterations.incrementAndGet();
 
-    LOG.debug("Sync iteration {} flushed transactions in this iteration {}",
-        flushIterations.get(),
-        flushedTransactionsSize);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sync iteration {} flushed transactions in this iteration {}",
+          flushIterations.get(),
+          flushedTransactionsSize);
+    }
 
     // Clean up committed transactions.
     cleanupCache(cleanupEpochs);
@@ -383,10 +386,7 @@ public final class OzoneManagerDoubleBuffer {
   private String addToBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer,
                             BatchOperation batchOperation) {
     String lastTraceId = null;
-
-    Iterator<DoubleBufferEntry<OMClientResponse>> iterator = buffer.iterator();
-    while (iterator.hasNext()) {
-      DoubleBufferEntry<OMClientResponse> entry = iterator.next();
+    for (DoubleBufferEntry<OMClientResponse> entry: buffer) {
       OMClientResponse response = entry.getResponse();
       OMResponse omResponse = response.getOMResponse();
       lastTraceId = omResponse.getTraceID();
@@ -487,13 +487,8 @@ public final class OzoneManagerDoubleBuffer {
    * so that handler thread can be released asap.
    */
   private void clearReadyFutureQueue(int count) {
-    if (isRatisEnabled) {
-      return;
-    }
-
-    Iterator<CompletableFuture<Void>> iterator = readyFutureQueue.iterator();
-    while (iterator.hasNext() && count > 0) {
-      iterator.next().complete(null);
+    while (!readyFutureQueue.isEmpty() && count > 0) {
+      readyFutureQueue.remove().complete(null);
       count--;
     }
   }
