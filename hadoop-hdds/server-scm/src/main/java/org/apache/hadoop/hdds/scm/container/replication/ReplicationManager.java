@@ -403,17 +403,17 @@ public class ReplicationManager implements SCMService {
    */
   public void sendDeleteCommand(final ContainerInfo container, int replicaIndex,
       final DatanodeDetails datanode) throws NotLeaderException {
-    LOG.info("Sending delete container command for container {}" +
-        " to datanode {}", container.containerID(), datanode);
-
     final DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(container.containerID(), false);
+    deleteCommand.setReplicaIndex(replicaIndex);
     sendDatanodeCommand(deleteCommand, container, datanode);
   }
 
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
       throws NotLeaderException {
+    LOG.info("Sending command of type {} for container {} to {}",
+        command.getType(), containerInfo, target);
     command.setTerm(getScmTerm());
     final CommandForDatanode<?> datanodeCommand =
         new CommandForDatanode<>(target.getUuid(), command);
