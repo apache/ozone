@@ -459,7 +459,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testSendDatanodeRewplicateCommand() throws NotLeaderException {
+  public void testSendDatanodeReplicateCommand() throws NotLeaderException {
     ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
     ContainerInfo containerInfo =
         ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
