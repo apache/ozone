@@ -28,14 +28,11 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,7 +46,6 @@ import static org.mockito.ArgumentMatchers.any;
 public class TestUnderReplicatedProcessor {
 
   private ConfigurationSource conf;
-  private TestClock clock;
   private ReplicationManager replicationManager;
   private ECReplicationConfig repConfig;
   private UnderReplicatedProcessor underReplicatedProcessor;
@@ -59,7 +55,6 @@ public class TestUnderReplicatedProcessor {
     conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     replicationManager = Mockito.mock(ReplicationManager.class);
     repConfig = new ECReplicationConfig(3, 2);
     underReplicatedProcessor = new UnderReplicatedProcessor(
