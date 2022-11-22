@@ -191,12 +191,14 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // TODO: we can improve to write partial stripe failures. In that case,
     //  we just need to write only available buffers.
     writeDataCells();
-    return handleParityWrites();
+    writeParityCells();
+    return commitStripeWrite();
   }
 
   private void encodeAndWriteParityCells() throws IOException {
     generateParityCells();
-    if (handleParityWrites() == StripeWriteStatus.FAILED) {
+    writeParityCells();
+    if (commitStripeWrite() == StripeWriteStatus.FAILED) {
       retryStripeWrite(config.getMaxECStripeWriteRetries());
     }
   }
@@ -220,8 +222,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private StripeWriteStatus handleParityWrites() throws IOException {
-    writeParityCells();
+  private StripeWriteStatus commitStripeWrite() throws IOException {
 
     ECBlockOutputStreamEntry streamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
