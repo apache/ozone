@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.UNKNOWN;
 
 import java.util.Map;
 
@@ -91,6 +92,9 @@ public class SCMContainerMetrics implements MetricsSource {
         .addGauge(Interns.info("DeletedContainers",
             "Number of containers in deleted state"),
             stateCount.get(DELETED.toString()))
+        .addGauge(Interns.info("UnknownContainers",
+                "Number of containers in unknown state"),
+            stateCount.get(UNKNOWN.toString()))
         .addGauge(Interns.info("TotalContainers",
             "Number of all containers"),
             totalContainers);

@@ -51,6 +51,7 @@ public class TestSCMContainerMetrics {
         put(HddsProtos.LifeCycleState.DELETING.toString(), 6);
         put(HddsProtos.LifeCycleState.DELETED.toString(), 7);
         put(HddsProtos.LifeCycleState.RECOVERING.toString(), 8);
+        put(HddsProtos.LifeCycleState.UNKNOWN.toString(), 9);
       }};
 
 
@@ -78,7 +79,9 @@ public class TestSCMContainerMetrics {
         "Number of containers in deleting state"), 6);
     verify(mb, times(1)).addGauge(Interns.info("DeletedContainers",
         "Number of containers in deleted state"), 7);
+    verify(mb, times(1)).addGauge(Interns.info("UnknownContainers",
+          "Number of containers in unknown state"), 9);
     verify(mb, times(1)).addGauge(Interns.info("TotalContainers",
-        "Number of all containers"), 35);
+        "Number of all containers"), 44);
   }
 }
