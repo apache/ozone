@@ -115,27 +115,6 @@ public abstract class BucketHandler {
     return subpath;
   }
 
-  public long getKeySizeWithReplication(OmKeyInfo keyInfo) {
-    OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocations =
-        locationGroup.getBlocksLatestVersionOnly();
-    long du = 0L;
-    // a key could be too large to fit in one single container
-    for (OmKeyLocationInfo location: keyLocations) {
-      BlockID block = location.getBlockID();
-      ContainerID containerId = new ContainerID(block.getContainerID());
-      try {
-        int replicationFactor =
-            containerManager.getContainerReplicas(containerId).size();
-        long blockSize = location.getLength() * replicationFactor;
-        du += blockSize;
-      } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find container {}", block.getContainerID(), cnfe);
-      }
-    }
-    return du;
-  }
-
   /**
    * Example: /vol1/buck1/a/b/c/d/e/file1.txt -> a/b/c/d/e/file1.txt.
    * @param names parsed request
