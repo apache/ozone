@@ -172,7 +172,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     writeOffset += len;
   }
 
-  private StripeWriteStatus rewriteStripeToNewBlockGroup() throws IOException {
+  private void rollbackAndReset() throws IOException {
     // Rollback the length/offset updated as part of this failed stripe write.
     final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
     offset -= Arrays.stream(dataBuffers).mapToInt(Buffer::limit).sum();
@@ -187,14 +187,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         failedStreamEntry.getPipeline().getId());
     // Let's close the current entry.
     failedStreamEntry.close();
-
-    // Let's rewrite the last stripe, so that it will be written to new block
-    // group.
-    // TODO: we can improve to write partial stripe failures. In that case,
-    //  we just need to write only available buffers.
-    writeDataCells();
-    writeParityCells();
-    return commitStripeWrite();
   }
 
   private void logStreamError(List<ECBlockOutputStream> failedStreams,
@@ -362,11 +354,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       // compute parity cells and write data
       if (chunkIndex == numDataBlks) {
         generateParityCells();
-        writeDataCells();
-        writeParityCells();
-        if (commitStripeWrite() == StripeWriteStatus.FAILED) {
-          retryStripeWrite(config.getMaxECStripeWriteRetries());
-        }
+        flushStripeToDatanodes();
         chunkIndex = 0;
       }
     }
@@ -480,11 +468,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       // If stripe buffer is not empty, encode and flush the stripe.
       if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
         generateParityCells();
-        writeDataCells();
-        writeParityCells();
-        if (commitStripeWrite() == StripeWriteStatus.FAILED) {
-          retryStripeWrite(config.getMaxECStripeWriteRetries());
-        }
+        flushStripeToDatanodes();
       }
 
       closeCurrentStreamEntry();
@@ -498,14 +482,19 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     ecChunkBufferCache.release();
   }
 
-  private void retryStripeWrite(int times) throws IOException {
-    for (int i = 0; i < times; i++) {
-      if (rewriteStripeToNewBlockGroup() == StripeWriteStatus.SUCCESS) {
+  private void flushStripeToDatanodes() throws IOException {
+    int maxRetry = config.getMaxECStripeWriteRetries();
+    for (int i = 0; i <= maxRetry; i++) {
+      writeDataCells();
+      writeParityCells();
+      if (commitStripeWrite() == StripeWriteStatus.SUCCESS) {
         return;
       }
+      // In case of failure, cleanup before retry
+      rollbackAndReset();
     }
     throw new IOException("Completed max allowed retries " +
-        times + " on stripe failures.");
+        maxRetry + " on stripe failures.");
   }
 
   public static void padBufferToLimit(ByteBuffer buf, int limit) {
