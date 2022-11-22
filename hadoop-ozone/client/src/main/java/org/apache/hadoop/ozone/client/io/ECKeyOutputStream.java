@@ -195,14 +195,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     return commitStripeWrite();
   }
 
-  private void encodeAndWriteParityCells() throws IOException {
-    generateParityCells();
-    writeParityCells();
-    if (commitStripeWrite() == StripeWriteStatus.FAILED) {
-      retryStripeWrite(config.getMaxECStripeWriteRetries());
-    }
-  }
-
   private void logStreamError(List<ECBlockOutputStream> failedStreams,
                               String operation) {
     Set<Integer> failedStreamIndexSet =
@@ -373,7 +365,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       // if this is last data cell in the stripe,
       // compute and write the parity cells
       if (currIdx == numDataBlks - 1) {
-        encodeAndWriteParityCells();
+        generateParityCells();
+        writeParityCells();
+        if (commitStripeWrite() == StripeWriteStatus.FAILED) {
+          retryStripeWrite(config.getMaxECStripeWriteRetries());
+        }
       }
     }
     return writeLen;
@@ -494,7 +490,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
           handleOutputStreamWrite(index, lastCell.position(), false);
         }
 
-        encodeAndWriteParityCells();
+        generateParityCells();
+        writeParityCells();
+        if (commitStripeWrite() == StripeWriteStatus.FAILED) {
+          retryStripeWrite(config.getMaxECStripeWriteRetries());
+        }
       }
 
       closeCurrentStreamEntry();
