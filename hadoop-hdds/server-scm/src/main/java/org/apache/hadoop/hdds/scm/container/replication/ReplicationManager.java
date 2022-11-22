@@ -595,21 +595,16 @@ public class ReplicationManager implements SCMService {
       final DatanodeDetails datanode, final boolean force) {
 
     ContainerID containerID = container.containerID();
-    LOG.info("Sending close container command for container {}" +
-        " to datanode {}.", containerID, datanode);
     CloseContainerCommand closeContainerCommand =
         new CloseContainerCommand(container.getContainerID(),
             container.getPipelineID(), force);
+    closeContainerCommand.setEncodedToken(getContainerToken(containerID));
     try {
-      closeContainerCommand.setTerm(scmContext.getTermOfLeader());
+      sendDatanodeCommand(closeContainerCommand, container, datanode);
     } catch (NotLeaderException nle) {
       LOG.warn("Skip sending close container command,"
           + " since current SCM is not leader.", nle);
-      return;
     }
-    closeContainerCommand.setEncodedToken(getContainerToken(containerID));
-    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-        new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
   }
 
   private String getContainerToken(ContainerID containerID) {
