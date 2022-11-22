@@ -1019,7 +1019,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public long getContainerCount(HddsProtos.LifeCycleState state) throws IOException {
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
     GetContainerCountRequestProto request =
         GetContainerCountRequestProto.newBuilder().build();
 

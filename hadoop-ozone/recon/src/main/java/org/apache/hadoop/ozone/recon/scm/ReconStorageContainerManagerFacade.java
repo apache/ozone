@@ -36,21 +36,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -92,7 +88,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.common.MonotonicClock;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
@@ -534,114 +529,6 @@ public class ReconStorageContainerManagerFacade
       }
     }
     return true;
-  }
-
-  private boolean updateContainerState(ContainerInfo container,
-                                       ContainerReplica replica)
-      throws InvalidStateTransitionException, IOException, TimeoutException {
-    final ContainerID containerId = container.containerID();
-    boolean ignored = false;
-    switch (container.getState()) {
-    case CLOSING:
-      /*
-       * When the container is in CLOSING state the replicas can be in any
-       * of the following states:
-       *
-       * - OPEN
-       * - CLOSING
-       * - QUASI_CLOSED
-       * - CLOSED
-       *
-       * If all the replica are either in OPEN or CLOSING state, do nothing.
-       *
-       * If the replica is in QUASI_CLOSED state, move the container to
-       * QUASI_CLOSED state.
-       *
-       * If the replica is in CLOSED state, mark the container as CLOSED.
-       *
-       */
-
-      if (replica.getState() == StorageContainerDatanodeProtocolProtos.
-          ContainerReplicaProto.State.QUASI_CLOSED) {
-        containerManager.updateContainerState(containerId,
-            HddsProtos.LifeCycleEvent.QUASI_CLOSE);
-      }
-
-      if (replica.getState() == StorageContainerDatanodeProtocolProtos.
-          ContainerReplicaProto.State.CLOSED) {
-        Preconditions.checkArgument(replica.getSequenceId()
-            == container.getSequenceId());
-        containerManager.updateContainerState(containerId,
-            HddsProtos.LifeCycleEvent.CLOSE);
-      }
-
-      break;
-    case QUASI_CLOSED:
-        /*
-         * The container is in QUASI_CLOSED state, this means that at least
-         * one of the replica was QUASI_CLOSED.
-         *
-         * Now replicas can be in any of the following state.
-         *
-         * 1. OPEN
-         * 2. CLOSING
-         * 3. QUASI_CLOSED
-         * 4. CLOSED
-         *
-         * If at least one of the replica is in CLOSED state, mark the
-         * container as CLOSED.
-         *
-         */
-      if (replica.getState() == StorageContainerDatanodeProtocolProtos.
-          ContainerReplicaProto.State.CLOSED) {
-        Preconditions.checkArgument(replica.getSequenceId()
-            == container.getSequenceId());
-        containerManager.updateContainerState(containerId,
-            HddsProtos.LifeCycleEvent.FORCE_CLOSE);
-      }
-      break;
-    case CLOSED:
-      /*
-       * The container is already in closed state. do nothing.
-       */
-      break;
-    case DELETING:
-      /*
-       * The container is under deleting. do nothing.
-       */
-      break;
-    case DELETED:
-      /*
-       * The container is deleted. delete the replica do nothing
-       *  as recon will not send any command to datanode
-       */
-      ignored = true;
-      break;
-    default:
-      break;
-    }
-    return ignored;
-  }
-
-  private static ContainerReplica buildContainerReplica(
-      ContainerInfo containerInfo,
-      HddsProtos.SCMContainerReplicaProto containerReplicaProto) {
-    final ContainerReplica replica = ContainerReplica.newBuilder()
-        .setContainerID(containerInfo.containerID())
-        .setContainerState(StorageContainerDatanodeProtocolProtos.
-            ContainerReplicaProto.State.valueOf(
-                containerReplicaProto.getState()))
-        .setDatanodeDetails(DatanodeDetails.getFromProtoBuf(
-            containerReplicaProto.getDatanodeDetails()))
-        .setOriginNodeId(UUID.fromString(
-            containerReplicaProto.getPlaceOfBirth()))
-        .setSequenceId(containerReplicaProto.getSequenceID())
-        .setKeyCount(containerReplicaProto.getKeyCount())
-        .setReplicaIndex(containerReplicaProto.hasReplicaIndex()
-            ? (int) containerReplicaProto.getReplicaIndex() : -1)
-        .setBytesUsed(containerReplicaProto.getBytesUsed())
-        .build();
-    return replica;
   }
 
   private void deleteOldSCMDB() throws IOException {
