@@ -16,12 +16,14 @@
  */
 
 package org.apache.hadoop.ozone.om;
+import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -53,14 +55,11 @@ import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -68,10 +67,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 /**
  * Test OmSnapshot bucket interface.
@@ -86,7 +83,9 @@ public class TestOmSnapshot {
   private static boolean enabledFileSystemPaths;
   private static ObjectStore store;
   private static File metaDir;
-  private static OzoneManager ozoneManager;
+  private static OzoneManager leaderOzoneManager;
+
+  private static OzoneBucket ozoneBucket;
 
   @Rule
   public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
@@ -122,38 +121,43 @@ public class TestOmSnapshot {
 
   /**
    * Create a MiniDFSCluster for testing.
-   * <p>
-   *
    */
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-      .setScmId(scmId).setOmId(omId).build();
+
+    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+        .setClusterId(clusterId)
+        .setScmId(scmId)
+        .setOMServiceId("om-service-test1")
+        .setNumOfOzoneManagers(3)
+        .build();
     cluster.waitForClusterToBeReady();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil
+    ozoneBucket = TestDataUtil
         .createVolumeAndBucket(cluster, bucketLayout);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    volumeName = ozoneBucket.getVolumeName();
+    bucketName = ozoneBucket.getName();
+
+    leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
+    cluster.setConf(leaderConfig);
 
     OzoneClient client = cluster.getClient();
     store = client.getObjectStore();
     writeClient = store.getClientProxy().getOzoneManagerClient();
-    ozoneManager = cluster.getOzoneManager();
+
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
-        .getInternalState(ozoneManager, "keyManager");
+        .getInternalState(leaderOzoneManager, "keyManager");
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(conf);
-
+    metaDir = OMStorage.getOmDbDir(leaderConfig);
   }
 
   @AfterClass
@@ -210,65 +214,43 @@ public class TestOmSnapshot {
     }
 
     String snapshotKeyPrefix = createSnapshot(volumeA, bucketA);
-    Iterator<? extends OzoneKey> volABucketAIter =
-        volAbucketA.listKeys(snapshotKeyPrefix + "key-");
-    int volABucketAKeyCount = 0;
-    while (volABucketAIter.hasNext()) {
-      volABucketAIter.next();
-      volABucketAKeyCount++;
-    }
+
+    int volABucketAKeyCount = keyCount(volAbucketA,
+        snapshotKeyPrefix + "key-");
     Assert.assertEquals(20, volABucketAKeyCount);
 
     snapshotKeyPrefix = createSnapshot(volumeA, bucketB);
     deleteKeys(volAbucketB);
-    Iterator<? extends OzoneKey> volABucketBIter =
-        volAbucketB.listKeys(snapshotKeyPrefix + "key-");
-    int volABucketBKeyCount = 0;
-    while (volABucketBIter.hasNext()) {
-      volABucketBIter.next();
-      volABucketBKeyCount++;
-    }
+
+    int volABucketBKeyCount = keyCount(volAbucketB,
+        snapshotKeyPrefix + "key-");
     Assert.assertEquals(20, volABucketBKeyCount);
 
     snapshotKeyPrefix = createSnapshot(volumeB, bucketA);
     deleteKeys(volBbucketA);
-    Iterator<? extends OzoneKey> volBBucketAIter =
-        volBbucketA.listKeys(snapshotKeyPrefix + "key-");
-    int volBBucketAKeyCount = 0;
-    while (volBBucketAIter.hasNext()) {
-      volBBucketAIter.next();
-      volBBucketAKeyCount++;
-    }
+
+    int volBBucketAKeyCount = keyCount(volBbucketA,
+        snapshotKeyPrefix + "key-");
     Assert.assertEquals(20, volBBucketAKeyCount);
 
     snapshotKeyPrefix = createSnapshot(volumeB, bucketB);
     deleteKeys(volBbucketB);
-    Iterator<? extends OzoneKey> volBBucketBIter =
-        volBbucketB.listKeys(snapshotKeyPrefix + "key-");
-    int volBBucketBKeyCount = 0;
-    while (volBBucketBIter.hasNext()) {
-      volBBucketBIter.next();
-      volBBucketBKeyCount++;
-    }
+
+    int volBBucketBKeyCount = keyCount(volBbucketB,
+        snapshotKeyPrefix + "key-");
     Assert.assertEquals(20, volBBucketBKeyCount);
 
     snapshotKeyPrefix = createSnapshot(volumeA, bucketA);
     deleteKeys(volAbucketA);
-    Iterator<? extends OzoneKey> volABucketAKeyAIter =
-        volAbucketA.listKeys(snapshotKeyPrefix + "key-a-");
-    int volABucketAKeyACount = 0;
-    while (volABucketAKeyAIter.hasNext()) {
-      volABucketAKeyAIter.next();
-      volABucketAKeyACount++;
-    }
+
+    int volABucketAKeyACount = keyCount(volAbucketA,
+        snapshotKeyPrefix + "key-a-");
     Assert.assertEquals(10, volABucketAKeyACount);
-    Iterator<? extends OzoneKey> volABucketAKeyBIter =
-        volAbucketA.listKeys(snapshotKeyPrefix + "key-b-");
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volABucketAKeyBIter.next().getName()
-          .startsWith(snapshotKeyPrefix + "key-b-" + i + "-"));
-    }
-    Assert.assertFalse(volABucketBIter.hasNext());
+
+
+    int volABucketAKeyBCount = keyCount(volAbucketA,
+        snapshotKeyPrefix + "key-b-");
+    Assert.assertEquals(10, volABucketAKeyBCount);
   }
 
   @Test
@@ -302,23 +284,19 @@ public class TestOmSnapshot {
 
   @Test
   public void checkKey() throws Exception {
-    OzoneVolume ozoneVolume = store.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
-    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
-
     String s = "testData";
     String dir1 = "dir1";
     String key1 = dir1 + "/key1";
 
     // create key1
-    OzoneOutputStream ozoneOutputStream =
-            ozoneBucket.createKey(key1, s.length());
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key1,
+        s.length());
     byte[] input = s.getBytes(StandardCharsets.UTF_8);
     ozoneOutputStream.write(input);
     ozoneOutputStream.close();
 
-    String snapshotKeyPrefix = createSnapshot();
+
+    String snapshotKeyPrefix = createSnapshot(volumeName, bucketName);
     ozoneBucket.deleteKey(key1);
     try {
       ozoneBucket.deleteKey(dir1);
@@ -349,25 +327,19 @@ public class TestOmSnapshot {
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     vol.createBucket(bucket);
-    OzoneBucket volbucket = vol.getBucket(bucket);
+    OzoneBucket volBucket = vol.getBucket(bucket);
 
     String key = "key-";
-    createFileKey(volbucket, key);
+    createFileKey(volBucket, key);
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
-    deleteKeys(volbucket);
+    deleteKeys(volBucket);
 
-    Iterator<? extends OzoneKey> volBucketIter =
-            volbucket.listKeys(snapshotKeyPrefix + "key-");
-    int volBucketKeyCount = 0;
-    while (volBucketIter.hasNext()) {
-      volBucketIter.next();
-      volBucketKeyCount++;
-    }
+    int volBucketKeyCount = keyCount(volBucket, snapshotKeyPrefix + "key-");
     Assert.assertEquals(1, volBucketKeyCount);
 
     snapshotKeyPrefix = createSnapshot(volume, bucket);
     Iterator<? extends OzoneKey> volBucketIter2 =
-            volbucket.listKeys(snapshotKeyPrefix);
+            volBucket.listKeys(snapshotKeyPrefix);
     while (volBucketIter2.hasNext()) {
       fail("The last snapshot should not have any keys in it!");
     }
@@ -381,41 +353,39 @@ public class TestOmSnapshot {
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
     vol.createBucket(bucket);
-    OzoneBucket volbucket = vol.getBucket(bucket);
+    OzoneBucket bucket1 = vol.getBucket(bucket);
 
     String key1 = "key-1-";
-    createFileKey(volbucket, key1);
+    createFileKey(bucket1, key1);
     String snapshotKeyPrefix1 = createSnapshot(volume, bucket);
 
     String key2 = "key-2-";
-    createFileKey(volbucket, key2);
+    createFileKey(bucket1, key2);
     String snapshotKeyPrefix2 = createSnapshot(volume, bucket);
 
-    Iterator<? extends OzoneKey> volBucketIter =
-            volbucket.listKeys(snapshotKeyPrefix1 + "key-");
-    int volBucketKeyCount = 0;
-    while (volBucketIter.hasNext()) {
-      volBucketIter.next();
-      volBucketKeyCount++;
-    }
+    int volBucketKeyCount = keyCount(bucket1, snapshotKeyPrefix1 + "key-");
     Assert.assertEquals(1, volBucketKeyCount);
 
-    Iterator<? extends OzoneKey> volBucketIter2 =
-            volbucket.listKeys(snapshotKeyPrefix2 + "key-");
-    int volBucketKeyCount2 = 0;
-    while (volBucketIter2.hasNext()) {
-      volBucketIter2.next();
-      volBucketKeyCount2++;
-    }
+
+    int volBucketKeyCount2 = keyCount(bucket1, snapshotKeyPrefix2 + "key-");
     Assert.assertEquals(2, volBucketKeyCount2);
 
-    deleteKeys(volbucket);
+    deleteKeys(bucket1);
+  }
 
+  private int keyCount(OzoneBucket bucket, String keyPrefix)
+      throws IOException {
+    Iterator<? extends OzoneKey> iterator = bucket.listKeys(keyPrefix);
+    int keyCount = 0;
+    while (iterator.hasNext()) {
+      iterator.next();
+      keyCount++;
+    }
+    return keyCount;
   }
 
   @Test
-  public void testNonExistentBucket()
-          throws Exception {
+  public void testNonExistentBucket() throws Exception {
     String volume = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
     //create volume but not bucket
@@ -426,50 +396,79 @@ public class TestOmSnapshot {
             () -> createSnapshot(volume, bucket));
   }
 
-  private String createSnapshot()
-      throws IOException, InterruptedException, TimeoutException {
-    return createSnapshot(volumeName, bucketName);
-  }
-  private String createSnapshot(String vname, String bname)
+  private String createSnapshot(String volName, String buckName)
       throws IOException, InterruptedException, TimeoutException {
     String snapshotName = UUID.randomUUID().toString();
-    writeClient = store.getClientProxy().getOzoneManagerClient();
-    writeClient.createSnapshot(vname, bname, snapshotName);
+    store.createSnapshot(volName, buckName, snapshotName);
     String snapshotKeyPrefix = OmSnapshotManager
         .getSnapshotPrefix(snapshotName);
-    SnapshotInfo snapshotInfo = ozoneManager
-        .getMetadataManager().getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(vname, bname, snapshotName));
+    SnapshotInfo snapshotInfo = leaderOzoneManager
+        .getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
     String snapshotDirName = metaDir + OM_KEY_PREFIX +
         OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
         snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
         1000, 120000);
-
     return snapshotKeyPrefix;
 
   }
 
-
   private void deleteKeys(OzoneBucket bucket) throws IOException {
-    Iterator<? extends OzoneKey> bucketIter =
-        bucket.listKeys(null);
-    while (bucketIter.hasNext()) {
-      OzoneKey key = bucketIter.next();
+    Iterator<? extends OzoneKey> bucketIterator = bucket.listKeys(null);
+    while (bucketIterator.hasNext()) {
+      OzoneKey key = bucketIterator.next();
       bucket.deleteKey(key.getName());
     }
   }
 
-  private void createFileKey(OzoneBucket bucket, String keyprefix)
-          throws IOException {
+  private void createFileKey(OzoneBucket bucket, String keyPrefix)
+      throws IOException {
     byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-    OzoneOutputStream fileKey = bucket.createKey(
-            keyprefix + RandomStringUtils.randomNumeric(5),
-            value.length, RATIS, ONE,
-            new HashMap<>());
+    String key = keyPrefix + RandomStringUtils.randomNumeric(5);
+    OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
   }
 
-}
+  @Test
+  public void testUniqueSnapshotId()
+      throws IOException, InterruptedException, TimeoutException {
+    createFileKey(ozoneBucket, "key");
 
+    String snapshotName = UUID.randomUUID().toString();
+    store.createSnapshot(volumeName, bucketName, snapshotName);
+
+    List<OzoneManager> ozoneManagers = ((MiniOzoneHAClusterImpl) cluster)
+        .getOzoneManagersList();
+    List<String> snapshotIds = new ArrayList<>();
+
+    for (OzoneManager ozoneManager : ozoneManagers) {
+      GenericTestUtils.waitFor(
+          () -> {
+            SnapshotInfo snapshotInfo;
+            try {
+              snapshotInfo = ozoneManager.getMetadataManager()
+                  .getSnapshotInfoTable()
+                  .get(
+                      SnapshotInfo.getTableKey(volumeName,
+                          bucketName,
+                          snapshotName)
+                  );
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+
+            if (snapshotInfo != null) {
+              snapshotIds.add(snapshotInfo.getSnapshotID());
+            }
+            return snapshotInfo != null;
+          },
+          1000,
+          120000);
+    }
+
+    assertEquals(1, snapshotIds.stream().distinct().count());
+  }
+}
