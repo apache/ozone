@@ -324,7 +324,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     ByteBuffer[] dataCells = ecChunkBufferCache.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
       if (dataCells[i].limit() > 0) {
-        handleOutputStreamWrite(i, dataCells[i].limit(), false);
+        handleOutputStreamWrite(dataCells[i], false);
       }
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
@@ -336,7 +336,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         .getCurrentStreamEntry().forceToFirstParityBlock();
     ByteBuffer[] parityCells = ecChunkBufferCache.getParityBuffers();
     for (int i = 0; i < numParityBlks; i++) {
-      handleOutputStreamWrite(numDataBlks + i, parityCells[i].limit(), true);
+      handleOutputStreamWrite(parityCells[i], true);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
   }
@@ -361,28 +361,22 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     return writeLen;
   }
 
-  private void handleOutputStreamWrite(int currIdx, int len, boolean isParity) {
-    ByteBuffer bytesToWrite = isParity ?
-        ecChunkBufferCache.getParityBuffers()[currIdx - numDataBlks] :
-        ecChunkBufferCache.getDataBuffers()[currIdx];
+  private void handleOutputStreamWrite(ByteBuffer buffer, boolean isParity) {
     try {
       // Since it's a full cell, let's write all content from buffer.
       // At a time we write max cell size in EC. So, it should safe to cast
       // the len to int to use the super class defined write API.
       // The len cannot be bigger than cell buffer size.
-      assert len <= ecChunkSize : " The len: " + len + ". EC chunk size: "
-          + ecChunkSize;
-      assert len <= bytesToWrite
-          .limit() : " The len: " + len + ". Chunk buffer limit: "
-          + bytesToWrite.limit();
+      assert buffer.limit() <= ecChunkSize : "The buffer size: " +
+          buffer.limit() + " should not exceed EC chunk size: " + ecChunkSize;
       writeToOutputStream(blockOutputStreamEntryPool.getCurrentStreamEntry(),
-          bytesToWrite.array(), len, 0, isParity);
+          buffer.array(), buffer.limit(), 0, isParity);
     } catch (Exception e) {
       markStreamAsFailed(e);
     }
   }
 
-  private long writeToOutputStream(ECBlockOutputStreamEntry current,
+  private void writeToOutputStream(ECBlockOutputStreamEntry current,
       byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
     try {
@@ -400,7 +394,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
               .getCurrentStreamIdx(), ioe);
       handleException(current, ioe);
     }
-    return writeLen;
   }
 
   private void handleException(BlockOutputStreamEntry streamEntry,
