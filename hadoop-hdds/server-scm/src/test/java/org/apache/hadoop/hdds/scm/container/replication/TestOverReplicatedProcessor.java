@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
@@ -51,9 +52,7 @@ public class TestOverReplicatedProcessor {
 
   private ConfigurationSource conf;
   private TestClock clock;
-  private ContainerReplicaPendingOps pendingOps;
   private ReplicationManager replicationManager;
-  private EventPublisher eventPublisher;
   private ECReplicationConfig repConfig;
   private OverReplicatedProcessor overReplicatedProcessor;
 
@@ -63,13 +62,10 @@ public class TestOverReplicatedProcessor {
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    pendingOps = new ContainerReplicaPendingOps(conf, clock);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    eventPublisher = Mockito.mock(EventPublisher.class);
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
-        replicationManager, pendingOps, eventPublisher,
-        rmConf.getOverReplicatedInterval());
+        replicationManager, rmConf.getOverReplicatedInterval());
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
   }
 
@@ -88,21 +84,11 @@ public class TestOverReplicatedProcessor {
     commands.put(MockDatanodeDetails.randomDatanodeDetails(), cmd);
 
     Mockito
-        .when(replicationManager.processOverReplicatedContainer(Mockito.any()))
+        .when(replicationManager.processOverReplicatedContainer(any()))
         .thenReturn(commands);
     overReplicatedProcessor.processAll();
 
-    // Ensure pending ops is updated for the target DNs in the command and the
-    // correct indexes.
-    List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(container.containerID());
-    //Check InFlight Deletion
-    Assert.assertEquals(pendingOps
-        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE), 1);
-    Assert.assertEquals(1, ops.size());
-    for (ContainerReplicaOp op : ops) {
-      Assert.assertEquals(5, op.getReplicaIndex());
-    }
+    Mockito.verify(replicationManager).sendDatanodeCommand(any(), any(), any());
   }
 
   @Test
@@ -115,18 +101,14 @@ public class TestOverReplicatedProcessor {
             null);
 
     Mockito.when(replicationManager
-            .processOverReplicatedContainer(Mockito.any()))
+            .processOverReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"));
     overReplicatedProcessor.processAll();
 
-    Mockito.verify(eventPublisher, Mockito.times(0))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), Mockito.any());
+    Mockito.verify(replicationManager, Mockito.times(0))
+        .sendDatanodeCommand(any(), any(), any());
     Mockito.verify(replicationManager, Mockito.times(1))
-        .requeueOverReplicatedContainer(Mockito.any());
+        .requeueOverReplicatedContainer(any());
 
-    // Ensure pending ops has nothing for this container.
-    List<ContainerReplicaOp> ops = pendingOps
-        .getPendingOps(container.containerID());
-    Assert.assertEquals(0, ops.size());
   }
 }

@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -37,10 +39,13 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.ozone.test.TestClock;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -49,13 +54,16 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 
@@ -339,6 +347,61 @@ public class TestReplicationManager {
 
     res = replicationManager.dequeueUnderReplicatedContainer();
     Assert.assertNull(res);
+  }
+
+  @Test
+  public void testSendDatanodeDeleteCommand() throws NotLeaderException {
+    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+
+    DeleteContainerCommand deleteContainerCommand = new DeleteContainerCommand(
+      containerInfo.getContainerID());
+    deleteContainerCommand.setReplicaIndex(1);
+
+    replicationManager.sendDatanodeCommand(deleteContainerCommand,
+        containerInfo, target);
+
+    List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
+        containerInfo.containerID());
+    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(target, ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+            .getEcDeletionCmdsSentTotal());
+    Assertions.assertEquals(0, replicationManager.getMetrics()
+        .getNumDeletionCmdsSent());
+
+    // Repeat with Ratis container, as different metrics should be incremented
+    Mockito.clearInvocations(eventPublisher);
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    deleteContainerCommand = new DeleteContainerCommand(
+        containerInfo.getContainerID());
+    replicationManager.sendDatanodeCommand(deleteContainerCommand,
+        containerInfo, target);
+
+    ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(target, ops.get(0).getTarget());
+    Assertions.assertEquals(0, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcDeletionCmdsSentTotal());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getNumDeletionCmdsSent());
+    Assertions.assertEquals(20, replicationManager.getMetrics()
+        .getNumDeletionBytesTotal());
   }
 
   @SafeVarargs

@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteContainerCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -223,8 +223,8 @@ public class ReplicationManager implements SCMService {
         new UnderReplicatedProcessor(this, containerReplicaPendingOps,
             eventPublisher, rmConf.getUnderReplicatedInterval());
     overReplicatedProcessor =
-        new OverReplicatedProcessor(this, containerReplicaPendingOps,
-            eventPublisher, rmConf.getOverReplicatedInterval());
+        new OverReplicatedProcessor(this,
+            rmConf.getOverReplicatedInterval());
 
     // Chain together the series of checks that are needed to validate the
     // containers when they are checked by RM.
@@ -406,17 +406,35 @@ public class ReplicationManager implements SCMService {
 
     final DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(container.containerID(), false);
-    deleteCommand.setTerm(getScmTerm());
+    sendDatanodeCommand(deleteCommand, container, datanode);
+  }
 
-    final CommandForDatanode<DeleteContainerCommandProto> datanodeCommand =
-        new CommandForDatanode<>(datanode.getUuid(), deleteCommand);
+  public void sendDatanodeCommand(SCMCommand<?> command,
+      ContainerInfo containerInfo, DatanodeDetails target)
+      throws NotLeaderException {
+
+    command.setTerm(getScmTerm());
+    final CommandForDatanode<?> datanodeCommand =
+        new CommandForDatanode<>(target.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-    containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        datanode, replicaIndex);
+    adjustPendingOpsAndMetrics(containerInfo, command, target);
+  }
 
-    synchronized (this) {
-      metrics.incrNumDeletionCmdsSent();
-      metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+  private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,
+      SCMCommand<?> cmd, DatanodeDetails targetDatanode) {
+    if (cmd.getType() == StorageContainerDatanodeProtocolProtos
+        .SCMCommandProto.Type.deleteContainerCommand) {
+      DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
+      containerReplicaPendingOps.scheduleDeleteReplica(
+          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex());
+      if (rcc.getReplicaIndex() > 0) {
+        getMetrics().incrEcDeletionCmdsSentTotal();
+      } else if (rcc.getReplicaIndex() == 0) {
+        getMetrics().incrNumDeletionCmdsSent();
+        getMetrics().incrNumDeletionBytesTotal(containerInfo.getUsedBytes());
+      }
+    } else {
+      throw new RuntimeException("Unexpected command type " + cmd.getType());
     }
   }
 
