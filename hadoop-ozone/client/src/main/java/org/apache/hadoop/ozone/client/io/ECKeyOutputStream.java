@@ -190,15 +190,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // group.
     // TODO: we can improve to write partial stripe failures. In that case,
     //  we just need to write only available buffers.
-    blockOutputStreamEntryPool.allocateBlockIfNeeded();
-    final ECBlockOutputStreamEntry currentStreamEntry =
-        blockOutputStreamEntryPool.getCurrentStreamEntry();
-    for (int i = 0; i < numDataBlks; i++) {
-      if (dataBuffers[i].limit() > 0) {
-        handleOutputStreamWrite(i, dataBuffers[i].limit(), false);
-      }
-      currentStreamEntry.useNextBlockStream();
-    }
+    writeDataCells();
     return handleParityWrites();
   }
 
@@ -337,6 +329,17 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     for (int i = firstNonFullIndex + 1; i < dataBuffers.length; i++) {
       dataBuffers[i].limit(0);
+    }
+  }
+
+  private void writeDataCells() throws IOException {
+    blockOutputStreamEntryPool.allocateBlockIfNeeded();
+    ByteBuffer[] dataCells = ecChunkBufferCache.getDataBuffers();
+    for (int i = 0; i < numDataBlks; i++) {
+      if (dataCells[i].limit() > 0) {
+        handleOutputStreamWrite(i, dataCells[i].limit(), false);
+      }
+      blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
     }
   }
 
