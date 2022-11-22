@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOpCompletionHandler;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 
 import java.util.Map;
@@ -33,7 +33,7 @@ import java.util.concurrent.TimeoutException;
  * MoveManager is responsible for keeping track of all Containers being moved,
  * and managing all container move operations like replication and deletion.
  */
-public interface MoveManager {
+public interface MoveManager extends ContainerReplicaOpCompletionHandler {
   /**
    * This is used for indicating the result of move option and
    * the corresponding reason. this is useful for tracking
@@ -77,25 +77,6 @@ public interface MoveManager {
     //write DB error
     FAIL_CAN_NOT_RECORD_TO_DB
   }
-
-  /**
-   * notify move manager that a container op has been completed.
-   *
-   * @param cop ContainerReplicaOp
-   * @param containerID ContainerID for which to complete
-   */
-  void notifyContainerOpCompleted(ContainerReplicaOp cop,
-      ContainerID containerID);
-
-
-  /**
-   * notify move manager that a container op has been Expired.
-   *
-   * @param cop ContainerReplicaOp
-   * @param containerID ContainerID for which to complete
-   */
-  void notifyContainerOpExpired(ContainerReplicaOp cop,
-      ContainerID containerID);
 
   /**
   * notify MoveManager that the current scm has become leader.

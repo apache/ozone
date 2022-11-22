@@ -25,7 +25,6 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
@@ -131,16 +130,6 @@ public interface ContainerManager extends Closeable {
    */
   Set<ContainerReplica> getContainerReplicas(ContainerID containerID)
       throws ContainerNotFoundException;
-
-  /**
-   * Returns the index of the container replica on the given datanode.
-   *
-   * @param containerID Container ID
-   * @param dn datanode
-   * @return the index of the replica
-   */
-  int getContainerReplicaIndex(ContainerID containerID, DatanodeDetails dn)
-      throws ContainerNotFoundException, ContainerReplicaNotFoundException;
 
   /**
    * Adds a container Replica for the given Container.

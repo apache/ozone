@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.move.MoveManager;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -50,15 +49,14 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<PendingOpType, AtomicLong>
       pendingOpCount = new ConcurrentHashMap<>();
   private ReplicationManagerMetrics replicationMetrics = null;
-  private MoveManager moveManager;
+  private List<ContainerReplicaOpCompletionHandler> handlers;
 
-  public ContainerReplicaPendingOps(
-      final Clock clock, final MoveManager moveManager) {
+  public ContainerReplicaPendingOps(final Clock clock) {
     this.clock = clock;
-    this.moveManager = moveManager;
     for (PendingOpType opType: PendingOpType.values()) {
       pendingOpCount.put(opType, new AtomicLong(0));
     }
+    this.handlers = new ArrayList<>();
   }
 
   /**
@@ -188,7 +186,7 @@ public class ContainerReplicaPendingOps {
             iterator.remove();
             pendingOpCount.get(op.getOpType()).decrementAndGet();
             updateTimeoutMetrics(op);
-            moveManager.notifyContainerOpExpired(op, containerID);
+            notifyHandlers(op, containerID, true);
           }
         }
         if (ops.size() == 0) {
@@ -248,7 +246,7 @@ public class ContainerReplicaPendingOps {
             found = true;
             iterator.remove();
             pendingOpCount.get(op.getOpType()).decrementAndGet();
-            moveManager.notifyContainerOpCompleted(op, containerID);
+            notifyHandlers(op, containerID, false);
           }
         }
         if (ops.size() == 0) {
@@ -259,6 +257,16 @@ public class ContainerReplicaPendingOps {
       lock.unlock();
     }
     return found;
+  }
+
+  public void registerOpCompletionHandler(
+      ContainerReplicaOpCompletionHandler handler) {
+    handlers.add(handler);
+  }
+
+  private void notifyHandlers(
+      ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    handlers.forEach(h -> h.onOpCompleted(op, containerID, timedOut));
   }
 
   private Lock writeLock(ContainerID containerID) {

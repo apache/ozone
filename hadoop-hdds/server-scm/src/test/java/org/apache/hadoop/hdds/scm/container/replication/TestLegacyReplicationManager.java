@@ -215,7 +215,7 @@ public class TestLegacyReplicationManager {
         new ContainerPlacementStatusDefault(2, 2, 3));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock, new FakeMoveManager());
+        new ContainerReplicaPendingOps(clock);
     createReplicationManager(new ReplicationManagerConfiguration());
   }
 

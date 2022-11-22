@@ -39,7 +39,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -345,19 +344,6 @@ public class ContainerManagerImpl implements ContainerManager {
     return Optional.ofNullable(containerStateManager
         .getContainerReplicas(id))
         .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
-  }
-
-  @Override
-  public int getContainerReplicaIndex(
-      final ContainerID id, final DatanodeDetails dn)
-      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
-    Set<ContainerReplica> replicas = getContainerReplicas(id);
-    return replicas.stream().filter(r -> r.getDatanodeDetails().equals(dn))
-        //there should not be more than one replica of a container on the same
-        //datanode. handle this if found in the future.
-        .findFirst().orElseThrow(() ->
-            new ContainerReplicaNotFoundException("ID " + id + ", DN " + dn))
-        .getReplicaIndex();
   }
 
   @Override

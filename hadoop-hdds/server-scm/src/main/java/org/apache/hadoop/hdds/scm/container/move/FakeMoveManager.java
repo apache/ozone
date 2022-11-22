@@ -38,27 +38,12 @@ public class FakeMoveManager implements MoveManager {
   public FakeMoveManager() {
 
   }
-  /**
-   * notify move manager that a container op has been completed.
-   *
-   * @param cop ContainerReplicaOp
-   * @param containerID ContainerID for which to complete
-   */
-  @Override
-  public void notifyContainerOpCompleted(ContainerReplicaOp cop,
-                                  ContainerID containerID) {
-  }
-
 
   /**
-   * notify move manager that a container op has been Expired.
-   *
-   * @param cop ContainerReplicaOp
-   * @param containerID ContainerID for which to complete
+   * notify the handler that a container op has been completed.
    */
-  @Override
-  public void notifyContainerOpExpired(ContainerReplicaOp cop,
-                                ContainerID containerID) {
+  public void onOpCompleted(ContainerReplicaOp op, ContainerID containerID,
+                            boolean timedOut) {
 
   }
 

@@ -400,13 +400,29 @@ public final class MoveManagerImpl implements MoveManager {
   }
 
   /**
+   * notify the handler that a container op has been completed.
+   */
+  @Override
+  public void onOpCompleted(ContainerReplicaOp op, ContainerID containerID,
+                            boolean timedOut) {
+    if (!running) {
+      return;
+    }
+
+    if (timedOut) {
+      notifyContainerOpExpired(op, containerID);
+    } else {
+      notifyContainerOpCompleted(op, containerID);
+    }
+  }
+
+  /**
    * notify move manager that a container op has been completed.
    *
    * @param cop ContainerReplicaOp
    * @param containerID ContainerID for which to complete
    */
-  @Override
-  public void notifyContainerOpCompleted(ContainerReplicaOp cop,
+  private void notifyContainerOpCompleted(ContainerReplicaOp cop,
       ContainerID containerID) {
     if (!running) {
       return;
@@ -445,8 +461,7 @@ public final class MoveManagerImpl implements MoveManager {
    * @param cop ContainerReplicaOp
    * @param containerID ContainerID for which to complete
    */
-  @Override
-  public void notifyContainerOpExpired(ContainerReplicaOp cop,
+  private void notifyContainerOpExpired(ContainerReplicaOp cop,
       ContainerID containerID) {
     if (!running) {
       return;
@@ -504,7 +519,7 @@ public final class MoveManagerImpl implements MoveManager {
 
     ContainerReplicaCount replicaCount =
         containerManager.getContainerReplicaCount(cid);
-    int index = containerManager.getContainerReplicaIndex(cid, src);
+    int index = getContainerReplicaIndex(cid, src);
     if (replicaCount.isOverReplicatedWithIndex(index) &&
         isPlacementStatusActuallyEqual(currentCPS, newCPS)) {
       sendDeleteCommand(cid, src);
@@ -588,7 +603,7 @@ public final class MoveManagerImpl implements MoveManager {
       final ContainerID cid, final DatanodeDetails tgt,
       final DatanodeDetails src)
       throws ContainerReplicaNotFoundException, ContainerNotFoundException {
-    int replicaIndex = containerManager.getContainerReplicaIndex(cid, src);
+    int replicaIndex = getContainerReplicaIndex(cid, src);
     final ReplicateContainerCommand replicateCommand =
         new ReplicateContainerCommand(cid.getId(),
             Collections.singletonList(src));
@@ -615,10 +630,10 @@ public final class MoveManagerImpl implements MoveManager {
    * @param cid Container to be deleted
    * @param datanode  The datanode on which the replica should be deleted
    */
-  public void sendDeleteCommand(
+  private void sendDeleteCommand(
       final ContainerID cid, final DatanodeDetails datanode)
       throws ContainerReplicaNotFoundException, ContainerNotFoundException {
-    int replicaIndex = containerManager.getContainerReplicaIndex(cid, datanode);
+    int replicaIndex = getContainerReplicaIndex(cid, datanode);
     LOG.info("Sending delete container command for container {}" +
         " to datanode {}", cid, datanode);
 
@@ -636,6 +651,18 @@ public final class MoveManagerImpl implements MoveManager {
         new CommandForDatanode<>(datanode.getUuid(), deleteCommand));
     scm.getContainerReplicaPendingOps()
         .scheduleDeleteReplica(cid, datanode, replicaIndex);
+  }
+
+  private int getContainerReplicaIndex(
+      final ContainerID id, final DatanodeDetails dn)
+      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(id);
+    return replicas.stream().filter(r -> r.getDatanodeDetails().equals(dn))
+        //there should not be more than one replica of a container on the same
+        //datanode. handle this if found in the future.
+        .findFirst().orElseThrow(() ->
+            new ContainerReplicaNotFoundException("ID " + id + ", DN " + dn))
+        .getReplicaIndex();
   }
 
   /**

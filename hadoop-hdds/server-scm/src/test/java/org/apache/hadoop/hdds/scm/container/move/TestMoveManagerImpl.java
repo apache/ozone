@@ -105,9 +105,6 @@ public class TestMoveManagerImpl {
     containerManager = Mockito.mock(ContainerManager.class);
     Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenReturn(cif);
-    Mockito.when(containerManager.getContainerReplicaIndex(
-        Mockito.any(ContainerID.class),
-        Mockito.any(DatanodeDetails.class))).thenReturn(1);
     scmContext = Mockito.mock(SCMContext.class);
     placementPolicyValidateProxy =
         Mockito.mock(PlacementPolicyValidateProxy.class);
@@ -169,17 +166,16 @@ public class TestMoveManagerImpl {
         .thenReturn(currentReplicas);
     doNothing().when(eventPublisher).fireEvent(Mockito.any(), Mockito.any());
     doNothing().when(containerReplicaPendingOps)
-        .scheduleDeleteReplica(cid, dn1, 1);
+        .scheduleDeleteReplica(cid, dn1, 3);
     doNothing().when(containerReplicaPendingOps)
-        .scheduleAddReplica(cid, dn2, 1);
+        .scheduleAddReplica(cid, dn2, 3);
     moveManager.onLeaderReady();
-
     //1. test normal move
     CompletableFuture<MoveManager.MoveResult> ret =
         moveManager.move(cid, dn1, dn2);
     //replication command should be sent;
     Mockito.verify(containerReplicaPendingOps, Mockito.times(1))
-        .scheduleAddReplica(cid, dn2, 1);
+        .scheduleAddReplica(cid, dn2, 3);
 
     ContainerReplicaOp opAdd = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, dn2, 3, 0);
@@ -189,14 +185,14 @@ public class TestMoveManagerImpl {
     currentReplicas.add(cp2);
     ContainerReplicaCount replicaCount =
         Mockito.mock(ContainerReplicaCount.class);
-    Mockito.when(replicaCount.isOverReplicatedWithIndex(1)).thenReturn(true);
+    Mockito.when(replicaCount.isOverReplicatedWithIndex(3)).thenReturn(true);
     Mockito.when(containerManager.getContainerReplicaCount(cid))
         .thenReturn(replicaCount);
-    moveManager.notifyContainerOpCompleted(opAdd, cid);
+    moveManager.onOpCompleted(opAdd, cid, false);
     //delete command should be sent;
     Mockito.verify(containerReplicaPendingOps, Mockito.times(1))
-        .scheduleDeleteReplica(cid, dn1, 1);
-    moveManager.notifyContainerOpCompleted(opDel, cid);
+        .scheduleDeleteReplica(cid, dn1, 3);
+    moveManager.onOpCompleted(opDel, cid, false);
 
     Assert.assertTrue(ret.get().equals(MoveManager.MoveResult.COMPLETED));
     Assert.assertTrue(moveManager.getPendingMove().isEmpty());
@@ -207,9 +203,9 @@ public class TestMoveManagerImpl {
     //replication command should be sent, we have sent a replication command
     //at line 159, so times here should be 1+1=2;
     Mockito.verify(containerReplicaPendingOps, Mockito.times(2))
-        .scheduleAddReplica(cid, dn2, 1);
+        .scheduleAddReplica(cid, dn2, 3);
     Assert.assertFalse(moveManager.getPendingMove().isEmpty());
-    moveManager.notifyContainerOpExpired(opAdd, cid);
+    moveManager.onOpCompleted(opAdd, cid, true);
     Assert.assertTrue(ret.get()
         .equals(MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT));
     Assert.assertTrue(moveManager.getPendingMove().isEmpty());
@@ -217,14 +213,14 @@ public class TestMoveManagerImpl {
     //3. test expired DELETE when moving
     ret = moveManager.move(cid, dn1, dn2);
     Mockito.verify(containerReplicaPendingOps, Mockito.times(3))
-        .scheduleAddReplica(cid, dn2, 1);
+        .scheduleAddReplica(cid, dn2, 3);
     Assert.assertFalse(moveManager.getPendingMove().isEmpty());
     currentReplicas.add(cp2);
-    moveManager.notifyContainerOpCompleted(opAdd, cid);
+    moveManager.onOpCompleted(opAdd, cid, false);
     Mockito.verify(containerReplicaPendingOps, Mockito.times(2))
-        .scheduleDeleteReplica(cid, dn1, 1);
+        .scheduleDeleteReplica(cid, dn1, 3);
     Assert.assertFalse(moveManager.getPendingMove().isEmpty());
-    moveManager.notifyContainerOpExpired(opDel, cid);
+    moveManager.onOpCompleted(opDel, cid, true);
     Assert.assertTrue(ret.get()
         .equals(MoveManager.MoveResult.DELETION_FAIL_TIME_OUT));
     Assert.assertTrue(moveManager.getPendingMove().isEmpty());

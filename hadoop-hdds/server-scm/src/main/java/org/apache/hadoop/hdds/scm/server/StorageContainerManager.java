@@ -706,7 +706,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     moveManager = new MoveManagerImpl(this);
 
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock, moveManager);
+        new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps.registerOpCompletionHandler(moveManager);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
