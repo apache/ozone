@@ -427,5 +427,10 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   long getContainerCount() throws IOException;
 
-  List<ContainerInfo> getListOfContainers() throws IOException;
+  long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException;
+
+  List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException;
 }

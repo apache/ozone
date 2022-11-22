@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
@@ -129,6 +128,8 @@ public class ReconStorageContainerManagerFacade
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
+  public static final int DEFAULT_RPC_SIZE = 64;
+  public static final int CONTAINER_METADATA_SIZE = 1;
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
@@ -355,7 +356,7 @@ public class ReconStorageContainerManagerFacade
     // between SCM container cache and recon container cache.
     scheduler.scheduleWithFixedDelay(() -> {
       try {
-        boolean isSuccess = syncSCMContainerInfoWithReconContainerInfo();
+        boolean isSuccess = syncWithSCMContainerInfo();
         if (!isSuccess) {
           LOG.debug("SCM container info sync is already running.");
         }
@@ -473,65 +474,59 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
-  public boolean syncSCMContainerInfoWithReconContainerInfo()
+  public boolean syncWithSCMContainerInfo()
       throws IOException {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
         List<ContainerInfo> containers = containerManager.getContainers();
-        List<ContainerInfo> listOfContainers = scmServiceProvider.
-            getListOfContainers();
-        if (null != listOfContainers && listOfContainers.size() > 0) {
-          LOG.info("Got list of containers frm SCM : " +
-              listOfContainers.size());
-          listOfContainers.forEach(containerInfo -> {
-            try {
-              long containerID = containerInfo.getContainerID();
-              List<HddsProtos.SCMContainerReplicaProto> containerReplicas
-                  = scmServiceProvider.getContainerReplicas(containerID);
-              boolean isContainerPresentAtRecon =
-                  containers.remove(containerID);
-              if (!isContainerPresentAtRecon) {
-                try {
-                  ContainerWithPipeline containerWithPipeline =
-                      scmServiceProvider.getContainerWithPipeline(containerID);
-                  containerManager.addNewContainer(containerWithPipeline);
-                } catch (IOException e) {
-                  LOG.error("Could not get container with pipeline " +
-                      "for container : {}", containerID);
-                } catch (TimeoutException e) {
-                  LOG.error("Could not add new container {} in Recon " +
-                      "container manager cache.", containerID);
-                }
-              }
-              containerReplicas.forEach(containerReplicaProto -> {
-                final ContainerReplica replica = buildContainerReplica(
-                    containerInfo, containerReplicaProto);
-                try {
-                  updateContainerState(containerInfo, replica);
-                  containerManager.updateContainerReplica(
-                      containerInfo.containerID(), replica);
-                } catch (ContainerNotFoundException e) {
-                  LOG.error("Could not update container replica as " +
-                      "container {} not found.", containerID);
-                } catch (InvalidStateTransitionException e) {
-                  LOG.error("Invalid state transition for container {}",
-                      containerID);
-                } catch (IOException e) {
-                  LOG.error("Could not update container {} state.",
-                      containerID);
-                } catch (TimeoutException e) {
-                  LOG.error("Timeout while updating container {} state.",
-                      containerID);
+
+        long containerCount = scmServiceProvider.getContainerCount(
+            HddsProtos.LifeCycleState.CLOSED);
+        // Assumption of size of 1 container info object here is 1 MB
+        long containersMetaDataTotalRpcRespSizeMB =
+            CONTAINER_METADATA_SIZE * containerCount;
+        double numOfApiCalls =
+            Double.valueOf(containersMetaDataTotalRpcRespSizeMB) /
+                Double.valueOf(DEFAULT_RPC_SIZE);
+        long totalApiCalls = Math.round(Math.ceil(numOfApiCalls));
+        long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
+            DEFAULT_RPC_SIZE ? containerCount : DEFAULT_RPC_SIZE;
+        if (containerCount > 0) {
+          for (int startContainerId = 1; startContainerId <= totalApiCalls;
+               startContainerId++) {
+            List<ContainerInfo> listOfContainers = scmServiceProvider.
+                getListOfContainers(Long.valueOf(startContainerId).longValue(),
+                    Long.valueOf(containerCountPerCall).intValue(),
+                    HddsProtos.LifeCycleState.CLOSED);
+            if (null != listOfContainers && listOfContainers.size() > 0) {
+              LOG.info("Got list of containers from SCM : " +
+                  listOfContainers.size());
+              listOfContainers.forEach(containerInfo -> {
+                long containerID = containerInfo.getContainerID();
+                boolean isContainerPresentAtRecon =
+                    containers.remove(containerID);
+                if (!isContainerPresentAtRecon) {
+                  try {
+                    ContainerWithPipeline containerWithPipeline =
+                        scmServiceProvider.getContainerWithPipeline(
+                            containerID);
+                    containerWithPipeline.getContainerInfo().setState(
+                        HddsProtos.LifeCycleState.UNKNOWN);
+                    containerManager.addNewContainer(containerWithPipeline);
+                  } catch (IOException e) {
+                    LOG.error("Could not get container with pipeline " +
+                        "for container : {}", containerID);
+                  } catch (TimeoutException e) {
+                    LOG.error("Could not add new container {} in Recon " +
+                        "container manager cache.", containerID);
+                  }
                 }
               });
-            } catch (IOException e) {
-              LOG.error("Unable to get container replicas for container : {}",
-                  containerInfo.getContainerID());
+            } else {
+              LOG.debug("SCM DB sync is already running.");
+              return false;
             }
-          });
-        } else {
-          LOG.debug("SCM DB sync is already running.");
-          return false;
+          }
         }
       } catch (IOException e) {
         LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);

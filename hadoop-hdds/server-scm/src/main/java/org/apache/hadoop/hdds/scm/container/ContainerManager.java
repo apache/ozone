@@ -81,6 +81,24 @@ public interface ContainerManager extends Closeable {
   List<ContainerInfo> getContainers(LifeCycleState state);
 
   /**
+   * Returns containers under certain conditions.
+   * Search container IDs from start ID(exclusive),
+   * The max size of the searching range cannot exceed the
+   * value of count.
+   *
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   * @param count count must be >= 0
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big.
+   * @param state container state
+   *
+   * @return a list of container.
+   */
+  List<ContainerInfo> getContainers(ContainerID startID,
+                                    int count, LifeCycleState state);
+
+  /**
    * Returns the size of containers which are in the specified state.
    *
    * @return size of containers.

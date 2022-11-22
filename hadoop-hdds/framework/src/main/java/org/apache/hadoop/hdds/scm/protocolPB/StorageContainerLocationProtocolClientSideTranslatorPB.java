@@ -1019,6 +1019,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state) throws IOException {
+    GetContainerCountRequestProto request =
+        GetContainerCountRequestProto.newBuilder().build();
+
+    GetContainerCountResponseProto response =
+        submitRequest(Type.GetClosedContainerCount,
+            builder -> builder.setGetContainerCountRequest(request))
+            .getGetContainerCountResponse();
+    return response.getContainerCount();
+  }
+
+  @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
   }
@@ -1029,7 +1041,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers() throws IOException {
-    return listContainer(0L, 1_000_000);
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return listContainer(startContainerID, count, state);
   }
 }

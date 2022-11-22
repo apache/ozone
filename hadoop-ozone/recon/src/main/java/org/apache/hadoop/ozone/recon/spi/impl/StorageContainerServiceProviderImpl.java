@@ -156,6 +156,12 @@ public class StorageContainerServiceProviderImpl
     return scmClient.getContainerCount();
   }
 
+  @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.getContainerCount(state);
+  }
+
   public String getScmDBSnapshotUrl() {
     return scmDBSnapshotUrl;
   }
@@ -218,15 +224,10 @@ public class StorageContainerServiceProviderImpl
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers() throws IOException {
-    return scmClient.getListOfContainers();
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.getListOfContainers(startContainerID, count, state);
   }
 
-  @Override
-  public List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId)
-      throws IOException {
-    return scmClient.getContainerReplicas(containerId,
-            ClientVersion.CURRENT_VERSION);
-  }
 }

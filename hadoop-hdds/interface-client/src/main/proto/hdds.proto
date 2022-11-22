@@ -211,6 +211,7 @@ enum LifeCycleState {
     DELETING = 5;
     DELETED = 6; // object is deleted.
     RECOVERING = 7;
+    UNKNOWN = 8; // Possible mis-match in container state between SCM and Recon
 }
 
 enum LifeCycleEvent {

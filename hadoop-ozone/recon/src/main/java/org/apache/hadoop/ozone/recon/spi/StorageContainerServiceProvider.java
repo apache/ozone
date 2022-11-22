@@ -82,17 +82,21 @@ public interface StorageContainerServiceProvider {
 
   /**
    * Get the list of containers from SCM. This is a RPC call.
-   * @return list of containers from SCM.
-   */
-  List<ContainerInfo> getListOfContainers() throws IOException;
-
-  /**
-   * Get the container replicas.
    *
-   * @param containerId the container Id
-   * @return the list of replicas for a container
+   * @param startContainerID the start container id
+   * @param count the number of containers to return
+   * @param state the containers in given state to be returned
+   * @return the list of containers from SCM in a given state
    * @throws IOException
    */
-  List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerId) throws IOException;
+  List<ContainerInfo> getListOfContainers(long startContainerID,
+                                          int count,
+                                          HddsProtos.LifeCycleState state)
+      throws IOException;
+
+  /**
+   * Requests SCM for container count for a given state.
+   * @return Total number of containers in SCM.
+   */
+  long getContainerCount(HddsProtos.LifeCycleState state) throws IOException;
 }

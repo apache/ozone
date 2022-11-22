@@ -1124,8 +1124,17 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers() throws IOException {
-    return scm.getClientProtocolServer().getListOfContainers();
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(state).size();
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(
+        ContainerID.valueOf(startContainerID), count, state);
   }
 
   /**

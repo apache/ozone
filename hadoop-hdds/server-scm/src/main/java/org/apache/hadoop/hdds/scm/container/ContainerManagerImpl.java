@@ -179,6 +179,27 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public List<ContainerInfo> getContainers(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    final List<ContainerID> containersIds =
+        new ArrayList<>(containerStateManager.getContainerIDs(state));
+    Collections.sort(containersIds);
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containersIds.stream()
+          .filter(id -> id.compareTo(startID) >= 0).limit(count)
+          .map(containerStateManager::getContainer)
+          .collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
+  }
+
+  @Override
   public int getContainerStateCount(final LifeCycleState state) {
     return containerStateManager.getContainerIDs(state).size();
   }
