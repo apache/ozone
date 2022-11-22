@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -58,6 +58,8 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -220,8 +222,8 @@ public class ReplicationManager implements SCMService {
         new ECOverReplicationHandler(ecReplicationCheckHandler,
             ecContainerPlacement, nodeManager);
     underReplicatedProcessor =
-        new UnderReplicatedProcessor(this, containerReplicaPendingOps,
-            eventPublisher, rmConf.getUnderReplicatedInterval());
+        new UnderReplicatedProcessor(this,
+            rmConf.getUnderReplicatedInterval());
     overReplicatedProcessor =
         new OverReplicatedProcessor(this,
             rmConf.getOverReplicatedInterval());
@@ -412,7 +414,6 @@ public class ReplicationManager implements SCMService {
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
       throws NotLeaderException {
-
     command.setTerm(getScmTerm());
     final CommandForDatanode<?> datanodeCommand =
         new CommandForDatanode<>(target.getUuid(), command);
@@ -422,8 +423,7 @@ public class ReplicationManager implements SCMService {
 
   private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,
       SCMCommand<?> cmd, DatanodeDetails targetDatanode) {
-    if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.deleteContainerCommand) {
+    if (cmd.getType() == Type.deleteContainerCommand) {
       DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
       containerReplicaPendingOps.scheduleDeleteReplica(
           containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex());
@@ -433,8 +433,24 @@ public class ReplicationManager implements SCMService {
         getMetrics().incrNumDeletionCmdsSent();
         getMetrics().incrNumDeletionBytesTotal(containerInfo.getUsedBytes());
       }
-    } else {
-      throw new RuntimeException("Unexpected command type " + cmd.getType());
+    } else if (cmd.getType() == Type.reconstructECContainersCommand) {
+      ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
+      List<DatanodeDetails> targets = rcc.getTargetDatanodes();
+      byte[] targetIndexes = rcc.getMissingContainerIndexes();
+      for (int i = 0; i < targetIndexes.length; i++) {
+        containerReplicaPendingOps.scheduleAddReplica(
+            containerInfo.containerID(), targets.get(i), targetIndexes[i]);
+      }
+      getMetrics().incrEcReconstructionCmdsSentTotal();
+    } else if (cmd.getType() == Type.replicateContainerCommand) {
+      ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
+      containerReplicaPendingOps.scheduleAddReplica(
+          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex());
+      if (rcc.getReplicaIndex() > 0) {
+        getMetrics().incrEcReplicationCmdsSentTotal();
+      } else if (rcc.getReplicaIndex() == 0) {
+        getMetrics().incrNumReplicationCmdsSent();
+      }
     }
   }
 

@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
@@ -61,6 +63,7 @@ import java.util.Set;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.mockito.ArgumentMatchers.any;
@@ -358,7 +361,7 @@ public class TestReplicationManager {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
 
     DeleteContainerCommand deleteContainerCommand = new DeleteContainerCommand(
-      containerInfo.getContainerID());
+        containerInfo.getContainerID());
     deleteContainerCommand.setReplicaIndex(1);
 
     replicationManager.sendDatanodeCommand(deleteContainerCommand,
@@ -402,6 +405,113 @@ public class TestReplicationManager {
         .getNumDeletionCmdsSent());
     Assertions.assertEquals(20, replicationManager.getMetrics()
         .getNumDeletionBytesTotal());
+  }
+
+  @Test
+  public void testSendDatanodeReconstructCommand() throws NotLeaderException {
+    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
+        sourceNodes = new ArrayList<>();
+    for (int i = 1; i <= 3; i++) {
+      sourceNodes.add(
+          new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
+              MockDatanodeDetails.randomDatanodeDetails(), i));
+    }
+    List<DatanodeDetails> targetNodes = new ArrayList<>();
+    DatanodeDetails target4 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target5 = MockDatanodeDetails.randomDatanodeDetails();
+    targetNodes.add(target4);
+    targetNodes.add(target5);
+    byte[] missingIndexes = {4, 5};
+
+    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
+        containerInfo.getContainerID(), sourceNodes, targetNodes,
+        missingIndexes, ecRepConfig);
+
+    replicationManager.sendDatanodeCommand(command, containerInfo, target4);
+
+    List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
+        containerInfo.containerID());
+    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Assertions.assertEquals(2, ops.size());
+    Set<DatanodeDetails> cmdTargets = new HashSet<>();
+    Set<Integer> cmdIndexes = new HashSet<>();
+    for (ContainerReplicaOp op : ops) {
+      Assertions.assertEquals(ADD, op.getOpType());
+      cmdTargets.add(op.getTarget());
+      cmdIndexes.add(op.getReplicaIndex());
+    }
+    Assertions.assertEquals(2, cmdTargets.size());
+    for (DatanodeDetails dn : targetNodes) {
+      Assertions.assertTrue(cmdTargets.contains(dn));
+    }
+
+    Assertions.assertEquals(2, cmdIndexes.size());
+    for (int i : missingIndexes) {
+      Assertions.assertTrue(cmdIndexes.contains(i));
+    }
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcReconstructionCmdsSentTotal());
+  }
+
+  @Test
+  public void testSendDatanodeRewplicateCommand() throws NotLeaderException {
+    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+
+    List<DatanodeDetails> sources = new ArrayList<>();
+    sources.add(MockDatanodeDetails.randomDatanodeDetails());
+    sources.add(MockDatanodeDetails.randomDatanodeDetails());
+
+
+    ReplicateContainerCommand command = new ReplicateContainerCommand(
+        containerInfo.getContainerID(), sources);
+    command.setReplicaIndex(1);
+
+    replicationManager.sendDatanodeCommand(command, containerInfo, target);
+
+    List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
+        containerInfo.containerID());
+    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(target, ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcReplicationCmdsSentTotal());
+    Assertions.assertEquals(0, replicationManager.getMetrics()
+        .getNumReplicationCmdsSent());
+
+    // Repeat with Ratis container, as different metrics should be incremented
+    Mockito.clearInvocations(eventPublisher);
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
+        HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    command = new ReplicateContainerCommand(
+        containerInfo.getContainerID(), sources);
+    replicationManager.sendDatanodeCommand(command, containerInfo, target);
+
+    ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(target, ops.get(0).getTarget());
+    Assertions.assertEquals(0, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcReplicationCmdsSentTotal());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getNumReplicationCmdsSent());
   }
 
   @SafeVarargs
