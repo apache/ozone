@@ -167,7 +167,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       }
     } catch (Exception e) {
       markStreamClosed();
-      throw new IOException(e.getMessage());
+      throw e;
     }
     writeOffset += len;
   }

@@ -677,8 +677,8 @@ public class TestOzoneECClient {
   }
 
   // The mocked impl throws IllegalStateException when there are not enough
-  // nodes in allocateBlock request. But write() converts it to IOException.
-  @Test(expected = IOException.class)
+  // nodes in allocateBlock request.
+  @Test(expected = IllegalStateException.class)
   public void testStripeWriteRetriesOnAllNodeFailures() throws IOException {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
