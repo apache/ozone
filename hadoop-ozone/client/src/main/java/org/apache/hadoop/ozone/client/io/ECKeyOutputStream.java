@@ -172,9 +172,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     writeOffset += len;
   }
 
-  private void rollbackAndReset() throws IOException {
+  private void rollbackAndReset(ECChunkBuffers stripe) throws IOException {
     // Rollback the length/offset updated as part of this failed stripe write.
-    final ByteBuffer[] dataBuffers = ecChunkBufferCache.getDataBuffers();
+    final ByteBuffer[] dataBuffers = stripe.getDataBuffers();
     offset -= Arrays.stream(dataBuffers).mapToInt(Buffer::limit).sum();
 
     final ECBlockOutputStreamEntry failedStreamEntry =
@@ -208,7 +208,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private StripeWriteStatus commitStripeWrite() throws IOException {
+  private StripeWriteStatus commitStripeWrite(ECChunkBuffers stripe)
+      throws IOException {
 
     ECBlockOutputStreamEntry streamEntry =
         blockOutputStreamEntryPool.getCurrentStreamEntry();
@@ -225,7 +226,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
     final boolean isLastStripe = streamEntry.getRemaining() <= 0 ||
-        ecChunkBufferCache.getLastDataCell().limit() < ecChunkSize;
+        stripe.getLastDataCell().limit() < ecChunkSize;
     ByteString checksum = streamEntry.calculateChecksum();
     streamEntry.executePutBlock(isLastStripe,
         streamEntry.getCurrentPosition(), checksum);
@@ -240,7 +241,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     streamEntry.updateBlockGroupToAckedPosition(
         streamEntry.getCurrentPosition());
-    ecChunkBufferCache.clear();
+    stripe.clear();
 
     if (streamEntry.getRemaining() <= 0) {
       streamEntry.close();
@@ -319,9 +320,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private void writeDataCells() throws IOException {
+  private void writeDataCells(ECChunkBuffers stripe) throws IOException {
     blockOutputStreamEntryPool.allocateBlockIfNeeded();
-    ByteBuffer[] dataCells = ecChunkBufferCache.getDataBuffers();
+    ByteBuffer[] dataCells = stripe.getDataBuffers();
     for (int i = 0; i < numDataBlks; i++) {
       if (dataCells[i].limit() > 0) {
         handleOutputStreamWrite(dataCells[i], false);
@@ -330,11 +331,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
   }
 
-  private void writeParityCells() {
+  private void writeParityCells(ECChunkBuffers stripe) {
     // Move the stream entry cursor to parity block index
     blockOutputStreamEntryPool
         .getCurrentStreamEntry().forceToFirstParityBlock();
-    ByteBuffer[] parityCells = ecChunkBufferCache.getParityBuffers();
+    ByteBuffer[] parityCells = stripe.getParityBuffers();
     for (int i = 0; i < numParityBlks; i++) {
       handleOutputStreamWrite(parityCells[i], true);
       blockOutputStreamEntryPool.getCurrentStreamEntry().useNextBlockStream();
@@ -354,7 +355,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       // compute parity cells and write data
       if (chunkIndex == numDataBlks) {
         generateParityCells();
-        flushStripeToDatanodes();
+        flushStripeToDatanodes(ecChunkBufferCache);
         chunkIndex = 0;
       }
     }
@@ -461,7 +462,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       // If stripe buffer is not empty, encode and flush the stripe.
       if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
         generateParityCells();
-        flushStripeToDatanodes();
+        flushStripeToDatanodes(ecChunkBufferCache);
       }
 
       closeCurrentStreamEntry();
@@ -475,16 +476,17 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     ecChunkBufferCache.release();
   }
 
-  private void flushStripeToDatanodes() throws IOException {
+  private void flushStripeToDatanodes(ECChunkBuffers stripe)
+      throws IOException {
     int maxRetry = config.getMaxECStripeWriteRetries();
     for (int i = 0; i <= maxRetry; i++) {
-      writeDataCells();
-      writeParityCells();
-      if (commitStripeWrite() == StripeWriteStatus.SUCCESS) {
+      writeDataCells(stripe);
+      writeParityCells(stripe);
+      if (commitStripeWrite(stripe) == StripeWriteStatus.SUCCESS) {
         return;
       }
       // In case of failure, cleanup before retry
-      rollbackAndReset();
+      rollbackAndReset(stripe);
     }
     throw new IOException("Completed max allowed retries " +
         maxRetry + " on stripe failures.");
