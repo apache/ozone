@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -49,6 +50,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.GB;
  * request.
  */
 public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
+
+  private static final String TEST_KEY = "key1";
 
   @Test
   public void testPreExecute() throws Exception {
@@ -283,5 +286,92 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(8 * GB, dbBucketInfo.getQuotaInBytes());
     Assert.assertEquals(EC,
         dbBucketInfo.getDefaultReplicationConfig().getType());
+  }
+
+  @Test
+  public void testSettingRepConfigWithEncryption() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketEncryptionKey(new BucketEncryptionKeyInfo.Builder()
+                    .setKeyName(TEST_KEY).build());
+
+    OMRequestTestUtils.addVolumeToDB(
+            volumeName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(
+            omMetadataManager, bucketInfo);
+
+    BucketArgs bucketArgs = OmBucketArgs.newBuilder()
+            .setDefaultReplicationConfig(new DefaultReplicationConfig(
+                    EC, new ECReplicationConfig(3, 2)))
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setIsVersionEnabled(true)
+            .build()
+            .getProtobuf();
+
+    OMRequest omRequest = OMRequest.newBuilder().setSetBucketPropertyRequest(
+                    SetBucketPropertyRequest.newBuilder().setBucketArgs(bucketArgs))
+            .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
+            .setClientId(UUID.randomUUID().toString()).build();
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+            new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+            .validateAndUpdateCache(ozoneManager, 1,
+                    ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(true, omClientResponse.getOMResponse().getSuccess());
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo dbBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    Assert.assertEquals(TEST_KEY, dbBucketInfo.getEncryptionKeyInfo().getKeyName());
+    Assert.assertEquals(EC,
+            dbBucketInfo.getDefaultReplicationConfig().getType());
+  }
+
+  @Test
+  public void testSettingQuotaWithEncryption() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketEncryptionKey(new BucketEncryptionKeyInfo.Builder()
+                    .setKeyName(TEST_KEY).build());
+
+    OMRequestTestUtils.addVolumeToDB(
+            volumeName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(
+            omMetadataManager, bucketInfo);
+
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+            bucketName, true, 20 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+            new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+            .validateAndUpdateCache(ozoneManager, 1,
+                    ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(true, omClientResponse.getOMResponse().getSuccess());
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo dbBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    Assert.assertEquals(TEST_KEY, dbBucketInfo.getEncryptionKeyInfo().getKeyName());
+    Assert.assertEquals(20 * GB,
+            dbBucketInfo.getQuotaInBytes());
+    Assert.assertEquals(1000L,
+            dbBucketInfo.getQuotaInNamespace());
   }
 }
