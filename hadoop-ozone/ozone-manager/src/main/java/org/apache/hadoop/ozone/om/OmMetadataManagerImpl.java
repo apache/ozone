@@ -1178,6 +1178,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           ResultCodes.BUCKET_NOT_FOUND);
     }
 
+    String bucketNameBytes = getBucketKey(volumeName, bucketName);
+    if (getBucketTable().get(bucketNameBytes) == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+          ResultCodes.BUCKET_NOT_FOUND);
+    }
+
     String prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
     TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
 
@@ -1207,6 +1213,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
       KeyValue< String, SnapshotInfo> snapshotinfo;
+      snapshotIter.seek(prefix);
       while (snapshotIter.hasNext()) {
         snapshotinfo = snapshotIter.next();
         if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix)) {
