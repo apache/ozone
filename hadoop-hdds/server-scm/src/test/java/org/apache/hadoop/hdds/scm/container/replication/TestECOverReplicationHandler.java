@@ -133,6 +133,37 @@ public class TestECOverReplicationHandler {
             .put(5, 1).build());
   }
 
+  /**
+   * Even if we pass an under-replicated health state to the over-rep handler
+   * it should process it OK, and if it has over replicated indexes, then
+   * delete commands should be produced.
+   */
+  @Test
+  public void testOverReplicationWithUnderReplication() {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    ContainerHealthResult.UnderReplicatedHealthResult health =
+        new ContainerHealthResult.UnderReplicatedHealthResult(
+            container, 1, false, false, false);
+
+    ECOverReplicationHandler ecORH =
+        new ECOverReplicationHandler(replicationCheck, policy, nodeManager);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands = ecORH
+        .processAndCreateCommands(availableReplicas, ImmutableList.of(),
+            health, 1);
+
+    Assert.assertEquals(1, commands.size());
+    for (SCMCommand<?> cmd : commands.values()) {
+      Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
+    }
+  }
+
   private void testOverReplicationWithIndexes(
       Set<ContainerReplica> availableReplicas,
       Map<Integer, Integer> index2excessNum) {
