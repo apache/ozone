@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
@@ -60,6 +61,8 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 
 /**
  * Tests the ECUnderReplicationHandling functionality.
@@ -73,6 +76,7 @@ public class TestECUnderReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
   private ECReplicationCheckHandler replicationCheck;
+  private PlacementPolicy ecPlacementPolicy;
 
   @BeforeEach
   public void setup() {
@@ -92,7 +96,11 @@ public class TestECUnderReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    replicationCheck = new ECReplicationCheckHandler();
+    ecPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+        anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+    replicationCheck = new ECReplicationCheckHandler(ecPlacementPolicy);
   }
 
   @Test
@@ -210,10 +218,10 @@ public class TestECUnderReplicationHandler {
             Mockito.mock(ContainerPlacementStatus.class);
     Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
             .thenReturn(false);
-    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
-            Mockito.anyInt())).thenReturn(mockedContainerPlacementStatus);
-    Mockito.when(mockedPolicy.validateContainerPlacement(Mockito.anyList(),
-            Mockito.anyInt())).thenAnswer(invocationOnMock -> {
+    Mockito.when(mockedPolicy.validateContainerPlacement(anyList(),
+            anyInt())).thenReturn(mockedContainerPlacementStatus);
+    Mockito.when(mockedPolicy.validateContainerPlacement(anyList(),
+            anyInt())).thenAnswer(invocationOnMock -> {
               Set<DatanodeDetails> dns =
                       new HashSet<>(invocationOnMock.getArgument(0));
               Assert.assertTrue(

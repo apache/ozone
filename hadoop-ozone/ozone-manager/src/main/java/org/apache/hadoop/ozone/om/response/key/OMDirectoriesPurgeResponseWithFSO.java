@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
@@ -51,14 +54,17 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
   private boolean isRatisEnabled;
+  private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
 
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
-      boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout) {
+      boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
+      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.isRatisEnabled = isRatisEnabled;
+    this.volBucketInfoMap = volBucketInfoMap;
   }
 
   @Override
@@ -123,6 +129,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         if (LOG.isDebugEnabled()) {
           LOG.info("Purge Deleted Directory DBKey: {}", path.getDeletedDir());
         }
+      }
+
+      // update bucket usedBytes.
+      for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
+        omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+            omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+                omBucketInfo.getBucketName()), omBucketInfo);
       }
     }
   }

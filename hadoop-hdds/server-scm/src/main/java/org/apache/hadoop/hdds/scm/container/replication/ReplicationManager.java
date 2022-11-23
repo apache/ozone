@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithMismatchedReplicasHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
@@ -166,15 +167,23 @@ public class ReplicationManager implements SCMService {
   /**
    * Constructs ReplicationManager instance with the given configuration.
    *
-   * @param conf OzoneConfiguration
-   * @param containerManager ContainerManager
-   * @param containerPlacement PlacementPolicy
-   * @param eventPublisher EventPublisher
+   * @param conf The SCM configuration used by RM.
+   * @param containerManager The containerManager instance
+   * @param ratisContainerPlacement The Ratis container placement policy
+   * @param ecContainerPlacement The EC container placement policy
+   * @param eventPublisher The eventPublisher instance
+   * @param scmContext The SCMContext instance
+   * @param nodeManager The nodeManager instance
+   * @param clock Clock object used to get the current time
+   * @param legacyReplicationManager The legacy ReplicationManager instance
+   * @param replicaPendingOps The pendingOps instance
+   * @throws IOException
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ConfigurationSource conf,
              final ContainerManager containerManager,
-             final PlacementPolicy containerPlacement,
+             final PlacementPolicy ratisContainerPlacement,
+             final PlacementPolicy ecContainerPlacement,
              final EventPublisher eventPublisher,
              final SCMContext scmContext,
              final NodeManager nodeManager,
@@ -196,19 +205,20 @@ public class ReplicationManager implements SCMService {
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
-    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
+    this.ecReplicationCheckHandler =
+        new ECReplicationCheckHandler(ecContainerPlacement);
     this.ratisReplicationCheckHandler =
-        new RatisReplicationCheckHandler(containerPlacement);
+        new RatisReplicationCheckHandler(ratisContainerPlacement);
     this.nodeManager = nodeManager;
     this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
-        ecReplicationCheckHandler, containerPlacement, conf, nodeManager);
+        ecReplicationCheckHandler, ecContainerPlacement, conf, nodeManager);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecReplicationCheckHandler,
-            containerPlacement, nodeManager);
+            ecContainerPlacement, nodeManager);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this, containerReplicaPendingOps,
             eventPublisher, rmConf.getUnderReplicatedInterval());
@@ -226,7 +236,8 @@ public class ReplicationManager implements SCMService {
         .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
         .addNext(ecReplicationCheckHandler)
-        .addNext(ratisReplicationCheckHandler);
+        .addNext(ratisReplicationCheckHandler)
+        .addNext(new ClosedWithUnhealthyReplicasHandler(this));
     start();
   }
 
