@@ -217,11 +217,9 @@ public class ReplicationManager implements SCMService {
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
-        ecReplicationCheckHandler, ecContainerPlacement, conf, nodeManager,
-        this);
+        ecContainerPlacement, conf, nodeManager, this);
     ecOverReplicationHandler =
-        new ECOverReplicationHandler(ecReplicationCheckHandler,
-            ecContainerPlacement, nodeManager);
+        new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
