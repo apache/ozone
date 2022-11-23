@@ -215,7 +215,8 @@ public class ReplicationManager implements SCMService {
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
-        ecReplicationCheckHandler, ecContainerPlacement, conf, nodeManager);
+        ecReplicationCheckHandler, ecContainerPlacement, conf, nodeManager,
+        this);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecReplicationCheckHandler,
             ecContainerPlacement, nodeManager);
