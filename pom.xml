@@ -1311,19 +1311,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${jersey.version}</version>
       </dependency>
 
-      <!--Wildfly openssl dependency is introduced by HADOOP-15669-->
-      <dependency>
-        <groupId>org.wildfly.openssl</groupId>
-        <artifactId>wildfly-openssl</artifactId>
-        <version>1.0.4.Final</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.threadly</groupId>
-        <artifactId>threadly</artifactId>
-        <version>4.9.0</version>
-      </dependency>
-
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk16</artifactId>
@@ -1353,11 +1340,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${hikari.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.swagger</groupId>
-        <artifactId>swagger-annotations</artifactId>
-        <version>${swagger-annotations-version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
         <version>${snakeyaml.version}</version>
@@ -1372,11 +1354,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.jboss.weld.servlet</groupId>
         <artifactId>weld-servlet</artifactId>
         <version>2.4.7.Final</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jruby.jcodings</groupId>
-        <artifactId>jcodings</artifactId>
-        <version>1.0.13</version>
       </dependency>
       <dependency>
         <groupId>org.powermock</groupId>
