@@ -1651,6 +1651,11 @@ message ListSnapshotRequest {
   required string bucketName = 2;
 }
 
+message ListSnapshotRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
