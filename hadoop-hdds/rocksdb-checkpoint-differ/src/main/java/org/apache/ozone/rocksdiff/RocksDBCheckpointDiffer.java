@@ -18,6 +18,7 @@
 package org.apache.ozone.rocksdiff;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.StringUtils;
@@ -139,6 +140,10 @@ public class RocksDBCheckpointDiffer {
    * Dummy object that acts as a write lock in compaction listener.
    */
   private final Object compactionListenerWriteLock = new Object();
+  /**
+   * Flag for testing. Skips SST file summary reader.
+   */
+  private boolean skipGetSSTFileSummary = false;
 
   /**
    * Constructor.
@@ -166,6 +171,16 @@ public class RocksDBCheckpointDiffer {
 
     // Active DB location is used in getSSTFileSummary
     this.activeDBLocationStr = activeDBLocation.toString() + "/";
+  }
+
+  /**
+   * This constructor is only meant for unit testing.
+   */
+  @VisibleForTesting
+  RocksDBCheckpointDiffer() {
+    this.skipGetSSTFileSummary = true;
+    this.sstBackupDir = null;
+    this.activeDBLocationStr = null;
   }
 
   private void setCompactionLogDir(String metadataDir,
@@ -335,6 +350,12 @@ public class RocksDBCheckpointDiffer {
       public void onCompactionBegin(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
+        // TODO: Skip (return) if no snapshot has been taken yet
+
+        // Note the current compaction listener implementation does not
+        // differentiate which column family each SST store. It is tracking
+        // all SST files.
+
         synchronized (compactionListenerWriteLock) {
 
           if (compactionJobInfo.inputFiles().size() == 0) {
@@ -447,6 +468,11 @@ public class RocksDBCheckpointDiffer {
    */
   private long getSSTFileSummary(String filename) throws RocksDBException {
 
+    if (skipGetSSTFileSummary) {
+      // For testing only
+      return 1L;
+    }
+
     if (!filename.endsWith(SST_FILE_EXTENSION)) {
       filename += SST_FILE_EXTENSION;
     }
@@ -528,6 +554,8 @@ public class RocksDBCheckpointDiffer {
 
       rocksDB = RocksDB.openReadOnly(dbOptions, dbPathArg,
           cfDescriptors, columnFamilyHandles);
+      // Note it retrieves only the selected column families by the descriptor
+      // i.e. keyTable, directoryTable, fileTable
       List<LiveFileMetaData> liveFileMetaDataList =
           rocksDB.getLiveFilesMetaData();
       LOG.debug("SST File Metadata for DB: " + dbPathArg);
@@ -551,7 +579,7 @@ public class RocksDBCheckpointDiffer {
   /**
    * Process each line of compaction log text file input and populate the DAG.
    */
-  private synchronized void processCompactionLogLine(String line) {
+  synchronized void processCompactionLogLine(String line) {
 
     LOG.debug("Processing line: {}", line);
 
@@ -636,6 +664,9 @@ public class RocksDBCheckpointDiffer {
   public synchronized List<String> getSSTDiffList(
       DifferSnapshotInfo src, DifferSnapshotInfo dest) {
 
+    // TODO: Reject or swap if dest is taken after src, once snapshot chain
+    //  integration is done.
+
     HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.getDbPath());
     HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.getDbPath());
 
@@ -672,11 +703,15 @@ public class RocksDBCheckpointDiffer {
   /**
    * Core getSSTDiffList logic.
    */
-  private void internalGetSSTDiffList(
+  void internalGetSSTDiffList(
       DifferSnapshotInfo src, DifferSnapshotInfo dest,
       HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
       HashSet<String> sameFiles, HashSet<String> differentFiles) {
+
+    // Sanity check
+    Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
+    Preconditions.checkArgument(differentFiles.isEmpty(), "Set must be empty");
 
     for (String fileName : srcSnapFiles) {
       if (destSnapFiles.contains(fileName)) {
@@ -700,13 +735,24 @@ public class RocksDBCheckpointDiffer {
       // Traversal level/depth indicator for debug print
       int level = 1;
       while (!currentLevel.isEmpty()) {
-        LOG.debug("BFS level: {}. Current level has {} nodes.",
+        LOG.debug("Traversal level: {}. Current level has {} nodes.",
             level++, currentLevel.size());
+
+        if (level >= 1000000) {
+          LOG.error("Graph traversal level exceeded allowed maximum ({}). "
+                  + "This could be due to invalid input generating a "
+                  + "loop in the traversal path. Same SSTs found so far: {}, "
+                  + "different SSTs: {}", level, sameFiles, differentFiles);
+          // Clear output to indicate an error. Expect fall back to full diff
+          sameFiles.clear();
+          differentFiles.clear();
+          return;
+        }
 
         final Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
           LOG.debug("Processing node: {}", current.getFileName());
-          if (current.getSnapshotGeneration() <= dest.getSnapshotGeneration()) {
+          if (current.getSnapshotGeneration() < dest.getSnapshotGeneration()) {
             LOG.debug("Current node's snapshot generation '{}' "
                     + "reached destination snapshot's '{}'. "
                     + "Src '{}' and dest '{}' have different SST file: '{}'",

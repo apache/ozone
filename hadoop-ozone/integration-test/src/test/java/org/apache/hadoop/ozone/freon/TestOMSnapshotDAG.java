@@ -208,8 +208,8 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap2 = new File(snap2.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap2::exists, 2000, 20000);
 
-    List<String> actualDiffList21 = differ.getSSTDiffList(snap2, snap1);
-    LOG.debug("Got diff list: {}", actualDiffList21);
+    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1);
+    LOG.debug("Got diff list: {}", sstDiffList21);
 
     // Delete 1000 keys, take a 3rd snapshot, and do another diff
     for (int i = 0; i < 1000; i++) {
@@ -224,22 +224,26 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
-    List<String> actualDiffList32 = differ.getSSTDiffList(snap3, snap2);
+    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2);
 
     // snap3-snap1 diff result is a combination of snap3-snap2 and snap2-snap1
-    List<String> actualDiffList31 = differ.getSSTDiffList(snap3, snap1);
+    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1);
+
+    // Same snapshot. Result should be empty list
+    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
+    Assertions.assertTrue(sstDiffList22.isEmpty());
 
     // Restart OM, do the same diffs again. See if DAG reconstruction works
     cluster.restartOzoneManager();
 
-    List<String> actualDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
-    Assertions.assertEquals(actualDiffList21, actualDiffList21Run2);
+    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
+    Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
 
-    List<String> actualDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
-    Assertions.assertEquals(actualDiffList32, actualDiffList32Run2);
+    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
+    Assertions.assertEquals(sstDiffList32, sstDiffList32Run2);
 
-    List<String> actualDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
-    Assertions.assertEquals(actualDiffList31, actualDiffList31Run2);
+    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
+    Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
   }
 
 }
