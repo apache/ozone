@@ -673,6 +673,7 @@ public class TestOmMetadataManager {
   public void testListSnapshot() throws Exception {
     String vol1 = "vol1";
     String bucket1 = "bucket1";
+    String nonexistentBucket = "nonexistentBucket";
 
     OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
     addBucketsToCache(vol1, bucket1);
@@ -689,12 +690,17 @@ public class TestOmMetadataManager {
     }
 
     //Test listing snapshots with no volume name.
-    Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
-        null, null));
+    Assert.assertThrows(OMException.class,
+        () -> omMetadataManager.listSnapshot(null, null));
 
     //Test listing snapshots with no bucket name.
-    Assert.assertThrows(OMException.class, () -> omMetadataManager.listSnapshot(
-        vol1, null));
+    Assert.assertThrows(OMException.class,
+        () -> omMetadataManager.listSnapshot(vol1, null));
+
+    //Test listing snapshots with non-existent bucket.
+
+    Assert.assertThrows(OMException.class,
+        () -> omMetadataManager.listSnapshot(vol1, nonexistentBucket));
 
     //Test listing all snapshots.
     List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
