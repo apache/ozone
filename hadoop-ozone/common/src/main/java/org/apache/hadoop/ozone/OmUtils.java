@@ -329,16 +329,6 @@ public final class OmUtils {
     }
   }
 
-  public static byte[] getMD5Digest(String input) throws IOException {
-    try {
-      MessageDigest md = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
-      return md.digest(input.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException ex) {
-      throw new IOException("Error creating an instance of MD5 digest.\n" +
-          "This could possibly indicate a faulty JRE");
-    }
-  }
-
   public static byte[] getSHADigest() throws IOException {
     try {
       SRAND.nextBytes(randomBytes);
