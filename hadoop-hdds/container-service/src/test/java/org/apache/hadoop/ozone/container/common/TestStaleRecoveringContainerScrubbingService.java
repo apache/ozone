@@ -50,12 +50,18 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -120,10 +126,11 @@ public class TestStaleRecoveringContainerScrubbingService {
   /**
    * A helper method to create a number of containers of given state.
    */
-  private void createTestContainers(
+  private List<Long> createTestContainers(
       ContainerSet containerSet, int num,
       ContainerProtos.ContainerDataProto.State state)
       throws StorageContainerException {
+    List<Long> createdIds = new ArrayList<>();
     int end = containerIdNum + num;
     for (; containerIdNum < end; containerIdNum++) {
       testClock.fastForward(10L);
@@ -139,7 +146,9 @@ public class TestStaleRecoveringContainerScrubbingService {
       recoveringKeyValueContainer.create(
           volumeSet, volumeChoosingPolicy, clusterID);
       containerSet.addContainer(recoveringKeyValueContainer);
+      createdIds.add((long) containerIdNum);
     }
+    return createdIds;
   }
 
   @Test
@@ -153,29 +162,44 @@ public class TestStaleRecoveringContainerScrubbingService {
             Duration.ofSeconds(300).toMillis(),
             containerSet);
     testClock.fastForward(1000L);
-    createTestContainers(containerSet, 5, CLOSED);
+    Map<Long, ContainerProtos.ContainerDataProto.State> containerStateMap =
+            new HashMap<>();
+    containerStateMap.putAll(createTestContainers(containerSet, 5, CLOSED)
+            .stream().collect(Collectors.toMap(i -> i, i -> CLOSED)));
+
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //closed container should not be scrubbed
     Assert.assertTrue(containerSet.containerCount() == 5);
 
-    createTestContainers(containerSet, 5, RECOVERING);
+    containerStateMap.putAll(createTestContainers(containerSet, 5,
+            RECOVERING).stream()
+            .collect(Collectors.toMap(i -> i, i -> UNHEALTHY)));
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should be scrubbed since recovering timeout
-    Assert.assertTrue(containerSet.containerCount() == 5);
+    Assert.assertTrue(containerSet.containerCount() == 10);
     Iterator<Container<?>> it = containerSet.getContainerIterator();
     while (it.hasNext()) {
       Container<?> entry = it.next();
-      Assert.assertTrue(entry.getContainerState().equals(CLOSED));
+      Assert.assertEquals(entry.getContainerState(),
+              containerStateMap.get(entry.getContainerData().getContainerID()));
     }
 
     //increase recovering timeout
     containerSet.setRecoveringTimeout(2000L);
-    createTestContainers(containerSet, 5, RECOVERING);
+    containerStateMap.putAll(createTestContainers(containerSet, 5,
+            RECOVERING).stream()
+            .collect(Collectors.toMap(i -> i, i -> RECOVERING)));
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should not be scrubbed
-    Assert.assertTrue(containerSet.containerCount() == 10);
+    Assert.assertTrue(containerSet.containerCount() == 15);
+    it = containerSet.getContainerIterator();
+    while (it.hasNext()) {
+      Container<?> entry = it.next();
+      Assert.assertEquals(entry.getContainerState(),
+              containerStateMap.get(entry.getContainerData().getContainerID()));
+    }
   }
 }
