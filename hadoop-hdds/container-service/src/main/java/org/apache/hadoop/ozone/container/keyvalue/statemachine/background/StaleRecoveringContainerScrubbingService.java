@@ -84,9 +84,8 @@ public class StaleRecoveringContainerScrubbingService
 
     @Override
     public BackgroundTaskResult call() throws Exception {
-      containerSet.getContainer(containerID).delete();
-      containerSet.removeContainer(containerID);
-      LOG.info("Delete stale recovering container {}", containerID);
+      containerSet.getContainer(containerID).markContainerUnhealthy();
+      LOG.info("Stale recovering container {} marked UNHEALTHY", containerID);
       return new BackgroundTaskResult.EmptyTaskResult();
     }
   }

@@ -40,6 +40,9 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
+import org.mockito.Mockito;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertTrue;
@@ -240,6 +243,44 @@ public abstract class GenericTestUtils {
 
   public static void setRootLogLevel(org.slf4j.event.Level level) {
     setLogLevel(LogManager.getRootLogger(), Level.toLevel(level.toString()));
+  }
+
+  public static <T> T mockFieldReflection(Object object, String fieldName)
+          throws NoSuchFieldException, IllegalAccessException {
+    Field field = object.getClass().getDeclaredField(fieldName);
+    boolean isAccessible = field.isAccessible();
+
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    boolean modifierFieldAccessible = modifiersField.isAccessible();
+    modifiersField.setAccessible(true);
+    int modifierVal = modifiersField.getInt(field);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    T value = (T) field.get(object);
+    value = Mockito.spy(value);
+    field.set(object, value);
+    modifiersField.setInt(field, modifierVal);
+    modifiersField.setAccessible(modifierFieldAccessible);
+    field.setAccessible(isAccessible);
+    return value;
+  }
+
+  public static <T> T getFieldReflection(Object object, String fieldName)
+          throws NoSuchFieldException, IllegalAccessException {
+    Field field = object.getClass().getDeclaredField(fieldName);
+    boolean isAccessible = field.isAccessible();
+
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    boolean modifierFieldAccessible = modifiersField.isAccessible();
+    modifiersField.setAccessible(true);
+    int modifierVal = modifiersField.getInt(field);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    T value = (T) field.get(object);
+    modifiersField.setInt(field, modifierVal);
+    modifiersField.setAccessible(modifierFieldAccessible);
+    field.setAccessible(isAccessible);
+    return value;
   }
 
   /**
