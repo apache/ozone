@@ -522,7 +522,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void addStripeToQueue(ECChunkBuffers stripe) throws IOException {
     try {
-      while (!ecStripeQueue.offer(stripe, 1, TimeUnit.SECONDS)) {
+      do {
         // If flushFuture is done, it means that the flush thread has
         // encountered an exception. Call get() to throw that exception here.
         if (flushFuture.isDone()) {
@@ -530,7 +530,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
           // We should never reach here.
           throw new IOException("Flush thread has ended before stream close");
         }
-      }
+      } while (!ecStripeQueue.offer(stripe, 1, TimeUnit.SECONDS));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while adding stripe to queue", e);
