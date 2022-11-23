@@ -70,7 +70,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
 
@@ -112,7 +111,6 @@ public class TestECContainerRecovery {
     datanodeConfiguration.setRecoveringContainerScrubInterval(
             Duration.of(10, ChronoUnit.SECONDS));
     conf.setFromObject(datanodeConfiguration);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
             .getObject(
                     ReplicationManager.ReplicationManagerConfiguration.class);
