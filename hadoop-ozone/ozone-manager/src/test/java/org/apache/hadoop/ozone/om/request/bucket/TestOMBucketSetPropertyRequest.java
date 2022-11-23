@@ -314,7 +314,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             .getProtobuf();
 
     OMRequest omRequest = OMRequest.newBuilder().setSetBucketPropertyRequest(
-                    SetBucketPropertyRequest.newBuilder().setBucketArgs(bucketArgs))
+            SetBucketPropertyRequest.newBuilder().setBucketArgs(bucketArgs))
             .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
             .setClientId(UUID.randomUUID().toString()).build();
 
@@ -331,7 +331,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OmBucketInfo dbBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
 
-    Assert.assertEquals(TEST_KEY, dbBucketInfo.getEncryptionKeyInfo().getKeyName());
+    Assert.assertEquals(TEST_KEY,
+            dbBucketInfo.getEncryptionKeyInfo().getKeyName());
     Assert.assertEquals(EC,
             dbBucketInfo.getDefaultReplicationConfig().getType());
   }
@@ -368,7 +369,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OmBucketInfo dbBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
 
-    Assert.assertEquals(TEST_KEY, dbBucketInfo.getEncryptionKeyInfo().getKeyName());
+    Assert.assertEquals(TEST_KEY,
+            dbBucketInfo.getEncryptionKeyInfo().getKeyName());
     Assert.assertEquals(20 * GB,
             dbBucketInfo.getQuotaInBytes());
     Assert.assertEquals(1000L,
