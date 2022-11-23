@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -65,7 +64,6 @@ public class TestECOverReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
-  private ECReplicationCheckHandler replicationCheck;
   private PlacementPolicy placementPolicy;
 
   @BeforeEach
@@ -90,7 +88,6 @@ public class TestECOverReplicationHandler {
     Mockito.when(placementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
-    replicationCheck = new ECReplicationCheckHandler(placementPolicy);
   }
 
   @Test
@@ -152,7 +149,7 @@ public class TestECOverReplicationHandler {
             container, 1, false, false, false);
 
     ECOverReplicationHandler ecORH =
-        new ECOverReplicationHandler(replicationCheck, policy, nodeManager);
+        new ECOverReplicationHandler(policy, nodeManager);
 
     Map<DatanodeDetails, SCMCommand<?>> commands = ecORH
         .processAndCreateCommands(availableReplicas, ImmutableList.of(),
@@ -168,7 +165,7 @@ public class TestECOverReplicationHandler {
       Set<ContainerReplica> availableReplicas,
       Map<Integer, Integer> index2excessNum) {
     ECOverReplicationHandler ecORH =
-        new ECOverReplicationHandler(replicationCheck, policy, nodeManager);
+        new ECOverReplicationHandler(policy, nodeManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
