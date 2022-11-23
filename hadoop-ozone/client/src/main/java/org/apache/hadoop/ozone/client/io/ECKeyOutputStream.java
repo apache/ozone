@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -521,10 +522,29 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void addStripeToQueue(ECChunkBuffers stripe) throws IOException {
     try {
-      ecStripeQueue.put(stripe);
+      while (!flushFuture.isDone()) {
+        if (ecStripeQueue.offer(stripe, 1, TimeUnit.SECONDS)) {
+          break;
+        }
+      }
+      // If flushFuture is done, it means that the flush thread has
+      // encountered an exception. We should throw that exception here.
+      if (flushFuture.isDone()) {
+        flushFuture.get();
+        // We should never reach here.
+        throw new IOException("Flush thread has ended before stream close");
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while adding stripe to queue", e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      } else if (e.getCause() instanceof RuntimeException) {
+        throw (RuntimeException) e.getCause();
+      } else {
+        throw new IOException(e.getCause());
+      }
     }
   }
 
