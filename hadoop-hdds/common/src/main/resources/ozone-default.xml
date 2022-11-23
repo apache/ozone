@@ -3284,6 +3284,24 @@
   </property>
 
   <property>
+    <name>ozone.client.ec.grpc.retries.enabled</name>
+    <value>true</value>
+    <tag>CLIENT</tag>
+    <description>
+      To enable Grpc client retries for EC.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.ec.grpc.retries.max</name>
+    <value>3</value>
+    <tag>CLIENT</tag>
+    <description>
+      The maximum attempts GRPC client makes before failover.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.audit.log.debug.cmd.list.omaudit</name>
     <value></value>
     <tag>OM</tag>
