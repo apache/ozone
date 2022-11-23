@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -60,7 +59,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
-  private final ECReplicationCheckHandler ecReplicationCheck;
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final NodeManager nodeManager;
@@ -72,10 +70,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     }
   }
 
-  public ECUnderReplicationHandler(ECReplicationCheckHandler ecReplicationCheck,
-      final PlacementPolicy containerPlacement, final ConfigurationSource conf,
-      NodeManager nodeManager, ReplicationManager replicationManager) {
-    this.ecReplicationCheck = ecReplicationCheck;
+  public ECUnderReplicationHandler(final PlacementPolicy containerPlacement,
+      final ConfigurationSource conf, NodeManager nodeManager,
+      ReplicationManager replicationManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -123,41 +120,19 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       final ContainerHealthResult result,
       final int remainingMaintenanceRedundancy) throws IOException {
     ContainerInfo container = result.getContainerInfo();
+    LOG.debug("Handling under-replicated EC container: {}", container);
+
     final ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
-
-    // TODO - do we really need to recheck the health via ecReplicationCheck?
-    //        Is it not enough to assume it was under-replicated if it got here
-    //        and then use the replica count object to validate it is under-rep?
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setContainerInfo(container)
-        .setContainerReplicas(replicas)
-        .setPendingOps(pendingOps)
-        .setMaintenanceRedundancy(remainingMaintenanceRedundancy)
-        .build();
-    ContainerHealthResult currentUnderRepRes = ecReplicationCheck
-        .checkHealth(request);
-    LOG.debug("Handling under-replicated EC container: {}", container);
-    if (currentUnderRepRes
-        .getHealthState() != ContainerHealthResult.HealthState
-        .UNDER_REPLICATED) {
+    if (replicaCount.isSufficientlyReplicated()) {
       LOG.info("The container {} state changed and it's not in under"
-              + " replication any more. Current state is: {}",
-          container.getContainerID(), currentUnderRepRes);
+              + " replication any more.", container.getContainerID());
       return emptyMap();
     }
-    // don't place reconstructed replicas on exclude nodes, since they already
-    // have replicas
-    List<DatanodeDetails> excludedNodes = replicas.stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList());
-
-    ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
-        ((ContainerHealthResult.UnderReplicatedHealthResult)
-            currentUnderRepRes);
-    if (containerHealthResult.isReplicatedOkAfterPending()) {
-      LOG.info("The container {} with replicas {} is sufficiently replicated",
+    if (replicaCount.isSufficientlyReplicated(true)) {
+      LOG.info("The container {} with replicas {} will be sufficiently " +
+          "replicated after pending replicas are created",
           container.getContainerID(), replicaCount.getReplicas());
       return emptyMap();
     }
@@ -166,6 +141,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           " are: {}.", container.containerID(), replicaCount.getReplicas());
       return emptyMap();
     }
+
+    // don't place reconstructed replicas on exclude nodes, since they already
+    // have replicas
+    List<DatanodeDetails> excludedNodes = replicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
     final ContainerID id = container.containerID();
     final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
     try {

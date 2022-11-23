@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
@@ -83,7 +82,6 @@ public class TestECUnderReplicationHandler {
   private PlacementPolicy policy;
   private static final int DATA = 3;
   private static final int PARITY = 2;
-  private ECReplicationCheckHandler replicationCheck;
   private PlacementPolicy ecPlacementPolicy;
 
   @BeforeEach
@@ -109,7 +107,6 @@ public class TestECUnderReplicationHandler {
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
-    replicationCheck = new ECReplicationCheckHandler(ecPlacementPolicy);
   }
 
   @Test
@@ -279,7 +276,7 @@ public class TestECUnderReplicationHandler {
     replicasToAdd.add(maintReplica);
 
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(replicationCheck,
+        new ECUnderReplicationHandler(
             noNodesPolicy, conf, nodeManager, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult underRep =
         new ContainerHealthResult.UnderReplicatedHealthResult(container,
@@ -347,7 +344,7 @@ public class TestECUnderReplicationHandler {
     replicasToAdd.add(maintReplica);
 
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(replicationCheck,
+        new ECUnderReplicationHandler(
             sameNodePolicy, conf, nodeManager, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult underRep =
         new ContainerHealthResult.UnderReplicatedHealthResult(container,
@@ -397,7 +394,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 4), Pair.of(DECOMMISSIONING, 5));
 
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(replicationCheck,
+        new ECUnderReplicationHandler(
             sameNodePolicy, conf, nodeManager, replicationManager);
 
     ContainerHealthResult.UnderReplicatedHealthResult underRep =
@@ -486,7 +483,7 @@ public class TestECUnderReplicationHandler {
       int decomIndexes, int maintenanceIndexes,
       PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
-        new ECUnderReplicationHandler(replicationCheck,
+        new ECUnderReplicationHandler(
             placementPolicy, conf, nodeManager, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
