@@ -207,7 +207,7 @@ public class TestKeyDeletingService {
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
 
-    // Let OM completely processes the deletion request
+    // the pre-allocated blocks are not committed, hence they will be deleted.
     GenericTestUtils.waitFor(
         () -> {
           try {
@@ -225,9 +225,6 @@ public class TestKeyDeletingService {
           }
         }, 100, 2000);
 
-    // the pre-allocated blocks are not committed, hence they will be deleted.
-    Assert.assertEquals(100,
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
     // Make sure that we have run the background thread 2 times or more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 2,
