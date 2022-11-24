@@ -123,7 +123,7 @@ public final class TestNSSummaryTaskWithFSO {
   public static void setUp() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        150 * 1000L);
+        15 * 1000L);
     omMetadataManager = initializeNewOmMetadataManager(
             TEMPORARY_FOLDER.newFolder());
     OzoneManagerServiceProvider ozoneManagerServiceProvider =

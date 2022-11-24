@@ -345,7 +345,7 @@ public class TestNSSummaryEndpointWithFSO {
   public void setUp() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        150 * 1000L);
+        15 * 1000L);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.newFolder());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =

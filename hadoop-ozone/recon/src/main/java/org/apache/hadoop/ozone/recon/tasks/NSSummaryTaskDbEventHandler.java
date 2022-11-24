@@ -208,6 +208,7 @@ public class NSSummaryTaskDbEventHandler {
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       writeNSSummariesToDB(nsSummaryMap);
+      nsSummaryMap.clear();
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
