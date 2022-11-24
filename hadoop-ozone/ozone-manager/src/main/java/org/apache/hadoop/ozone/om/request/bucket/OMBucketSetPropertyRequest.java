@@ -183,12 +183,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
           .get(volumeKey);
-      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs)) {
+      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs,
+          dbBucketInfo)) {
         bucketInfoBuilder.setQuotaInBytes(omBucketArgs.getQuotaInBytes());
       } else {
         bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
       }
-      if (checkQuotaNamespaceValid(omVolumeArgs, omBucketArgs)) {
+      if (checkQuotaNamespaceValid(omVolumeArgs, omBucketArgs, dbBucketInfo)) {
         bucketInfoBuilder.setQuotaInNamespace(
             omBucketArgs.getQuotaInNamespace());
       } else {
@@ -265,7 +266,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
-                     OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs)
+                     OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs,
+                     OmBucketInfo dbBucketInfo)
       throws IOException {
     if (!omBucketArgs.hasQuotaInBytes()) {
       // Quota related values are not in the request, so we don't need to check
@@ -290,6 +292,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     if (quotaInBytes > OzoneConsts.QUOTA_RESET) {
       totalBucketQuota = quotaInBytes;
+      if (quotaInBytes < dbBucketInfo.getUsedBytes()) {
+        throw new OMException("Cannot update bucket quota. Requested " +
+            "spaceQuota less than used spaceQuota.",
+            OMException.ResultCodes.QUOTA_ERROR);
+      }
     }
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
@@ -312,7 +319,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   }
 
   public boolean checkQuotaNamespaceValid(OmVolumeArgs omVolumeArgs,
-      OmBucketArgs omBucketArgs) {
+      OmBucketArgs omBucketArgs, OmBucketInfo dbBucketInfo)
+      throws IOException {
     if (!omBucketArgs.hasQuotaInNamespace()) {
       // Quota related values are not in the request, so we don't need to check
       // them as they have not changed.
@@ -322,6 +330,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
       return false;
+    }
+    
+    if (quotaInNamespace != OzoneConsts.QUOTA_RESET
+        && quotaInNamespace < dbBucketInfo.getUsedNamespace()) {
+      throw new OMException("Cannot update bucket quota. NamespaceQuota " +
+          "requested is less than used namespaceQuota.",
+          OMException.ResultCodes.QUOTA_ERROR);
     }
     return true;
   }

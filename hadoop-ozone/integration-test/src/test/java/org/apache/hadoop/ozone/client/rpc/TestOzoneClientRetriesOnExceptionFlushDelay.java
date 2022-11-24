@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.rpc;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -45,7 +44,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.After;
 import org.junit.Assert;
@@ -92,8 +90,6 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000,
-        TimeUnit.MILLISECONDS);
 
     OzoneClientConfig config = new OzoneClientConfig();
     config.setChecksumType(ChecksumType.NONE);

@@ -172,10 +172,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void emitSafeModeStatus() {
     SafeModeStatus safeModeStatus =
         new SafeModeStatus(getInSafeMode(), getPreCheckComplete());
-    // TODO: remove eventPublisher,
-    //  since there will no consumer of SAFE_MODE_STATUS in future.
-    eventPublisher.fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        safeModeStatus);
 
     // update SCMContext
     scmContext.updateSafeModeStatus(safeModeStatus);
