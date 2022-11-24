@@ -36,7 +36,7 @@ import static  org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public class TestOMKeyRenameResponse extends TestOMKeyResponse {
-  protected OmKeyInfo formKeyParent;
+  protected OmKeyInfo fromKeyParent;
   protected OmKeyInfo toKeyParent;
   @Test
   public void testAddToDBBatch() throws Exception {
@@ -62,7 +62,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(getDBKeyName(formKeyParent)));
+          .isExist(getDBKeyName(fromKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }
@@ -78,7 +78,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
-          .isExist(getDBKeyName(formKeyParent)));
+          .isExist(getDBKeyName(fromKeyParent)));
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }
@@ -107,7 +107,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(getDBKeyName(formKeyParent)));
+          .isExist(getDBKeyName(fromKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }
@@ -124,7 +124,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
-          .isExist(getDBKeyName(formKeyParent)));
+          .isExist(getDBKeyName(fromKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }

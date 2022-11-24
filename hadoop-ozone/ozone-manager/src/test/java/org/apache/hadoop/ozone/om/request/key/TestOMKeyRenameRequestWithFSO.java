@@ -44,7 +44,7 @@ import java.util.UUID;
  * Tests RenameKeyWithFSO request.
  */
 public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
-  private OmKeyInfo formKeyParentInfo;
+  private OmKeyInfo fromKeyParentInfo;
   private OmKeyInfo toKeyParentInfo;
   @Override
   @Before
@@ -54,18 +54,18 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     long volumeId = omMetadataManager.getVolumeId(volumeName);
     long bucketId = omMetadataManager.getBucketId(volumeName,
         bucketName);
-    String formKeyParentName = UUID.randomUUID().toString();
+    String fromKeyParentName = UUID.randomUUID().toString();
     String toKeyParentName = UUID.randomUUID().toString();
-    formKeyName = new Path(formKeyParentName, "formKey").toString();
+    fromKeyName = new Path(fromKeyParentName, "fromKey").toString();
     toKeyName = new Path(toKeyParentName, "toKey").toString();
-    formKeyParentInfo = getOmKeyInfo(formKeyParentName);
-    formKeyParentInfo.setParentObjectID(bucketId);
+    fromKeyParentInfo = getOmKeyInfo(fromKeyParentName);
+    fromKeyParentInfo.setParentObjectID(bucketId);
     toKeyParentInfo = getOmKeyInfo(toKeyParentName);
     toKeyParentInfo.setParentObjectID(bucketId);
-    formKeyInfo = getOmKeyInfo(formKeyName);
-    formKeyInfo.setParentObjectID(formKeyParentInfo.getObjectID());
+    fromKeyInfo = getOmKeyInfo(fromKeyName);
+    fromKeyInfo.setParentObjectID(fromKeyParentInfo.getObjectID());
     OMRequestTestUtils.addDirKeyToDirTable(false,
-        OMFileRequest.getDirectoryInfo(formKeyParentInfo), volumeName,
+        OMFileRequest.getDirectoryInfo(fromKeyParentInfo), volumeName,
         bucketName, txnLogId, omMetadataManager);
     OMRequestTestUtils.addDirKeyToDirTable(false,
         OMFileRequest.getDirectoryInfo(toKeyParentInfo), volumeName,
@@ -80,7 +80,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     String invalidToKeyName = "";
     Assert.assertThrows(
         OMException.class, () -> doPreExecute(createRenameKeyRequest(
-            volumeName, bucketName, formKeyName, invalidToKeyName)));  }
+            volumeName, bucketName, fromKeyName, invalidToKeyName)));  }
 
   @Override
   @Test
@@ -182,11 +182,11 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
       throws IOException {
     // For filesystem should change the modification time for
     // both the parents directory
-    OmDirectoryInfo updatedFormKeyParentInfo = omMetadataManager
-        .getDirectoryTable().get(getDBKeyName(formKeyParentInfo));
+    OmDirectoryInfo updatedFromKeyParentInfo = omMetadataManager
+        .getDirectoryTable().get(getDBKeyName(fromKeyParentInfo));
     OmDirectoryInfo updatedToKeyParentInfo = omMetadataManager
         .getDirectoryTable().get(getDBKeyName(toKeyParentInfo));
-    Assert.assertEquals(except, updatedFormKeyParentInfo.getModificationTime());
+    Assert.assertEquals(except, updatedFromKeyParentInfo.getModificationTime());
     Assert.assertEquals(except, updatedToKeyParentInfo.getModificationTime());
   }
 

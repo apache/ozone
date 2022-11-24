@@ -63,23 +63,23 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
       OmKeyInfo fromKeyInfo, OmKeyInfo toKeyInfo) throws IOException {
     createParentKey();
     return new OMKeyRenameResponseWithFSO(response, getDBKeyName(fromKeyInfo),
-        getDBKeyName(toKeyInfo), formKeyParent, toKeyParent, toKeyInfo,
+        getDBKeyName(toKeyInfo), fromKeyParent, toKeyParent, toKeyInfo,
         false, getBucketLayout());
   }
   protected void createParentKey() {
     long bucketId = random.nextLong();
-    String formKeyParentName = UUID.randomUUID().toString();
+    String fromKeyParentName = UUID.randomUUID().toString();
     String toKeyParentName = UUID.randomUUID().toString();
-    formKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, formKeyParentName, replicationType, replicationFactor,
+    fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, fromKeyParentName, replicationType, replicationFactor,
         bucketId + 100L);
     toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
         bucketName, toKeyParentName, replicationType, replicationFactor,
         bucketId + 101L);
-    formKeyParent.setParentObjectID(bucketId);
+    fromKeyParent.setParentObjectID(bucketId);
     toKeyParent.setParentObjectID(bucketId);
-    formKeyParent.setFileName(OzoneFSUtils.getFileName(
-        formKeyParent.getKeyName()));
+    fromKeyParent.setFileName(OzoneFSUtils.getFileName(
+        fromKeyParent.getKeyName()));
     toKeyParent.setFileName(OzoneFSUtils.getFileName(
         toKeyParent.getKeyName()));
   }

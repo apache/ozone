@@ -373,6 +373,24 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     assertTrue(dir1BeforeMTime < dir1AfterMTime);
     assertTrue(dir2BeforeMTime < dir2AfterMTime);
     assertEquals(file1BeforeMTime, file1AfterMTime);
+
+    // mv "/dir1/subdir1/" to "/dir2/subdir1/"
+    Path subdir1 = new Path(dir1, "subdir1");
+    Path renamedSubdir1 = new Path(dir2, "subdir1");
+    getFs().mkdirs(subdir1);
+
+    dir1BeforeMTime = getFs().getFileStatus(dir1).getModificationTime();
+    dir2BeforeMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long subdir1BeforeMTime = getFs().getFileStatus(subdir1)
+        .getModificationTime();
+    getFs().rename(subdir1, renamedSubdir1);
+    dir1AfterMTime = getFs().getFileStatus(dir1).getModificationTime();
+    dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long subdir1AfterMTime = getFs().getFileStatus(renamedSubdir1)
+        .getModificationTime();
+    assertTrue(dir1BeforeMTime < dir1AfterMTime);
+    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertEquals(subdir1BeforeMTime, subdir1AfterMTime);
   }
 
   @Override

@@ -42,8 +42,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public class TestOMKeyRenameRequest extends TestOMKeyRequest {
-  protected OmKeyInfo formKeyInfo;
-  protected String formKeyName;
+  protected OmKeyInfo fromKeyInfo;
+  protected String fromKeyName;
   protected String toKeyName;
   protected String dbToKey;
 
@@ -51,23 +51,23 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   public void createParentKey() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
-    formKeyName = new Path("formKey").toString();
+    fromKeyName = new Path("fromKey").toString();
     toKeyName = new Path("toKey").toString();
-    formKeyInfo = getOmKeyInfo(formKeyName);
+    fromKeyInfo = getOmKeyInfo(fromKeyName);
     dbToKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
   }
 
   @Test
   public void testPreExecute() throws Exception {
     doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, formKeyName, toKeyName));
+        volumeName, bucketName, fromKeyName, toKeyName));
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-            volumeName, bucketName, formKeyName, toKeyName));
-    String dbFromKey = addKeyToTable(formKeyInfo);
+            volumeName, bucketName, fromKeyName, toKeyName));
+    String dbFromKey = addKeyToTable(fromKeyInfo);
 
     OMKeyRenameRequest omKeyRenameRequest =
             getOMKeyRenameRequest(modifiedOmRequest);
@@ -96,7 +96,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, formKeyName, toKeyName));
+        volumeName, bucketName, fromKeyName, toKeyName));
 
     // Add only volume and bucket entry to DB.
 
@@ -119,7 +119,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        "not_exist_volume", "not_exist_bucket", formKeyName, toKeyName));
+        "not_exist_volume", "not_exist_bucket", fromKeyName, toKeyName));
 
     OMKeyRenameRequest omKeyRenameRequest =
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
@@ -135,7 +135,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, "not_exist_bucket", formKeyName, toKeyName));
+        volumeName, "not_exist_bucket", fromKeyName, toKeyName));
 
     // Add only volume entry to DB.
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
@@ -155,7 +155,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
     String invalidToKeyName = "";
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, formKeyName, invalidToKeyName));
+        volumeName, bucketName, fromKeyName, invalidToKeyName));
 
     // Add only volume and bucket entry to DB.
 
@@ -227,8 +227,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
    * @return OMRequest
    */
   protected OMRequest createRenameKeyRequest(
-      String volume, String bucket, String formKey, String toKey) {
-    KeyArgs keyArgs = KeyArgs.newBuilder().setKeyName(formKey)
+      String volume, String bucket, String fromKey, String toKey) {
+    KeyArgs keyArgs = KeyArgs.newBuilder().setKeyName(fromKey)
         .setVolumeName(volume).setBucketName(bucket).build();
 
     RenameKeyRequest renameKeyRequest = RenameKeyRequest.newBuilder()
