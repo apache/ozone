@@ -67,7 +67,7 @@ public final class TestNSSummaryTaskWithFSO {
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
 
-  private static OzoneConfiguration ozoneConfiguration;
+  private OzoneConfiguration ozoneConfiguration;
 
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
@@ -148,7 +148,8 @@ public final class TestNSSummaryTaskWithFSO {
     populateOMDB();
 
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration);
   }
 
   /**

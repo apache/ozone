@@ -108,7 +108,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private static OzoneConfiguration ozoneConfiguration;
+  private OzoneConfiguration ozoneConfiguration;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
