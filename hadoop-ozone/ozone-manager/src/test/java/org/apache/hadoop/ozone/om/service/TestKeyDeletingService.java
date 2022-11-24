@@ -207,6 +207,24 @@ public class TestKeyDeletingService {
     KeyDeletingService keyDeletingService =
         (KeyDeletingService) keyManager.getDeletingService();
 
+    // Let OM completely processes the deletion request
+    GenericTestUtils.waitFor(
+        () -> {
+          try {
+            int numPendingDeletionKeys =
+                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
+            if (numPendingDeletionKeys != keyCount) {
+              LOG.info("Expected {} keys to be pending deletion, but got {}",
+                  keyCount, numPendingDeletionKeys);
+              return false;
+            }
+            return true;
+          } catch (IOException e) {
+            LOG.error("Error while getting pending deletion keys.", e);
+            return false;
+          }
+        }, 100, 2000);
+
     // the pre-allocated blocks are not committed, hence they will be deleted.
     Assert.assertEquals(100,
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
