@@ -677,7 +677,8 @@ public class RpcClient implements ClientProtocol {
         : "with server-side default bucket layout";
     LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
             "Storage Type set to {} and Encryption set to {}, " +
-            "Replication Type set to {}, Namespace Quota set to {}, Space Quota set to {} ",
+            "Replication Type set to {}, Namespace Quota set to {}, " + 
+            "Space Quota set to {} ",
         volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
         storageType, bek != null, replicationType.toString(),
         bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes() );
