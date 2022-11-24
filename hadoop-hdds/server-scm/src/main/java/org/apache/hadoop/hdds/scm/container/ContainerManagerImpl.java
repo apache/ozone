@@ -342,7 +342,8 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public ContainerInfo getMatchingContainer(final long size, final String owner,
-      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs) {
+      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs,
+      boolean closeContainer) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
     try {
@@ -354,7 +355,7 @@ public class ContainerManagerImpl implements ContainerManager {
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
-            size, owner, pipeline.getId(), containerIDs);
+            size, owner, pipeline.getId(), containerIDs, closeContainer);
         if (containerInfo == null) {
           containerInfo = allocateContainer(pipeline, owner);
         }

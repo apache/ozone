@@ -48,17 +48,19 @@ public class WritableContainerFactory {
   }
 
   public ContainerInfo getContainer(final long size,
-      ReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      long localId, long allocIdx)
       throws IOException, TimeoutException {
     switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider
-          .getContainer(size, repConfig, owner, excludeList);
+          .getContainer(size, repConfig, owner, excludeList, localId, allocIdx);
     case RATIS:
-      return ratisProvider.getContainer(size, repConfig, owner, excludeList);
+      return ratisProvider.getContainer(size, repConfig, owner, excludeList,
+          localId, allocIdx);
     case EC:
       return ecProvider.getContainer(size, (ECReplicationConfig)repConfig,
-          owner, excludeList);
+          owner, excludeList, localId, allocIdx);
     default:
       throw new IOException(repConfig.getReplicationType()
           + " is an invalid replication type");

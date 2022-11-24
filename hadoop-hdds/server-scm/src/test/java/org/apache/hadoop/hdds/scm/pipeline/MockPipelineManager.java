@@ -219,6 +219,10 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void closeContainer(PipelineID pipeline, ContainerID containerID) {
+  }
+
+  @Override
   public void closeStalePipelines(DatanodeDetails datanodeDetails) {
 
   }

@@ -154,7 +154,8 @@ public interface ContainerManager extends Closeable {
 
   default ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline) {
-    return getMatchingContainer(size, owner, pipeline, Collections.emptySet());
+    return getMatchingContainer(size, owner, pipeline,
+        Collections.emptySet(), false);
   }
 
   /**
@@ -163,11 +164,14 @@ public interface ContainerManager extends Closeable {
    * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
+   * @param closeContainer - flag to indicate if close container for 
+   *                       not satisfying condition
    * @return ContainerInfo for the matching container.
    */
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
-                                     Set<ContainerID> excludedContainerIDS);
+                                     Set<ContainerID> excludedContainerIDS,
+                                     boolean closeContainer);
 
   /**
    * Once after report processor handler completes, call this to notify

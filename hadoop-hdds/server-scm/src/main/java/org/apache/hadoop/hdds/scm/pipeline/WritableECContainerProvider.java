@@ -61,6 +61,7 @@ public class WritableECContainerProvider
   private final ContainerManager containerManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
+  private final long blockExpiryDuration;
 
   public WritableECContainerProvider(ConfigurationSource conf,
       PipelineManager pipelineManager, ContainerManager containerManager,
@@ -72,6 +73,9 @@ public class WritableECContainerProvider
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
     this.containerSize = getConfiguredContainerSize();
+    this.blockExpiryDuration = conf.getLong(
+        ScmConfigKeys.OZONE_SCM_BLOCK_EXPIRY_DURATION,
+        ScmConfigKeys.OZONE_SCM_BLOCK_EXPIRY_DURATION_DEFAULT);
   }
 
   /**
@@ -91,15 +95,19 @@ public class WritableECContainerProvider
    */
   @Override
   public ContainerInfo getContainer(final long size,
-      ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ECReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      long localId, long allocIdx)
       throws IOException, TimeoutException {
     synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < providerConfig.getMinimumPipelines()) {
         try {
-          return allocateContainer(
+          ContainerInfo containerInfo = allocateContainer(
               repConfig, size, owner, excludeList);
+          containerInfo.addBlockExpiry(getExpiryTime(allocIdx,
+              blockExpiryDuration), localId);
+          return containerInfo;
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
@@ -135,6 +143,8 @@ public class WritableECContainerProvider
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipeline);
             } else {
+              containerInfo.addBlockExpiry(getExpiryTime(allocIdx,
+                  blockExpiryDuration), localId);
               return containerInfo;
             }
           }
@@ -150,7 +160,11 @@ public class WritableECContainerProvider
     // allocate a new one and usePipelineManagerV2Impl.java it.
     try {
       synchronized (this) {
-        return allocateContainer(repConfig, size, owner, excludeList);
+        ContainerInfo containerInfo = allocateContainer(repConfig, size,
+            owner, excludeList);
+        containerInfo.addBlockExpiry(getExpiryTime(allocIdx,
+            blockExpiryDuration), localId);
+        return containerInfo;
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
@@ -202,7 +216,7 @@ public class WritableECContainerProvider
     // The size passed from OM will be the cluster block size. Therefore we
     // just check if the container has enough free space to accommodate another
     // full block.
-    return container.getUsedBytes() + size <= containerSize;
+    return container.getBlockedSpace(size) + size <= containerSize;
   }
 
   private long getConfiguredContainerSize() {

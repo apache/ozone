@@ -19,12 +19,15 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -396,6 +399,15 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  public void addBlockExpiry(final ContainerID id) {
+    lockManager.readLock(id);
+    try {
+      containers.addBlockExpiry(id);
+    } finally {
+      lockManager.readUnlock(id);
+    }
+  }
+
   @Override
   public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
@@ -445,7 +457,8 @@ public final class ContainerStateManagerImpl
   }
 
   public ContainerInfo getMatchingContainer(final long size, String owner,
-      PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
+      PipelineID pipelineID, NavigableSet<ContainerID> containerIDs,
+      boolean closeContainer) {
     if (containerIDs.isEmpty()) {
       return null;
     }
@@ -457,13 +470,15 @@ public final class ContainerStateManagerImpl
         lastUsedMap.getOrDefault(key, containerIDs.first());
 
 
+    List<ContainerID> unmatchedContainerList = new ArrayList<>();
     // There is a small issue here. The first time, we will skip the first
     // container. But in most cases it will not matter.
     NavigableSet<ContainerID> resultSet = containerIDs.tailSet(lastID, false);
     if (resultSet.isEmpty()) {
       resultSet = containerIDs;
     }
-    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
+    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet,
+        unmatchedContainerList);
     if (selectedContainer == null) {
 
       // If we did not find any space in the tailSet, we need to look for
@@ -475,27 +490,42 @@ public final class ContainerStateManagerImpl
       // last element in the sorted set.
 
       resultSet = containerIDs.headSet(lastID, true);
-      selectedContainer = findContainerWithSpace(size, resultSet);
+      selectedContainer = findContainerWithSpace(size, resultSet,
+          unmatchedContainerList);
     }
 
     // TODO: cleanup entries in lastUsedMap
     if (selectedContainer != null) {
       lastUsedMap.put(key, selectedContainer.containerID());
     }
+    
+    if (closeContainer && !unmatchedContainerList.isEmpty()) {
+      for (ContainerID id : unmatchedContainerList) {
+        try {
+          pipelineManager.closeContainer(pipelineID, id);
+        } catch (IOException | TimeoutException e) {
+          LOG.error("Exception occurred in container {} close when " +
+              "enough space not available", id, e);
+        }
+      }
+    }
     return selectedContainer;
   }
 
   private ContainerInfo findContainerWithSpace(final long size,
-                                               final NavigableSet<ContainerID>
-                                                   searchSet) {
-      // Get the container with space to meet our request.
+      final NavigableSet<ContainerID> searchSet,
+      List<ContainerID> unmatchedContainer) {
+    // Get the container with space to meet our request.
     for (ContainerID id : searchSet) {
       try {
         lockManager.readLock(id);
         final ContainerInfo containerInfo = containers.getContainerInfo(id);
-        if (containerInfo.getUsedBytes() + size <= this.containerSize) {
+        if (containerInfo.getBlockedSpace(size) + size
+            <= this.containerSize) {
           containerInfo.updateLastUsedTime();
           return containerInfo;
+        } else {
+          unmatchedContainer.add(id);
         }
       } finally {
         lockManager.readUnlock(id);

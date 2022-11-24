@@ -954,7 +954,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.addContainerToPipeline(
         allocatedPipeline.getId(), container.containerID());
     doReturn(container).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), eq(allocatedPipeline), any());
+        anyString(), eq(allocatedPipeline), any(), any());
 
 
     Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  OPEN)
@@ -978,7 +978,7 @@ public class TestPipelineManagerImpl {
 
     
     ContainerInfo c = provider.getContainer(1, repConfig,
-        owner, new ExcludeList());
+        owner, new ExcludeList(), 0, 0);
     Assertions.assertTrue(c.equals(container),
         "Expected container was returned");
 

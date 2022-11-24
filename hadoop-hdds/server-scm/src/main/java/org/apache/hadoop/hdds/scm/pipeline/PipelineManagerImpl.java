@@ -451,6 +451,36 @@ public class PipelineManagerImpl implements PipelineManager {
     }
   }
 
+  /**
+   * Close the container belonging to pipeline.
+   * @param pipelineID
+   * @param containerID
+   */
+  @Override
+  public void closeContainer(PipelineID pipelineID, ContainerID containerID)
+      throws IOException, TimeoutException {
+    if (!stateManager.getContainers(pipelineID).contains(containerID)) {
+      LOG.info("Container {} is not present in pipeline={}, might be removed",
+          containerID, pipelineID);
+      return;
+    }
+    
+    ContainerManager containerManager = scmContext.getScm()
+        .getContainerManager();
+    if (containerManager.getContainer(containerID).getState()
+        == HddsProtos.LifeCycleState.OPEN) {
+      try {
+        containerManager.updateContainerState(containerID,
+            HddsProtos.LifeCycleEvent.FINALIZE);
+      } catch (InvalidStateTransitionException ex) {
+        throw new IOException(ex);
+      }
+    }
+    eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+    LOG.info("Container {} closed for pipeline={}", containerID,
+        pipelineID);
+  }
+
   /** close the pipelines whose nodes' IPs are stale.
    *
    * @param datanodeDetails new datanodeDetails

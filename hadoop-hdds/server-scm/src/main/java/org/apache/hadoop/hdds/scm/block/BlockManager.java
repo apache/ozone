@@ -43,8 +43,8 @@ public interface BlockManager extends Closeable {
    * @throws IOException
    */
   AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig,
-      String owner,
-      ExcludeList excludeList) throws IOException, TimeoutException;
+      String owner, ExcludeList excludeList, int allcIdx)
+      throws IOException, TimeoutException;
 
   /**
    * Deletes a list of blocks in an atomic operation. Internally, SCM

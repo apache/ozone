@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.util.Time;
 
 /**
  * Interface used by the WritableContainerFactory to obtain a writable container
@@ -48,12 +49,18 @@ public interface WritableContainerProvider<T extends ReplicationConfig> {
    * @param owner The owner of the container
    * @param excludeList A set of datanodes, container and pipelines which should
    *                    not be considered.
+   * @param localId localId part of blockId for block reservation
+   * @param allocIdx index of allocation for multiple block allocation
    * @return A ContainerInfo which is open and has the capacity to store the
    *         desired block size.
    * @throws IOException
    */
   ContainerInfo getContainer(long size, T repConfig,
-      String owner, ExcludeList excludeList)
+      String owner, ExcludeList excludeList, long localId, long allocIdx)
       throws IOException, TimeoutException;
+  
+  default long getExpiryTime(long allocIdx, long expiryDuration) {
+    return Time.now() + (allocIdx + 1) * expiryDuration * 1000;
+  }
 
 }

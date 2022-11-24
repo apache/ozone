@@ -25,10 +25,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +52,7 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
+  private final long blockExpiryDuration;
 
   public WritableRatisContainerProvider(ConfigurationSource conf,
       PipelineManager pipelineManager,
@@ -59,12 +62,16 @@ public class WritableRatisContainerProvider
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
+    this.blockExpiryDuration = conf.getLong(
+        ScmConfigKeys.OZONE_SCM_BLOCK_EXPIRY_DURATION,
+        ScmConfigKeys.OZONE_SCM_BLOCK_EXPIRY_DURATION_DEFAULT);
   }
 
 
   @Override
   public ContainerInfo getContainer(final long size,
-      ReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      long localId, long allocIdx)
       throws IOException, TimeoutException {
     /*
       Here is the high level logic.
@@ -100,7 +107,7 @@ public class WritableRatisContainerProvider
                         Pipeline.PipelineState.OPEN);
         if (availablePipelines.size() != 0) {
           containerInfo = selectContainer(availablePipelines, size, owner,
-              excludeList);
+              excludeList, localId, allocIdx);
         }
         if (containerInfo != null) {
           return containerInfo;
@@ -157,7 +164,7 @@ public class WritableRatisContainerProvider
             break;
           }
           containerInfo = selectContainer(availablePipelines, size, owner,
-              excludeList);
+              excludeList, localId, allocIdx);
           if (containerInfo != null) {
             return containerInfo;
           }
@@ -191,7 +198,8 @@ public class WritableRatisContainerProvider
   }
 
   private ContainerInfo selectContainer(List<Pipeline> availablePipelines,
-      long size, String owner, ExcludeList excludeList) {
+      long size, String owner, ExcludeList excludeList,
+      long localId, long allocIdx) {
     Pipeline pipeline;
     ContainerInfo containerInfo;
 
@@ -202,9 +210,12 @@ public class WritableRatisContainerProvider
             availablePipelines, pri);
 
     // look for OPEN containers that match the criteria.
-    containerInfo = containerManager.getMatchingContainer(size, owner,
-        pipeline, excludeList.getContainerIds());
-
+    synchronized (pipeline.getId()) {
+      containerInfo = containerManager.getMatchingContainer(size, owner,
+          pipeline, excludeList.getContainerIds(), true);
+      containerInfo.addBlockExpiry(getExpiryTime(allocIdx,
+          blockExpiryDuration), localId);
+    }
     return containerInfo;
 
   }

@@ -26,6 +26,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -74,6 +76,15 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   // container replica should have the same sequenceId.
   private long sequenceId;
 
+  // blocks written with actual size to the container
+  @JsonIgnore
+  private long totalWrittenBlockSize = 0;
+
+  // block list reserved with expiry information
+  @JsonIgnore
+  private BlockingQueue<ExpiryInfo> blockExpiryTimeList
+      = new PriorityBlockingQueue<>();
+
   /**
    * Allows you to maintain private data on ContainerInfo. This is not
    * serialized via protobuf, just allows us to maintain some private data.
@@ -104,6 +115,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
     this.replicationConfig = repConfig;
+    this.totalWrittenBlockSize = this.usedBytes;
   }
 
   /**
@@ -202,6 +214,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public void setUsedBytes(long value) {
     usedBytes = value;
+    if (blockExpiryTimeList.isEmpty()) {
+      totalWrittenBlockSize = usedBytes;
+    }
   }
 
   public long getNumberOfKeys() {
@@ -423,6 +438,35 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     throw new IOException(SERIALIZATION_ERROR_MSG);
   }
 
+  public long getTotalWrittenBlockSize() {
+    return totalWrittenBlockSize;
+  }
+
+  public void setTotalWrittenBlockSize(long totalWrittenBlockSize) {
+    this.totalWrittenBlockSize = totalWrittenBlockSize;
+  }
+
+  public void addBlockExpiry(long expiryTime, long blkId) {
+    blockExpiryTimeList.add(new ExpiryInfo(expiryTime, blkId));
+  }
+  
+  public long getBlockedSpace(long blockSize) {
+    releaseExpiredBlock();
+    long blockedBlockSize = getTotalWrittenBlockSize()
+        + blockExpiryTimeList.size() * blockSize;
+    return Math.max(getUsedBytes(), blockedBlockSize);
+  }
+
+  private void releaseExpiredBlock() {
+    while (!blockExpiryTimeList.isEmpty()) {
+      if (blockExpiryTimeList.peek().expiryTime > Time.now()) {
+        blockExpiryTimeList.poll();
+      } else {
+        break;
+      }
+    }
+  }
+
   /**
    * Builder class for ContainerInfo.
    */
@@ -504,6 +548,22 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public boolean isOpen() {
     return state == HddsProtos.LifeCycleState.OPEN
         || state == HddsProtos.LifeCycleState.CLOSING;
+  }
+
+  /**
+   * Expiry information for the blocks.
+   */
+  static class ExpiryInfo {
+    private long expiryTime;
+    private long blockId;
+    
+    ExpiryInfo(long expiryTime, long blockId) {
+      this.expiryTime = expiryTime;
+      this.blockId = blockId;
+    }
+    public long getExpiryTime() {
+      return expiryTime;
+    }
   }
 
 }

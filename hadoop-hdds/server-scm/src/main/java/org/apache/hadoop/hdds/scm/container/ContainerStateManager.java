@@ -164,7 +164,8 @@ public interface ContainerStateManager {
    */
   ContainerInfo getMatchingContainer(long size, String owner,
                                      PipelineID pipelineID,
-                                     NavigableSet<ContainerID> containerIDs);
+                                     NavigableSet<ContainerID> containerIDs,
+                                     boolean closeContainer);
 
   /**
    *

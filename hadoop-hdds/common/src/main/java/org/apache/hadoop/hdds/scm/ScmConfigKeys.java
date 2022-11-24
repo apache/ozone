@@ -342,6 +342,11 @@ public final class ScmConfigKeys {
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
 
+  public static final String OZONE_SCM_BLOCK_EXPIRY_DURATION =
+      "ozone.scm.block.expiry.duration";
+  // block expiry duration with unit as seconds with default 30 minutes
+  public static final long OZONE_SCM_BLOCK_EXPIRY_DURATION_DEFAULT = 1800;
+
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
