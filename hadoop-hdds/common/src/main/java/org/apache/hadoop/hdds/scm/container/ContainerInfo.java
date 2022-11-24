@@ -23,6 +23,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -446,6 +447,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.totalWrittenBlockSize = totalWrittenBlockSize;
   }
 
+  public Collection<ExpiryInfo> getBlockExpiryTimeList() {
+    return blockExpiryTimeList;
+  }
+
   public void addBlockExpiry(long expiryTime, long blkId) {
     blockExpiryTimeList.add(new ExpiryInfo(expiryTime, blkId));
   }
@@ -459,7 +464,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   private void releaseExpiredBlock() {
     while (!blockExpiryTimeList.isEmpty()) {
-      if (blockExpiryTimeList.peek().expiryTime > Time.now()) {
+      if (blockExpiryTimeList.peek().expiryTime <= Time.now()) {
         blockExpiryTimeList.poll();
       } else {
         break;
@@ -563,6 +568,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     }
     public long getExpiryTime() {
       return expiryTime;
+    }
+
+    public long getBlockId() {
+      return blockId;
     }
   }
 

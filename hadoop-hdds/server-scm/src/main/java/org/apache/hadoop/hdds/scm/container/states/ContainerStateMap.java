@@ -471,19 +471,4 @@ public class ContainerStateMap {
       resultCache.remove(key);
     }
   }
-
-  /**
-   * Returns Containers by State.
-   *
-   * @param containerID - container Id
-   * @return List of containers by state.
-   */
-  public void addBlockExpiry(
-      final ContainerID containerID) {
-    Preconditions.checkNotNull(containerID);
-    final ContainerInfo currentInfo = containerMap.get(containerID);
-    if (currentInfo != null) {
-      // currentInfo check and add block list
-    }
-  }
 }

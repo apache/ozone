@@ -39,11 +39,12 @@ public interface BlockManager extends Closeable {
    * @param replicationConfig configuration of the replication method
    * @param excludeList List of datanodes/containers to exclude during block
    *                    allocation.
+   * @param allocIdx index for allocate block during multiple allocation
    * @return AllocatedBlock
    * @throws IOException
    */
   AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList, int allcIdx)
+      String owner, ExcludeList excludeList, int allocIdx)
       throws IOException, TimeoutException;
 
   /**

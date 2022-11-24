@@ -399,15 +399,6 @@ public final class ContainerStateManagerImpl
     }
   }
 
-  public void addBlockExpiry(final ContainerID id) {
-    lockManager.readLock(id);
-    try {
-      containers.addBlockExpiry(id);
-    } finally {
-      lockManager.readUnlock(id);
-    }
-  }
-
   @Override
   public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
@@ -525,7 +516,10 @@ public final class ContainerStateManagerImpl
           containerInfo.updateLastUsedTime();
           return containerInfo;
         } else {
-          unmatchedContainer.add(id);
+          // container info for cleanup only when blocks not reserved
+          if (containerInfo.getBlockExpiryTimeList().isEmpty()) {
+            unmatchedContainer.add(id);
+          }
         }
       } finally {
         lockManager.readUnlock(id);
