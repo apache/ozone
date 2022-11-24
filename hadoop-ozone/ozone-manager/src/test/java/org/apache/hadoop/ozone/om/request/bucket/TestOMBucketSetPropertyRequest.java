@@ -23,6 +23,8 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -283,5 +285,70 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(8 * GB, dbBucketInfo.getQuotaInBytes());
     Assert.assertEquals(EC,
         dbBucketInfo.getDefaultReplicationConfig().getType());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithQuotaSpaceUsed() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeToDB(
+        volumeName, omMetadataManager, 10 * GB);
+    OMRequestTestUtils.addBucketToDB(
+        volumeName, bucketName, omMetadataManager, 8 * GB);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    CacheValue<OmBucketInfo> cacheValue = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey));
+    cacheValue.getCacheValue().incrUsedBytes(5 * GB);
+    cacheValue.getCacheValue().incrUsedNamespace(10);
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        bucketName, true, 1 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
+    Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
+        contains("Cannot update bucket quota. Requested spaceQuota less than " +
+            "used spaceQuota"));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithQuotaNamespaceUsed()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeToDB(
+        volumeName, omMetadataManager, 10 * GB);
+    OMRequestTestUtils.addBucketToDB(
+        volumeName, bucketName, omMetadataManager, 8 * GB);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    CacheValue<OmBucketInfo> cacheValue = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey));
+    cacheValue.getCacheValue().incrUsedBytes(5 * GB);
+    cacheValue.getCacheValue().incrUsedNamespace(2000);
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        bucketName, true, 9 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
+    Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
+        contains("Cannot update bucket quota. NamespaceQuota requested " +
+            "is less than used namespaceQuota"));
   }
 }
