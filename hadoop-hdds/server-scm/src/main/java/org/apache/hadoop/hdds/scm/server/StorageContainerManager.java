@@ -761,6 +761,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           conf,
           containerManager,
           containerPlacementPolicy,
+          ecContainerPlacementPolicy,
           eventQueue,
           scmContext,
           scmNodeManager,
