@@ -681,7 +681,7 @@ public class RpcClient implements ClientProtocol {
             "Space Quota set to {} ",
         volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
         storageType, bek != null, replicationType.toString(),
-        bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes() );
+        bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes());
 
     ozoneManagerClient.createBucket(builder.build());
   }
