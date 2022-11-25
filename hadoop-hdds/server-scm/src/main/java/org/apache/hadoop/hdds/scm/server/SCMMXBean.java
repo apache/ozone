@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -43,12 +44,6 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getClientRpcPort();
 
   /**
-   * Get container report info that includes container IO stats of nodes.
-   * @return The datanodeUUid to report json string mapping
-   */
-  Map<String, String> getContainerReport();
-
-  /**
    * Returns safe mode status.
    * @return boolean
    */
@@ -70,4 +65,16 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getScmId();
 
   String getClusterId();
+
+  String getScmRatisRoles() throws IOException;
+
+  /**
+   * Primordial node is the node on which scm init operation is performed.
+   * @return hostname of primordialNode
+   */
+  String getPrimordialNode();
+
+  String getRatisLogDirectory();
+
+  String getRocksDbDirectory();
 }

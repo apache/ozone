@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
+
 /**
  * A ContainerReplica timestamp class that tracks first and last seen time.
  *
@@ -37,11 +39,22 @@ public class ContainerReplicaHistory {
   // Last reported time of the replica
   private Long lastSeenTime;
 
+  private long bcsId;
+
   public ContainerReplicaHistory(UUID id, Long firstSeenTime,
-      Long lastSeenTime) {
+      Long lastSeenTime, long bcsId) {
     this.uuid = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
+    this.bcsId = bcsId;
+  }
+
+  public long getBcsId() {
+    return bcsId;
+  }
+
+  public void setBcsId(long bcsId) {
+    this.bcsId = bcsId;
   }
 
   public UUID getUuid() {
@@ -58,5 +71,17 @@ public class ContainerReplicaHistory {
 
   public void setLastSeenTime(Long lastSeenTime) {
     this.lastSeenTime = lastSeenTime;
+  }
+
+  public static ContainerReplicaHistory fromProto(
+      ContainerReplicaHistoryProto proto) {
+    return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
+        proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId());
+  }
+
+  public ContainerReplicaHistoryProto toProto() {
+    return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
+        .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
+        .setBcsId(bcsId).build();
   }
 }

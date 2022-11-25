@@ -26,6 +26,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.metrics2.lib.MutableStat;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
@@ -57,6 +58,9 @@ public class OzoneManagerDoubleBufferMetrics {
   @Metric(about = "Average number of transactions flushed in a single " +
       "iteration")
   private MutableGaugeFloat avgFlushTransactionsInOneIteration;
+
+  @Metric(about = "DoubleBuffer queue size.", valueName = "Size")
+  private MutableStat queueSize;
 
   public static synchronized OzoneManagerDoubleBufferMetrics create() {
     if (instance != null) {
@@ -117,6 +121,15 @@ public class OzoneManagerDoubleBufferMetrics {
 
   public void setAvgFlushTransactionsInOneIteration(float count) {
     this.avgFlushTransactionsInOneIteration.set(count);
+  }
+
+  public void updateQueueSize(long size) {
+    queueSize.add(size);
+  }
+
+  @VisibleForTesting
+  public MutableStat getQueueSize() {
+    return queueSize;
   }
 
   public void unRegister() {

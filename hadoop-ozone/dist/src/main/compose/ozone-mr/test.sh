@@ -14,6 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+#suite:MR
+
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 ALL_RESULT_DIR="$SCRIPT_DIR/result"
 mkdir -p "$ALL_RESULT_DIR"
@@ -23,7 +26,9 @@ source "$SCRIPT_DIR/../testlib.sh"
 tests=$(find_tests)
 cd "$SCRIPT_DIR"
 
-run_test_scripts ${tests}
-RESULT=$?
+RESULT=0
+run_test_scripts ${tests} || RESULT=$?
+
+generate_report "ozone-mr" "${ALL_RESULT_DIR}"
 
 exit ${RESULT}

@@ -24,6 +24,9 @@ import java.util.ServiceLoader;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS_DEFAULT;
+
 /**
  * Factory pattern to create object for RPC communication with OM.
  */
@@ -34,24 +37,31 @@ public interface OmTransportFactory {
 
   static OmTransport create(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
-    OmTransportFactory factory = createFactory();
+    OmTransportFactory factory = createFactory(conf);
 
     return factory.createOmTransport(conf, ugi, omServiceId);
   }
 
-  static OmTransportFactory createFactory() throws IOException {
-    ServiceLoader<OmTransportFactory> transportFactoryServiceLoader =
-        ServiceLoader.load(OmTransportFactory.class);
-    Iterator<OmTransportFactory> iterator =
-        transportFactoryServiceLoader.iterator();
-    if (iterator.hasNext()) {
-      return iterator.next();
-    }
+  static OmTransportFactory createFactory(ConfigurationSource conf)
+      throws IOException {
     try {
+      // if configured transport class is different than the default
+      // OmTransportFactory (Hadoop3OmTransportFactory), then
+      // check service loader for transport class and instantiate it
+      if (conf
+          .get(OZONE_OM_TRANSPORT_CLASS,
+              OZONE_OM_TRANSPORT_CLASS_DEFAULT) !=
+          OZONE_OM_TRANSPORT_CLASS_DEFAULT) {
+        ServiceLoader<OmTransportFactory> transportFactoryServiceLoader =
+            ServiceLoader.load(OmTransportFactory.class);
+        Iterator<OmTransportFactory> iterator =
+            transportFactoryServiceLoader.iterator();
+        if (iterator.hasNext()) {
+          return iterator.next();
+        }
+      }
       return OmTransportFactory.class.getClassLoader()
-          .loadClass(
-              "org.apache.hadoop.ozone.om.protocolPB"
-                  + ".Hadoop3OmTransportFactory")
+          .loadClass(OZONE_OM_TRANSPORT_CLASS_DEFAULT)
           .asSubclass(OmTransportFactory.class)
           .newInstance();
     } catch (Exception ex) {

@@ -24,8 +24,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -43,14 +41,6 @@ final class AWSV4AuthValidator {
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
 
   private AWSV4AuthValidator() {
-  }
-
-  private static String urlDecode(String str) {
-    try {
-      return URLDecoder.decode(str, StandardCharsets.UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
@@ -94,7 +84,9 @@ final class AWSV4AuthValidator {
     byte[] kRegion = sign(kDate, regionName);
     byte[] kService = sign(kRegion, serviceName);
     byte[] kSigning = sign(kService, "aws4_request");
-    LOG.info(Hex.encode(kSigning));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(Hex.encode(kSigning));
+    }
     return kSigning;
   }
 

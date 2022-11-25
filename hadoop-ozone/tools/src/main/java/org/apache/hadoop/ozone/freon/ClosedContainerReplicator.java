@@ -16,6 +16,34 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import com.codahale.metrics.Timer;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
+import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
+import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.jetbrains.annotations.NotNull;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,33 +56,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
-
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
-import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-
-import com.codahale.metrics.Timer;
-import org.jetbrains.annotations.NotNull;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import java.util.stream.Stream;
 
 /**
  * Utility to replicated closed container with datanode code.
@@ -85,7 +87,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     OzoneConfiguration conf = createOzoneConfiguration();
 
     final Collection<String> datanodeStorageDirs =
-        MutableVolumeSet.getDatanodeStorageDirs(conf);
+        HddsServerUtil.getDatanodeStorageDirs(conf);
 
     for (String dir : datanodeStorageDirs) {
       checkDestinationDirectory(dir);
@@ -148,9 +150,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (Files.notExists(dirPath)) {
       return;
     }
-
-    if (Files.list(dirPath).count() == 0) {
-      return;
+    try (Stream<Path> stream = Files.list(dirPath)) {
+      if (stream.count() == 0) {
+        return;
+      }
     }
 
     throw new IllegalArgumentException(
@@ -167,11 +170,12 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
 
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
-    MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf);
+    MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 
@@ -186,7 +190,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               metrics,
               containerReplicaProto -> {
               });
-      handler.setScmID(UUID.randomUUID().toString());
+      handler.setClusterID(UUID.randomUUID().toString());
       handlers.put(containerType, handler);
     }
 

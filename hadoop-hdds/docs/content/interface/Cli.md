@@ -116,7 +116,7 @@ $ ozone sh volume info /vol1
 
 ```shell
 $ ozone sh volume list /
-{
+[ {
   "metadata" : { },
   "name" : "s3v",
   "admin" : "hadoop",
@@ -135,8 +135,9 @@ $ ozone sh volume list /
     "aclList" : [ "ALL" ]
   } ],
   "quota" : 1152921504606846976
-}
-....
+}, {
+  ....
+} ]
 ```
 ## Bucket operations
 

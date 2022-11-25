@@ -20,6 +20,9 @@ package org.apache.hadoop.hdds.scm.utils;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
+/**
+ * These methods should be merged with other similar utility classes.
+ */
 public final class ClientCommandsUtils {
 
   /** Utility classes should not be constructed. **/

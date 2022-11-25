@@ -80,4 +80,10 @@ public interface CommandHandler {
   default void stop() {
     // Default implementation does nothing
   }
+
+  /**
+   * Returns the queued command count for this handler.
+   * @return The number of queued commands inside this handler.
+   */
+  int getQueuedCount();
 }

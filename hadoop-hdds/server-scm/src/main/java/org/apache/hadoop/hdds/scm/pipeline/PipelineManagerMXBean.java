@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.util.Map;
 
@@ -33,6 +34,6 @@ public interface PipelineManagerMXBean {
    * Returns the number of pipelines in different state.
    * @return state to number of pipeline map
    */
-  Map<String, Integer> getPipelineInfo();
+  Map<String, Integer> getPipelineInfo() throws NotLeaderException;
 
 }

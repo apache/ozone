@@ -19,27 +19,18 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.StringUtils;
-
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.Holder;
-import org.rocksdb.ReadOptions;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteOptions;
-import org.rocksdb.RocksIterator;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 
 /**
  * RocksDB implementation of ozone metadata store. This class should be only
@@ -53,52 +44,37 @@ class RDBTable implements Table<byte[], byte[]> {
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
 
-  private final RocksDB db;
-  private final ColumnFamilyHandle handle;
-  private final WriteOptions writeOptions;
+  private final RocksDatabase db;
+  private final ColumnFamily family;
   private final RDBMetrics rdbMetrics;
 
   /**
    * Constructs a TableStore.
    *
    * @param db - DBstore that we are using.
-   * @param handle - ColumnFamily Handle.
-   * @param writeOptions - RocksDB write Options.
+   * @param family - ColumnFamily Handle.
    */
-  RDBTable(RocksDB db, ColumnFamilyHandle handle,
-      WriteOptions writeOptions, RDBMetrics rdbMetrics) {
+  RDBTable(RocksDatabase db, ColumnFamily family,
+      RDBMetrics rdbMetrics) {
     this.db = db;
-    this.handle = handle;
-    this.writeOptions = writeOptions;
+    this.family = family;
     this.rdbMetrics = rdbMetrics;
   }
 
-  /**
-   * Returns the Column family Handle.
-   *
-   * @return ColumnFamilyHandle.
-   */
-  public ColumnFamilyHandle getHandle() {
-    return handle;
+  public ColumnFamily getColumnFamily() {
+    return family;
   }
 
   @Override
   public void put(byte[] key, byte[] value) throws IOException {
-    try {
-      db.put(handle, writeOptions, key, value);
-    } catch (RocksDBException e) {
-      LOG.error("Failed to write to DB. Key: {}", new String(key,
-          StandardCharsets.UTF_8));
-      throw toIOException("Failed to put key-value to metadata "
-          + "store", e);
-    }
+    db.put(family, key, value);
   }
 
   @Override
   public void putWithBatch(BatchOperation batch, byte[] key, byte[] value)
       throws IOException {
     if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).put(getHandle(), key, value);
+      ((RDBBatchOperation) batch).put(family, key, value);
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
@@ -115,37 +91,23 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isExist(byte[] key) throws IOException {
-    try {
-      // RocksDB#keyMayExist
-      // If the key definitely does not exist in the database, then this
-      // method returns false, else true.
-      rdbMetrics.incNumDBKeyMayExistChecks();
-      Holder<byte[]> outValue = new Holder<>();
-      boolean keyMayExist = db.keyMayExist(handle, key, outValue);
-      if (keyMayExist) {
-        boolean keyExists =
-            (outValue.getValue() != null && outValue.getValue().length > 0) ||
-                (db.get(handle, key) != null);
-        if (!keyExists) {
-          rdbMetrics.incNumDBKeyMayExistMisses();
-        }
-        return keyExists;
-      }
+    rdbMetrics.incNumDBKeyMayExistChecks();
+    final Supplier<byte[]> holder = db.keyMayExistHolder(family, key);
+    if (holder == null) {
       return false;
-    } catch (RocksDBException e) {
-      throw toIOException(
-          "Error in accessing DB. ", e);
     }
+    final byte[] value = holder.get();
+    final boolean exists = (value != null && value.length > 0)
+        || db.get(family, key) != null;
+    if (!exists) {
+      rdbMetrics.incNumDBKeyMayExistMisses();
+    }
+    return exists;
   }
 
   @Override
   public byte[] get(byte[] key) throws IOException {
-    try {
-      return db.get(handle, key);
-    } catch (RocksDBException e) {
-      throw toIOException(
-          "Failed to get the value for the given key", e);
-    }
+    return db.get(family, key);
   }
 
   /**
@@ -163,43 +125,31 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public byte[] getIfExist(byte[] key) throws IOException {
-    try {
-      // RocksDB#keyMayExist
-      // If the key definitely does not exist in the database, then this
-      // method returns false, else true.
-      rdbMetrics.incNumDBKeyGetIfExistChecks();
-      boolean keyMayExist = db.keyMayExist(handle, key, null);
-      if (keyMayExist) {
-        // Not using out value from string builder, as that is causing
-        // IllegalArgumentException during protobuf parsing.
-        rdbMetrics.incNumDBKeyGetIfExistGets();
-        byte[] val;
-        val = db.get(handle, key);
-        if (val == null) {
-          rdbMetrics.incNumDBKeyGetIfExistMisses();
-        }
-        return val;
+    rdbMetrics.incNumDBKeyGetIfExistChecks();
+    final boolean keyMayExist = db.keyMayExist(family, key);
+    if (keyMayExist) {
+      // Not using out value from string builder, as that is causing
+      // IllegalArgumentException during protobuf parsing.
+      rdbMetrics.incNumDBKeyGetIfExistGets();
+      final byte[] val = db.get(family, key);
+      if (val == null) {
+        rdbMetrics.incNumDBKeyGetIfExistMisses();
       }
-      return null;
-    } catch (RocksDBException e) {
-      throw toIOException("Error in accessing DB. ", e);
+      return val;
     }
+    return null;
   }
 
   @Override
   public void delete(byte[] key) throws IOException {
-    try {
-      db.delete(handle, key);
-    } catch (RocksDBException e) {
-      throw toIOException("Failed to delete the given key", e);
-    }
+    db.delete(family, key);
   }
 
   @Override
   public void deleteWithBatch(BatchOperation batch, byte[] key)
       throws IOException {
     if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).delete(getHandle(), key);
+      ((RDBBatchOperation) batch).delete(family, key);
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
@@ -207,19 +157,21 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], ByteArrayKeyValue> iterator() {
-    ReadOptions readOptions = new ReadOptions();
-    readOptions.setFillCache(false);
-    return new RDBStoreIterator(db.newIterator(handle, readOptions), this);
+  public TableIterator<byte[], ByteArrayKeyValue> iterator()
+      throws IOException {
+    return new RDBStoreIterator(db.newIterator(family, false), this);
+  }
+
+  @Override
+  public TableIterator<byte[], ByteArrayKeyValue> iterator(byte[] prefix)
+      throws IOException {
+    return new RDBStoreIterator(db.newIterator(family, false), this,
+        prefix);
   }
 
   @Override
   public String getName() throws IOException {
-    try {
-      return StringUtils.bytes2String(this.getHandle().getName());
-    } catch (RocksDBException rdbEx) {
-      throw toIOException("Unable to get the table name.", rdbEx);
-    }
+    return family.getName();
   }
 
   @Override
@@ -229,68 +181,92 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public long getEstimatedKeyCount() throws IOException {
-    try {
-      return db.getLongProperty(handle, "rocksdb.estimate-num-keys");
-    } catch (RocksDBException e) {
-      throw toIOException(
-          "Failed to get estimated key count of table " + getName(), e);
-    }
+    return db.estimateNumKeys(family);
   }
 
   @Override
   public List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, false, filters);
+    return getRangeKVs(startKey, count, false, prefix, filters);
   }
 
   @Override
   public List<ByteArrayKeyValue> getSequentialRangeKVs(byte[] startKey,
-      int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, byte[] prefix,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, true, filters);
+    return getRangeKVs(startKey, count, true, prefix, filters);
+  }
+
+  @Override
+  public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
+      throws IOException {
+    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix)) {
+      while (iter.hasNext()) {
+        deleteWithBatch(batch, iter.next().getValue());
+      }
+    }
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
+      throws IOException {
+    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix);
+         DumpFileWriter fileWriter = new RDBSstFileWriter()) {
+      fileWriter.open(externalFile);
+      while (iter.hasNext()) {
+        ByteArrayKeyValue entry = iter.next();
+        fileWriter.put(entry.getKey(), entry.getValue());
+      }
+    }
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    try (DumpFileLoader fileLoader = new RDBSstFileLoader(db, family)) {
+      fileLoader.load(externalFile);
+    }
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, boolean sequential,
+      int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
     List<ByteArrayKeyValue> result = new ArrayList<>();
     long start = System.currentTimeMillis();
+
     if (count < 0) {
       throw new IllegalArgumentException(
             "Invalid count given " + count + ", count must be greater than 0");
     }
-    try (RocksIterator it = db.newIterator(handle)) {
+    try (TableIterator<byte[], ByteArrayKeyValue> it = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();
       } else {
-        if (get(startKey) == null) {
+        if ((prefix == null || startKey.length > prefix.length)
+            && get(startKey) == null) {
           // Key not found, return empty list
           return result;
         }
         it.seek(startKey);
       }
-      while (it.isValid() && result.size() < count) {
-        byte[] currentKey = it.key();
-        byte[] currentValue = it.value();
 
-        it.prev();
-        final byte[] prevKey = it.isValid() ? it.key() : null;
-
-        it.seek(currentKey);
-        it.next();
-        final byte[] nextKey = it.isValid() ? it.key() : null;
+      while (it.hasNext() && result.size() < count) {
+        ByteArrayKeyValue currentEntry = it.next();
+        byte[] currentKey = currentEntry.getKey();
 
         if (filters == null) {
-          result.add(ByteArrayKeyValue
-                  .create(currentKey, currentValue));
+          result.add(currentEntry);
         } else {
+          // NOTE: the preKey and nextKey are never checked
+          // in all existing underlying filters, so they could
+          // be safely as null here.
           if (Arrays.stream(filters)
-                  .allMatch(entry -> entry.filterKey(prevKey,
-                          currentKey, nextKey))) {
-            result.add(ByteArrayKeyValue
-                    .create(currentKey, currentValue));
+                  .allMatch(entry -> entry.filterKey(null,
+                          currentKey, null))) {
+            result.add(currentEntry);
           } else {
             if (result.size() > 0 && sequential) {
               // if the caller asks for a sequential range of results,

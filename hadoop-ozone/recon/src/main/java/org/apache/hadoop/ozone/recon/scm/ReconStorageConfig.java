@@ -18,22 +18,81 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_STORAGE_DIR;
 
 import java.io.IOException;
+import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 
+import javax.inject.Inject;
+
 /**
  * Recon's extension of SCMStorageConfig.
  */
 public class ReconStorageConfig extends SCMStorageConfig {
 
-  public ReconStorageConfig(OzoneConfiguration conf) throws IOException {
-    super(NodeType.RECON, ReconUtils.getReconScmDbDir(conf), RECON_STORAGE_DIR);
+  public static final String RECON_CERT_SERIAL_ID = "reconCertSerialId";
+  public static final String RECON_ID = "uuid";
+
+  @Inject
+  public ReconStorageConfig(OzoneConfiguration conf, ReconUtils reconUtils)
+      throws IOException {
+    super(NodeType.RECON, reconUtils.getReconDbDir(conf, OZONE_RECON_DB_DIR),
+        RECON_STORAGE_DIR);
   }
-  
+
+  public void setReconCertSerialId(String certSerialId) throws IOException {
+    getStorageInfo().setProperty(RECON_CERT_SERIAL_ID, certSerialId);
+  }
+
+  public void setReconId(String uuid) throws IOException {
+    if (getState() == StorageState.INITIALIZED) {
+      throw new IOException("Recon is already initialized.");
+    } else {
+      getStorageInfo().setProperty(RECON_ID, uuid);
+    }
+  }
+
+  /**
+   * Retrieves the Recon ID from the version file.
+   * @return RECON_ID
+   */
+  public String getReconId() {
+    return getStorageInfo().getProperty(RECON_ID);
+  }
+
+  @Override
+  protected Properties getNodeProperties() {
+    String reconId = getReconId();
+    if (reconId == null) {
+      reconId = UUID.randomUUID().toString();
+    }
+    Properties reconProperties = new Properties();
+    reconProperties.setProperty(RECON_ID, reconId);
+
+    if (getReconCertSerialId() != null) {
+      reconProperties.setProperty(RECON_CERT_SERIAL_ID, getReconCertSerialId());
+    }
+    return reconProperties;
+  }
+
+  /**
+   * Retrieves the serial id of certificate issued by SCM.
+   * @return RECON_CERT_SERIAL_ID
+   */
+  public String getReconCertSerialId() {
+    return getStorageInfo().getProperty(RECON_CERT_SERIAL_ID);
+  }
+
+  public void unsetReconCertSerialId() {
+    getStorageInfo().unsetProperty(RECON_CERT_SERIAL_ID);
+  }
+
+
 }

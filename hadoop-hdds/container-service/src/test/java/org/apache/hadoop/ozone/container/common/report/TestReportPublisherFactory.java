@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -52,6 +53,16 @@ public class TestReportPublisherFactory {
     ReportPublisher publisher = factory
         .getPublisherFor(NodeReportProto.class);
     Assert.assertEquals(NodeReportPublisher.class, publisher.getClass());
+    Assert.assertEquals(conf, publisher.getConf());
+  }
+
+  @Test
+  public void testGetCRLStatusReportPublisher() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReportPublisherFactory factory = new ReportPublisherFactory(conf);
+    ReportPublisher publisher = factory
+        .getPublisherFor(CRLStatusReport.class);
+    Assert.assertEquals(CRLStatusReportPublisher.class, publisher.getClass());
     Assert.assertEquals(conf, publisher.getConf());
   }
 

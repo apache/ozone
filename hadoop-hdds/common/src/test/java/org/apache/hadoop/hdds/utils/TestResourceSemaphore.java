@@ -17,14 +17,18 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for ResourceSemaphore.
  */
 public class TestResourceSemaphore {
-  @Test(timeout = 1000)
+  @Test
+  @Timeout(1)
   public void testGroup() {
     final ResourceSemaphore.Group g = new ResourceSemaphore.Group(3, 1);
 
@@ -49,28 +53,20 @@ public class TestResourceSemaphore {
     g.release(0, 0);
     assertUsed(g, 0, 0);
 
-    try {
-      g.release(1, 0);
-      Assert.fail("Should have failed.");
-    } catch (IllegalStateException e){
-    }
-    try {
-      g.release(0, 1);
-      Assert.fail("Should have failed.");
-    } catch (IllegalStateException e){
-    }
+    assertThrows(IllegalStateException.class, () -> g.release(1, 0));
+    assertThrows(IllegalStateException.class, () -> g.release(0, 1));
   }
 
   static void assertUsed(ResourceSemaphore.Group g, int... expected) {
-    Assert.assertEquals(expected.length, g.resourceSize());
-    for(int i = 0; i < expected.length; i++) {
-      Assert.assertEquals(expected[i], g.get(i).used());
+    Assertions.assertEquals(expected.length, g.resourceSize());
+    for (int i = 0; i < expected.length; i++) {
+      Assertions.assertEquals(expected[i], g.get(i).used());
     }
   }
 
   static void assertAcquire(ResourceSemaphore.Group g, boolean expected,
       int... permits) {
     final boolean computed = g.tryAcquire(permits);
-    Assert.assertEquals(expected, computed);
+    Assertions.assertEquals(expected, computed);
   }
 }

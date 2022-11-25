@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -28,9 +28,15 @@ import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
  * commands in protobuf format.
  * @param <T>
  */
-public abstract class SCMCommand<T extends GeneratedMessage> implements
+public abstract class SCMCommand<T extends Message> implements
     IdentifiableEventPayload {
-  private long id;
+  private final long id;
+
+  // If running upon Ratis, holds term of underlying RaftServer iff current
+  // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
+  private long term;
+
+  private String encodedToken = "";
 
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();
@@ -60,4 +66,26 @@ public abstract class SCMCommand<T extends GeneratedMessage> implements
     return id;
   }
 
+  /**
+   * Get term of this command.
+   * @return term
+   */
+  public long getTerm() {
+    return term;
+  }
+
+  /**
+   * Set term of this command.
+   */
+  public void setTerm(long term) {
+    this.term = term;
+  }
+
+  public String getEncodedToken() {
+    return encodedToken;
+  }
+
+  public void setEncodedToken(String encodedToken) {
+    this.encodedToken = encodedToken;
+  }
 }

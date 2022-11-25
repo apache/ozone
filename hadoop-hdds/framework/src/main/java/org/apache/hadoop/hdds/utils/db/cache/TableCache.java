@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 
 /**
@@ -107,10 +108,18 @@ public interface TableCache<CACHEKEY extends CacheKey,
    */
   CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey);
 
-
   @VisibleForTesting
-  Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
+  NavigableMap<Long, Set<CACHEKEY>> getEpochEntries();
 
+  /**
+   * Return the stat counters.
+   * @return
+   */
+  CacheStats getStats();
+
+  /**
+   * Cache completeness.
+   */
   enum CacheType {
     FULL_CACHE, //  This mean's the table maintains full cache. Cache and DB
     // state are same.

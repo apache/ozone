@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.times;
@@ -61,7 +61,7 @@ public class TestContainerActionsHandler {
     queue.fireEvent(SCMEvents.CONTAINER_ACTIONS, containerActions);
     queue.processAll(1000L);
     verify(closeContainerEventHandler, times(1))
-        .onMessage(ContainerID.valueof(1L), queue);
+        .onMessage(ContainerID.valueOf(1L), queue);
 
   }
 

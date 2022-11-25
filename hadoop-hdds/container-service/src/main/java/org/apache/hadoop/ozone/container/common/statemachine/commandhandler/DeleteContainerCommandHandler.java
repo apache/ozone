@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,12 +52,9 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private final ExecutorService executor;
 
   public DeleteContainerCommandHandler(int threadPoolSize) {
-    this.executor = new ThreadPoolExecutor(
-        0, threadPoolSize, 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DeleteContainerThread-%d")
-            .build());
+    this.executor = Executors.newFixedThreadPool(
+        threadPoolSize, new ThreadFactoryBuilder()
+            .setNameFormat("DeleteContainerThread-%d").build());
   }
 
   @Override
@@ -80,6 +77,11 @@ public class DeleteContainerCommandHandler implements CommandHandler {
         totalTime.getAndAdd(Time.monotonicNow() - startTime);
       }
     });
+  }
+
+  @Override
+  public int getQueuedCount() {
+    return ((ThreadPoolExecutor)executor).getQueue().size();
   }
 
   @Override

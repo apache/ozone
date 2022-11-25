@@ -21,13 +21,13 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -42,8 +42,8 @@ import java.util.EnumMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 
 /**
  * Selects ChunkManager implementation to use for each chunk operation.
@@ -53,12 +53,15 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkManagerDispatcher.class);
 
-  private final Map<ChunkLayOutVersion, ChunkManager> handlers
-      = new EnumMap<>(ChunkLayOutVersion.class);
+  private final Map<ContainerLayoutVersion, ChunkManager> handlers
+      = new EnumMap<>(ContainerLayoutVersion.class);
 
-  ChunkManagerDispatcher(boolean sync, BlockManager manager) {
-    handlers.put(FILE_PER_CHUNK, new FilePerChunkStrategy(sync, manager));
-    handlers.put(FILE_PER_BLOCK, new FilePerBlockStrategy(sync, manager));
+  ChunkManagerDispatcher(boolean sync, BlockManager manager,
+                         VolumeSet volSet) {
+    handlers.put(FILE_PER_CHUNK,
+        new FilePerChunkStrategy(sync, manager, volSet));
+    handlers.put(FILE_PER_BLOCK,
+        new FilePerBlockStrategy(sync, manager, volSet));
   }
 
   @Override
@@ -98,9 +101,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
 
-    selectHandler(container)
-        .deleteChunk(container, blockID, info);
-    container.getContainerData().decrBytesUsed(info.getLen());
+    // Delete the chunk from disk.
+    // Do not decrement the ContainerData counters (usedBytes) here as it
+    // will be updated while deleting the block from the DB
+
+    selectHandler(container).deleteChunk(container, blockID, info);
+
   }
 
   @Override
@@ -109,11 +115,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
     Preconditions.checkNotNull(blockData, "Block data cannot be null.");
 
-    selectHandler(container).deleteChunks(container, blockData);
+    // Delete the chunks belonging to blockData.
+    // Do not decrement the ContainerData counters (usedBytes) here as it
+    // will be updated while deleting the block from the DB
 
-    container.getContainerData().decrBytesUsed(
-        blockData.getChunks().stream()
-            .mapToLong(ContainerProtos.ChunkInfo::getLen).sum());
+    selectHandler(container).deleteChunks(container, blockData);
   }
 
   @Override
@@ -124,11 +130,13 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private @Nonnull ChunkManager selectHandler(Container container)
       throws StorageContainerException {
 
-    ChunkLayOutVersion layout = container.getContainerData().getLayOutVersion();
+    ContainerLayoutVersion layout =
+        container.getContainerData().getLayoutVersion();
     return selectVersionHandler(layout);
   }
 
-  private @Nonnull ChunkManager selectVersionHandler(ChunkLayOutVersion version)
+  private @Nonnull ChunkManager selectVersionHandler(
+      ContainerLayoutVersion version)
       throws StorageContainerException {
     ChunkManager versionHandler = handlers.get(version);
     if (versionHandler == null) {
@@ -138,7 +146,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   private static ChunkManager throwUnknownLayoutVersion(
-      ChunkLayOutVersion version) throws StorageContainerException {
+      ContainerLayoutVersion version) throws StorageContainerException {
 
     String message = "Unsupported storage container layout: " + version;
     LOG.warn(message);

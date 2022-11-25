@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_RENAME;
 
 /**
  * Response for RenameKeys request.
@@ -46,6 +48,14 @@ public class OMKeysRenameResponse extends OMClientResponse {
     this.omRenameKeys = omRenameKeys;
   }
 
+  @Override
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
+          BatchOperation batchOperation) throws IOException {
+    if (getOMResponse().getStatus() == OK ||
+        getOMResponse().getStatus() == PARTIAL_RENAME) {
+      addToDBBatch(omMetadataManager, batchOperation);
+    }
+  }
 
   /**
    * For when the request is not successful or it is a replay transaction.
@@ -68,12 +78,13 @@ public class OMKeysRenameResponse extends OMClientResponse {
       OmKeyInfo newKeyInfo = entry.getValue();
       String toKeyName = newKeyInfo.getKeyName();
 
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .deleteWithBatch(batchOperation, omMetadataManager
               .getOzoneKey(volumeName, bucketName, fromKeyName));
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-          newKeyInfo);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .putWithBatch(batchOperation,
+              omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+              newKeyInfo);
     }
   }
 
