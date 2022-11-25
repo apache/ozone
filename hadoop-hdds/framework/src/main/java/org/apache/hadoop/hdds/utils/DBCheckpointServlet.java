@@ -21,32 +21,25 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -146,12 +139,22 @@ public class DBCheckpointServlet extends HttpServlet {
 
     DBCheckpoint checkpoint = null;
     try {
-
       boolean flush = false;
       String flushParam =
           request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
       if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.valueOf(flushParam);
+        flush = Boolean.parseBoolean(flushParam);
+      }
+
+      List<String> receivedSstList = new ArrayList<>();
+      String[] sstParam = request.getParameterValues(
+          OZONE_DB_CHECKPOINT_REQUEST_SST);
+      if (sstParam != null) {
+        receivedSstList = Arrays.stream(sstParam)
+            .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+            .distinct()
+            .collect(Collectors.toList());
+        LOG.info("Received excluding SST {}", receivedSstList);
       }
 
       checkpoint = dbStore.getCheckpoint(flush);
@@ -170,19 +173,26 @@ public class DBCheckpointServlet extends HttpServlet {
       }
       response.setContentType("application/x-tgz");
       response.setHeader("Content-Disposition",
-          "attachment; filename=\"" +
-               file.toString() + ".tgz\"");
+          "attachment; filename=\"" + file + ".tgz\"");
 
       Instant start = Instant.now();
-      writeDBCheckpointToStream(checkpoint,
-          response.getOutputStream());
+      List<String> excluded = HddsServerUtil.writeDBCheckpointToStream(
+          checkpoint, response.getOutputStream(), receivedSstList);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
+      if (!excluded.isEmpty()) {
+        LOG.info("Excluded SST {} from the latest checkpoint.", excluded);
+        dbMetrics.incNumIncrementalCheckpoint();
+        dbMetrics.setLastCheckpointStreamingNumSSTExcluded(excluded.size());
+      } else {
+        dbMetrics.incNumCheckpoints();
+        dbMetrics.setLastCheckpointStreamingNumSSTExcluded(0);
+      }
       dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
-      dbMetrics.incNumCheckpoints();
+
     } catch (Exception e) {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
@@ -198,55 +208,5 @@ public class DBCheckpointServlet extends HttpServlet {
         }
       }
     }
-  }
-
-  /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
-   *
-   * @param checkpoint  checkpoint file
-   * @param destination desination output stream.
-   * @throws IOException
-   */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
-      throws IOException {
-
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
-            }
-          }
-        }
-      }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
-    }
-  }
-
-  private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
-    }
-    archiveOutputStream.closeArchiveEntry();
   }
 }

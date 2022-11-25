@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -20,12 +20,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -36,6 +39,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -48,16 +53,19 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.util.LifeCycle;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
@@ -66,6 +74,8 @@ import org.slf4j.event.Level;
 @Timeout(500)
 @Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
+  public static final Logger LOG = LoggerFactory.getLogger(
+      TestSCMInstallSnapshotWithHA.class);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
@@ -76,8 +86,8 @@ public class TestSCMInstallSnapshotWithHA {
   private int numOfOMs = 1;
   private int numOfSCMs = 3;
 
-  private static final long SNAPSHOT_THRESHOLD = 5;
-  private static final int LOG_PURGE_GAP = 5;
+  private static final long SNAPSHOT_THRESHOLD = 50;
+  private static final int LOG_PURGE_GAP = 50;
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -92,6 +102,11 @@ public class TestSCMInstallSnapshotWithHA {
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
 
+    conf.setStorageSize(ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_SIZE,
+        8, StorageUnit.KB);
+    conf.setStorageSize(
+        ScmConfigKeys.OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE,
+        8, StorageUnit.KB);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
@@ -120,10 +135,11 @@ public class TestSCMInstallSnapshotWithHA {
   }
 
   @Test
+  @Timeout(300)
   public void testInstallSnapshot() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    Assert.assertNotNull(leaderSCM);
+    assertNotNull(leaderSCM);
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getSCMNodeId();
 
@@ -146,21 +162,245 @@ public class TestSCMInstallSnapshotWithHA {
     GenericTestUtils.waitFor(() -> {
       return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
     }, 100, 3000);
-    long followerLastAppliedIndex =
-        followerSM.getLastAppliedTermIndex().getIndex();
-    assertTrue(followerLastAppliedIndex >= 200);
+
+    assertTrue(followerSCM.getScmHAManager().
+        getSCMSnapshotProvider().getNumDownloaded() >= 1);
     assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify that the follower 's DB contains the transactions which were
     // made while it was inactive.
     SCMMetadataStore followerMetaStore = followerSCM.getScmMetadataStore();
     for (ContainerInfo containerInfo : containers) {
-      Assert.assertNotNull(followerMetaStore.getContainerTable()
+      assertNotNull(followerMetaStore.getContainerTable()
           .get(containerInfo.containerID()));
     }
   }
 
   @Test
+  @Timeout(300)
+  public void testInstallIncrementalSnapshot() throws Exception {
+    // Get the leader SCM
+    StorageContainerManager leaderSCM = getLeader(cluster);
+    assertNotNull(leaderSCM);
+
+    // Find the inactive SCM
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
+    StorageContainerManager followerSCM = cluster.getSCM(followerId);
+
+    // Start the inactive SCM. Install Snapshot will happen as part
+    // of setConfiguration() call to ratis leader and the follower will catch
+    // up
+    cluster.startInactiveSCM(followerId);
+
+    // Wait the follower bootstrap finish
+    GenericTestUtils.waitFor(() -> {
+      return ((SCMHAManagerImpl) followerSCM.getScmHAManager()).
+          getGrpcServerState();
+    }, 1000, 5000);
+
+    followerSCM.stop();
+
+    // Do some transactions so that the log index increases
+    List<ContainerInfo> firstContainers =
+        writeToIncreaseLogIndex(leaderSCM, 100);
+
+    // ReInstantiate the follower SCM
+    StorageContainerManager restartedSCM =
+        cluster.reInstantiateStorageContainerManager(followerSCM);
+
+    // Set fault injector to pause before install
+    FaultInjector faultInjector = new SnapshotPauseInjector();
+    restartedSCM.getScmHAManager().getSCMSnapshotProvider().
+        setInjector(faultInjector);
+
+    // Restart the follower SCM
+    restartedSCM.start();
+    cluster.waitForClusterToBeReady();
+
+    // Wait the follower download the snapshot,but get stuck by injector
+    GenericTestUtils.waitFor(() -> {
+      LOG.info("Current NumDownloaded {}", restartedSCM.getScmHAManager().
+          getSCMSnapshotProvider().getNumDownloaded());
+      return restartedSCM.getScmHAManager().getSCMSnapshotProvider().
+          getNumDownloaded() >= 1;
+    }, 1000, 10000);
+
+    // Do some transactions so that the log index increases
+    List<ContainerInfo> secondContainers =
+        writeToIncreaseLogIndex(leaderSCM, 200);
+
+    // Resume the follower thread, it would download the incremental snapshot.
+    faultInjector.resume();
+
+    SCMStateMachine followerSM = restartedSCM.getScmHAManager().
+        getRatisServer().getSCMStateMachine();
+
+    // Wait & retry for follower to update transactions to leader
+    // snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
+    }, 100, 3000);
+
+    assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
+    assertTrue(restartedSCM.getScmHAManager().getSCMSnapshotProvider().
+        getNumDownloaded() >= 2);
+
+    // Verify that the follower's DB contains the transactions which were
+    // made while it was inactive.
+    SCMMetadataStore followerMetaStore = restartedSCM.getScmMetadataStore();
+    for (ContainerInfo containerInfo : firstContainers) {
+      assertNotNull(followerMetaStore.getContainerTable()
+          .get(containerInfo.containerID()));
+    }
+    for (ContainerInfo containerInfo : secondContainers) {
+      assertNotNull(followerMetaStore.getContainerTable()
+          .get(containerInfo.containerID()));
+    }
+
+    // Verify the metrics recording the incremental checkpoint at leader side
+    DBCheckpointMetrics dbMetrics = leaderSCM.getMetrics().
+        getDBCheckpointMetrics();
+    assertTrue(dbMetrics.getLastCheckpointStreamingNumSSTExcluded() > 0);
+    assertEquals(1, dbMetrics.getNumIncrementalCheckpoints());
+    assertEquals(1, dbMetrics.getNumCheckpoints());
+
+    // Trigger notifySnapshotInstalled event
+    writeToIncreaseLogIndex(leaderSCM, 220);
+
+    // Verify follower candidate directory get cleaned
+    String[] filesInCandidate = restartedSCM.getScmHAManager().
+        getSCMSnapshotProvider().getCandidateDir().list();
+    assertNotNull(filesInCandidate);
+    assertEquals(0, filesInCandidate.length);
+  }
+
+  @Test
+  @Timeout(300)
+  public void testInstallIncrementalSnapshotWithFailure() throws Exception {
+    // Get the leader SCM
+    StorageContainerManager leaderSCM = getLeader(cluster);
+    assertNotNull(leaderSCM);
+
+    // Find the inactive SCM
+    String followerId = getInactiveSCM(cluster).getSCMNodeId();
+    StorageContainerManager followerSCM = cluster.getSCM(followerId);
+
+    // Start the inactive SCM. Install Snapshot will happen as part
+    // of setConfiguration() call to ratis leader and the follower will catch
+    // up
+    cluster.startInactiveSCM(followerId);
+
+    // Wait the follower bootstrap finish
+    GenericTestUtils.waitFor(() -> {
+      return ((SCMHAManagerImpl) followerSCM.getScmHAManager()).
+          getGrpcServerState();
+    }, 1000, 5000);
+
+    followerSCM.stop();
+
+    // Do some transactions so that the log index increases
+    List<ContainerInfo> firstContainers =
+        writeToIncreaseLogIndex(leaderSCM, 100);
+
+    // ReInstantiate the follower SCM
+    StorageContainerManager restartedSCM =
+        cluster.reInstantiateStorageContainerManager(followerSCM);
+
+    // Set fault injector to pause before install
+    FaultInjector faultInjector = new SnapshotPauseInjector();
+    restartedSCM.getScmHAManager().getSCMSnapshotProvider().
+        setInjector(faultInjector);
+
+    // Restart the follower SCM
+    restartedSCM.start();
+    cluster.waitForClusterToBeReady();
+
+    // Wait the follower download the snapshot,but get stuck by injector
+    GenericTestUtils.waitFor(() -> {
+      LOG.info("Current NumDownloaded {}", restartedSCM.getScmHAManager().
+          getSCMSnapshotProvider().getNumDownloaded());
+      return restartedSCM.getScmHAManager().getSCMSnapshotProvider().
+          getNumDownloaded() >= 1;
+    }, 1000, 10000);
+
+    // Do some transactions so that the log index increases
+    List<ContainerInfo> secondContainers =
+        writeToIncreaseLogIndex(leaderSCM, 200);
+
+    // Resume the follower thread, it would download the incremental snapshot.
+    faultInjector.resume();
+
+    // Pause the follower thread again to block the second-time install
+    faultInjector.reset();
+
+    // Wait the follower download the incremental snapshot, but get stuck
+    // by injector
+    GenericTestUtils.waitFor(() -> {
+      return restartedSCM.getScmHAManager().getSCMSnapshotProvider().
+          getNumDownloaded() == 2;
+    }, 1000, 10000);
+
+    SCMStateMachine followerSM = restartedSCM.getScmHAManager().
+        getRatisServer().getSCMStateMachine();
+
+    // Corrupt the mixed checkpoint in the candidate DB dir
+    File followerCandidateDir = restartedSCM.getScmHAManager().
+        getSCMSnapshotProvider().getCandidateDir();
+    List<String> sstList = HAUtils.getExistingSstFiles(followerCandidateDir);
+    assertTrue(sstList.size() > 0);
+    Collections.shuffle(sstList);
+    List<String> victimSstList = sstList.subList(0, sstList.size() / 3);
+    for (String sst: victimSstList) {
+      File victimSst = new File(followerCandidateDir, sst);
+      assertTrue(victimSst.delete());
+    }
+
+    // Resume the follower thread, it would download the full snapshot again
+    // as the installation will fail for the corruption detected.
+    faultInjector.resume();
+
+    // Wait & retry for follower to update transactions to leader
+    // snapshot index.
+    // Timeout error if follower does not load update within 5s
+    GenericTestUtils.waitFor(() -> {
+      return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
+    }, 100, 5000);
+
+    assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
+
+    // Verify that the follower's DB contains the transactions which were
+    // made while it was inactive.
+    SCMMetadataStore followerMetaStore = restartedSCM.getScmMetadataStore();
+    for (ContainerInfo containerInfo : firstContainers) {
+      assertNotNull(followerMetaStore.getContainerTable()
+          .get(containerInfo.containerID()));
+    }
+    for (ContainerInfo containerInfo : secondContainers) {
+      assertNotNull(followerMetaStore.getContainerTable()
+          .get(containerInfo.containerID()));
+    }
+
+    // Verify the metrics recording the checkpoint at leader side
+    // should have twice full checkpoint download
+    DBCheckpointMetrics dbMetrics = leaderSCM.getMetrics().
+        getDBCheckpointMetrics();
+    assertEquals(0, dbMetrics.getLastCheckpointStreamingNumSSTExcluded());
+    assertTrue(dbMetrics.getNumIncrementalCheckpoints() >= 1);
+    assertTrue(dbMetrics.getNumCheckpoints() >= 2);
+
+    // Trigger notifySnapshotInstalled event
+    writeToIncreaseLogIndex(leaderSCM, 220);
+
+    // Verify follower candidate directory get cleaned
+    String[] filesInCandidate = restartedSCM.getScmHAManager().
+        getSCMSnapshotProvider().getCandidateDir().list();
+    assertNotNull(filesInCandidate);
+    assertEquals(0, filesInCandidate.length);
+  }
+
+  @Test
+  @Timeout(300)
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
@@ -170,9 +410,11 @@ public class TestSCMInstallSnapshotWithHA {
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
     cluster.startInactiveSCM(followerId);
     followerSCM.exitSafeMode();
-    DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().getStore()
-        .getCheckpoint(false);
 
+    // Manual flush SCMHADBTransactionBuffer to write TRANSACTION_INFO_KEY
+    leaderSCM.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+    DBCheckpoint leaderDbCheckpoint = leaderSCM.getScmMetadataStore().
+        getStore().getCheckpoint(false);
     SCMStateMachine leaderSM =
         leaderSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
     TermIndex lastTermIndex = leaderSM.getLastAppliedTermIndex();
@@ -186,12 +428,11 @@ public class TestSCMInstallSnapshotWithHA {
     // Advance the follower
     followerSM.notifyTermIndexUpdated(lastTermIndex.getTerm(),
         lastTermIndex.getIndex() + 100);
-
     GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.INFO);
     GenericTestUtils.LogCapturer logCapture =
         GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
 
-    // Install the old checkpoint on the follower . This should fail as the
+    // Install the old checkpoint on the follower. This should fail as the
     // follower is already ahead of that transactionLogIndex and the
     // state should be reloaded.
     TermIndex followerTermIndex = followerSM.getLastAppliedTermIndex();
@@ -203,18 +444,20 @@ public class TestSCMInstallSnapshotWithHA {
       newTermIndex = scmhaManager.installCheckpoint(leaderDbCheckpoint);
     } catch (IOException ioe) {
       // throw IOException as expected
+      LOG.info("Got an Exception", ioe);
     }
 
     String errorMsg = "Reloading old state of SCM";
-    Assert.assertTrue(logCapture.getOutput().contains(errorMsg));
-    Assert.assertNull(" installed checkpoint even though checkpoint " +
-        "logIndex is less than it's lastAppliedIndex", newTermIndex);
-    Assert.assertEquals(followerTermIndex,
+    assertTrue(logCapture.getOutput().contains(errorMsg));
+    assertNull(newTermIndex, " installed checkpoint even though " +
+        "checkpoint logIndex is less than it's lastAppliedIndex");
+    assertEquals(followerTermIndex,
         followerSM.getLastAppliedTermIndex());
-    Assert.assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
+    assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
   }
 
   @Test
+  @Timeout(300)
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     StorageContainerManager leaderSCM = getLeader(cluster);
     // Find the inactive SCM
@@ -235,7 +478,7 @@ public class TestSCMInstallSnapshotWithHA {
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation,
             new SCMDBDefinition());
 
-    Assert.assertNotNull(leaderCheckpointLocation);
+    assertNotNull(leaderCheckpointLocation);
     // Take a backup of the current DB
     String dbBackupName =
         "SCM_CHECKPOINT_BACKUP" + termIndex.getIndex() + "_" + System
@@ -272,17 +515,17 @@ public class TestSCMInstallSnapshotWithHA {
     scmhaManager.installCheckpoint(leaderCheckpointLocation,
         leaderCheckpointTrxnInfo);
 
-    Assert.assertTrue(logCapture.getOutput()
+    assertTrue(logCapture.getOutput()
         .contains("Failed to reload SCM state and instantiate services."));
     final LifeCycle.State s = followerSM.getLifeCycleState();
-    Assert.assertTrue("Unexpected lifeCycle state: " + s,
-        s == LifeCycle.State.NEW || s.isPausingOrPaused());
+    assertTrue(s == LifeCycle.State.NEW || s.isPausingOrPaused(),
+        "Unexpected lifeCycle state: " + s);
 
     // Verify correct reloading
     followerSM.setInstallingDBCheckpoint(
         new RocksDBCheckpoint(checkpointBackup.toPath()));
     followerSM.reinitialize();
-    Assert.assertEquals(followerSM.getLastAppliedTermIndex(),
+    assertEquals(followerSM.getLastAppliedTermIndex(),
         leaderCheckpointTrxnInfo.getTermIndex());
   }
 
@@ -301,6 +544,7 @@ public class TestSCMInstallSnapshotWithHA {
               TestSCMInstallSnapshotWithHA.class.getName()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();
+      LOG.info("Current SM log index {}", logIndex);
     }
     return containers;
   }
@@ -327,6 +571,44 @@ public class TestSCMInstallSnapshotWithHA {
       MiniOzoneHAClusterImpl cluster) {
     Iterator<StorageContainerManager> inactiveScms = cluster.getInactiveSCM();
     return inactiveScms.hasNext() ? inactiveScms.next() : null;
+  }
+
+  private static class SnapshotPauseInjector extends FaultInjector {
+    private CountDownLatch ready;
+    private CountDownLatch wait;
+
+    SnapshotPauseInjector() {
+      init();
+    }
+
+    @Override
+    public void init() {
+      this.ready = new CountDownLatch(1);
+      this.wait = new CountDownLatch(1);
+    }
+
+    @Override
+    public void pause() throws IOException {
+      LOG.info("FaultInjector pauses");
+      ready.countDown();
+      try {
+        wait.await();
+      } catch (InterruptedException e) {
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void resume() throws IOException {
+      LOG.info("FaultInjector resumes");
+      wait.countDown();
+    }
+
+    @Override
+    public void reset() throws IOException {
+      LOG.info("FaultInjector resets");
+      init();
+    }
   }
 }
 

@@ -85,7 +85,7 @@ public class TestSCMDbCheckpointServlet {
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
-    scmMetrics = StorageContainerManager.getMetrics();
+    scmMetrics = scm.getMetrics();
   }
 
   /**

@@ -59,7 +59,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
   private final DBTransactionBuffer transactionBuffer;
-  private final SCMSnapshotProvider scmSnapshotProvider;
+  private final SCMDBSnapshotProvider scmSnapshotProvider;
   private final StorageContainerManager scm;
   private ExitManager exitManager;
 
@@ -78,7 +78,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
       this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
       this.ratisServer = new SCMRatisServerImpl(conf, scm,
           (SCMHADBTransactionBuffer) transactionBuffer);
-      this.scmSnapshotProvider = new SCMSnapshotProvider(conf,
+      this.scmSnapshotProvider = new SCMDBSnapshotProvider(conf,
+          new File(SCMHAUtils.getSCMRatisSnapshotDirectory(conf)),
           scm.getSCMHANodeDetails().getPeerNodeDetails(),
           scm.getScmCertificateClient());
       grpcServer = new InterSCMGrpcProtocolService(conf, scm);
@@ -135,7 +136,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   @Override
-  public SCMSnapshotProvider getSCMSnapshotProvider() {
+  public SCMDBSnapshotProvider getSCMSnapshotProvider() {
     return scmSnapshotProvider;
   }
 
@@ -156,8 +157,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
     }
 
     DBCheckpoint dBCheckpoint = getDBCheckpointFromLeader(leaderId);
-    LOG.info("Downloaded checkpoint from Leader {} to the location {}",
-        leaderId, dBCheckpoint.getCheckpointLocation());
+    if (dBCheckpoint != null) {
+      LOG.info("Downloaded checkpoint from Leader {} to the location {}",
+          leaderId, dBCheckpoint.getCheckpointLocation());
+    }
     return dBCheckpoint;
   }
 
@@ -208,7 +211,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         "from the checkpoint.", leaderId);
 
     try {
-      return scmSnapshotProvider.getSCMDBSnapshot(leaderId);
+      return scmSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException e) {
       LOG.error("Failed to download checkpoint from SCM leader {}", leaderId,
           e);
@@ -271,8 +274,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // this exception. In this way reinitialize can throw exception to
       // ratis to handle properly.
       LOG.error("Failed to install Snapshot as SCM failed to replace"
-          + " DB with downloaded checkpoint. Checkpoint transaction {}", e,
-          checkpointTxnInfo.getTransactionIndex());
+          + " DB with downloaded checkpoint. Checkpoint transaction {}",
+          checkpointTxnInfo.getTransactionIndex(), e);
       throw e;
     }
 
@@ -287,18 +290,15 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // revert to the old db, since the new db may be a corrupted one
       // so that SCM can restart from the old db.
       try {
-        if (dbBackup != null) {
-          dbBackup =
-              HAUtils.replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
-                  dbBackup.toPath(), OzoneConsts.SCM_DB_BACKUP_PREFIX);
-          LOG.error("Replacing SCM state with Term : {} and Index:",
-              termIndex.getTerm(), termIndex.getTerm());
-          // This is being done to check before stop with old db
-          // try to reload and then finally terminate and also test has
-          // assumption for re-verify after corrupt DB loading without
-          // reloadSCMState call test fails with NPE when finding db location.
-          reloadSCMState();
-        }
+        HAUtils.replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+                dbBackup.toPath(), OzoneConsts.SCM_DB_BACKUP_PREFIX);
+        LOG.error("Replacing SCM state with Term : {} and Index: {}",
+            termIndex.getTerm(), termIndex.getIndex());
+        // This is being done to check before stop with old db
+        // try to reload and then finally terminate and also test has
+        // assumption for re-verify after corrupt DB loading without
+        // reloadSCMState call test fails with NPE when finding db location.
+        reloadSCMState();
       } finally {
         String errorMsg = "Failed to reload SCM state and instantiate " +
             "services.";
@@ -308,12 +308,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
     // Delete the backup DB
     try {
-      if (dbBackup != null) {
-        FileUtils.deleteFully(dbBackup);
-      }
+      FileUtils.deleteFully(dbBackup);
     } catch (Exception e) {
       LOG.error("Failed to delete the backup of the original DB {}",
-          dbBackup);
+          dbBackup, e);
     }
 
     return checkpointTxnInfo.getTermIndex();
@@ -401,5 +399,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @VisibleForTesting
   public static Logger getLogger() {
     return LOG;
+  }
+
+  @VisibleForTesting
+  public boolean getGrpcServerState() {
+    return grpcServer.getState();
   }
 }

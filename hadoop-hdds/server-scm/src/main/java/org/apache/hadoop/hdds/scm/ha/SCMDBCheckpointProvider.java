@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCheckpointRequestProto;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -28,6 +31,7 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 // TODO: define a generic interface for this
 /**
@@ -38,12 +42,15 @@ public class SCMDBCheckpointProvider {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMDBCheckpointProvider.class);
   private transient DBStore scmDbStore;
+  private final DBCheckpointMetrics metrics;
 
-  public SCMDBCheckpointProvider(DBStore scmDbStore) {
+  public SCMDBCheckpointProvider(DBStore scmDbStore, SCMMetrics metrics) {
     this.scmDbStore = scmDbStore;
+    this.metrics = metrics.getDBCheckpointMetrics();
   }
 
-  public void writeDBCheckPointToSream(OutputStream stream, boolean flush)
+  public void writeDBCheckPointToStream(OutputStream stream,
+      CopyDBCheckpointRequestProto request)
       throws IOException {
     LOG.info("Received request to obtain SCM DB checkpoint snapshot");
     if (scmDbStore == null) {
@@ -53,26 +60,37 @@ public class SCMDBCheckpointProvider {
 
     DBCheckpoint checkpoint = null;
     try {
-
+      boolean flush = request.getFlush();
+      List<String> receivedSstList = request.getSstList();
       checkpoint = scmDbStore.getCheckpoint(flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         throw new IOException("Unable to process metadata snapshot request. "
             + "Checkpoint request returned null.");
       }
-
+      metrics.setLastCheckpointCreationTimeTaken(checkpoint.
+          checkpointCreationTimeTaken());
       Path file = checkpoint.getCheckpointLocation().getFileName();
       if (file == null) {
         return;
       }
 
       Instant start = Instant.now();
-      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream);
+      List<String> excluded = HddsServerUtil.writeDBCheckpointToStream(
+          checkpoint, stream, receivedSstList);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-
+      if (!excluded.isEmpty()) {
+        LOG.info("Excluded SST {} from the latest checkpoint.", excluded);
+        metrics.incNumIncrementalCheckpoint();
+        metrics.setLastCheckpointStreamingNumSSTExcluded(excluded.size());
+      } else {
+        metrics.incNumCheckpoints();
+        metrics.setLastCheckpointStreamingNumSSTExcluded(0);
+      }
+      metrics.setLastCheckpointStreamingTimeTaken(duration);
     } catch (IOException ioe) {
       LOG.error("Unable to process metadata snapshot request. ", ioe);
       throw ioe;

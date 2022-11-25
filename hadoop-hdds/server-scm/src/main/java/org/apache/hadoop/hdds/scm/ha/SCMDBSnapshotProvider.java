@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,39 +20,31 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
-
-import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * SCMSnapshotProvider downloads the latest checkpoint from the
+ * SCMDBSnapshotProvider downloads the latest checkpoint from the
  * leader SCM and loads the checkpoint into State Machine.
  */
-public class SCMSnapshotProvider {
+public class SCMDBSnapshotProvider extends RDBSnapshotProvider {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMSnapshotProvider.class);
-
-  private final File scmSnapshotDir;
-
+      LoggerFactory.getLogger(SCMDBSnapshotProvider.class);
 
   private final ConfigurationSource conf;
 
@@ -60,10 +52,13 @@ public class SCMSnapshotProvider {
 
   private final SCMCertificateClient scmCertificateClient;
 
-  public SCMSnapshotProvider(ConfigurationSource conf,
+  public SCMDBSnapshotProvider(ConfigurationSource conf,
+      File scmRatisSnapshotDir,
       List<SCMNodeDetails> peerNodes,
       SCMCertificateClient scmCertificateClient) {
+    super(scmRatisSnapshotDir, OzoneConsts.SCM_DB_NAME);
     LOG.info("Initializing SCM Snapshot Provider");
+
     this.conf = conf;
     this.scmCertificateClient = scmCertificateClient;
     // Create Ratis storage dir
@@ -75,9 +70,6 @@ public class SCMSnapshotProvider {
     }
     HddsUtils.createDir(scmRatisDirectory);
 
-    // Create Ratis snapshot dir
-    scmSnapshotDir = HddsUtils.createDir(
-        SCMHAUtils.getSCMRatisSnapshotDirectory(conf));
     if (peerNodes != null) {
       this.peerNodesMap = new HashMap<>();
       for (SCMNodeDetails peerNode : peerNodes) {
@@ -91,54 +83,28 @@ public class SCMSnapshotProvider {
     this.peerNodesMap = peerNodesMap;
   }
 
-  /**
-   * Download the latest checkpoint from SCM Leader .
-   * @param leaderSCMNodeID leader SCM Node ID.
-   * @return the DB checkpoint (including the ratis snapshot index)
-   */
-  public DBCheckpoint getSCMDBSnapshot(String leaderSCMNodeID)
+  @Override
+  public void downloadSnapshot(String leaderNodeID, File targetFile)
       throws IOException {
-    String snapshotTime = Long.toString(System.currentTimeMillis());
-    String snapshotFileName =
-        OzoneConsts.SCM_DB_NAME + "-" + leaderSCMNodeID + "-" + snapshotTime;
-    String snapshotFilePath =
-        Paths.get(scmSnapshotDir.getAbsolutePath(), snapshotFileName).toFile()
-            .getAbsolutePath();
-    File targetFile = new File(snapshotFilePath + ".tar.gz");
-
-
     // the downloadClient instance will be created as and when install snapshot
     // request is received. No caching of the client as it should be a very rare
-    int port = peerNodesMap.get(leaderSCMNodeID).getGrpcPort();
-    String host = peerNodesMap.get(leaderSCMNodeID).getInetAddress()
-            .getHostAddress();
+    SCMNodeDetails leader = peerNodesMap.get(leaderNodeID);
+    int port = leader.getGrpcPort();
+    String host = leader.getInetAddress().getHostAddress();
 
-    try (SCMSnapshotDownloader downloadClient =
-        new InterSCMGrpcClient(host, port, conf, scmCertificateClient)) {
+    try (InterSCMGrpcClient downloadClient =
+             new InterSCMGrpcClient(host, port, conf, scmCertificateClient)) {
+      downloadClient.setSstList(HAUtils.getExistingSstFiles(getCandidateDir()));
       downloadClient.download(targetFile.toPath()).get();
     } catch (ExecutionException | InterruptedException e) {
       LOG.error("Rocks DB checkpoint downloading failed", e);
       Thread.currentThread().interrupt();
       throw new IOException(e);
     }
-
-
-    // Untar the checkpoint file.
-    Path untarredDbDir = Paths.get(snapshotFilePath);
-    FileUtil.unTar(targetFile, untarredDbDir.toFile());
-    FileUtils.deleteQuietly(targetFile);
-
-    LOG.info(
-        "Successfully downloaded latest checkpoint from leader SCM: {} path {}",
-        leaderSCMNodeID, untarredDbDir.toAbsolutePath());
-
-    RocksDBCheckpoint scmCheckpoint = new RocksDBCheckpoint(untarredDbDir);
-    return scmCheckpoint;
   }
 
-  @VisibleForTesting
-  public File getScmSnapshotDir() {
-    return scmSnapshotDir;
+  @Override
+  public void close() throws IOException {
   }
 
 }

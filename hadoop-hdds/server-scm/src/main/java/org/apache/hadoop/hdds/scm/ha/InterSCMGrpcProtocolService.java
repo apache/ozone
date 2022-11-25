@@ -108,4 +108,8 @@ public class InterSCMGrpcProtocolService {
       isStarted.set(false);
     }
   }
+
+  public boolean getState() {
+    return isStarted.get();
+  }
 }

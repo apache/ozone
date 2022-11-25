@@ -40,6 +40,8 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -56,15 +58,17 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
   private final InterSCMProtocolServiceGrpc.InterSCMProtocolServiceStub
       client;
   private final long timeout;
+  private boolean flush = true;
+  private List<String> sstList = new ArrayList<>();
 
   public InterSCMGrpcClient(final String host,
       int port, final ConfigurationSource conf,
       CertificateClient scmCertificateClient) throws IOException {
     Preconditions.checkNotNull(conf);
     timeout = conf.getTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL,
-            ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT,
-            TimeUnit.MILLISECONDS);
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
@@ -93,7 +97,8 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
     // By default on every checkpoint, the rocks db will be flushed
     InterSCMProtocolProtos.CopyDBCheckpointRequestProto request =
         InterSCMProtocolProtos.CopyDBCheckpointRequestProto.newBuilder()
-            .setFlush(true)
+            .setFlush(flush)
+            .addAllSst(sstList)
             .build();
     CompletableFuture<Path> response = new CompletableFuture<>();
 
@@ -191,4 +196,11 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
     }
   }
 
+  public void setFlush(boolean flush) {
+    this.flush = flush;
+  }
+
+  public void setSstList(List<String> sstList) {
+    this.sstList = sstList;
+  }
 }

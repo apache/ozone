@@ -205,7 +205,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM metrics.
    */
-  private static SCMMetrics metrics;
+  private SCMMetrics metrics = null;
 
   /*
    * RPC Endpoints exposed by SCM.
@@ -1301,14 +1301,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Initialize SCM metrics.
    */
-  public static void initMetrics() {
+  public void initMetrics() {
     metrics = SCMMetrics.create();
   }
 
   /**
    * Return SCM metrics instance.
    */
-  public static SCMMetrics getMetrics() {
+  public SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
 

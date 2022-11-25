@@ -122,7 +122,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
   }
 
   @Override
-  public SCMSnapshotProvider getSCMSnapshotProvider() {
+  public SCMDBSnapshotProvider getSCMSnapshotProvider() {
     return null;
   }
 

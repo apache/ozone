@@ -42,7 +42,7 @@ public interface SCMHAManager {
   /**
    * Returns SCM snapshot provider.
    */
-  SCMSnapshotProvider getSCMSnapshotProvider();
+  SCMDBSnapshotProvider getSCMSnapshotProvider();
 
   /**
    * Returns DB transaction buffer.

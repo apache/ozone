@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -530,32 +531,60 @@ public final class HddsServerUtil {
    *
    * @param checkpoint  checkpoint file
    * @param destination destination output stream.
+   * @param toExcludeList the file list
    * @throws IOException
    */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
+  public static List<String> writeDBCheckpointToStream(DBCheckpoint checkpoint,
+      OutputStream destination, List<String> toExcludeList)
       throws IOException {
+    try {
+      return writeCompressedStream(
+          checkpoint.getCheckpointLocation(), destination, toExcludeList);
+    } catch (IOException e) {
+      throw new IOException(
+          "Can't compress the checkpoint: " +
+              checkpoint.getCheckpointLocation(), e);
+    }
+  }
+
+  /**
+   * Write the files in the path to an output stream as a compressed file (tgz).
+   *
+   * @param fromPath    the source path of files to be compressed
+   * @param destination destination output stream.
+   * @param toExcludeList the file list
+   * @throws IOException
+   */
+  public static List<String> writeCompressedStream(Path fromPath,
+      OutputStream destination, List<String> toExcludeList) throws IOException {
+    toExcludeList = toExcludeList == null ? new ArrayList<>() : toExcludeList;
+    List<String> excluded = new ArrayList<>();
     try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
         .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination);
-        ArchiveOutputStream archiveOutputStream =
-            new TarArchiveOutputStream(gzippedOut);
-        Stream<Path> files =
-            Files.list(checkpoint.getCheckpointLocation())) {
-      for (Path path : files.collect(Collectors.toList())) {
-        if (path != null) {
-          Path fileName = path.getFileName();
-          if (fileName != null) {
-            includeFile(path.toFile(), fileName.toString(),
-                archiveOutputStream);
+            destination)) {
+      try (ArchiveOutputStream archiveOutputStream =
+               new TarArchiveOutputStream(gzippedOut)) {
+        try (Stream<Path> files = Files.list(fromPath)) {
+          for (Path path : files.collect(Collectors.toList())) {
+            if (path != null) {
+              Path fileNamePath = path.getFileName();
+              if (fileNamePath != null) {
+                String fileName = fileNamePath.toString();
+                if (!toExcludeList.contains(fileName)) {
+                  includeFile(path.toFile(), fileName, archiveOutputStream);
+                } else {
+                  excluded.add(fileName);
+                }
+              }
+            }
           }
         }
       }
     } catch (CompressorException e) {
       throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
+          "Can't compress the path: " + fromPath, e);
     }
+    return excluded;
   }
 
   private static void includeFile(File file, String entryName,

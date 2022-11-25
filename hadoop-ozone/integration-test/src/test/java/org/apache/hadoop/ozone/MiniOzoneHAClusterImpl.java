@@ -254,10 +254,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     scmhaService.removeInstance(scm);
   }
 
-  public StorageContainerManager restartStorageContainerManager(
-      StorageContainerManager scm, boolean waitForSCM)
-      throws IOException, TimeoutException,
-      InterruptedException, AuthenticationException {
+  public StorageContainerManager reInstantiateStorageContainerManager(
+      StorageContainerManager scm) throws IOException, AuthenticationException {
     LOG.info("Restarting SCM in cluster " + this.getClass());
     scmhaService.removeInstance(scm);
     OzoneConfiguration scmConf = scm.getConfiguration();
@@ -265,6 +263,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     scm.join();
     scm = HddsTestUtils.getScmSimple(scmConf, getSCMConfigurator());
     scmhaService.addInstance(scm, true);
+    return scm;
+  }
+
+  public StorageContainerManager restartStorageContainerManager(
+      StorageContainerManager scm, boolean waitForSCM)
+      throws IOException, TimeoutException,
+      InterruptedException, AuthenticationException {
+    scm = reInstantiateStorageContainerManager(scm);
     scm.start();
     if (waitForSCM) {
       waitForClusterToBeReady();

@@ -17,13 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMSnapshotProvider;
+import org.apache.hadoop.hdds.scm.ha.SCMDBSnapshotProvider;
 import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -40,17 +39,20 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
 import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Class to test install snapshot feature for SCM HA.
@@ -107,15 +109,15 @@ public class TestSCMInstallSnapshot {
         .build();
     Map<String, SCMNodeDetails> peerMap = new HashMap<>();
     peerMap.put(scmNodeDetails.getNodeId(), scmNodeDetails);
-    SCMSnapshotProvider provider =
+    SCMDBSnapshotProvider provider =
         scm.getScmHAManager().getSCMSnapshotProvider();
     provider.setPeerNodesMap(peerMap);
-    DBCheckpoint checkpoint =
-        provider.getSCMDBSnapshot(scmNodeDetails.getNodeId());
-    final File[] files = FileUtil.listFiles(provider.getScmSnapshotDir());
-    Assert.assertTrue(files[0].getName().startsWith(
-        OzoneConsts.SCM_DB_NAME + "-" + scmNodeDetails.getNodeId()));
-    return checkpoint;
+    DBCheckpoint dbCheckpoint = provider.downloadDBSnapshotFromLeader(
+        scmNodeDetails.getNodeId());
+    assertFalse(HAUtils.getExistingSstFiles(provider.getCandidateDir())
+        .isEmpty());
+    assertEquals(1, provider.getNumDownloaded());
+    return dbCheckpoint;
   }
 
   @Test
@@ -127,10 +129,10 @@ public class TestSCMInstallSnapshot {
         .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
             checkpoint.getCheckpointLocation().getFileName().toString(),
             new SCMDBDefinition());
-    // Hack the transaction index in the checkpoint so as to ensure the
-    // checkpointed transaction index is higher than when it was downloaded
+    // Hack the transaction index in the checkpoint to ensure the
+    // checkpoint transaction index is higher than when it was downloaded
     // from.
-    Assert.assertNotNull(db);
+    assertNotNull(db);
     HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
             .setCurrentTerm(10).setTransactionIndex(100).build());
@@ -141,9 +143,8 @@ public class TestSCMInstallSnapshot {
         scm.getPipelineManager().getPipelines().get(0).getId();
     scm.getScmMetadataStore().getPipelineTable().delete(pipelineID);
     scm.getContainerManager().deleteContainer(cid);
-    Assert.assertNull(
-        scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
-    Assert.assertFalse(scm.getContainerManager().containerExist(cid));
+    assertNull(scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
+    assertFalse(scm.getContainerManager().containerExist(cid));
 
     SCMStateMachine sm =
         scm.getScmHAManager().getRatisServer().getSCMStateMachine();
@@ -151,16 +152,16 @@ public class TestSCMInstallSnapshot {
     sm.setInstallingDBCheckpoint(checkpoint);
     sm.reinitialize();
 
-    Assert.assertNotNull(
+    assertNotNull(
         scm.getScmMetadataStore().getPipelineTable().get(pipelineID));
-    Assert.assertNotNull(
+    assertNotNull(
         scm.getScmMetadataStore().getContainerTable().get(cid));
-    Assert.assertTrue(scm.getPipelineManager().containsPipeline(pipelineID));
-    Assert.assertTrue(scm.getContainerManager().containerExist(cid));
-    Assert.assertEquals(100, scm.getScmMetadataStore().
+    assertTrue(scm.getPipelineManager().containsPipeline(pipelineID));
+    assertTrue(scm.getContainerManager().containerExist(cid));
+    assertEquals(100, scm.getScmMetadataStore().
         getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY)
         .getTransactionIndex());
-    Assert.assertEquals(100,
+    assertEquals(100,
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo()
             .getTermIndex().getIndex());
   }
