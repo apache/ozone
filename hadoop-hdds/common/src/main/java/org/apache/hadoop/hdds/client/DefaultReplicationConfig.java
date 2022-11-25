@@ -26,18 +26,21 @@ import java.util.Objects;
  */
 public class DefaultReplicationConfig {
 
-  private ReplicationType type;
+  private final ReplicationType type;
   private ReplicationFactor factor;
   private ECReplicationConfig ecReplicationConfig;
+  private final ReplicationConfig replicationConfig;
 
   public DefaultReplicationConfig(ReplicationType type,
       ReplicationFactor factor) {
+    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
     this.type = type;
     this.factor = factor;
     this.ecReplicationConfig = null;
   }
 
   public DefaultReplicationConfig(ReplicationConfig replicationConfig) {
+    this.replicationConfig = replicationConfig;
     this.type =
         ReplicationType.fromProto(replicationConfig.getReplicationType());
     if (replicationConfig instanceof ECReplicationConfig) {
@@ -50,6 +53,7 @@ public class DefaultReplicationConfig {
 
   public DefaultReplicationConfig(ReplicationType type,
       ECReplicationConfig ecReplicationConfig) {
+    this.replicationConfig = ecReplicationConfig;
     this.type = type;
     this.factor = null;
     this.ecReplicationConfig = ecReplicationConfig;
@@ -57,6 +61,7 @@ public class DefaultReplicationConfig {
 
   public DefaultReplicationConfig(ReplicationType type,
       ReplicationFactor factor, ECReplicationConfig ecReplicationConfig) {
+    this.replicationConfig = ecReplicationConfig;
     this.type = type;
     this.factor = factor;
     this.ecReplicationConfig = ecReplicationConfig;
@@ -67,11 +72,12 @@ public class DefaultReplicationConfig {
           defaultReplicationConfig) {
     this.type = ReplicationType.fromProto(defaultReplicationConfig.getType());
     if (defaultReplicationConfig.hasEcReplicationConfig()) {
-      this.ecReplicationConfig = new ECReplicationConfig(
+      this.replicationConfig = this.ecReplicationConfig = new ECReplicationConfig(
           defaultReplicationConfig.getEcReplicationConfig());
     } else {
       this.factor =
           ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
+      this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
     }
   }
 
@@ -90,6 +96,10 @@ public class DefaultReplicationConfig {
 
   public ECReplicationConfig getEcReplicationConfig() {
     return this.ecReplicationConfig;
+  }
+
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public int getRequiredNodes() {
