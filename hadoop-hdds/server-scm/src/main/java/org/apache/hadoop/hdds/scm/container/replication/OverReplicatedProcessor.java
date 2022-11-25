@@ -19,12 +19,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,17 +36,12 @@ public class OverReplicatedProcessor implements Runnable {
   private static final Logger LOG = LoggerFactory
       .getLogger(OverReplicatedProcessor.class);
   private final ReplicationManager replicationManager;
-  private final ContainerReplicaPendingOps pendingOps;
-  private final EventPublisher eventPublisher;
   private volatile boolean runImmediately = false;
   private final long intervalInMillis;
 
   public OverReplicatedProcessor(ReplicationManager replicationManager,
-      ContainerReplicaPendingOps pendingOps,
-      EventPublisher eventPublisher, long intervalInMillis) {
+      long intervalInMillis) {
     this.replicationManager = replicationManager;
-    this.pendingOps = pendingOps;
-    this.eventPublisher = eventPublisher;
     this.intervalInMillis = intervalInMillis;
   }
 
@@ -97,30 +86,8 @@ public class OverReplicatedProcessor implements Runnable {
         .processOverReplicatedContainer(overRep);
     for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
       SCMCommand<?> scmCmd = cmd.getValue();
-      scmCmd.setTerm(replicationManager.getScmTerm());
-      final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(cmd.getKey().getUuid(), scmCmd);
-      eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-      adjustPendingOps(overRep.getContainerInfo().containerID(),
-          scmCmd, cmd.getKey());
-    }
-  }
-
-  private void adjustPendingOps(ContainerID containerID, SCMCommand<?> cmd,
-      DatanodeDetails targetDatanode)
-      throws IOException {
-    if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.deleteContainerCommand) {
-      DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
-      pendingOps.scheduleDeleteReplica(containerID, targetDatanode,
-          rcc.getReplicaIndex());
-      if (rcc.getReplicaIndex() > 0) {
-        replicationManager.getMetrics().incrEcDeletionCmdsSentTotal();
-      } else if (rcc.getReplicaIndex() == 0) {
-        replicationManager.getMetrics().incrNumDeletionCmdsSent();
-      }
-    } else {
-      throw new IOException("Unexpected command type " + cmd.getType());
+      replicationManager.sendDatanodeCommand(scmCmd, overRep.getContainerInfo(),
+          cmd.getKey());
     }
   }
 

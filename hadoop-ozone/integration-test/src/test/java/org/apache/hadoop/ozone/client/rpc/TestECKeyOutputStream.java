@@ -60,7 +60,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -98,7 +97,6 @@ public class TestECKeyOutputStream {
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     // If SCM detects dead node too quickly, then container would be moved to
     // closed state and all in progress writes will get exception. To avoid
     // that, we are just keeping higher timeout and none of the tests depending
