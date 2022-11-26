@@ -127,8 +127,10 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    *
    * @param certType - CertType.
    * @return Iterator<X509Certificate>
+   * @throws IOException on failure.
    */
-  TableIterator getAllCerts(CertificateStore.CertType certType);
+  TableIterator getAllCerts(CertificateStore.CertType certType)
+      throws IOException;
 
   /**
    * A Table that maintains all the pipeline information.

@@ -378,6 +378,7 @@ message ChunkInfo {
   required uint64 len = 3;
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
+  optional bytes stripeChecksum = 6;
 }
 
 message ChunkInfoList {

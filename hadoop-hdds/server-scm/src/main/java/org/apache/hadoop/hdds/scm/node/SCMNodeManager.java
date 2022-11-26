@@ -698,10 +698,12 @@ public class SCMNodeManager implements NodeManager {
    *
    * @param datanodeDetails
    * @param commandQueueReportProto
+   * @param commandsToBeSent
    */
   @Override
   public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandQueueReportProto) {
+      CommandQueueReportProto commandQueueReportProto,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     LOG.debug("Processing Command Queue Report from [datanode={}]",
         datanodeDetails.getHostName());
     if (LOG.isTraceEnabled()) {
@@ -712,8 +714,11 @@ public class SCMNodeManager implements NodeManager {
     try {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
       if (commandQueueReportProto != null) {
-        datanodeInfo.setCommandCounts(commandQueueReportProto);
+        datanodeInfo.setCommandCounts(commandQueueReportProto,
+            commandsToBeSent);
         metrics.incNumNodeCommandQueueReportProcessed();
+        scmNodeEventPublisher.fireEvent(
+            SCMEvents.DATANODE_COMMAND_COUNT_UPDATED, datanodeDetails);
       }
     } catch (NodeNotFoundException e) {
       metrics.incNumNodeCommandQueueReportProcessingFailed();
@@ -729,10 +734,23 @@ public class SCMNodeManager implements NodeManager {
    * @param cmdType
    * @return The queued count or -1 if no data has been received from the DN.
    */
+  @Override
   public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException {
     DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
     return datanodeInfo.getCommandCount(cmdType);
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
   }
 
   /**

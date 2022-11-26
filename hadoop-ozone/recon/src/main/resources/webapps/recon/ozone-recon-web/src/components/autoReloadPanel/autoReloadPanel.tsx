@@ -30,7 +30,9 @@ interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   lastUpdatedOMDBDelta: number;
   lastUpdatedOMDBFull: number;
   isLoading: boolean;
+  omStatus: string;
   togglePolling: (isEnabled: boolean) => void;
+  omSyncLoad: () => void;
 }
 
 class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
@@ -40,7 +42,8 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   };
 
   render() {
-    const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading} = this.props;
+    const {onReload, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, isLoading, omSyncLoad, omStatus} = this.props;
+    const autoReloadEnabled = sessionStorage.getItem('autoReloadEnabled') === 'false' ? false : true;
     
      const lastRefreshedText = lastRefreshed === 0 || lastRefreshed === undefined ? 'NA' :
       (
@@ -49,9 +52,12 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
         >
           {moment(lastRefreshed).format('LT')}
         </Tooltip>
-      );
-
-      const omDBDeltaFullToolTip = <span>
+       );
+    
+     const omSyncStatusDisplay = omStatus === '' ? '' : omStatus ? <div>OM DB update is successfully triggered.</div> : <div>OM DB update is already running.</div>;
+    
+     const omDBDeltaFullToolTip = <span>
+          {omSyncStatusDisplay}
           {'Delta Update'}: {moment(lastUpdatedOMDBDelta).fromNow()}, {moment(lastUpdatedOMDBDelta).format('LT')}
           <br/>
           {'Full Update'}: {moment(lastUpdatedOMDBFull).fromNow()}, {moment(lastUpdatedOMDBFull).format('LT')}
@@ -72,14 +78,14 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
      (
       <>
       &nbsp; | OM DB updated at {lastUpdatedDeltaFullToolTip}
-      &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} />
+      &nbsp;<Button shape='circle' icon='play-circle' size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true } />
       </>
      );
 
     return (
       <div className='auto-reload-panel'>
         Auto Refresh
-        &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp;<Switch defaultChecked={autoReloadEnabled} size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
         &nbsp; | Refreshed at {lastRefreshedText}
         &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
         {lastUpdatedDeltaFullText}

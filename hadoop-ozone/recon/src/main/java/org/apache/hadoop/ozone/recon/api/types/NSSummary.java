@@ -24,6 +24,8 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Arrays;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
+
 /**
  * Class to encapsulate namespace metadata summaries from OM.
  */
@@ -90,7 +92,7 @@ public class NSSummary {
   }
 
   public void setDirName(String dirName) {
-    this.dirName = dirName;
+    this.dirName = removeTrailingSlashIfNeeded(dirName);
   }
 
   public void addChildDir(long childId) {

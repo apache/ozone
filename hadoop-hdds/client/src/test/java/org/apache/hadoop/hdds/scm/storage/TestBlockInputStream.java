@@ -29,19 +29,20 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -52,11 +53,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -68,7 +70,6 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link BlockInputStream}'s functionality.
  */
-@RunWith(MockitoJUnitRunner.class)
 public class TestBlockInputStream {
 
   private static final int CHUNK_SIZE = 100;
@@ -80,11 +81,12 @@ public class TestBlockInputStream {
   private List<ChunkInfo> chunks;
   private Map<String, byte[]> chunkDataMap;
 
-  @Mock
   private Function<BlockID, Pipeline> refreshPipeline;
 
-  @Before
+  @BeforeEach
+  @SuppressWarnings("unchecked")
   public void setup() throws Exception {
+    refreshPipeline = Mockito.mock(Function.class);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
@@ -280,35 +282,9 @@ public class TestBlockInputStream {
     }
   }
 
-  @Test
-  public void testGetBlockInfoFailWithIOException() throws Exception {
-    GenericTestUtils.setLogLevel(BlockInputStream.getLog(), Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(BlockInputStream.class));
-    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
-    AtomicBoolean isRefreshed = new AtomicBoolean();
-    createChunkList(5);
-    BlockInputStream blockInputStreamWithRetry =
-        new DummyBlockInputStreamWithRetry(blockID, blockSize,
-            MockPipeline.createSingleNodePipeline(), null,
-            false, null, chunks, chunkDataMap, isRefreshed,
-            new IOException("unavailable"));
-    try {
-      Assert.assertFalse(isRefreshed.get());
-      byte[] b = new byte[200];
-      blockInputStreamWithRetry.read(b, 0, 200);
-      // As in case of IOException we do not do do refresh.
-      Assert.assertFalse(isRefreshed.get());
-      Assert.assertTrue(logCapturer.getOutput().contains(
-          "Retry to get chunk info fail"));
-    } finally {
-      blockInputStreamWithRetry.close();
-    }
-  }
-
-  @Test
-  public void testRefreshOnReadFailure() throws Exception {
+  @ParameterizedTest
+  @MethodSource("exceptionsTriggersRefresh")
+  public void testRefreshOnReadFailure(IOException ex) throws Exception {
     // GIVEN
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
@@ -317,7 +293,7 @@ public class TestBlockInputStream {
     final int len = 200;
     final ChunkInputStream stream = mock(ChunkInputStream.class);
     when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(new StorageContainerException("test", CONTAINER_NOT_FOUND))
+        .thenThrow(ex)
         .thenReturn(len);
     when(stream.getRemaining())
         .thenReturn((long) len);
@@ -347,47 +323,17 @@ public class TestBlockInputStream {
     }
   }
 
-  @Test
-  public void testRefreshExitsIfPipelineHasSameNodes() throws Exception {
-    // GIVEN
-    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-
-    final int len = 200;
-    final ChunkInputStream stream = mock(ChunkInputStream.class);
-    when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(new StorageContainerException("test", CONTAINER_UNHEALTHY));
-    when(stream.getRemaining())
-        .thenReturn((long) len);
-
-    when(refreshPipeline.apply(blockID))
-        .thenAnswer(invocation -> samePipelineWithNewId(pipeline));
-
-    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
-        pipeline, null, false, null, refreshPipeline, chunks, null) {
-      @Override
-      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-        return stream;
-      }
-    };
-
-    try {
-      subject.initialize();
-
-      // WHEN
-      byte[] b = new byte[len];
-      LambdaTestUtils.intercept(StorageContainerException.class,
-          () -> subject.read(b, 0, len));
-
-      // THEN
-      verify(refreshPipeline).apply(blockID);
-    } finally {
-      subject.close();
-    }
+  private static Stream<Arguments> exceptionsNotTriggerRefresh() {
+    return Stream.of(
+        Arguments.of(new SCMSecurityException("Security problem")),
+        Arguments.of(new OzoneChecksumException("checksum missing")),
+        Arguments.of(new IOException("Some random exception."))
+    );
   }
-
-  @Test
-  public void testReadNotRetriedOnOtherException() throws Exception {
+  @ParameterizedTest
+  @MethodSource("exceptionsNotTriggerRefresh")
+  public void testReadNotRetriedOnOtherException(IOException ex)
+      throws Exception {
     // GIVEN
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
@@ -395,7 +341,7 @@ public class TestBlockInputStream {
     final int len = 200;
     final ChunkInputStream stream = mock(ChunkInputStream.class);
     when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(new OzoneChecksumException("checksum missing"));
+        .thenThrow(ex);
     when(stream.getRemaining())
         .thenReturn((long) len);
 
@@ -412,9 +358,8 @@ public class TestBlockInputStream {
 
       // WHEN
       byte[] b = new byte[len];
-      LambdaTestUtils.intercept(OzoneChecksumException.class,
+      Assertions.assertThrows(ex.getClass(),
           () -> subject.read(b, 0, len));
-
       // THEN
       verify(refreshPipeline, never()).apply(blockID);
     } finally {
@@ -428,8 +373,10 @@ public class TestBlockInputStream {
     return MockPipeline.createPipeline(reverseOrder);
   }
 
-  @Test
-  public void testRefreshOnReadFailureAfterUnbuffer() throws Exception {
+  @ParameterizedTest
+  @MethodSource("exceptionsTriggersRefresh")
+  public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)
+      throws Exception {
     // GIVEN
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
@@ -442,7 +389,7 @@ public class TestBlockInputStream {
     final int len = 200;
     final ChunkInputStream stream = mock(ChunkInputStream.class);
     when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(new StorageContainerException("test", CONTAINER_NOT_FOUND))
+        .thenThrow(ex)
         .thenReturn(len);
     when(stream.getRemaining())
         .thenReturn((long) len);
@@ -480,5 +427,13 @@ public class TestBlockInputStream {
     } finally {
       subject.close();
     }
+  }
+
+  private static Stream<Arguments> exceptionsTriggersRefresh() {
+    return Stream.of(
+        Arguments.of(new StorageContainerException(CONTAINER_NOT_FOUND)),
+        Arguments.of(new IOException(new ExecutionException(
+            new StatusException(Status.UNAVAILABLE))))
+    );
   }
 }

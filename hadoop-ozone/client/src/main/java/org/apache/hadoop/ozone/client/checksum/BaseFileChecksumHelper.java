@@ -21,7 +21,6 @@ import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -138,6 +137,10 @@ public abstract class BaseFileChecksumHelper {
     this.remaining = remaining;
   }
 
+  protected OmKeyInfo getKeyInfo() {
+    return this.keyInfo;
+  }
+
   int getBytesPerCRC() {
     return bytesPerCRC;
   }
@@ -165,11 +168,6 @@ public abstract class BaseFileChecksumHelper {
               .setSortDatanodesInPipeline(true)
               .setLatestVersionLocation(true).build();
       keyInfo = ozoneManagerClient.lookupKey(keyArgs);
-    }
-
-    if (keyInfo.getReplicationConfig()
-        .getReplicationType() == HddsProtos.ReplicationType.EC) {
-      return;
     }
 
     if (keyInfo.getFileChecksum() != null &&

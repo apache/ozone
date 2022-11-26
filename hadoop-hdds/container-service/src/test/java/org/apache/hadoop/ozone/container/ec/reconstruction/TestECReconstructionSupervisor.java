@@ -42,7 +42,8 @@ public class TestECReconstructionSupervisor {
     final CountDownLatch holdProcessing = new CountDownLatch(1);
     ECReconstructionSupervisor supervisor =
         new ECReconstructionSupervisor(null, null, 5,
-            new ECReconstructionCoordinator(new OzoneConfiguration(), null) {
+            new ECReconstructionCoordinator(new OzoneConfiguration(), null,
+                ECReconstructionMetrics.create()) {
               @Override
               public void reconstructECContainerGroup(long containerID,
                   ECReplicationConfig repConfig,
