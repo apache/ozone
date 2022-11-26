@@ -193,31 +193,6 @@ public final class OMPBHelper {
     return defaultReplicationConfigObj;
   }
 
-  public static HddsProtos.DefaultReplicationConfig convert(
-      DefaultReplicationConfig defaultReplicationConfig) {
-    if (defaultReplicationConfig == null) {
-      throw new IllegalArgumentException(
-          "Invalid argument: default replication config" + " is null");
-    }
-
-    final HddsProtos.DefaultReplicationConfig.Builder builder =
-        HddsProtos.DefaultReplicationConfig.newBuilder();
-    builder.setType(ReplicationType.toProto(
-        defaultReplicationConfig.getType()));
-
-    if (defaultReplicationConfig.getFactor() != null) {
-      builder.setFactor(ReplicationFactor.toProto(
-          defaultReplicationConfig.getFactor()));
-    }
-
-    if (defaultReplicationConfig.getEcReplicationConfig() != null) {
-      builder.setEcReplicationConfig(
-          defaultReplicationConfig.getEcReplicationConfig().toProto());
-    }
-
-    return builder.build();
-  }
-
   public static FileChecksum convert(FileChecksumProto proto)
       throws IOException {
     if (proto == null) {
