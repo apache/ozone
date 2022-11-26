@@ -102,13 +102,6 @@ public class DefaultReplicationConfig {
     return replicationConfig;
   }
 
-  public int getRequiredNodes() {
-    if (this.type == ReplicationType.EC) {
-      return ecReplicationConfig.getRequiredNodes();
-    }
-    return this.factor.getValue();
-  }
-
   public HddsProtos.DefaultReplicationConfig toProto() {
     final HddsProtos.DefaultReplicationConfig.Builder builder =
         HddsProtos.DefaultReplicationConfig.newBuilder()
