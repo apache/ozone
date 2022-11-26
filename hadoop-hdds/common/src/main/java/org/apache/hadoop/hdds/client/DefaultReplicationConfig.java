@@ -27,19 +27,19 @@ import java.util.Objects;
 public class DefaultReplicationConfig {
 
   private final ReplicationType type;
-  private ReplicationFactor factor;
-  private ECReplicationConfig ecReplicationConfig;
+  private final ReplicationFactor factor;
+  private final ECReplicationConfig ecReplicationConfig;
   private final ReplicationConfig replicationConfig;
 
   public DefaultReplicationConfig(ReplicationConfig replicationConfig) {
     this.replicationConfig = replicationConfig;
-    this.type =
-        ReplicationType.fromProto(replicationConfig.getReplicationType());
+    type = ReplicationType.fromProto(replicationConfig.getReplicationType());
     if (replicationConfig instanceof ECReplicationConfig) {
-      this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
+      ecReplicationConfig = (ECReplicationConfig) replicationConfig;
+      factor = null;
     } else {
-      this.factor =
-          ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
+      factor = ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
+      ecReplicationConfig = null;
     }
   }
 
@@ -51,10 +51,12 @@ public class DefaultReplicationConfig {
       ecReplicationConfig = new ECReplicationConfig(
           defaultReplicationConfig.getEcReplicationConfig());
       replicationConfig = ecReplicationConfig;
+      factor = null;
     } else {
       factor =
           ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
       replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
+      ecReplicationConfig = null;
     }
   }
 
