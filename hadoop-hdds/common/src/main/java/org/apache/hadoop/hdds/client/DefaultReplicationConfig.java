@@ -62,16 +62,8 @@ public class DefaultReplicationConfig {
     return this.type;
   }
 
-  public ReplicationFactor getFactor() {
-    return this.factor;
-  }
-
   public DefaultReplicationConfig copy() {
     return new DefaultReplicationConfig(replicationConfig);
-  }
-
-  public ECReplicationConfig getEcReplicationConfig() {
-    return this.ecReplicationConfig;
   }
 
   public ReplicationConfig getReplicationConfig() {
@@ -100,14 +92,17 @@ public class DefaultReplicationConfig {
       return false;
     }
     DefaultReplicationConfig that = (DefaultReplicationConfig) o;
-    return Objects.equals(type, that.type) && Objects
-        .equals(factor, that.factor) && Objects
-        .equals(ecReplicationConfig, that.ecReplicationConfig);
+    return Objects.equals(replicationConfig, that.replicationConfig);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, factor, ecReplicationConfig);
+    return Objects.hash(replicationConfig);
+  }
+
+  @Override
+  public String toString() {
+    return replicationConfig.toString();
   }
 }
 

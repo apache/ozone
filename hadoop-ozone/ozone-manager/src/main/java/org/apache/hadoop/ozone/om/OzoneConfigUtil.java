@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -106,25 +104,12 @@ public final class OzoneConfigUtil {
       // Client passed the replication config, so let's use it.
       replicationConfig = ReplicationConfig
           .fromProto(clientType, clientFactor, clientECReplicationConfig);
-    } else {
+    } else if (bucketDefaultReplicationConfig != null) {
       // type is NONE, so, let's look for the bucket defaults.
-      if (bucketDefaultReplicationConfig != null) {
-        boolean hasECReplicationConfig = bucketDefaultReplicationConfig
-            .getType() == ReplicationType.EC && bucketDefaultReplicationConfig
-            .getEcReplicationConfig() != null;
-        // Since Bucket defaults are available, let's inherit
-        replicationConfig = ReplicationConfig.fromProto(
-            ReplicationType.toProto(bucketDefaultReplicationConfig.getType()),
-            ReplicationFactor
-                .toProto(bucketDefaultReplicationConfig.getFactor()),
-            hasECReplicationConfig ?
-                bucketDefaultReplicationConfig.getEcReplicationConfig()
-                    .toProto() :
-                null);
-      } else {
-        // if bucket defaults also not available, then use server defaults.
-        replicationConfig = omDefaultReplicationConfig;
-      }
+      replicationConfig = bucketDefaultReplicationConfig.getReplicationConfig();
+    } else {
+      // if bucket defaults also not available, then use server defaults.
+      replicationConfig = omDefaultReplicationConfig;
     }
     return replicationConfig;
   }
