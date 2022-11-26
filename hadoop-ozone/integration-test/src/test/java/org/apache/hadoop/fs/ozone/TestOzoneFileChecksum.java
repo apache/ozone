@@ -132,7 +132,7 @@ public class TestOzoneFileChecksum {
         .setStorageType(StorageType.DISK)
         .setBucketLayout(BucketLayout.LEGACY)
         .setDefaultReplicationConfig(
-            new DefaultReplicationConfig(ReplicationType.EC,
+            new DefaultReplicationConfig(
                 new ECReplicationConfig("RS-3-2-1024k")))
         .build();
 

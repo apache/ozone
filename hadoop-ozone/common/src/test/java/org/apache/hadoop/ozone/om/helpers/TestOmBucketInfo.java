@@ -145,7 +145,7 @@ public class TestOmBucketInfo {
             "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
             OzoneAcl.AclScope.ACCESS)))
         .setDefaultReplicationConfig(
-            new DefaultReplicationConfig(ReplicationType.EC,
+            new DefaultReplicationConfig(
                 new ECReplicationConfig(3, 2))).build();
     protobuf = omBucketInfo.getProtobuf();
 

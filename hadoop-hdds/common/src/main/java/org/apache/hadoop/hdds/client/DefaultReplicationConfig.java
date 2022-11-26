@@ -31,14 +31,6 @@ public class DefaultReplicationConfig {
   private ECReplicationConfig ecReplicationConfig;
   private final ReplicationConfig replicationConfig;
 
-  public DefaultReplicationConfig(ReplicationType type,
-      ReplicationFactor factor) {
-    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
-    this.type = type;
-    this.factor = factor;
-    this.ecReplicationConfig = null;
-  }
-
   public DefaultReplicationConfig(ReplicationConfig replicationConfig) {
     this.replicationConfig = replicationConfig;
     this.type =
@@ -51,33 +43,18 @@ public class DefaultReplicationConfig {
     }
   }
 
-  public DefaultReplicationConfig(ReplicationType type,
-      ECReplicationConfig ecReplicationConfig) {
-    this.replicationConfig = ecReplicationConfig;
-    this.type = type;
-    this.factor = null;
-    this.ecReplicationConfig = ecReplicationConfig;
-  }
-
-  public DefaultReplicationConfig(ReplicationType type,
-      ReplicationFactor factor, ECReplicationConfig ecReplicationConfig) {
-    this.replicationConfig = ecReplicationConfig;
-    this.type = type;
-    this.factor = factor;
-    this.ecReplicationConfig = ecReplicationConfig;
-  }
-
   public DefaultReplicationConfig(
       org.apache.hadoop.hdds.protocol.proto.HddsProtos.DefaultReplicationConfig
           defaultReplicationConfig) {
-    this.type = ReplicationType.fromProto(defaultReplicationConfig.getType());
+    type = ReplicationType.fromProto(defaultReplicationConfig.getType());
     if (defaultReplicationConfig.hasEcReplicationConfig()) {
-      this.replicationConfig = this.ecReplicationConfig = new ECReplicationConfig(
+      ecReplicationConfig = new ECReplicationConfig(
           defaultReplicationConfig.getEcReplicationConfig());
+      replicationConfig = ecReplicationConfig;
     } else {
-      this.factor =
+      factor =
           ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
-      this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
+      replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
     }
   }
 
@@ -90,8 +67,7 @@ public class DefaultReplicationConfig {
   }
 
   public DefaultReplicationConfig copy() {
-    return new DefaultReplicationConfig(this.type, this.factor,
-        this.ecReplicationConfig);
+    return new DefaultReplicationConfig(replicationConfig);
   }
 
   public ECReplicationConfig getEcReplicationConfig() {

@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -93,8 +92,8 @@ public class TestOzoneConfigUtil {
   @Test
   public void testResolveClientSideRepConfigWhenBucketHasEC3() {
     DefaultReplicationConfig ratisBucketDefaults =
-        new DefaultReplicationConfig(ReplicationType.RATIS,
-            ReplicationFactor.THREE);
+        new DefaultReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE));
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(noneType, zeroFactor,
             clientECReplicationConfig, ratisBucketDefaults,

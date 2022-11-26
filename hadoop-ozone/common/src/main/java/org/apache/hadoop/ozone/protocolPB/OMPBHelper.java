@@ -28,9 +28,6 @@ import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -173,24 +170,10 @@ public final class OMPBHelper {
       HddsProtos.DefaultReplicationConfig defaultReplicationConfig) {
     if (defaultReplicationConfig == null) {
       throw new IllegalArgumentException(
-          "Invalid argument: default replication config" + " is null");
+          "Invalid argument: default replication config is null");
     }
 
-    final ReplicationType type =
-        ReplicationType.fromProto(defaultReplicationConfig.getType());
-    DefaultReplicationConfig defaultReplicationConfigObj = null;
-    switch (type) {
-    case EC:
-      defaultReplicationConfigObj = new DefaultReplicationConfig(type,
-          new ECReplicationConfig(
-              defaultReplicationConfig.getEcReplicationConfig()));
-      break;
-    default:
-      final ReplicationFactor factor =
-          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
-      defaultReplicationConfigObj = new DefaultReplicationConfig(type, factor);
-    }
-    return defaultReplicationConfigObj;
+    return new DefaultReplicationConfig(defaultReplicationConfig);
   }
 
   public static FileChecksum convert(FileChecksumProto proto)

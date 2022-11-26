@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -216,7 +215,7 @@ public class TestOzoneECClient {
   public void testCreateBucketWithDefaultReplicationConfig()
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
 
@@ -285,7 +284,7 @@ public class TestOzoneECClient {
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     final OzoneBucket bucket = writeIntoECKey(offset, numChunks * chunkSize,
-            inputData, keyName, new DefaultReplicationConfig(ReplicationType.EC,
+            inputData, keyName, new DefaultReplicationConfig(
                     new ECReplicationConfig(dataBlocks, parityBlocks,
                             ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneKey key = bucket.getKey(keyName);
@@ -319,7 +318,7 @@ public class TestOzoneECClient {
         Byte.parseByte("1"));
 
     writeIntoECKey(firstSmallChunk, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneManagerProtocolProtos.KeyLocationList blockList =
@@ -446,7 +445,7 @@ public class TestOzoneECClient {
     Arrays.fill(inputData, (numFullChunks * chunkSize),
         ((numFullChunks * chunkSize)) + partialChunkLen - 1, (byte) 1);
     final OzoneBucket bucket = writeIntoECKey(inputData, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneKey key = bucket.getKey(keyName);
@@ -457,7 +456,7 @@ public class TestOzoneECClient {
   public void testCommitKeyInfo()
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
 
