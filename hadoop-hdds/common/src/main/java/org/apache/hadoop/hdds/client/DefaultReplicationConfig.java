@@ -71,7 +71,7 @@ public class DefaultReplicationConfig {
   public HddsProtos.DefaultReplicationConfig toProto() {
     final HddsProtos.DefaultReplicationConfig.Builder builder =
         HddsProtos.DefaultReplicationConfig.newBuilder()
-            .setType(ReplicationType.toProto(this.type));
+            .setType(replicationConfig.getReplicationType());
     if (this.factor != null) {
       builder.setFactor(ReplicationFactor.toProto(this.factor));
     }
