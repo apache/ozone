@@ -56,16 +56,15 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull long volumeId, @Nonnull long bucketId,
       @Nonnull OmDirectoryInfo dirInfo,
-      @Nonnull List<OmDirectoryInfo> pDirInfos,
-      @Nonnull OmBucketInfo bucketInfo, @Nonnull Result result,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
+      @Nonnull BucketLayout bucketLayout, @Nonnull OmBucketInfo bucketInfo) {
     super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
-    this.bucketInfo = bucketInfo;
     this.result = result;
     this.volumeId = volumeId;
     this.bucketId = bucketId;
+    this.bucketInfo = bucketInfo;
   }
 
   /**

@@ -1178,11 +1178,10 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testBucketUsedNamespace(BucketLayout layout) throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneVolume volume = null;
     String value = "sample value";
     int valueLength = value.getBytes(UTF_8).length;
     store.createVolume(volumeName);
-    volume = store.getVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setBucketLayout(layout)
         .build();

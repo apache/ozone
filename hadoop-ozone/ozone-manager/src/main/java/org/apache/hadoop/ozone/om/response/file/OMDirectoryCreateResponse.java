@@ -54,13 +54,13 @@ public class OMDirectoryCreateResponse extends OmKeyResponse {
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo dirKeyInfo,
-      @Nonnull List<OmKeyInfo> parentKeyInfos, @Nonnull OmBucketInfo bucketInfo,
-      @Nonnull Result result, @Nonnull BucketLayout bucketLayout) {
+      @Nonnull List<OmKeyInfo> parentKeyInfos, @Nonnull Result result,
+      @Nonnull BucketLayout bucketLayout, @Nonnull OmBucketInfo bucketInfo) {
     super(omResponse, bucketLayout);
     this.dirKeyInfo = dirKeyInfo;
     this.parentKeyInfos = parentKeyInfos;
-    this.bucketInfo = bucketInfo;
     this.result = result;
+    this.bucketInfo = bucketInfo;
   }
 
   /**

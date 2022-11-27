@@ -98,9 +98,9 @@ public class TestOMDirectoryCreateResponseWithFSO {
 
     OMDirectoryCreateResponseWithFSO omDirectoryCreateResponseWithFSO =
         new OMDirectoryCreateResponseWithFSO(omResponse, volumeId, bucketId,
-                omDirInfo, new ArrayList<>(), omBucketInfo,
+                omDirInfo, new ArrayList<>(),
                 OMDirectoryCreateRequestWithFSO.Result.SUCCESS,
-                BucketLayout.FILE_SYSTEM_OPTIMIZED);
+                BucketLayout.FILE_SYSTEM_OPTIMIZED, omBucketInfo);
 
     omDirectoryCreateResponseWithFSO
         .addToDBBatch(omMetadataManager, batchOperation);
