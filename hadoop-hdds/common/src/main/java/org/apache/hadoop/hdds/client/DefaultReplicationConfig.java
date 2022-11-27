@@ -43,21 +43,17 @@ public class DefaultReplicationConfig {
     }
   }
 
-  public DefaultReplicationConfig(
-      org.apache.hadoop.hdds.protocol.proto.HddsProtos.DefaultReplicationConfig
-          defaultReplicationConfig) {
-    type = ReplicationType.fromProto(defaultReplicationConfig.getType());
-    if (defaultReplicationConfig.hasEcReplicationConfig()) {
-      ecReplicationConfig = new ECReplicationConfig(
-          defaultReplicationConfig.getEcReplicationConfig());
-      replicationConfig = ecReplicationConfig;
-      factor = null;
-    } else {
-      factor =
-          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
-      replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
-      ecReplicationConfig = null;
+  public static DefaultReplicationConfig fromProto(
+      HddsProtos.DefaultReplicationConfig proto) {
+    if (proto == null) {
+      throw new IllegalArgumentException(
+          "Invalid argument: default replication config is null");
     }
+    ReplicationConfig config = proto.hasEcReplicationConfig()
+        ? new ECReplicationConfig(proto.getEcReplicationConfig())
+        : ReplicationConfig.fromProtoTypeAndFactor(
+            proto.getType(), proto.getFactor());
+    return new DefaultReplicationConfig(config);
   }
 
   public ReplicationType getType() {

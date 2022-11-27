@@ -668,7 +668,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (bucketInfo.hasDefaultReplicationConfig()) {
       obib.setDefaultReplicationConfig(
-          OMPBHelper.convert(bucketInfo.getDefaultReplicationConfig()));
+          DefaultReplicationConfig.fromProto(
+              bucketInfo.getDefaultReplicationConfig()));
     }
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());

@@ -27,8 +27,6 @@ import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -164,16 +162,6 @@ public final class OMPBHelper {
     String keyName = proto.getKeyName();
     return new FileEncryptionInfo(suite, version, key, iv, keyName,
         ezKeyVersionName);
-  }
-
-  public static DefaultReplicationConfig convert(
-      HddsProtos.DefaultReplicationConfig defaultReplicationConfig) {
-    if (defaultReplicationConfig == null) {
-      throw new IllegalArgumentException(
-          "Invalid argument: default replication config is null");
-    }
-
-    return new DefaultReplicationConfig(defaultReplicationConfig);
   }
 
   public static FileChecksum convert(FileChecksumProto proto)
