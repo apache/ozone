@@ -26,19 +26,14 @@ import java.util.Objects;
  */
 public class DefaultReplicationConfig {
 
-  private final ReplicationType type;
-  private final ReplicationFactor factor;
   private final ECReplicationConfig ecReplicationConfig;
   private final ReplicationConfig replicationConfig;
 
   public DefaultReplicationConfig(ReplicationConfig replicationConfig) {
     this.replicationConfig = replicationConfig;
-    type = ReplicationType.fromProto(replicationConfig.getReplicationType());
     if (replicationConfig instanceof ECReplicationConfig) {
       ecReplicationConfig = (ECReplicationConfig) replicationConfig;
-      factor = null;
     } else {
-      factor = ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
       ecReplicationConfig = null;
     }
   }
@@ -57,7 +52,7 @@ public class DefaultReplicationConfig {
   }
 
   public ReplicationType getType() {
-    return this.type;
+    return ReplicationType.fromProto(replicationConfig.getReplicationType());
   }
 
   public DefaultReplicationConfig copy() {
@@ -72,11 +67,12 @@ public class DefaultReplicationConfig {
     final HddsProtos.DefaultReplicationConfig.Builder builder =
         HddsProtos.DefaultReplicationConfig.newBuilder()
             .setType(replicationConfig.getReplicationType());
-    if (this.factor != null) {
-      builder.setFactor(ReplicationFactor.toProto(this.factor));
-    }
     if (this.ecReplicationConfig != null) {
       builder.setEcReplicationConfig(this.ecReplicationConfig.toProto());
+    } else {
+      ReplicationFactor factor =
+          ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
+      builder.setFactor(factor.toProto());
     }
     return builder.build();
   }
