@@ -309,7 +309,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     BucketArgs bucketArgs = OmBucketArgs.newBuilder()
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    EC, new ECReplicationConfig(3, 2)))
+                    new ECReplicationConfig(3, 2)))
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
             .setIsVersionEnabled(true)
