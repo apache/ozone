@@ -531,7 +531,7 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @Test
-  public void testPipeLineProviderRackScatter() throws SCMException {
+  public void testPipelineProviderRackScatter() throws SCMException {
     setup(3, 1);
     List<DatanodeDetails> usedDns = new ArrayList<>();
     List<DatanodeDetails> excludedDns = new ArrayList<>();
@@ -547,7 +547,7 @@ public class TestSCMContainerPlacementRackScatter {
   // 3 nodes required and 2 racks placing 2 in one 1 in another.  When
   // only 1 rack placing all nodes in same rack.
   @Test
-  public void testPipeLineProviderRackScatterFallback() throws SCMException {
+  public void testPipelineProviderRackScatterFallback() throws SCMException {
     setup(3, 2);
     List<DatanodeDetails> usedDns = new ArrayList<>();
     List<DatanodeDetails> excludedDns = new ArrayList<>();

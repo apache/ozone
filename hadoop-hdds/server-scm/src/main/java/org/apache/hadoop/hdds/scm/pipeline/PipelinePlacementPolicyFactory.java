@@ -62,8 +62,7 @@ public final class PipelinePlacementPolicyFactory {
 
     try {
       if (conf.get(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY)
-          .equals("org.apache.hadoop.hdds.scm.container.placement" +
-              ".algorithms.SCMContainerPlacementRackScatter")) {
+          .equals(SCMContainerPlacementRackScatter.class.getCanonicalName())) {
         placementClass = conf.getClass(ScmConfigKeys
                 .OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
             OZONE_SCM_CONTAINER_PLACEMENT_IMPL_DEFAULT,

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -321,12 +322,11 @@ public class TestRatisPipelineProvider {
   @Test
   // Test pipeline provider with RackScatter policy cannot create
   // pipeline due to nodes with full pipeline engagement.
-  public void testFactorTHREEPipelineRacKScatterEngagement()
+  public void testFactorTHREEPipelineRackScatterEngagement()
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
-        "org.apache.hadoop.hdds.scm.container.placement" +
-            ".algorithms.SCMContainerPlacementRackScatter");
+        SCMContainerPlacementRackScatter.class.getCanonicalName());
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "0");
     init(0, conf);
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
