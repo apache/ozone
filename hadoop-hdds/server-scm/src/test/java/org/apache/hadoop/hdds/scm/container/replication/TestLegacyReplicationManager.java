@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager
-    .ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.LegacyReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
@@ -221,15 +221,15 @@ public class TestLegacyReplicationManager {
       throws Exception {
     replicationManager.stop();
     dbStore.close();
-    final LegacyReplicationManager.ReplicationManagerConfiguration conf
-        = new LegacyReplicationManager.ReplicationManagerConfiguration();
+    final LegacyReplicationManagerConfiguration conf
+        = new LegacyReplicationManagerConfiguration();
     conf.setContainerInflightReplicationLimit(replicationLimit);
     conf.setContainerInflightDeletionLimit(deletionLimit);
     createReplicationManager(conf);
   }
 
   void createReplicationManager(
-      LegacyReplicationManager.ReplicationManagerConfiguration conf)
+      LegacyReplicationManagerConfiguration conf)
       throws Exception {
     createReplicationManager(null, conf);
   }
@@ -240,7 +240,7 @@ public class TestLegacyReplicationManager {
   }
 
   void createReplicationManager(ReplicationManagerConfiguration rmConf,
-      LegacyReplicationManager.ReplicationManagerConfiguration lrmConf)
+      LegacyReplicationManagerConfiguration lrmConf)
       throws InterruptedException, IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     testDir = GenericTestUtils
