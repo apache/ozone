@@ -291,8 +291,7 @@ public class TestOMDbCheckpointServlet {
   }
 
   @Test
-  public void testWriteDbDataToStream()
-      throws Exception {
+  public void testWriteDbDataToStream() throws Exception {
     prepSnapshotData();
     // set http param to include snapshot data
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
