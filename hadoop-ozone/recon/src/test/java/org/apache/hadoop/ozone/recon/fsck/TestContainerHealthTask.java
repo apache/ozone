@@ -136,7 +136,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set(HDDS_CONTAINER_REPORT_INTERVAL, HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT);
+    ozoneConfiguration.set(HDDS_CONTAINER_REPORT_INTERVAL,
+        HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT);
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
     ContainerHealthTask containerHealthTask =
@@ -284,7 +285,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set(HDDS_CONTAINER_REPORT_INTERVAL, HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT);
+    ozoneConfiguration.set(HDDS_CONTAINER_REPORT_INTERVAL,
+        HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT);
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
             scmMock.getScmServiceProvider(),
