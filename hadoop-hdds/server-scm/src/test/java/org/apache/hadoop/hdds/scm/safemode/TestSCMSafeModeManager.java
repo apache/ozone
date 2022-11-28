@@ -665,8 +665,6 @@ public class TestSCMSafeModeManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
 
-    SafeModeEventHandler smHandler = new SafeModeEventHandler();
-    queue.addHandler(SCMEvents.SAFE_MODE_STATUS, smHandler);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, pipelineManager, queue, serviceManager,
         scmContext);
@@ -682,7 +680,6 @@ public class TestSCMSafeModeManager {
       assertFalse(scmSafeModeManager.getPreCheckComplete());
     }
     queue.processAll(5000);
-    assertEquals(0, smHandler.getInvokedCount());
 
     // Register last DataNode and check that the SafeModeEvent gets fired, but
     // SafeMode is still enabled with preCheck completed.
@@ -690,9 +687,8 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
     queue.processAll(5000);
 
-    assertEquals(1, smHandler.getInvokedCount());
-    assertTrue(smHandler.getPreCheckComplete());
-    assertTrue(smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertTrue(scmSafeModeManager.getInSafeMode());
 
     /* There is a race condition where the background pipeline creation
      * task creates the pipeline before the following create call.
@@ -716,9 +712,8 @@ public class TestSCMSafeModeManager {
     firePipelineEvent(pipelineManager, pipeline);
 
     queue.processAll(5000);
-    assertEquals(2, smHandler.getInvokedCount());
-    assertTrue(smHandler.getPreCheckComplete());
-    assertFalse(smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertFalse(scmSafeModeManager.getInSafeMode());
   }
 
   private static class SafeModeEventHandler
