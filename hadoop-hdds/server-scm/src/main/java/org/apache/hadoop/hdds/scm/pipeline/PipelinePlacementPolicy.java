@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -37,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -49,7 +51,8 @@ import java.util.stream.Collectors;
  * 4. Choose an anchor node among the viable nodes.
  * 5. Choose other nodes around the anchor node based on network topology
  */
-public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
+public final class PipelinePlacementPolicy<RID> extends
+        SCMCommonPlacementPolicy<RID> {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
@@ -73,9 +76,9 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param conf        Configuration
    */
   public PipelinePlacementPolicy(final NodeManager nodeManager,
-                                 final PipelineStateManager stateManager,
-                                 final ConfigurationSource conf) {
-    super(nodeManager, conf);
+      final PipelineStateManager stateManager, final ConfigurationSource conf,
+      final Function<ContainerReplica, RID> replicaIdentifierFunction) {
+    super(nodeManager, conf, replicaIdentifierFunction);
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.stateManager = stateManager;

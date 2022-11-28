@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -120,9 +121,9 @@ public class TestSCMContainerPlacementCapacity {
                       .orElse(null);
             });
 
-    SCMContainerPlacementCapacity scmContainerPlacementRandom =
-        new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,
-            null);
+    SCMContainerPlacementCapacity<Integer> scmContainerPlacementRandom =
+        new SCMContainerPlacementCapacity<>(mockNodeManager, conf, null, true,
+            null, ContainerReplica::getReplicaIndex);
 
     List<DatanodeDetails> existingNodes = new ArrayList<>();
     existingNodes.add(datanodes.get(0));

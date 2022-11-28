@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -343,7 +345,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
    * of a datanode via setMisRepWhenDnPresent. If a DN with that UUID is passed
    * to validateContainerPlacement, then it will return an invalid placement.
    */
-  private static class MockPlacementPolicy implements PlacementPolicy {
+  private static class MockPlacementPolicy implements
+          PlacementPolicy<ContainerReplica, Node> {
 
     private UUID misRepWhenDnPresent = null;
 
@@ -368,6 +371,25 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       } else {
         return new ContainerPlacementStatusDefault(1, 1, 1);
       }
+    }
+
+    @Override
+    public Map<ContainerReplica, Integer> replicasToCopy(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
+      return null;
+    }
+
+    @Override
+    public Set<ContainerReplica> replicasToRemove(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
+      return null;
+    }
+
+    @Override
+    public Node getPlacementGroup(DatanodeDetails dn) {
+      return dn.getParent();
     }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {

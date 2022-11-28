@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -36,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -50,8 +52,8 @@ import java.util.stream.Stream;
  * recommend to use this if the network topology has more layers.
  * <p>
  */
-public final class SCMContainerPlacementRackScatter
-    extends SCMCommonPlacementPolicy {
+public final class SCMContainerPlacementRackScatter<RID>
+    extends SCMCommonPlacementPolicy<RID> {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackScatter.class);
@@ -71,8 +73,9 @@ public final class SCMContainerPlacementRackScatter
    */
   public SCMContainerPlacementRackScatter(final NodeManager nodeManager,
       final ConfigurationSource conf, final NetworkTopology networkTopology,
-      boolean fallback, final SCMContainerPlacementMetrics metrics) {
-    super(nodeManager, conf);
+      boolean fallback, final SCMContainerPlacementMetrics metrics,
+      Function<ContainerReplica, RID> replicaIdentifierFunction) {
+    super(nodeManager, conf, replicaIdentifierFunction);
     this.networkTopology = networkTopology;
     this.metrics = metrics;
   }

@@ -198,7 +198,8 @@ public final class ReplicationTestUtil {
 
   public static PlacementPolicy getSimpleTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf) {
-    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+    return new SCMCommonPlacementPolicy<Integer>(nodeManager, conf,
+            ContainerReplica::getReplicaIndex) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
               List<DatanodeDetails> usedNodes,
@@ -222,7 +223,8 @@ public final class ReplicationTestUtil {
   public static PlacementPolicy getSameNodeTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf,
       DatanodeDetails nodeToReturn) {
-    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+    return new SCMCommonPlacementPolicy<Integer>(nodeManager, conf,
+            ContainerReplica::getReplicaIndex) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
               List<DatanodeDetails> usedNodes,
@@ -251,7 +253,8 @@ public final class ReplicationTestUtil {
 
   public static PlacementPolicy getNoNodesTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf) {
-    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+    return new SCMCommonPlacementPolicy<Integer>(nodeManager, conf,
+            ContainerReplica::getReplicaIndex) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
               List<DatanodeDetails> usedNodes,

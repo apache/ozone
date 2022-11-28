@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -118,8 +119,8 @@ public class TestPipelinePlacementPolicy {
         .setNodeManager(nodeManager)
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
-    placementPolicy = new PipelinePlacementPolicy(
-        nodeManager, stateManager, conf);
+    placementPolicy = new PipelinePlacementPolicy<>(
+        nodeManager, stateManager, conf, ContainerReplica::getReplicaIndex);
   }
 
   @AfterEach
@@ -201,8 +202,10 @@ public class TestPipelinePlacementPolicy {
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
 
-    PipelinePlacementPolicy localPlacementPolicy = new PipelinePlacementPolicy(
-        localNodeManager, tempPipelineStateManager, conf);
+    PipelinePlacementPolicy<Integer> localPlacementPolicy =
+            new PipelinePlacementPolicy<>(localNodeManager,
+                    tempPipelineStateManager, conf,
+                    ContainerReplica::getReplicaIndex);
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
     List<DatanodeDetails> results = localPlacementPolicy.chooseDatanodes(
         new ArrayList<>(datanodes.size()),
@@ -238,8 +241,10 @@ public class TestPipelinePlacementPolicy {
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
 
-    PipelinePlacementPolicy localPlacementPolicy = new PipelinePlacementPolicy(
-        localNodeManager, tempPipelineStateManager, conf);
+    PipelinePlacementPolicy localPlacementPolicy =
+            new PipelinePlacementPolicy<>(localNodeManager,
+                    tempPipelineStateManager, conf,
+                    ContainerReplica::getReplicaIndex);
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
     String expectedMessageSubstring = "Unable to find enough nodes that meet " +
@@ -477,8 +482,8 @@ public class TestPipelinePlacementPolicy {
     cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    placementPolicy = new PipelinePlacementPolicy(
-        nodeManager, stateManager, conf);
+    placementPolicy = new PipelinePlacementPolicy<>(
+        nodeManager, stateManager, conf, ContainerReplica::getReplicaIndex);
 
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(MockDatanodeDetails
@@ -524,8 +529,8 @@ public class TestPipelinePlacementPolicy {
     cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    placementPolicy = new PipelinePlacementPolicy(
-        nodeManager, stateManager, conf);
+    placementPolicy = new PipelinePlacementPolicy<>(
+        nodeManager, stateManager, conf, ContainerReplica::getReplicaIndex);
 
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(MockDatanodeDetails
@@ -616,8 +621,8 @@ public class TestPipelinePlacementPolicy {
 
     nodeManager = new MockNodeManager(cluster, dns,
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    placementPolicy = new PipelinePlacementPolicy(
-        nodeManager, stateManager, conf);
+    placementPolicy = new PipelinePlacementPolicy<>(
+        nodeManager, stateManager, conf, ContainerReplica::getReplicaIndex);
     return dns;
   }
 

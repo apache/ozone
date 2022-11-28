@@ -21,8 +21,11 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -30,9 +33,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 
 /**
  * Test functions of SCMCommonPlacementPolicy.
@@ -59,17 +68,83 @@ public class TestSCMCommonPlacementPolicy {
     Assertions.assertNotEquals(1, resultSet.size());
   }
 
-  private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
+  @Test
+  public void testReplicasToCopy() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf);
+    List<DatanodeDetails> list =
+            nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    Set<ContainerReplica> replicas =
+            IntStream.range(1, 6).mapToObj(i ->
+                    ContainerReplica.newBuilder()
+                            .setContainerID(new ContainerID(1))
+                            .setContainerState(CLOSED)
+                            .setReplicaIndex(i)
+            .setDatanodeDetails(list.get(i)).build())
+                    .collect(Collectors.toSet());
+
+
+    Map<ContainerReplica, Integer> replicasToCopy =
+            dummyPlacementPolicy.replicasToCopy(replicas,
+            2, 5);
+    Assertions.assertEquals(replicas, replicasToCopy.keySet());
+    Assertions.assertTrue(replicasToCopy.values().stream()
+            .allMatch(i -> i == 1));
+  }
+
+  @Test
+  public void testReplicasToRemove() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf);
+    List<DatanodeDetails> list =
+            nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    Set<ContainerReplica> replicas =
+            IntStream.range(1, 6).mapToObj(i ->
+                            ContainerReplica.newBuilder()
+                                    .setContainerID(new ContainerID(1))
+                                    .setContainerState(CLOSED)
+                                    .setReplicaIndex(i)
+                                    .setDatanodeDetails(list.get(i)).build())
+                    .collect(Collectors.toSet());
+    ContainerReplica replica = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(7)).build();
+    replicas.add(replica);
+
+    Set<ContainerReplica> replicasToRemove =
+            dummyPlacementPolicy.replicasToRemove(replicas,
+                    1, 5);
+    Assertions.assertEquals(replicasToRemove.size(), 1);
+    Assertions.assertEquals(replicasToRemove.stream().findFirst().get(),
+            replica);
+  }
+
+  private static class DummyPlacementPolicy extends
+          SCMCommonPlacementPolicy<Integer> {
+    private Map<DatanodeDetails, Node> dns;
 
     DummyPlacementPolicy(
         NodeManager nodeManager,
         ConfigurationSource conf) {
-      super(nodeManager, conf);
+      super(nodeManager, conf, ContainerReplica::getReplicaIndex);
+      dns = new HashMap<>();
+      List<DatanodeDetails> datanodeDetails =
+              nodeManager.getNodes(NodeStatus.inServiceHealthy());
+      for (int idx = 0; idx < datanodeDetails.size(); idx++) {
+        dns.put(datanodeDetails.get(idx), datanodeDetails.get(idx % 5));
+      }
     }
 
     @Override
     public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
       return healthyNodes.get(0);
+    }
+
+    @Override
+    public Node getPlacementGroup(DatanodeDetails dn) {
+      return dns.get(dn);
     }
   }
 }

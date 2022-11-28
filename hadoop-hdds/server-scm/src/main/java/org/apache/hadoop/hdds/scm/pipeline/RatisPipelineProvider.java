@@ -78,7 +78,8 @@ public class RatisPipelineProvider
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.placementPolicy =
-        new PipelinePlacementPolicy(nodeManager, stateManager, conf);
+        new PipelinePlacementPolicy<>(nodeManager, stateManager, conf,
+                ContainerReplica::getReplicaIndex);
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);

@@ -18,10 +18,12 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import java.util.List;
+import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -66,8 +68,8 @@ import org.slf4j.LoggerFactory;
  * little or no work and the cluster will achieve a balanced distribution
  * over time.
  */
-public final class SCMContainerPlacementCapacity
-    extends SCMCommonPlacementPolicy {
+public final class SCMContainerPlacementCapacity<RID>
+    extends SCMCommonPlacementPolicy<RID> {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementCapacity.class);
@@ -81,8 +83,9 @@ public final class SCMContainerPlacementCapacity
    */
   public SCMContainerPlacementCapacity(final NodeManager nodeManager,
       final ConfigurationSource conf, final NetworkTopology networkTopology,
-      final boolean fallback, final SCMContainerPlacementMetrics metrics) {
-    super(nodeManager, conf);
+      final boolean fallback, final SCMContainerPlacementMetrics metrics,
+      final Function<ContainerReplica, RID> replicaIdentifierFunction) {
+    super(nodeManager, conf, replicaIdentifierFunction);
   }
 
   /**

@@ -20,19 +20,30 @@ package org.apache.hadoop.hdds.scm;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -46,7 +57,8 @@ import org.slf4j.LoggerFactory;
  * for all basic placement policies, acts as the repository of helper
  * functions which are common to placement policies.
  */
-public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
+public abstract class SCMCommonPlacementPolicy<RID> implements
+        PlacementPolicy<ContainerReplica, Node> {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
@@ -56,6 +68,8 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   private final Random rand = new Random();
   private final ConfigurationSource conf;
   private final boolean shouldRemovePeers;
+
+  private Function<ContainerReplica, RID> replicaIdentifierFunction;
 
   /**
    * Return for replication factor 1 containers where the placement policy
@@ -75,10 +89,12 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * @param conf        Configuration class.
    */
   public SCMCommonPlacementPolicy(NodeManager nodeManager,
-      ConfigurationSource conf) {
+      ConfigurationSource conf,
+      Function<ContainerReplica, RID> replicaIdentifierFunction) {
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.shouldRemovePeers = ScmUtils.shouldRemovePeers(conf);
+    this.replicaIdentifierFunction = replicaIdentifierFunction;
   }
 
   /**
@@ -379,7 +395,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     // leafLevel - 1 is the rack count
     numRacks = topology.getNumOfNodes(maxLevel - 1);
     final long currentRackCount = dns.stream()
-        .map(d -> topology.getAncestor(d, 1))
+        .map(this::getPlacementGroup)
         .distinct()
         .count();
 
@@ -426,4 +442,136 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     }
     return false;
   }
+  @Override
+  public Set<ContainerReplica> replicasToRemove(Set<ContainerReplica> replicas,
+         int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
+    Map<RID, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
+    Map<Node, Map<RID, Set<ContainerReplica>>> placementGroupReplicaIdMap
+            = new HashMap<>();
+    Map<Node, Integer> placementGroupCntMap = new HashMap<>();
+    for (ContainerReplica replica:replicas) {
+      RID replicaId = replicaIdentifierFunction.apply(replica);
+      Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
+      if (!replicaIdMap.containsKey(replicaId)) {
+        replicaIdMap.put(replicaId, Sets.newHashSet());
+      }
+      if (!placementGroupReplicaIdMap.containsKey(placementGroup)) {
+        placementGroupReplicaIdMap.put(placementGroup, Maps.newHashMap());
+      }
+      placementGroupCntMap.compute(placementGroup,
+              (group, cnt) -> (cnt == null ? 0 : cnt) + 1);
+      replicaIdMap.get(replicaId).add(replica);
+      Map<RID, Set<ContainerReplica>> placementGroupReplicaIDMap =
+              placementGroupReplicaIdMap.get(placementGroup);
+      placementGroupReplicaIDMap.compute(replicaId,
+              (rid, placementGroupReplicas) -> {
+          if (placementGroupReplicas == null) {
+            placementGroupReplicas = Sets.newHashSet();
+          }
+          placementGroupReplicas.add(replica);
+          return placementGroupReplicas;
+        });
+    }
+
+    Set<ContainerReplica> replicasToRemove = new HashSet<>();
+    List<RID> sortedRIDList = replicaIdMap.keySet().stream().sorted((o1, o2) ->
+            Integer.compare(replicaIdMap.get(o2).size(),
+            replicaIdMap.get(o1).size())).collect(Collectors.toList());
+    for (RID rid : sortedRIDList) {
+      Queue<Node> pq = new PriorityQueue<>((o1, o2) ->
+              Integer.compare(placementGroupCntMap.get(o2),
+                      placementGroupCntMap.get(o1)));
+      pq.addAll(placementGroupReplicaIdMap.entrySet()
+              .stream()
+              .filter(nodeMapEntry -> nodeMapEntry.getValue().containsKey(rid))
+              .map(Map.Entry::getKey)
+              .collect(Collectors.toList()));
+
+      while (replicaIdMap.get(rid).size() > expectedCountPerUniqueReplica) {
+        Node rack = pq.poll();
+        Set<ContainerReplica> replicaSet =
+                placementGroupReplicaIdMap.get(rack).get(rid);
+        if (replicaSet.size() > 0) {
+          ContainerReplica r = replicaSet.stream().findFirst().get();
+          replicasToRemove.add(r);
+          replicaSet.remove(r);
+          replicaIdMap.get(rid).remove(r);
+          placementGroupCntMap.compute(rack,
+                  (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
+          if (replicaSet.size() == 0) {
+            placementGroupReplicaIdMap.get(rack).remove(rid);
+          } else {
+            pq.add(rack);
+          }
+        }
+      }
+    }
+    return replicasToRemove;
+  }
+
+  @Override
+  public Map<ContainerReplica, Integer> replicasToCopy(
+         Set<ContainerReplica> replicas, int expectedCountPerUniqueReplicas,
+         int expectedUniqueGroups) {
+    Map<RID, ContainerReplica> replicaIdMap = new HashMap<>();
+    Map<RID, Integer> replicaIdCntMap = new HashMap<>();
+    Map<Node, Set<ContainerReplica>> placementGroupReplicaIdMap
+            = new HashMap<>();
+    for (ContainerReplica replica:replicas) {
+      RID replicaId = replicaIdentifierFunction.apply(replica);
+      Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
+      if (!replicaIdMap.containsKey(replicaId)) {
+        replicaIdMap.put(replicaId, replica);
+      }
+      replicaIdCntMap.compute(replicaId, (rid, cnt) ->
+              (cnt == null ? 0 : cnt) + 1);
+      placementGroupReplicaIdMap.compute(placementGroup,
+              (rid, placementGroupReplicas) -> {
+                if (placementGroupReplicas == null) {
+                  placementGroupReplicas = Sets.newHashSet();
+                }
+                placementGroupReplicas.add(replica);
+                return placementGroupReplicas;
+              });
+    }
+    int misreplicationCnt = Math.max(getRequiredRackCount(
+        expectedUniqueGroups * expectedCountPerUniqueReplicas)
+        - placementGroupReplicaIdMap.size(), 0);
+    Map<RID, Integer> copyRIDMap = new HashMap<>();
+    for (RID rid : replicaIdMap.keySet()) {
+      if (replicaIdCntMap.get(rid) < expectedCountPerUniqueReplicas) {
+        int additionalReplica = expectedCountPerUniqueReplicas -
+                replicaIdCntMap.get(rid);
+        copyRIDMap.compute(rid, (replicaIdx, cnt) -> (cnt == null ? 0 : cnt)
+                + additionalReplica);
+        misreplicationCnt -= additionalReplica;
+      }
+    }
+
+    for (Set<ContainerReplica> replicaSet: placementGroupReplicaIdMap
+            .values()) {
+      if (misreplicationCnt > 0 && replicaSet.size() > 1) {
+        Map<RID, Long> cntMap = replicaSet.stream()
+                .limit(Math.min(replicaSet.size() - 1, misreplicationCnt))
+                .collect(Collectors.groupingBy(replicaIdentifierFunction,
+                        Collectors.counting()));
+        for (RID rid : cntMap.keySet()) {
+          int additionalReplica = Math.toIntExact(cntMap.get(rid));
+          copyRIDMap.compute(rid, (replicaIdx, cnt) -> (cnt == null ? 0 : cnt)
+                  + additionalReplica);
+          misreplicationCnt -= additionalReplica;
+        }
+      }
+    }
+    return copyRIDMap.entrySet().stream()
+            .collect(Collectors.toMap(e -> replicaIdMap.get(e.getKey()),
+                    Map.Entry::getValue));
+  }
+
+  @Override
+  public Node getPlacementGroup(DatanodeDetails dn) {
+    return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
+  }
+
+
 }

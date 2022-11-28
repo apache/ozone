@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -31,9 +33,11 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -176,7 +180,8 @@ public class TestContainerPlacementFactory {
   /**
    * A dummy container placement implementation for test.
    */
-  public static class DummyImpl implements PlacementPolicy {
+  public static class DummyImpl implements
+          PlacementPolicy<ContainerReplica, Node> {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,
@@ -190,6 +195,25 @@ public class TestContainerPlacementFactory {
     public ContainerPlacementStatus
         validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
       return new ContainerPlacementStatusDefault(1, 1, 1);
+    }
+
+    @Override
+    public Map<ContainerReplica, Integer> replicasToCopy(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
+      return null;
+    }
+
+    @Override
+    public Set<ContainerReplica> replicasToRemove(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
+      return null;
+    }
+
+    @Override
+    public Node getPlacementGroup(DatanodeDetails dn) {
+      return dn.getParent();
     }
   }
 

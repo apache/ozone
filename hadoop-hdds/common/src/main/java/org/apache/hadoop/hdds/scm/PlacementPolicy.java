@@ -22,12 +22,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A PlacementPolicy support choosing datanodes to build
  * pipelines or containers with specified constraints.
  */
-public interface PlacementPolicy {
+public interface PlacementPolicy<Replica, PlacementGroup> {
 
   default List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
@@ -60,9 +62,23 @@ public interface PlacementPolicy {
    * Given a list of datanode and the number of replicas required, return
    * a PlacementPolicyStatus object indicating if the container meets the
    * placement policy - ie is it on the correct number of racks, etc.
-   * @param dns List of datanodes holding a replica of the container
+   * @param dns List of replica holding a replica of the container
    * @param replicas The expected number of replicas
    */
   ContainerPlacementStatus validateContainerPlacement(
-      List<DatanodeDetails> dns, int replicas);
+          List<DatanodeDetails> dns, int replicas);
+  Map<Replica, Integer> replicasToCopy(Set<Replica> replicas,
+                                       int expectedCountPerUniqueReplica,
+                                       int expectedUniqueGroups);
+
+  Set<Replica> replicasToRemove(Set<Replica> replicas,
+                                int expectedCountPerUniqueReplica,
+                                int expectedUniqueGroups);
+
+
+  /** Gets the group of from the datanode based on the placement.
+   * @param dn
+   * @return PlacementGroup
+   */
+  PlacementGroup getPlacementGroup(DatanodeDetails dn);
 }

@@ -21,14 +21,17 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Container placement policy that randomly chooses healthy datanodes.
@@ -39,8 +42,9 @@ import java.util.List;
  * Balancer will need to support containers as a feature before this class
  * can be practically used.
  */
-public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
-    implements PlacementPolicy {
+public final class SCMContainerPlacementRandom<RID> extends
+        SCMCommonPlacementPolicy<RID> implements
+        PlacementPolicy<ContainerReplica, Node> {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
@@ -53,8 +57,9 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    */
   public SCMContainerPlacementRandom(final NodeManager nodeManager,
       final ConfigurationSource conf, final NetworkTopology networkTopology,
-      final boolean fallback, final SCMContainerPlacementMetrics metrics) {
-    super(nodeManager, conf);
+      final boolean fallback, final SCMContainerPlacementMetrics metrics,
+      Function<ContainerReplica, RID> replicaIdentifierFunction) {
+    super(nodeManager, conf, replicaIdentifierFunction);
   }
 
   /**

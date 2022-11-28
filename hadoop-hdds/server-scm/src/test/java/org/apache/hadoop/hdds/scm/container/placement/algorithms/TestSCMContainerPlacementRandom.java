@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -89,9 +90,9 @@ public class TestSCMContainerPlacementRandom {
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
 
-    SCMContainerPlacementRandom scmContainerPlacementRandom =
-        new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
-            null);
+    SCMContainerPlacementRandom<Integer> scmContainerPlacementRandom =
+        new SCMContainerPlacementRandom<>(mockNodeManager, conf, null, true,
+            null, ContainerReplica::getReplicaIndex);
 
     List<DatanodeDetails> existingNodes = new ArrayList<>();
     existingNodes.add(datanodes.get(0));
@@ -132,9 +133,9 @@ public class TestSCMContainerPlacementRandom {
     }
 
     NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
-    SCMContainerPlacementRandom scmContainerPlacementRandom =
-        new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
-            null);
+    SCMContainerPlacementRandom<Integer> scmContainerPlacementRandom =
+        new SCMContainerPlacementRandom<>(mockNodeManager, conf, null, true,
+            null, ContainerReplica::getReplicaIndex);
     ContainerPlacementStatus status =
         scmContainerPlacementRandom.validateContainerPlacement(datanodes, 3);
     assertTrue(status.isPolicySatisfied());
@@ -211,9 +212,9 @@ public class TestSCMContainerPlacementRandom {
     when(mockNodeManager.getNodeByUuid(datanodes.get(2).getUuidString()))
         .thenReturn(datanodes.get(2));
 
-    SCMContainerPlacementRandom scmContainerPlacementRandom =
-        new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
-            null);
+    SCMContainerPlacementRandom<Integer> scmContainerPlacementRandom =
+        new SCMContainerPlacementRandom<>(mockNodeManager, conf, null, true,
+            null, ContainerReplica::getReplicaIndex);
 
     Assertions.assertTrue(
         scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));

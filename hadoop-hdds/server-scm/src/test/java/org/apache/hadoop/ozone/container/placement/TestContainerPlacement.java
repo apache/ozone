@@ -22,6 +22,7 @@ import java.util.Random;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
@@ -76,13 +77,15 @@ public class TestContainerPlacement {
     assertEquals(beforeCapacity.getStandardDeviation(), beforeRandom
         .getStandardDeviation(), 0.001);
 
-    SCMContainerPlacementCapacity capacityPlacer = new
-        SCMContainerPlacementCapacity(nodeManagerCapacity,
+    SCMContainerPlacementCapacity<Integer> capacityPlacer = new
+        SCMContainerPlacementCapacity<>(nodeManagerCapacity,
         new OzoneConfiguration(),
-        null, true, null);
-    SCMContainerPlacementRandom randomPlacer = new
-        SCMContainerPlacementRandom(nodeManagerRandom, new OzoneConfiguration(),
-        null, true, null);
+        null, true, null,
+            ContainerReplica::getReplicaIndex);
+    SCMContainerPlacementRandom<Integer> randomPlacer = new
+        SCMContainerPlacementRandom<>(nodeManagerRandom,
+            new OzoneConfiguration(), null, true, null,
+            ContainerReplica::getReplicaIndex);
 
     for (int x = 0; x < opsCount; x++) {
       long containerSize = random.nextInt(10) * OzoneConsts.GB;
