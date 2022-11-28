@@ -127,16 +127,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         includeSnapshotData(request));
 
     try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (TarArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-        archiveOutputStream
-            .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-
-        writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
-      }
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP, destination);
+         TarArchiveOutputStream archiveOutputStream = 
+             new TarArchiveOutputStream(gzippedOut)
+    ) {
+      archiveOutputStream.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
     } catch (CompressorException e) {
       throw new IOException(
           "Can't compress the checkpoint: " +
