@@ -677,5 +677,4 @@ public class ReconStorageContainerManagerFacade
   public StorageContainerServiceProvider getScmServiceProvider() {
     return scmServiceProvider;
   }
-
 }
