@@ -72,6 +72,10 @@ public class ContainerHealthStatus {
     return replicaDelta == 0 && !isMisReplicated();
   }
 
+  public boolean isUnknown() {
+    return this.container.getState() == HddsProtos.LifeCycleState.UNKNOWN;
+  }
+
   public boolean isDeleted() {
     return container.getState() == HddsProtos.LifeCycleState.DELETED ||
         container.getState() == HddsProtos.LifeCycleState.DELETING;

@@ -51,7 +51,6 @@ public class TestSCMContainerMetrics {
         put(HddsProtos.LifeCycleState.DELETING.toString(), 6);
         put(HddsProtos.LifeCycleState.DELETED.toString(), 7);
         put(HddsProtos.LifeCycleState.RECOVERING.toString(), 8);
-        put(HddsProtos.LifeCycleState.UNKNOWN.toString(), 9);
       }};
 
 

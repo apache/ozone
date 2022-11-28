@@ -37,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -103,6 +104,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
 
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -123,8 +126,7 @@ public class ReconStorageContainerManagerFacade
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
-  public static final int DEFAULT_RPC_SIZE = 64;
-  public static final int CONTAINER_METADATA_SIZE = 1;
+  public static final long CONTAINER_METADATA_SIZE = 1 * 1024 * 1024L;
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
@@ -284,7 +286,8 @@ public class ReconStorageContainerManagerFacade
         scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
-        reconTaskConfig));
+        reconTaskConfig,
+        conf));
   }
 
   /**
@@ -475,22 +478,16 @@ public class ReconStorageContainerManagerFacade
       try {
         List<ContainerInfo> containers = containerManager.getContainers();
 
-        long containerCount = scmServiceProvider.getContainerCount(
+        long totalContainerCount = scmServiceProvider.getContainerCount(
             HddsProtos.LifeCycleState.CLOSED);
-        // Assumption of size of 1 container info object here is 1 MB
-        long containersMetaDataTotalRpcRespSizeMB =
-            CONTAINER_METADATA_SIZE * containerCount;
-        double numOfApiCalls =
-            Double.valueOf(containersMetaDataTotalRpcRespSizeMB) /
-                Double.valueOf(DEFAULT_RPC_SIZE);
-        long totalApiCalls = Math.round(Math.ceil(numOfApiCalls));
-        long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
-            DEFAULT_RPC_SIZE ? containerCount : DEFAULT_RPC_SIZE;
-        if (containerCount > 0) {
-          for (int startContainerId = 1; startContainerId <= totalApiCalls;
-               startContainerId++) {
+        long containerCountPerCall =
+            getContainerCountPerCall(totalContainerCount);
+        long startContainerId = 1;
+        long retrievedContainerCount = 0;
+        if (totalContainerCount > 0) {
+          while (retrievedContainerCount < totalContainerCount) {
             List<ContainerInfo> listOfContainers = scmServiceProvider.
-                getListOfContainers(Long.valueOf(startContainerId).longValue(),
+                getListOfContainers(startContainerId,
                     Long.valueOf(containerCountPerCall).intValue(),
                     HddsProtos.LifeCycleState.CLOSED);
             if (null != listOfContainers && listOfContainers.size() > 0) {
@@ -499,14 +496,13 @@ public class ReconStorageContainerManagerFacade
               listOfContainers.forEach(containerInfo -> {
                 long containerID = containerInfo.getContainerID();
                 boolean isContainerPresentAtRecon =
-                    containers.remove(containerID);
+                    containers.contains(containerInfo);
                 if (!isContainerPresentAtRecon) {
                   try {
+                    containerInfo.setState(HddsProtos.LifeCycleState.UNKNOWN);
                     ContainerWithPipeline containerWithPipeline =
                         scmServiceProvider.getContainerWithPipeline(
                             containerID);
-                    containerWithPipeline.getContainerInfo().setState(
-                        HddsProtos.LifeCycleState.UNKNOWN);
                     containerManager.addNewContainer(containerWithPipeline);
                   } catch (IOException e) {
                     LOG.error("Could not get container with pipeline " +
@@ -517,18 +513,37 @@ public class ReconStorageContainerManagerFacade
                   }
                 }
               });
+              startContainerId = listOfContainers.get(
+                  listOfContainers.size() - 1).getContainerID() + 1;
             } else {
-              LOG.debug("SCM DB sync is already running.");
+              LOG.info("No containers found at SCM in CLOSED state");
               return false;
             }
+            retrievedContainerCount += containerCountPerCall;
           }
         }
       } catch (IOException e) {
         LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
         return false;
       }
+    } else {
+      LOG.debug("SCM DB sync is already running.");
+      return false;
     }
     return true;
+  }
+
+  private long getContainerCountPerCall(long totalContainerCount) {
+    // Assumption of size of 1 container info object here is 1 MB
+    long containersMetaDataTotalRpcRespSizeMB =
+        CONTAINER_METADATA_SIZE * totalContainerCount;
+    long hadoopRPCSize = ozoneConfiguration.getInt(
+        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
+        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+    long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
+        hadoopRPCSize ? totalContainerCount :
+        Math.round(Math.floor(hadoopRPCSize / CONTAINER_METADATA_SIZE));
+    return containerCountPerCall;
   }
 
   private void deleteOldSCMDB() throws IOException {

@@ -19,12 +19,15 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -47,6 +50,9 @@ import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT;
+
 /**
  * Class that scans the list of containers and keeps track of containers with
  * no replicas in a SQL table.
@@ -61,6 +67,10 @@ public class ContainerHealthTask extends ReconScmTask {
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private PlacementPolicy placementPolicy;
   private final long interval;
+
+  private static OzoneConfiguration config;
+
+  private static Long containerReportInterval = null;
   private Set<ContainerInfo> processedContainers = new HashSet<>();
 
   public ContainerHealthTask(
@@ -76,6 +86,20 @@ public class ContainerHealthTask extends ReconScmTask {
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    containerReportInterval = getContainerReportFrequency();
+  }
+
+  public ContainerHealthTask(
+      ContainerManager containerManager,
+      StorageContainerServiceProvider scmClient,
+      ReconTaskStatusDao reconTaskStatusDao,
+      ContainerHealthSchemaManager containerHealthSchemaManager,
+      PlacementPolicy placementPolicy,
+      ReconTaskConfig reconTaskConfig,
+      OzoneConfiguration config) {
+    this(containerManager, scmClient, reconTaskStatusDao,
+        containerHealthSchemaManager, placementPolicy, reconTaskConfig);
+    this.config = config;
   }
 
   @Override
@@ -242,6 +266,7 @@ public class ContainerHealthTask extends ReconScmTask {
    */
   public static class ContainerHealthRecords {
 
+
     /**
      * Given an existing database record and a ContainerHealthStatus object,
      * this method will check if the database record should be retained or not.
@@ -272,6 +297,9 @@ public class ContainerHealthTask extends ReconScmTask {
         break;
       case OVER_REPLICATED:
         returnValue = keepOverReplicatedRecord(container, rec);
+        break;
+      case UNKNOWN:
+        returnValue = keepUnknownContainerRecord(container, rec);
         break;
       default:
         returnValue = false;
@@ -328,6 +356,13 @@ public class ContainerHealthTask extends ReconScmTask {
               UnHealthyContainerStates.MIS_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
+      }
+
+      if (container.isUnknown()
+          && !recordForStateExists.contains(
+          UnHealthyContainerStates.UNKNOWN.toString())) {
+        records.add(recordForState(
+            container, UnHealthyContainerStates.UNKNOWN, time));
       }
       return records;
     }
@@ -386,6 +421,30 @@ public class ContainerHealthTask extends ReconScmTask {
       return false;
     }
 
+    private static boolean keepUnknownContainerRecord(
+        ContainerHealthStatus container, UnhealthyContainersRecord rec) {
+      if (container.isUnknown()) {
+        updateExpectedReplicaCount(rec, container.getReplicationFactor());
+        updateActualReplicaCount(rec, container.getReplicaCount());
+        updateReplicaDelta(rec, container.replicaDelta());
+        if (containerReportTimeElapsed(rec)) {
+          rec.setContainerState(UnHealthyContainerStates.MISSING.toString());
+          container.getContainer().setState(HddsProtos.LifeCycleState.CLOSED);
+        }
+        return true;
+      }
+      return false;
+    }
+
+    private static boolean containerReportTimeElapsed(
+        UnhealthyContainersRecord rec) {
+      long currentTime = System.currentTimeMillis();
+      long timeElapsed = currentTime - rec.getInStateSince();
+      return timeElapsed >=
+          ContainerHealthTask.getContainerReportFrequency()
+              + Duration.ofMinutes(1).toMillis();
+    }
+
     /**
      * With a Jooq record, if you update any field in the record, the record
      * is marked as changed, even if you updated it to the same value as it is
@@ -422,4 +481,13 @@ public class ContainerHealthTask extends ReconScmTask {
     }
   }
 
+  protected static long getContainerReportFrequency() {
+    if (containerReportInterval == null) {
+      config.getTimeDuration(
+          HDDS_CONTAINER_REPORT_INTERVAL,
+          HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+    }
+    return containerReportInterval;
+  }
 }
