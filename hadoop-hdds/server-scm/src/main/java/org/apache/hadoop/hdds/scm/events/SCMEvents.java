@@ -60,6 +60,15 @@ public final class SCMEvents {
           CommandQueueReportFromDatanode.class, "Command_Queue_Report");
 
   /**
+   * After node manager processes a COMMAND_QUEUE_REPORT it fires
+   * this event to allow any other processes which depend upon the counts to
+   * be notified they have been updated.
+   */
+  public static final TypedEvent<DatanodeDetails>
+      DATANODE_COMMAND_COUNT_UPDATED = new TypedEvent<>(
+          DatanodeDetails.class, "Datanode_Command_Queue_Updated");
+
+  /**
    * Event generated on DataNode registration.
    */
   public static final TypedEvent<NodeRegistrationContainerReport>

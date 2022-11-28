@@ -23,8 +23,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -39,6 +39,9 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 
 /**
  * Test implementation for CertificateClient. To be used only for test
@@ -63,10 +66,16 @@ public class CertificateClientTestImpl implements CertificateClient {
         new HDDSKeyGenerator(securityConfig.getConfiguration());
     keyPair = keyGen.generateKey();
     config = conf;
+    LocalDateTime start = LocalDateTime.now();
+    String certDurationString = conf.get(HDDS_X509_DEFAULT_DURATION,
+        HDDS_X509_DEFAULT_DURATION_DEFAULT);
+    Duration certDuration = Duration.parse(certDurationString);
+    LocalDateTime end = start.plus(certDuration);
+
     SelfSignedCertificate.Builder builder =
         SelfSignedCertificate.newBuilder()
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(365, ChronoUnit.DAYS))
+            .setBeginDate(start)
+            .setEndDate(end)
             .setClusterID("cluster1")
             .setKey(keyPair)
             .setSubject("localhost")

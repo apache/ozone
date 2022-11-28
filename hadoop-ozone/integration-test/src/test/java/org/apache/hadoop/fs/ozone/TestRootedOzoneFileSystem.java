@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -34,12 +35,15 @@ import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -52,12 +56,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -86,6 +92,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -98,6 +105,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKP
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -1934,6 +1942,61 @@ public class TestRootedOzoneFileSystem {
     }
 
   }
+
+
+  @Test
+  public void testCreateAndCheckECFileDiskUsage() throws Exception {
+    String key = "eckeytest";
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, volumeName);
+    Path bucketPathTest = new Path(volPathTest, bucketName);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    new ECReplicationConfig("RS-3-2-1024"),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+    // make sure the disk usage matches the expected value
+    Path filePath = new Path(bucketPathTest, key);
+    ContentSummary contentSummary = ofs.getContentSummary(filePath);
+    long length = contentSummary.getLength();
+    long spaceConsumed = contentSummary.getSpaceConsumed();
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
+            new ECReplicationConfig(3, 2, RS, 1024));
+    Assert.assertEquals(expectDiskUsage, spaceConsumed);
+    //clean up
+    ofs.delete(filePath, true);
+  }
+
+
+  @Test
+  public void testCreateAndCheckRatisFileDiskUsage() throws Exception {
+    String key = "ratiskeytest";
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, volumeName);
+    Path bucketPathTest = new Path(volPathTest, bucketName);
+    Path filePathTest = new Path(bucketPathTest, key);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    RatisReplicationConfig.getInstance(
+                            HddsProtos.ReplicationFactor.THREE),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+    // make sure the disk usage matches the expected value
+    ContentSummary contentSummary = ofs.getContentSummary(filePathTest);
+    long length = contentSummary.getLength();
+    long spaceConsumed = contentSummary.getSpaceConsumed();
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
+            RatisReplicationConfig.getInstance(
+                    HddsProtos.ReplicationFactor.THREE));
+    Assert.assertEquals(expectDiskUsage, spaceConsumed);
+    //clean up
+    ofs.delete(filePathTest, true);
+  }
+
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
     // This test is only meaningful when ACL is enabled

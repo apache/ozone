@@ -45,6 +45,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -244,10 +245,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     // By this time, we should have finished full stripe. So, lets call
     // executePutBlock for all.
-    // TODO: we should alter the put block calls to share CRC to each stream.
     final boolean isLastStripe = streamEntry.getRemaining() <= 0 ||
         ecChunkBufferCache.getLastDataCell().limit() < ecChunkSize;
-    streamEntry.executePutBlock(isLastStripe, streamEntry.getCurrentPosition());
+    ByteString checksum = streamEntry.calculateChecksum();
+    streamEntry.executePutBlock(isLastStripe,
+        streamEntry.getCurrentPosition(), checksum);
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {

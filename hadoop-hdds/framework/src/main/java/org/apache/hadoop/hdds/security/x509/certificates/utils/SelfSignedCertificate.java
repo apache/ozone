@@ -23,9 +23,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -58,6 +57,8 @@ import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A Self Signed Certificate with CertificateServer basic constraint can be used
@@ -69,11 +70,13 @@ public final class SelfSignedCertificate {
   private String subject;
   private String clusterID;
   private String scmID;
-  private LocalDate beginDate;
-  private LocalDate endDate;
+  private LocalDateTime beginDate;
+  private LocalDateTime endDate;
   private KeyPair key;
   private SecurityConfig config;
   private List<GeneralName> altNames;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SelfSignedCertificate.class);
 
   /**
    * Private Ctor invoked only via Builder Interface.
@@ -125,16 +128,13 @@ public final class SelfSignedCertificate {
       serial = new BigInteger(Long.toString(Time.monotonicNow()));
     }
 
-    ZoneOffset zoneOffset =
-        beginDate.atStartOfDay(ZoneOffset.systemDefault()).getOffset();
-
     // Valid from the Start of the day when we generate this Certificate.
     Date validFrom =
-        Date.from(beginDate.atTime(LocalTime.MIN).toInstant(zoneOffset));
+        Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant());
 
     // Valid till end day finishes.
     Date validTill =
-        Date.from(endDate.atTime(LocalTime.MAX).toInstant(zoneOffset));
+        Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant());
 
     X509v3CertificateBuilder builder = new X509v3CertificateBuilder(name,
         serial, validFrom, validTill, name, publicKeyInfo);
@@ -151,7 +151,12 @@ public final class SelfSignedCertificate {
                 new GeneralName[altNames.size()])).getEncoded()));
       }
     }
-    return builder.build(contentSigner);
+    X509CertificateHolder certHolder = builder.build(contentSigner);
+    LOG.info("Certificate {} is issued by {} to {}, valid from {} to {}",
+        certHolder.getSerialNumber(), certHolder.getIssuer(),
+        certHolder.getSubject(), certHolder.getNotBefore(),
+        certHolder.getNotAfter());
+    return certHolder;
   }
 
   /**
@@ -161,8 +166,8 @@ public final class SelfSignedCertificate {
     private String subject;
     private String clusterID;
     private String scmID;
-    private LocalDate beginDate;
-    private LocalDate endDate;
+    private LocalDateTime beginDate;
+    private LocalDateTime endDate;
     private KeyPair key;
     private SecurityConfig config;
     private boolean isCA;
@@ -193,12 +198,12 @@ public final class SelfSignedCertificate {
       return this;
     }
 
-    public Builder setBeginDate(LocalDate date) {
+    public Builder setBeginDate(LocalDateTime date) {
       this.beginDate = date;
       return this;
     }
 
-    public Builder setEndDate(LocalDate date) {
+    public Builder setEndDate(LocalDateTime date) {
       this.endDate = date;
       return this;
     }
@@ -279,8 +284,7 @@ public final class SelfSignedCertificate {
 
       // We just read the beginDate and EndDate as Start of the Day and
       // confirm that we do not violate the maxDuration Config.
-      Duration certDuration = Duration.between(beginDate.atStartOfDay(),
-          endDate.atStartOfDay());
+      Duration certDuration = Duration.between(beginDate, endDate);
       Duration maxDuration = config.getMaxCertificateDuration();
       if (certDuration.compareTo(maxDuration) > 0) {
         throw new SCMSecurityException("The cert duration violates the " +

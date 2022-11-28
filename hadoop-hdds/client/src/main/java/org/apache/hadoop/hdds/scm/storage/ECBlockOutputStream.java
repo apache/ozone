@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -28,11 +30,14 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -90,6 +95,87 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   public CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
+      boolean force, long blockGroupLength, BlockData[] blockData)
+      throws IOException {
+
+    ECReplicationConfig repConfig = (ECReplicationConfig)
+        getPipeline().getReplicationConfig();
+    int totalNodes = repConfig.getRequiredNodes();
+    int parity = repConfig.getParity();
+
+    //Write checksum only to parity and 1st Replica.
+    if (getReplicationIndex() > 1 &&
+        getReplicationIndex() <= (totalNodes - parity)) {
+      return executePutBlock(close, force, blockGroupLength);
+    }
+
+    BlockData checksumBlockData = null;
+    //Reverse Traversal as all parity will have checksumBytes
+    for (int i = blockData.length - 1; i >= 0; i--) {
+      BlockData bd = blockData[i];
+      if (bd == null) {
+        continue;
+      }
+      List<ChunkInfo> chunks = bd.getChunks();
+      if (chunks != null && chunks.get(0).hasStripeChecksum()) {
+        checksumBlockData = bd;
+        break;
+      }
+    }
+
+    if (checksumBlockData != null) {
+      List<ChunkInfo> currentChunks = getContainerBlockData().getChunksList();
+      List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
+
+      Preconditions.checkArgument(
+          currentChunks.size() == checksumBlockDataChunks.size());
+      List<ChunkInfo> newChunkList = new ArrayList<>();
+
+      for (int i = 0; i < currentChunks.size(); i++) {
+        ChunkInfo chunkInfo = currentChunks.get(i);
+        ChunkInfo checksumChunk = checksumBlockDataChunks.get(i);
+
+        ChunkInfo.Builder builder = ChunkInfo.newBuilder(chunkInfo);
+
+        if (chunkInfo.hasChecksumData()) {
+          builder.setStripeChecksum(checksumChunk.getStripeChecksum());
+        }
+
+        ChunkInfo newInfo =  builder.build();
+        newChunkList.add(newInfo);
+      }
+
+      getContainerBlockData().clearChunks();
+      getContainerBlockData().addAllChunks(newChunkList);
+    } else {
+      throw new IOException("None of the block data have checksum " +
+          "which means " + parity + "(parity)+1 blocks are " +
+          "not present");
+    }
+
+    return executePutBlock(close, force, blockGroupLength);
+  }
+
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutBlock(boolean close,
+      boolean force, long blockGroupLength, ByteString checksum)
+      throws IOException {
+
+    ECReplicationConfig repConfig = (ECReplicationConfig)
+        getPipeline().getReplicationConfig();
+    int totalNodes = repConfig.getRequiredNodes();
+    int parity = repConfig.getParity();
+
+    //Do not update checksum other than parity and 1st Replica.
+    if (!(getReplicationIndex() > 1 &&
+        getReplicationIndex() <= (totalNodes - parity))) {
+      updateChecksum(checksum);
+    }
+    return executePutBlock(close, force, blockGroupLength);
+  }
+
+  public CompletableFuture<ContainerProtos.
+      ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force, long blockGroupLength) throws IOException {
     updateBlockGroupLengthInPutBlockMeta(blockGroupLength);
     return executePutBlock(close, force);
@@ -106,6 +192,18 @@ public class ECBlockOutputStream extends BlockOutputStream {
     metadataList.add(keyValue);
     getContainerBlockData().clearMetadata(); // Clears old meta.
     getContainerBlockData().addAllMetadata(metadataList); // Add updated meta.
+  }
+
+  private void updateChecksum(ByteString checksum) {
+    int size = getContainerBlockData().getChunksCount();
+
+    if (size > 0) {
+      ChunkInfo oldInfo = getContainerBlockData().getChunks(size - 1);
+      ChunkInfo newInfo = ChunkInfo.newBuilder(oldInfo)
+          .setStripeChecksum(checksum).build();
+      getContainerBlockData().removeChunks(size - 1);
+      getContainerBlockData().addChunks(newInfo);
+    }
   }
 
   /**

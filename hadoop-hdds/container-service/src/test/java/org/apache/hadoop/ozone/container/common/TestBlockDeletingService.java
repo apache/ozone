@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -70,6 +71,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -77,11 +79,15 @@ import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -306,7 +312,11 @@ public class TestBlockDeletingService {
     long chunkLength = 100;
     try {
       for (int k = 0; k < numOfChunksPerBlock; k++) {
-        final String chunkName = String.format("block.%d.chunk.%d", i, k);
+        // This real chunkName should be localID_chunk_chunkIndex, here is for
+        // explicit debug and the necessity of HDDS-7446 to detect the orphan
+        // chunks through the chunk file name
+        final String chunkName = String.format("%d_chunk_%d_block_%d",
+            blockID.getContainerBlockID().getLocalID(), k, i);
         final long offset = k * chunkLength;
         ContainerProtos.ChunkInfo info =
             ContainerProtos.ChunkInfo.newBuilder().setChunkName(chunkName)
@@ -503,18 +513,20 @@ public class TestBlockDeletingService {
   @Test
   public void testWithUnrecordedBlocks() throws Exception {
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
-    // from received TNXs will be skipped to delete and will not be added into
-    // the NumPendingDeletionBlocks
-    if (Objects.equals(schemaVersion, SCHEMA_V1)) {
-      return;
-    }
+    // from received TNXs will be deleted, not in BlockDeletingService
+    Assume.assumeFalse(Objects.equals(schemaVersion, SCHEMA_V1));
+
+    int numOfContainers = 2;
+    int numOfChunksPerBlock = 1;
+    int numOfBlocksPerContainer = 3;
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionLimit(2);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
     conf.setFromObject(dnConf);
     ContainerSet containerSet = new ContainerSet(1000);
 
-    createToDeleteBlocks(containerSet, 2, 3, 1);
+    createToDeleteBlocks(containerSet, numOfContainers, numOfBlocksPerContainer,
+        numOfChunksPerBlock);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -535,18 +547,44 @@ public class TestBlockDeletingService {
     KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
         ctr1.getDeletingBlockKeyFilter() : ctr1.getUnprefixedKeyFilter();
 
+    // Have two unrecorded blocks onDisk and another two not to simulate the
+    // possible cases
+    int numUnrecordedBlocks = 4;
+    int numExistingOnDiskUnrecordedBlocks = 2;
+    List<Long> unrecordedBlockIds = new ArrayList<>();
+    Set<File> unrecordedChunks = new HashSet<>();
+
     try (DBHandle meta = BlockUtils.getDB(ctr1, conf)) {
       // create unrecorded blocks in a new txn and update metadata,
       // service shall first choose the top pendingDeletion container
       // if using the TopNOrderedContainerDeletionChoosingPolicy
-      List<Long> unrecordedBlocks = new ArrayList<>();
-      int numUnrecorded = 4;
-      for (int i = 0; i < numUnrecorded; i++) {
-        unrecordedBlocks.add(System.nanoTime() + i);
+      File chunkDir = ContainerUtils.getChunkDir(ctr1);
+      for (int i = 0; i < numUnrecordedBlocks; i++) {
+        long localId = System.nanoTime() + i;
+        unrecordedBlockIds.add(localId);
+        String chunkName;
+        for (int indexOfChunk = 0; indexOfChunk < numOfChunksPerBlock;
+             indexOfChunk++) {
+          if (layout == FILE_PER_BLOCK) {
+            chunkName = localId + ".block";
+          } else {
+            chunkName = localId + "_chunk_" + indexOfChunk;
+          }
+          File chunkFile = new File(chunkDir, chunkName);
+          unrecordedChunks.add(chunkFile);
+        }
       }
-      createTxn(ctr1, unrecordedBlocks, 100, ctr1.getContainerID());
+      // create unreferenced onDisk chunks
+      Iterator<File> iter = unrecordedChunks.iterator();
+      for (int m = 0; m < numExistingOnDiskUnrecordedBlocks; m++) {
+        File chunk = iter.next();
+        createRandomContentFile(chunk.getName(), chunkDir, 100);
+        Assert.assertTrue(chunk.exists());
+      }
+
+      createTxn(ctr1, unrecordedBlockIds, 100, ctr1.getContainerID());
       ctr1.updateDeleteTransactionId(100);
-      ctr1.incrPendingDeletionBlocks(numUnrecorded);
+      ctr1.incrPendingDeletionBlocks(numUnrecordedBlocks);
       updateMetaData(ctr1, (KeyValueContainer) containerSet.getContainer(
           ctr1.getContainerID()), 3, 1);
       // Ensure there are 3 + 4 = 7 blocks under deletion
@@ -577,6 +615,12 @@ public class TestBlockDeletingService {
     // check if blockData get deleted
     assertBlockDataTableRecordCount(0, ctr1, filter);
     assertBlockDataTableRecordCount(0, ctr2, filter);
+
+    // check if all the unreferenced chunks get deleted
+    for (File f: unrecordedChunks) {
+      Assert.assertFalse(f.exists());
+    }
+
     svc.shutdown();
   }
 
@@ -887,5 +931,22 @@ public class TestBlockDeletingService {
     Assert.assertEquals("Excepted: " + expectedCount
         + ", but actual: " + count + " in the blockData table of container: "
         + containerID + ".", expectedCount, count);
+  }
+
+  /**
+   * Create the certain sized file in the appointed directory.
+   *
+   * @param fileName the string of file to be created
+   * @param dir      the directory where file to be created
+   * @param sizeInBytes the bytes size of the file
+   * @throws IOException
+   */
+  private void createRandomContentFile(String fileName, File dir,
+      long sizeInBytes) throws IOException {
+    File file = new File(dir, fileName);
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(file,
+        "rw")) {
+      randomAccessFile.setLength(sizeInBytes);
+    }
   }
 }

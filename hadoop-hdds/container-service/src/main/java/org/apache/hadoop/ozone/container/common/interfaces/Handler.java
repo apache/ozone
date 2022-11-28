@@ -191,6 +191,17 @@ public abstract class Handler {
   public abstract void deleteBlock(Container container, BlockData blockData)
       throws IOException;
 
+  /**
+   * Deletes the possible onDisk but unreferenced blocks/chunks with localID
+   * in the container.
+   *
+   * @param container container whose block/chunk is to be deleted
+   * @param localID   localId of the block/chunk
+   * @throws IOException
+   */
+  public abstract void deleteUnreferenced(Container container, long localID)
+      throws IOException;
+
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;
   }
