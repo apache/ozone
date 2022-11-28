@@ -79,7 +79,8 @@ public class NSSummaryTask implements ReconOmTask {
     this.reconOMMetadataManager = reconOMMetadataManager;
     this.ozoneConfiguration = ozoneConfiguration;
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
