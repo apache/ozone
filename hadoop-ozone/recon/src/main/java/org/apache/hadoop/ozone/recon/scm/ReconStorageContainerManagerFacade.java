@@ -678,16 +678,4 @@ public class ReconStorageContainerManagerFacade
     return scmServiceProvider;
   }
 
-  public static void main(String[] args) {
-    long totalContainerCount = 130;
-    long containersMetaDataTotalRpcRespSizeMB =
-        CONTAINER_METADATA_SIZE * totalContainerCount;
-    long hadoopRPCSize = CommonConfigurationKeys.
-        IPC_MAXIMUM_DATA_LENGTH_DEFAULT;
-    long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
-        hadoopRPCSize ? totalContainerCount :
-        Math.round(Math.floor(Double.valueOf(
-            hadoopRPCSize / CONTAINER_METADATA_SIZE)));
-    System.out.println(containerCountPerCall);
-  }
 }
