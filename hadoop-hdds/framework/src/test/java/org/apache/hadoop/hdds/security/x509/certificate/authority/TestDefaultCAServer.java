@@ -293,7 +293,6 @@ public class TestDefaultCAServer {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
               CRLReason.lookup(CRLReason.keyCompromise), now);
-          result.isDone();
           result.get();
         });
   }
@@ -331,7 +330,6 @@ public class TestDefaultCAServer {
           Future<X509CertificateHolder> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
-          holder.isDone();
           holder.get();
         });
   }
