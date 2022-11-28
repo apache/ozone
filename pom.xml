@@ -112,7 +112,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.21</commons-compress.version>
     <commons-configuration2.version>2.1.1</commons-configuration2.version>
-    <commons-csv.version>1.0</commons-csv.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
     <commons-io.version>2.11.0</commons-io.version>
     <commons-lang3.version>3.7</commons-lang3.version>
@@ -150,7 +149,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>1.7.36</slf4j.version>
-    <log4j.version>1.2.17</log4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
     <reload4j.version>1.2.22</reload4j.version>
@@ -174,14 +172,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <guice.version>4.0</guice.version>
     <gson.version>2.9.0</gson.version>
 
-    <!-- Required for testing LDAP integration -->
-    <apacheds.version>2.0.0-M21</apacheds.version>
-    <ldap-api.version>1.0.0-M33</ldap-api.version>
-
-    <jcache.version>1.0-alpha-1</jcache.version>
-    <ehcache.version>3.3.1</ehcache.version>
-    <hikari.version>2.4.12</hikari.version>
-    <mssql.version>6.2.1.jre7</mssql.version>
     <okhttp.version>2.7.5</okhttp.version>
     <mockito1-powermock.version>1.10.19</mockito1-powermock.version>
     <mockito2.version>2.28.2</mockito2.version>
@@ -263,12 +253,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
         <version>${okhttp.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.squareup.okhttp3</groupId>
-        <artifactId>mockwebserver</artifactId>
-        <version>3.7.0</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
@@ -705,11 +689,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-compress.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-csv</artifactId>
-        <version>${commons-csv.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
         <version>${httpclient.version}</version>
@@ -878,11 +857,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>5.0.4</version>
       </dependency>
       <dependency>
-        <groupId>org.ojalgo</groupId>
-        <artifactId>ojalgo</artifactId>
-        <version>43.0</version>
-      </dependency>
-      <dependency>
         <groupId>com.sun.jersey</groupId>
         <artifactId>jersey-core</artifactId>
         <version>${jersey.version}</version>
@@ -955,30 +929,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>com.sun.jersey.jersey-test-framework</groupId>
-        <artifactId>jersey-test-framework-core</artifactId>
-        <version>${jersey.version}</version>
-        <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey.jersey-test-framework</groupId>
-        <artifactId>jersey-test-framework-grizzly2</artifactId>
-        <version>${jersey.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-
-      <dependency>
         <groupId>org.apache.ratis</groupId>
         <artifactId>ratis-proto-shaded</artifactId>
         <version>${ratis.version}</version>
@@ -1028,11 +978,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-io.version}</version>
       </dependency>
 
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-servlet-tester</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
       <dependency>
         <groupId>commons-logging</groupId>
         <artifactId>commons-logging</artifactId>
@@ -1108,21 +1053,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.amazonaws</groupId>
         <artifactId>aws-java-sdk-s3</artifactId>
         <version>${aws-java-sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ftpserver</groupId>
-        <artifactId>ftplet-api</artifactId>
-        <version>1.0.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ftpserver</groupId>
-        <artifactId>ftpserver-core</artifactId>
-        <version>1.0.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ftpserver</groupId>
-        <artifactId>ftpserver-deprecated</artifactId>
-        <version>1.0.0-M2</version>
       </dependency>
       <dependency>
         <groupId>junit</groupId>
@@ -1212,11 +1142,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.eclipse.jdt</groupId>
-        <artifactId>core</artifactId>
-        <version>3.1.1</version>
-      </dependency>
-      <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
         <version>5.4.0</version>
@@ -1270,22 +1195,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>1.0</version>
       </dependency>
       <dependency>
-        <groupId>org.mock-server</groupId>
-        <artifactId>mockserver-netty</artifactId>
-        <version>3.9.2</version>
-        <exclusions>
-          <exclusion>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>net.sf.kosmosfs</groupId>
-        <artifactId>kfs</artifactId>
-        <version>0.3</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.re2j</groupId>
         <artifactId>re2j</artifactId>
         <version>${re2j.version}</version>
@@ -1309,11 +1218,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.jcraft</groupId>
         <artifactId>jsch</artifactId>
         <version>0.1.54</version>
-      </dependency>
-      <dependency>
-        <groupId>com.googlecode.json-simple</groupId>
-        <artifactId>json-simple</artifactId>
-        <version>1.1.1</version>
       </dependency>
 
       <dependency>
@@ -1400,57 +1304,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>org.glassfish.grizzly</groupId>
-        <artifactId>grizzly-http-servlet</artifactId>
-        <version>2.2.21</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.grizzly</groupId>
-        <artifactId>grizzly-http</artifactId>
-        <version>2.2.21</version>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.grizzly</groupId>
-        <artifactId>grizzly-http-server</artifactId>
-        <version>2.2.21</version>
-      </dependency>
-
-      <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-storage</artifactId>
-        <version>7.0.0</version>
-      </dependency>
-
-      <!--Wildfly openssl dependency is introduced by HADOOP-15669-->
-      <dependency>
-        <groupId>org.wildfly.openssl</groupId>
-        <artifactId>wildfly-openssl</artifactId>
-        <version>1.0.4.Final</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.threadly</groupId>
-        <artifactId>threadly</artifactId>
-        <version>4.9.0</version>
-      </dependency>
-
-      <dependency>
-        <groupId>com.aliyun.oss</groupId>
-        <artifactId>aliyun-sdk-oss</artifactId>
-        <version>2.8.3</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>commons-beanutils</groupId>
-            <artifactId>commons-beanutils</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-
-      <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk16</artifactId>
         <version>${bouncycastle.version}</version>
@@ -1464,39 +1317,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>org.skyscreamer</groupId>
-        <artifactId>jsonassert</artifactId>
-        <version>1.3.0</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.kerby</groupId>
         <artifactId>kerb-simplekdc</artifactId>
         <version>1.0.1</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.geronimo.specs</groupId>
-        <artifactId>geronimo-jcache_1.0_spec</artifactId>
-        <version>${jcache.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.ehcache</groupId>
-        <artifactId>ehcache</artifactId>
-        <version>${ehcache.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.zaxxer</groupId>
-        <artifactId>HikariCP-java7</artifactId>
-        <version>${hikari.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.microsoft.sqlserver</groupId>
-        <artifactId>mssql-jdbc</artifactId>
-        <version>${mssql.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.swagger</groupId>
-        <artifactId>swagger-annotations</artifactId>
-        <version>${swagger-annotations-version}</version>
       </dependency>
       <dependency>
         <groupId>org.yaml</groupId>
@@ -1513,11 +1336,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.jboss.weld.servlet</groupId>
         <artifactId>weld-servlet</artifactId>
         <version>2.4.7.Final</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jruby.jcodings</groupId>
-        <artifactId>jcodings</artifactId>
-        <version>1.0.13</version>
       </dependency>
       <dependency>
         <groupId>org.powermock</groupId>
