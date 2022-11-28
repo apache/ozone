@@ -153,7 +153,7 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
     }
 
     // Open 5 containers on pipeline 2
-    for (long i = 6L; i <= 19L; ++i) {
+    for (long i = 6L; i <= 10L; ++i) {
       ContainerInfo containerInfo = new ContainerInfo.Builder()
           .setContainerID(i)
           .setReplicationConfig(
@@ -223,7 +223,7 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
 
     // initialize container report
     builder = ContainerReportsProto.newBuilder();
-    for (long i = 1L; i <= 19L; i++) {
+    for (long i = 1L; i <= 10L; i++) {
       if (i >= 1L && i < 6L) {
         builder.addReports(
             ContainerReplicaProto.newBuilder()
@@ -359,8 +359,6 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
     });
 
     Response response = clusterStateEndpoint.getClusterState();
-    ClusterStateResponse clusterStateResponse =
-        (ClusterStateResponse) response.getEntity();
     response = nodeEndpoint.getDatanodes();
     DatanodesResponse datanodesResponse =
         (DatanodesResponse) response.getEntity();
