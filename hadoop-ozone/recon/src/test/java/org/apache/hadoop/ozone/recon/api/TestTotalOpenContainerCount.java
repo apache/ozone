@@ -355,7 +355,7 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
       Response response1 = clusterStateEndpoint.getClusterState();
       ClusterStateResponse clusterStateResponse1 =
           (ClusterStateResponse) response1.getEntity();
-      return (clusterStateResponse1.getContainers() == 19);
+      return (clusterStateResponse1.getContainers() == 10);
     });
 
     Response response = clusterStateEndpoint.getClusterState();
