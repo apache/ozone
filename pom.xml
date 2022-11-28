@@ -72,10 +72,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>2.4.0</ratis.version>
+    <ratis.version>2.4.1</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.2</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.3</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -193,7 +193,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
-    <grpc.protobuf-compile.version>3.19.2</grpc.protobuf-compile.version>
+    <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
     <netty.version>4.1.79.Final</netty.version>
@@ -211,7 +211,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
 
     <!-- Plugin versions and config -->
-    <maven-surefire-plugin.argLine>-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
