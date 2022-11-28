@@ -118,7 +118,7 @@ public class ContainerHealthStatus {
   }
 
   public boolean isMissing() {
-    return numReplicas == 0;
+    return numReplicas == 0 && !isUnknown();
   }
 
   private ContainerPlacementStatus getPlacementStatus(
