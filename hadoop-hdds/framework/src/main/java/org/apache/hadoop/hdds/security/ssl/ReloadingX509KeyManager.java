@@ -61,7 +61,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    * memory.
    */
   static final char[] EMPTY_PASSWORD = new char[0];
-  private AtomicReference<X509ExtendedKeyManager> keyManagerRef;
+  private final AtomicReference<X509ExtendedKeyManager> keyManagerRef;
   /**
    * Current private key and cert used in keyManager. Used to detect if these
    * materials are changed.

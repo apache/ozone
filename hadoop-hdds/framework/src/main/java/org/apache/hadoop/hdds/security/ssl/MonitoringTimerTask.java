@@ -47,8 +47,8 @@ public class MonitoringTimerTask extends TimerTask {
   private final Consumer<Throwable> onReloadFailure;
 
   /**
-   * See {@link #MonitoringTimerTask(CertificateClient, Consumer, Consumer)}.
-   *
+   * Create monitoring task to be scheduled by a java.util.Timer instance.
+   * @param caClient client that holds all security materials.
    * @param onReload What to do when the security materials change.
    * @param onReloadFailure What to do when <code>onReload</code>
    *                        throws an exception.

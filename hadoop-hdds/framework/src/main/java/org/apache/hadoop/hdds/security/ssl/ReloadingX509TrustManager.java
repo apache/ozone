@@ -49,8 +49,8 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   static final String RELOAD_ERROR_MESSAGE =
       "Could not reload truststore (keep using existing one) : ";
 
-  private String type;
-  private AtomicReference<X509TrustManager> trustManagerRef;
+  private final String type;
+  private final AtomicReference<X509TrustManager> trustManagerRef;
   /**
    * Current CA cert in trustManager, to detect if certificate is changed.
    */

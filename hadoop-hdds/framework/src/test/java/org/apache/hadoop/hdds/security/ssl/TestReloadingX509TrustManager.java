@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.ssl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.CertificateClientTest;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -46,9 +47,9 @@ public class TestReloadingX509TrustManager {
     caClient = new CertificateClientTest(conf);
   }
 
-  @Test (timeout = 3000000)
+  @Test
   public void testReload() throws Exception {
-    long reloadInterval = 1000;
+    int reloadInterval = 1000;
     Timer fileMonitoringTimer = new Timer(true);
     ReloadingX509TrustManager tm =
         new ReloadingX509TrustManager("jks", caClient);
@@ -70,9 +71,11 @@ public class TestReloadingX509TrustManager {
           "ReloadingX509TrustManager is reloaded"));
 
       // Make sure there is only one reload happened.
-      Thread.sleep((reloadInterval + 1000));
-      assertEquals(1, StringUtils.countMatches(reloaderLog.getOutput(),
-          "ReloadingX509TrustManager is reloaded"));
+      GenericTestUtils.waitFor(
+          () -> 1 == StringUtils.countMatches(reloaderLog.getOutput(),
+              "ReloadingX509TrustManager is reloaded"),
+          1000, reloadInterval + 1000);
+
     } finally {
       fileMonitoringTimer.cancel();
     }
