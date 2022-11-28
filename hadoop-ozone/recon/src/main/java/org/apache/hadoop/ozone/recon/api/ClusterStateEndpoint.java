@@ -90,13 +90,20 @@ public class ClusterStateEndpoint {
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
     int containers = this.containerManager.getContainers().size();
     int pipelines = this.pipelineManager.getPipelines().size();
-    List<UnhealthyContainers> unhealthyContainers = containerHealthSchemaManager
+    List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0, MISSING_CONTAINER_COUNT_LIMIT);
-    int totalMissingContainerCount = unhealthyContainers.size() ==
+    int totalMissingContainerCount = missingContainers.size() ==
         MISSING_CONTAINER_COUNT_LIMIT ?
-        MISSING_CONTAINER_COUNT_LIMIT : unhealthyContainers.size();
+        MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size();
+    List<UnhealthyContainers> unknownContainers = containerHealthSchemaManager
+        .getUnhealthyContainers(
+            ContainerSchemaDefinition.UnHealthyContainerStates.UNKNOWN,
+            0, MISSING_CONTAINER_COUNT_LIMIT);
+    int unknownContainerCount = unknownContainers.size() ==
+        MISSING_CONTAINER_COUNT_LIMIT ?
+        MISSING_CONTAINER_COUNT_LIMIT : unknownContainers.size();
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
@@ -137,6 +144,7 @@ public class ClusterStateEndpoint {
         .setPipelines(pipelines)
         .setContainers(containers)
         .setMissingContainers(totalMissingContainerCount)
+        .setUnknownContainers(unknownContainerCount)
         .setTotalDatanodes(datanodeDetails.size())
         .setHealthyDatanodes(healthyDatanodes)
         .build();
