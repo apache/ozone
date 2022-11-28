@@ -68,26 +68,10 @@ public class ContainerHealthTask extends ReconScmTask {
   private PlacementPolicy placementPolicy;
   private final long interval;
 
-  private static OzoneConfiguration config;
+  private OzoneConfiguration config;
 
-  private static Long containerReportInterval = null;
+  private Long containerReportInterval = null;
   private Set<ContainerInfo> processedContainers = new HashSet<>();
-
-  public ContainerHealthTask(
-      ContainerManager containerManager,
-      StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
-      ContainerHealthSchemaManager containerHealthSchemaManager,
-      PlacementPolicy placementPolicy,
-      ReconTaskConfig reconTaskConfig) {
-    super(reconTaskStatusDao);
-    this.scmClient = scmClient;
-    this.containerHealthSchemaManager = containerHealthSchemaManager;
-    this.placementPolicy = placementPolicy;
-    this.containerManager = containerManager;
-    interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
-    containerReportInterval = getContainerReportFrequency();
-  }
 
   public ContainerHealthTask(
       ContainerManager containerManager,
@@ -97,9 +81,14 @@ public class ContainerHealthTask extends ReconScmTask {
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig,
       OzoneConfiguration config) {
-    this(containerManager, scmClient, reconTaskStatusDao,
-        containerHealthSchemaManager, placementPolicy, reconTaskConfig);
+    super(reconTaskStatusDao);
+    this.scmClient = scmClient;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.placementPolicy = placementPolicy;
+    this.containerManager = containerManager;
+    interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
     this.config = config;
+    containerReportInterval = getContainerReportFrequency();
   }
 
   @Override
@@ -183,7 +172,8 @@ public class ContainerHealthTask extends ReconScmTask {
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
           if (ContainerHealthRecords
-              .retainOrUpdateRecord(currentContainer, rec)) {
+              .retainOrUpdateRecord(currentContainer, rec,
+                  containerReportInterval)) {
             // Check if the missing container is deleted in SCM
             if (currentContainer.isMissing() &&
                 containerDeletedInSCM(currentContainer.getContainer())) {
@@ -266,7 +256,6 @@ public class ContainerHealthTask extends ReconScmTask {
    */
   public static class ContainerHealthRecords {
 
-
     /**
      * Given an existing database record and a ContainerHealthStatus object,
      * this method will check if the database record should be retained or not.
@@ -277,13 +266,19 @@ public class ContainerHealthTask extends ReconScmTask {
      * If the record is to be retained, the fields in the record for actual
      * replica count, delta and reason will be updated if their counts have
      * changed.
-     * @param container ContainerHealthStatus representing the health state of
-     *                  the container.
-     * @param rec Existing database record from the UnhealthyContainers table.
-     * @return
+     *
+     * @param container               ContainerHealthStatus representing the
+     *                                health state of the container.
+     * @param rec                     Existing database record from the
+     *                                UnhealthyContainers table.
+     * @param containerReportInterval Interval at which  datanodes to send
+     *                                report to Recon
+     * @return returns true or false if need to retain or update the unhealthy
+     * container record
      */
     public static boolean retainOrUpdateRecord(
-        ContainerHealthStatus container, UnhealthyContainersRecord rec) {
+        ContainerHealthStatus container, UnhealthyContainersRecord rec,
+        Long containerReportInterval) {
       boolean returnValue = false;
       switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
@@ -299,7 +294,8 @@ public class ContainerHealthTask extends ReconScmTask {
         returnValue = keepOverReplicatedRecord(container, rec);
         break;
       case UNKNOWN:
-        returnValue = keepUnknownContainerRecord(container, rec);
+        returnValue = keepUnknownContainerRecord(container, rec,
+            containerReportInterval);
         break;
       default:
         returnValue = false;
@@ -422,12 +418,13 @@ public class ContainerHealthTask extends ReconScmTask {
     }
 
     private static boolean keepUnknownContainerRecord(
-        ContainerHealthStatus container, UnhealthyContainersRecord rec) {
+        ContainerHealthStatus container, UnhealthyContainersRecord rec,
+        Long containerReportInterval) {
       if (container.isUnknown()) {
         updateExpectedReplicaCount(rec, container.getReplicationFactor());
         updateActualReplicaCount(rec, container.getReplicaCount());
         updateReplicaDelta(rec, container.replicaDelta());
-        if (containerReportTimeElapsed(rec)) {
+        if (containerReportTimeElapsed(rec, containerReportInterval)) {
           rec.setContainerState(UnHealthyContainerStates.MISSING.toString());
           container.getContainer().setState(HddsProtos.LifeCycleState.CLOSED);
         }
@@ -437,11 +434,10 @@ public class ContainerHealthTask extends ReconScmTask {
     }
 
     private static boolean containerReportTimeElapsed(
-        UnhealthyContainersRecord rec) {
+        UnhealthyContainersRecord rec, Long containerReportInterval) {
       long currentTime = System.currentTimeMillis();
       long timeElapsed = currentTime - rec.getInStateSince();
-      return timeElapsed >=
-          ContainerHealthTask.getContainerReportFrequency()
+      return timeElapsed >= containerReportInterval
               + Duration.ofMinutes(1).toMillis();
     }
 
@@ -481,13 +477,10 @@ public class ContainerHealthTask extends ReconScmTask {
     }
   }
 
-  protected static long getContainerReportFrequency() {
-    if (containerReportInterval == null) {
-      config.getTimeDuration(
-          HDDS_CONTAINER_REPORT_INTERVAL,
-          HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-    }
-    return containerReportInterval;
+  protected long getContainerReportFrequency() {
+    return config.getTimeDuration(
+        HDDS_CONTAINER_REPORT_INTERVAL,
+        HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 }

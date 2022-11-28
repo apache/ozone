@@ -595,6 +595,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(2, clusterStateResponse.getTotalDatanodes());
     Assertions.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
     Assertions.assertEquals(0, clusterStateResponse.getMissingContainers());
+    Assertions.assertEquals(0, clusterStateResponse.getUnknownContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = clusterStateEndpoint.getClusterState();
