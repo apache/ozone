@@ -69,7 +69,9 @@ public class SCMContainerMetrics implements MetricsSource {
 
     int totalContainers = 0;
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
-      totalContainers = totalContainers + stateCount.get(state.toString());
+      totalContainers = totalContainers +
+          (null == stateCount.get(state.toString())
+              ? 0 : stateCount.get(state.toString()));
     }
 
     collector.addRecord(SOURCE)
