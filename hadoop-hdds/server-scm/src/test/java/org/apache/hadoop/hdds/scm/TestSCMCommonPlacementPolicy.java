@@ -33,11 +33,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -74,20 +76,28 @@ public class TestSCMCommonPlacementPolicy {
             new DummyPlacementPolicy(nodeManager, conf);
     List<DatanodeDetails> list =
             nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    Set<ContainerReplica> replicas =
-            IntStream.range(1, 6).mapToObj(i ->
+    Map<Integer, ContainerReplica> replicas =
+            IntStream.range(1, 5).mapToObj(i ->
                     ContainerReplica.newBuilder()
                             .setContainerID(new ContainerID(1))
                             .setContainerState(CLOSED)
                             .setReplicaIndex(i)
-            .setDatanodeDetails(list.get(i)).build())
-                    .collect(Collectors.toSet());
-
+            .setDatanodeDetails(list.get(i - 1)).build())
+                    .collect(Collectors.toMap(ContainerReplica::getReplicaIndex,
+                            Function.identity()));
+    replicas.put(5, ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(5)
+            .setDatanodeDetails(list.get(5)).build());
 
     Map<ContainerReplica, Integer> replicasToCopy =
-            dummyPlacementPolicy.replicasToCopy(replicas,
-            2, 5);
-    Assertions.assertEquals(replicas, replicasToCopy.keySet());
+            dummyPlacementPolicy.replicasToCopy(replicas.values()
+                            .stream().collect(Collectors.toSet()),
+            1, 5);
+    Assertions.assertTrue(replicasToCopy.keySet().stream().findFirst()
+            .map(replica -> Arrays.asList(replicas.get(1), replicas.get(5))
+                    .contains(replica)).orElse(false));
     Assertions.assertTrue(replicasToCopy.values().stream()
             .allMatch(i -> i == 1));
   }
@@ -122,13 +132,13 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   private static class DummyPlacementPolicy extends
-          SCMCommonPlacementPolicy<Integer> {
+          SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> dns;
 
     DummyPlacementPolicy(
         NodeManager nodeManager,
         ConfigurationSource conf) {
-      super(nodeManager, conf, ContainerReplica::getReplicaIndex);
+      super(nodeManager, conf);
       dns = new HashMap<>();
       List<DatanodeDetails> datanodeDetails =
               nodeManager.getNodes(NodeStatus.inServiceHealthy());
@@ -145,6 +155,11 @@ public class TestSCMCommonPlacementPolicy {
     @Override
     public Node getPlacementGroup(DatanodeDetails dn) {
       return dns.get(dn);
+    }
+
+    @Override
+    protected int getRequiredRackCount(int numReplicas) {
+      return 5;
     }
   }
 }

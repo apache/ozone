@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -80,7 +79,7 @@ public class TestSCMContainerPlacementRackScatter {
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
   // policy with fallback capability
-  private SCMContainerPlacementRackScatter<Integer> policy;
+  private SCMContainerPlacementRackScatter policy;
   // node storage capacity
   private static final long STORAGE_CAPACITY = 100L;
   private SCMContainerPlacementMetrics metrics;
@@ -197,9 +196,8 @@ public class TestSCMContainerPlacementRackScatter {
         .thenReturn(cluster);
 
     // create placement policy instances
-    policy = new SCMContainerPlacementRackScatter<>(
-        nodeManager, conf, cluster, true, metrics,
-            ContainerReplica::getReplicaIndex);
+    policy = new SCMContainerPlacementRackScatter(
+        nodeManager, conf, cluster, true, metrics);
   }
 
   @BeforeEach
@@ -467,9 +465,9 @@ public class TestSCMContainerPlacementRackScatter {
 
     // choose nodes to host 5 replica
     int nodeNum = 5;
-    SCMContainerPlacementRackScatter<Integer> newPolicy =
-        new SCMContainerPlacementRackScatter<>(nodeManager, conf, clusterMap,
-            true, metrics, ContainerReplica::getReplicaIndex);
+    SCMContainerPlacementRackScatter newPolicy =
+        new SCMContainerPlacementRackScatter(nodeManager, conf, clusterMap,
+            true, metrics);
     List<DatanodeDetails> datanodeDetails =
         newPolicy.chooseDatanodes(null, null, nodeNum, 0, 15);
     Assertions.assertEquals(nodeNum, datanodeDetails.size());

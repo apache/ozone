@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -76,9 +75,9 @@ public class TestSCMContainerPlacementRackAware {
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
   // policy with fallback capability
-  private SCMContainerPlacementRackAware<Integer> policy;
+  private SCMContainerPlacementRackAware policy;
   // policy prohibit fallback
-  private SCMContainerPlacementRackAware<Integer> policyNoFallback;
+  private SCMContainerPlacementRackAware policyNoFallback;
   // node storage capacity
   private static final long STORAGE_CAPACITY = 100L;
   private SCMContainerPlacementMetrics metrics;
@@ -181,10 +180,10 @@ public class TestSCMContainerPlacementRackAware {
         .thenReturn(cluster);
 
     // create placement policy instances
-    policy = new SCMContainerPlacementRackAware<>(nodeManager, conf, cluster,
-            true, metrics, ContainerReplica::getReplicaIndex);
-    policyNoFallback = new SCMContainerPlacementRackAware<>(nodeManager, conf,
-            cluster, false, metrics, ContainerReplica::getReplicaIndex);
+    policy = new SCMContainerPlacementRackAware(
+        nodeManager, conf, cluster, true, metrics);
+    policyNoFallback = new SCMContainerPlacementRackAware(
+        nodeManager, conf, cluster, false, metrics);
   }
 
   @BeforeEach
@@ -482,9 +481,9 @@ public class TestSCMContainerPlacementRackAware {
 
     // choose nodes to host 3 replica
     int nodeNum = 3;
-    SCMContainerPlacementRackAware<Integer> newPolicy =
-        new SCMContainerPlacementRackAware<>(nodeManager, conf, clusterMap,
-                true, metrics, ContainerReplica::getReplicaIndex);
+    SCMContainerPlacementRackAware newPolicy =
+        new SCMContainerPlacementRackAware(nodeManager, conf, clusterMap, true,
+            metrics);
     List<DatanodeDetails> datanodeDetails =
         newPolicy.chooseDatanodes(null, null, nodeNum, 0, 15);
     Assertions.assertEquals(nodeNum, datanodeDetails.size());

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -34,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -49,8 +47,8 @@ import java.util.stream.Collectors;
  * recommend to use this if the network topology has more layers.
  * <p>
  */
-public final class SCMContainerPlacementRackAware<RID>
-    extends SCMCommonPlacementPolicy<RID> {
+public final class SCMContainerPlacementRackAware
+    extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackAware.class);
@@ -74,9 +72,8 @@ public final class SCMContainerPlacementRackAware<RID>
    */
   public SCMContainerPlacementRackAware(final NodeManager nodeManager,
       final ConfigurationSource conf, final NetworkTopology networkTopology,
-      final boolean fallback, final SCMContainerPlacementMetrics metrics,
-      final Function<ContainerReplica, RID> containerReplicaFunction) {
-    super(nodeManager, conf, containerReplicaFunction);
+      final boolean fallback, final SCMContainerPlacementMetrics metrics) {
+    super(nodeManager, conf);
     this.networkTopology = networkTopology;
     this.fallback = fallback;
     this.metrics = metrics;

@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.function.Function;
 
 /**
  * Container placement policy that randomly chooses healthy datanodes.
@@ -42,9 +41,8 @@ import java.util.function.Function;
  * Balancer will need to support containers as a feature before this class
  * can be practically used.
  */
-public final class SCMContainerPlacementRandom<RID> extends
-        SCMCommonPlacementPolicy<RID> implements
-        PlacementPolicy<ContainerReplica, Node> {
+public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
+    implements PlacementPolicy<ContainerReplica, Node> {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
@@ -57,9 +55,8 @@ public final class SCMContainerPlacementRandom<RID> extends
    */
   public SCMContainerPlacementRandom(final NodeManager nodeManager,
       final ConfigurationSource conf, final NetworkTopology networkTopology,
-      final boolean fallback, final SCMContainerPlacementMetrics metrics,
-      Function<ContainerReplica, RID> replicaIdentifierFunction) {
-    super(nodeManager, conf, replicaIdentifierFunction);
+      final boolean fallback, final SCMContainerPlacementMetrics metrics) {
+    super(nodeManager, conf);
   }
 
   /**
