@@ -237,8 +237,8 @@ public class TestOMRatisSnapshots {
     // read back data from the OM snapshot
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-                .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
+        .setBucketName(bucketName)
+        .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
     OmKeyInfo omKeyInfo = null;
     try {
       omKeyInfo = followerOM.lookupKey(omKeyArgs);
