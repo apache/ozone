@@ -245,7 +245,7 @@ public class TestOMRatisSnapshots {
     } catch (Exception e) {
       Assertions.fail("received exception: " + e);
     }
-    Assertions.assertTrue(omKeyInfo != null);
+    Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }
 
