@@ -135,12 +135,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private TableCountTask tableCountTask;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
-  private String pipelineId, pipelineId2;
+  private String pipelineId;
   private DatanodeDetails datanodeDetails;
   private DatanodeDetails datanodeDetails2;
+  private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
-  private Pipeline pipeline, pipeline2;
+  private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
@@ -150,11 +151,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
+
   private ContainerHealthSchemaManager containerHealthSchemaManager;
-  private List<Long> containerIDs;
-  private List<ContainerWithPipeline> cpw;
-  private StorageContainerServiceProvider mockScmServiceProvider;
-  private ContainerReportsProto.Builder builder;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -168,57 +166,31 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     datanodeDetails2.setIpAddress(IP2);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
-    pipeline2 = getRandomPipeline(datanodeDetails2);
-    pipelineId2 = pipeline2.getId().getId().toString();
+
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE))
+        .setState(LifeCycleState.OPEN)
+        .setOwner("test")
+        .setPipelineID(pipeline.getId())
+        .build();
+
+    ContainerWithPipeline containerWithPipeline =
+        new ContainerWithPipeline(containerInfo, pipeline);
 
     StorageContainerLocationProtocol mockScmClient = mock(
         StorageContainerLocationProtocol.class);
-    mockScmServiceProvider = mock(
+    StorageContainerServiceProvider mockScmServiceProvider = mock(
         StorageContainerServiceProviderImpl.class);
-
     when(mockScmServiceProvider.getPipeline(
         pipeline.getId().getProtobuf())).thenReturn(pipeline);
-    when(mockScmServiceProvider.getPipeline(
-        pipeline2.getId().getProtobuf())).thenReturn(pipeline2);
-
-    // Open 5 containers on pipeline 1
-    containerIDs = new LinkedList<>();
-    cpw = new LinkedList<>();
-    for (long i = 1L; i <= 5L; ++i) {
-      ContainerInfo containerInfo = new ContainerInfo.Builder()
-          .setContainerID(i)
-          .setReplicationConfig(
-              RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
-          .setState(LifeCycleState.OPEN)
-          .setOwner("test")
-          .setPipelineID(pipeline.getId())
-          .build();
-      ContainerWithPipeline containerWithPipeline =
-          new ContainerWithPipeline(containerInfo, pipeline);
-      when(mockScmServiceProvider.getContainerWithPipeline(i))
-          .thenReturn(containerWithPipeline);
-      containerIDs.add(i);
-      cpw.add(containerWithPipeline);
-    }
-
-    // Open 5 containers on pipeline 2
-    for (long i = 6L; i <= 10L; ++i) {
-      ContainerInfo containerInfo = new ContainerInfo.Builder()
-          .setContainerID(i)
-          .setReplicationConfig(
-              RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
-          .setState(LifeCycleState.OPEN)
-          .setOwner("test")
-          .setPipelineID(pipeline2.getId())
-          .build();
-      ContainerWithPipeline containerWithPipeline =
-          new ContainerWithPipeline(containerInfo, pipeline2);
-      when(mockScmServiceProvider.getContainerWithPipeline(i))
-          .thenReturn(containerWithPipeline);
-      containerIDs.add(i);
-      cpw.add(containerWithPipeline);
-    }
-
+    when(mockScmServiceProvider.getContainerWithPipeline(containerId))
+        .thenReturn(containerWithPipeline);
+    List<Long> containerIDs = new LinkedList<>();
+    containerIDs.add(containerId);
+    List<ContainerWithPipeline> cpw = new LinkedList<>();
+    cpw.add(containerWithPipeline);
     when(mockScmServiceProvider
         .getExistContainerWithPipelinesInBatch(containerIDs))
         .thenReturn(cpw);
@@ -292,29 +264,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     }
     String datanodeId = datanodeDetails.getUuid().toString();
     String datanodeId2 = datanodeDetails2.getUuid().toString();
-
-    // initialize container report
-    builder = ContainerReportsProto.newBuilder();
-    for (long i = 1L; i <= 10L; i++) {
-      if (i >= 1L && i < 6L) {
-        builder.addReports(
-            ContainerReplicaProto.newBuilder()
-                .setContainerID(i)
-                .setState(ContainerReplicaProto.State.OPEN)
-                .setOriginNodeId(datanodeId)
-                .build()
-        );
-      } else {
-        builder.addReports(
-            ContainerReplicaProto.newBuilder()
-                .setContainerID(i)
-                .setState(ContainerReplicaProto.State.OPEN)
-                .setOriginNodeId(datanodeId2)
-                .build()
-        );
-      }
-    }
-    containerReportsProto = builder.build();
+    containerReportsProto =
+        ContainerReportsProto.newBuilder()
+            .addReports(
+                ContainerReplicaProto.newBuilder()
+                    .setContainerID(containerId)
+                    .setState(ContainerReplicaProto.State.OPEN)
+                    .setOriginNodeId(datanodeId)
+                    .build())
+            .build();
 
     UUID pipelineUuid = UUID.fromString(pipelineId);
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
@@ -328,6 +286,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
                 .build())
         .setIsLeader(true)
         .build();
+    PipelineReportsProto pipelineReportsProto =
+        PipelineReportsProto.newBuilder()
+            .addPipelineReport(pipelineReport).build();
     DatanodeDetailsProto datanodeDetailsProto =
         DatanodeDetailsProto.newBuilder()
             .setHostName(HOST1)
@@ -359,20 +320,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto1)
             .addStorageReport(storageReportProto2).build();
 
-    UUID pipelineUuid2 = UUID.fromString(pipelineId2);
-    uuid128 = HddsProtos.UUID.newBuilder()
-        .setMostSigBits(pipelineUuid2.getMostSignificantBits())
-        .setLeastSigBits(pipelineUuid2.getLeastSignificantBits())
-        .build();
-    PipelineReport pipelineReport2 = PipelineReport.newBuilder()
-        .setPipelineID(
-            PipelineID.newBuilder().setId(pipelineId2).setUuid128(uuid128)
-                .build()).setIsLeader(false).build();
-    PipelineReportsProto pipelineReportsProto =
-        PipelineReportsProto.newBuilder()
-            .addPipelineReport(pipelineReport)
-            .addPipelineReport(pipelineReport2)
-            .build();
     DatanodeDetailsProto datanodeDetailsProto2 =
         DatanodeDetailsProto.newBuilder()
             .setHostName(HOST2)
@@ -410,9 +357,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto, layoutInfo);
       reconScm.getDatanodeProtocolServer()
-          .register(extendedDatanodeDetailsProto2,
-              nodeReportProto2, containerReportsProto, pipelineReportsProto,
-              layoutInfo);
+          .register(extendedDatanodeDetailsProto2, nodeReportProto2,
+              ContainerReportsProto.newBuilder().build(),
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
@@ -456,39 +404,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     dslContext.truncate(GLOBAL_STATS);
   }
 
-  @Test
-  public void testOpenContainerCount() throws Exception {
-
-    waitAndCheckConditionAfterHeartbeat(() -> {
-      Response response1 = clusterStateEndpoint.getClusterState();
-      ClusterStateResponse clusterStateResponse1 =
-          (ClusterStateResponse) response1.getEntity();
-      return (clusterStateResponse1.getContainers() == 10);
-    });
-
-    Response response = clusterStateEndpoint.getClusterState();
-    ClusterStateResponse clusterStateResponse =
-        (ClusterStateResponse) response.getEntity();
-    response = nodeEndpoint.getDatanodes();
-    DatanodesResponse datanodesResponse =
-        (DatanodesResponse) response.getEntity();
-    Assertions.assertEquals(2, datanodesResponse.getTotalCount());
-    AtomicInteger expectedCount = new AtomicInteger();
-
-    Response response1 = clusterStateEndpoint.getClusterState();
-    ClusterStateResponse clusterStateResponse1 =
-        (ClusterStateResponse) response1.getEntity();
-    // Get the total count of Open containers across all DataNodes
-    datanodesResponse.getDatanodes().forEach(datanodeMetadata -> {
-      expectedCount.set(
-          expectedCount.get() +
-              datanodeMetadata.getOpenContainers());
-    });
-
-    Assertions.assertEquals(expectedCount.intValue(),
-        clusterStateResponse1.getOpenContainers());
-  }
-
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
       throws IOException {
     // Check NodeState and NodeOperationalState field existence
@@ -525,8 +440,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Assertions.assertEquals(80000,
           datanodeMetadata.getDatanodeStorageReport().getUsed());
 
-      Assertions.assertEquals(1, datanodeMetadata.getPipelines().size());
-      Assertions.assertEquals(1, datanodeMetadata.getLeaderCount());
+      Assertions.assertEquals(0, datanodeMetadata.getPipelines().size());
+      Assertions.assertEquals(0, datanodeMetadata.getLeaderCount());
       break;
     default:
       Assertions.fail(String.format("Datanode %s not registered",
@@ -558,13 +473,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           (DatanodesResponse) response1.getEntity();
       DatanodeMetadata datanodeMetadata1 =
           datanodesResponse1.getDatanodes().stream().filter(datanodeMetadata ->
-                  datanodeMetadata.getHostname().equals("host1.datanode"))
+              datanodeMetadata.getHostname().equals("host1.datanode"))
               .findFirst().orElse(null);
       return (datanodeMetadata1 != null &&
-          datanodeMetadata1.getContainers() == 5 &&
-          datanodeMetadata1.getOpenContainers() == 5 &&
+          datanodeMetadata1.getContainers() == 1 &&
+          datanodeMetadata1.getOpenContainers() == 1 &&
           reconScm.getPipelineManager()
-              .getContainersInPipeline(pipeline.getId()).size() == 10);
+              .getContainersInPipeline(pipeline.getId()).size() == 1);
     });
 
     // Change Node OperationalState with NodeManager
@@ -610,8 +525,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Response response = pipelineEndpoint.getPipelines();
     PipelinesResponse pipelinesResponse =
         (PipelinesResponse) response.getEntity();
-    Assertions.assertEquals(2, pipelinesResponse.getTotalCount());
-    Assertions.assertEquals(2, pipelinesResponse.getPipelines().size());
+    Assertions.assertEquals(1, pipelinesResponse.getTotalCount());
+    Assertions.assertEquals(1, pipelinesResponse.getPipelines().size());
     PipelineMetadata pipelineMetadata =
         pipelinesResponse.getPipelines().iterator().next();
     Assertions.assertEquals(1, pipelineMetadata.getDatanodes().size());
@@ -663,7 +578,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     byte[] fileBytes = FileUtils.readFileToByteArray(
         new File(classLoader.getResource(PROMETHEUS_TEST_RESPONSE_FILE)
             .getFile())
-    );
+        );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
   }
 
@@ -673,7 +588,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ClusterStateResponse clusterStateResponse =
         (ClusterStateResponse) response.getEntity();
 
-    Assertions.assertEquals(2, clusterStateResponse.getPipelines());
+    Assertions.assertEquals(1, clusterStateResponse.getPipelines());
     Assertions.assertEquals(0, clusterStateResponse.getVolumes());
     Assertions.assertEquals(0, clusterStateResponse.getBuckets());
     Assertions.assertEquals(0, clusterStateResponse.getKeys());
@@ -685,7 +600,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Response response1 = clusterStateEndpoint.getClusterState();
       ClusterStateResponse clusterStateResponse1 =
           (ClusterStateResponse) response1.getEntity();
-      return (clusterStateResponse1.getContainers() == 10);
+      return (clusterStateResponse1.getContainers() == 1);
     });
 
     // check volume, bucket and key count after running table count task
