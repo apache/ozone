@@ -252,8 +252,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         // checkpoint files go to root of tarball
         fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
-      includeFile(file.toFile(), fixedFile,
-          archiveOutputStream);
+      includeFile(file.toFile(), fixedFile, archiveOutputStream);
     }
 
     //  Create list of hard links
