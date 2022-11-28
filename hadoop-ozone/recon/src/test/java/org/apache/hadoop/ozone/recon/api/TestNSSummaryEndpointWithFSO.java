@@ -75,6 +75,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -107,6 +108,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
+  private OzoneConfiguration ozoneConfiguration;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -341,6 +343,9 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Before
   public void setUp() throws Exception {
+    ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.newFolder());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -368,7 +373,7 @@ public class TestNSSummaryEndpointWithFSO {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager);
+            reconOMMetadataManager, ozoneConfiguration);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
