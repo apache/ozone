@@ -555,8 +555,8 @@ public class ReconStorageContainerManagerFacade
         CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
     long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
         hadoopRPCSize ? totalContainerCount :
-        Math.round(Math.floor(Double.valueOf(
-            hadoopRPCSize / CONTAINER_METADATA_SIZE)));
+        Math.round(Math.floor(
+            hadoopRPCSize / (double) CONTAINER_METADATA_SIZE));
     return containerCountPerCall;
   }
 
