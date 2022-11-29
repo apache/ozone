@@ -164,16 +164,8 @@ public class GrpcOzoneManagerMetrics {
     return grpcOmQueueTime;
   }
 
-  public MutableQuantiles[] getGrpcOmQueueTimeMillisQuantiles() {
-    return grpcOmQueueTimeMillisQuantiles;
-  }
-
   public MutableRate getGrpcOmProcessingTime() {
     return grpcOmProcessingTime;
-  }
-
-  public MutableQuantiles[] getGrpcOmProcessingTimeMillisQuantiles() {
-    return grpcOmProcessingTimeMillisQuantiles;
   }
 
   public MutableGaugeInt getNumActiveClientConnections() {
