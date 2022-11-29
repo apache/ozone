@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -33,36 +33,40 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
 
   @Override
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+      OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
-        omKeyInfo, true, getOmBucketInfo(), false);
+        omKeyInfo, true, getOmBucketInfo(), false,
+        omMetadataManager.getVolumeId(volumeName));
   }
 
   @Override
   protected String addKeyToTable() throws Exception {
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
 
     // Create parent dirs for the path
-    long parentId = TestOMRequestUtils.addParentsToDirTable(volumeName,
+    long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
             bucketName, "", omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentId + 1,
                     parentId, 100, Time.now());
-    TestOMRequestUtils.addFileToKeyTable(false, false,
+    OMRequestTestUtils.addFileToKeyTable(false, false,
             keyName, omKeyInfo, -1, 50, omMetadataManager);
-    return omKeyInfo.getPath();
+    return omMetadataManager.getOzonePathKey(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+           omKeyInfo.getParentObjectID(), keyName);
   }
 
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     Assert.assertNotNull(getOmBucketInfo());
-    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName,
             getOmBucketInfo().getBucketName(), keyName, replicationType,
             replicationFactor,
             getOmBucketInfo().getObjectID() + 1,

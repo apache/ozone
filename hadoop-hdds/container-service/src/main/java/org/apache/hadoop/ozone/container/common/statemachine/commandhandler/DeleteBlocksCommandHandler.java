@@ -31,20 +31,19 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
@@ -53,18 +52,18 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -72,6 +71,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
  * Handle block deletion commands.
@@ -88,17 +88,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ExecutorService executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
+  private final OzoneContainer ozoneContainer;
 
-  public DeleteBlocksCommandHandler(ContainerSet cset,
+  public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
-    this.containerSet = cset;
+    this.ozoneContainer = container;
+    this.containerSet = container.getContainerSet();
     this.conf = conf;
-    this.executor = new ThreadPoolExecutor(
-        0, threadPoolSize, 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DeleteBlocksCommandHandlerThread-%d")
-            .build());
+    this.executor = Executors.newFixedThreadPool(
+        threadPoolSize, new ThreadFactoryBuilder()
+            .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
     this.deleteCommandQueues = new LinkedBlockingQueue<>(queueLimit);
     handlerThread = new Daemon(new DeleteCmdWorker());
     handlerThread.start();
@@ -120,8 +119,18 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
       LOG.warn("Command is discarded because of the command queue is full");
-      return;
     }
+  }
+
+  /**
+   * The count returned here, is the count of queued SCM delete block commands.
+   * We get at most one such command per heartbeat, but the command can contain
+   * many blocks to delete.
+   * @return The number of SCM delete block commands pending in the queue.
+   */
+  @Override
+  public int getQueuedCount() {
+    return deleteCommandQueues.size();
   }
 
   /**
@@ -175,6 +184,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           Thread.sleep(2000);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
+          break;
         }
       }
     }
@@ -183,18 +193,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   /**
    * Process one delete transaction.
    */
-  public final class ProcessTransactionTask implements Runnable {
+  public final class ProcessTransactionTask implements
+      Callable<DeleteBlockTransactionResult> {
     private DeletedBlocksTransaction tx;
-    private ContainerBlocksDeletionACKProto.Builder result;
 
-    public ProcessTransactionTask(DeletedBlocksTransaction transaction,
-        ContainerBlocksDeletionACKProto.Builder resultBuilder) {
-      this.result = resultBuilder;
+    public ProcessTransactionTask(DeletedBlocksTransaction transaction) {
       this.tx = transaction;
     }
 
     @Override
-    public void run() {
+    public DeleteBlockTransactionResult call() {
       DeleteBlockTransactionResult.Builder txResultBuilder =
           DeleteBlockTransactionResult.newBuilder();
       txResultBuilder.setTxID(tx.getTxID());
@@ -219,10 +227,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
               markBlocksForDeletionSchemaV2(containerData, tx,
                   newDeletionBlocks, tx.getTxID());
+            } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+              markBlocksForDeletionSchemaV3(containerData, tx,
+                  newDeletionBlocks, tx.getTxID());
             } else {
               throw new UnsupportedOperationException(
-                  "Only schema version 1 and schema version 2 are "
-                      + "supported.");
+                  "Only schema version 1,2,3 are supported.");
             }
           } finally {
             cont.writeUnlock();
@@ -241,7 +251,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         txResultBuilder.setContainerID(containerId)
             .setSuccess(false);
       }
-      result.addResults(txResultBuilder.build());
+      return txResultBuilder.build();
     }
   }
 
@@ -267,18 +277,18 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder();
-      List<Future> futures = new ArrayList<>();
+      List<Future<DeleteBlockTransactionResult>> futures = new ArrayList<>();
       for (int i = 0; i < containerBlocks.size(); i++) {
         DeletedBlocksTransaction tx = containerBlocks.get(i);
-        Future future = executor.submit(
-            new ProcessTransactionTask(tx, resultBuilder));
+        Future<DeleteBlockTransactionResult> future =
+            executor.submit(new ProcessTransactionTask(tx));
         futures.add(future);
       }
 
       // Wait for tasks to finish
       futures.forEach(f -> {
         try {
-          f.get();
+          resultBuilder.addResults(f.get());
         } catch (InterruptedException | ExecutionException e) {
           LOG.error("task failed.", e);
           Thread.currentThread().interrupt();
@@ -316,6 +326,34 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
+  private void markBlocksForDeletionSchemaV3(
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
+      int newDeletionBlocks, long txnID)
+      throws IOException {
+    DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
+      Table<String, DeletedBlocksTransaction> delTxTable =
+          (Table<String, DeletedBlocksTransaction>) table;
+      delTxTable.putWithBatch(batch, containerData.deleteTxnKey(tid), txn);
+    };
+
+    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
+        txnID, schemaV3Marker);
+  }
+
+  private void markBlocksForDeletionSchemaV2(
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
+      int newDeletionBlocks, long txnID)
+      throws IOException {
+    DeletionMarker schemaV2Marker = (table, batch, tid, txn) -> {
+      Table<Long, DeletedBlocksTransaction> delTxTable =
+          (Table<Long, DeletedBlocksTransaction>) table;
+      delTxTable.putWithBatch(batch, tid, txn);
+    };
+
+    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
+        txnID, schemaV2Marker);
+  }
+
   /**
    * Move a bunch of blocks from a container to deleting state. This is a meta
    * update, the actual deletes happen in async mode.
@@ -324,24 +362,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    * @param delTX a block deletion transaction.
    * @throws IOException if I/O error occurs.
    */
-
-  private void markBlocksForDeletionSchemaV2(
+  private void markBlocksForDeletionTransaction(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks, long txnID) throws IOException {
+      int newDeletionBlocks, long txnID, DeletionMarker marker)
+      throws IOException {
     long containerId = delTX.getContainerID();
     if (!isTxnIdValid(containerId, containerData, delTX)) {
       return;
     }
-    try (ReferenceCountedDB containerDB = BlockUtils
-        .getDB(containerData, conf)) {
-      DatanodeStore ds = containerDB.getStore();
-      DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-          (DatanodeStoreSchemaTwoImpl) ds;
-      Table<Long, DeletedBlocksTransaction> delTxTable =
-          dnStoreTwoImpl.getDeleteTransactionTable();
+    try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
+      DeleteTransactionStore<?> store =
+          (DeleteTransactionStore<?>) containerDB.getStore();
+      Table<?, DeletedBlocksTransaction> delTxTable =
+          store.getDeleteTransactionTable();
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
-        delTxTable.putWithBatch(batch, txnID, delTX);
+        marker.apply(delTxTable, batch, txnID, delTX);
         newDeletionBlocks += delTX.getLocalIDList().size();
         updateMetaData(containerData, delTX, newDeletionBlocks, containerDB,
             batch);
@@ -358,8 +394,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       return;
     }
     int newDeletionBlocks = 0;
-    try (ReferenceCountedDB containerDB = BlockUtils
-        .getDB(containerData, conf)) {
+    try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
           containerDB.getStore().getBlockDataTable();
       Table<String, ChunkInfoList> deletedBlocksTable =
@@ -368,16 +403,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
         for (Long blkLong : delTX.getLocalIDList()) {
-          String blk = blkLong.toString();
+          String blk = containerData.blockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           if (blkInfo != null) {
-            String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
+            String deletingKey = containerData.deletingBlockKey(blkLong);
             if (blockDataTable.get(deletingKey) != null
                 || deletedBlocksTable.get(blk) != null) {
               if (LOG.isDebugEnabled()) {
-                LOG.debug(String.format(
-                    "Ignoring delete for block %s in container %d."
-                        + " Entry already added.", blk, containerId));
+                LOG.debug("Ignoring delete for block {} in container {}."
+                        + " Entry already added.", blkLong, containerId);
               }
               continue;
             }
@@ -388,12 +422,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             newDeletionBlocks++;
             if (LOG.isDebugEnabled()) {
               LOG.debug("Transited Block {} to DELETING state in container {}",
-                  blk, containerId);
+                  blkLong, containerId);
             }
           } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Block {} not found or already under deletion in"
-                  + " container {}, skip deleting it.", blk, containerId);
+            // try clean up the possibly onDisk but unreferenced blocks/chunks
+            try {
+              Container<?> container = containerSet.getContainer(containerId);
+              ozoneContainer.getDispatcher().getHandler(container
+                  .getContainerType()).deleteUnreferenced(container, blkLong);
+            } catch (IOException e) {
+              LOG.error("Failed to delete files for unreferenced block {} of " +
+                      "container {}", blkLong, containerId, e);
             }
           }
         }
@@ -412,7 +451,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   private void updateMetaData(KeyValueContainerData containerData,
       DeletedBlocksTransaction delTX, int newDeletionBlocks,
-      ReferenceCountedDB containerDB, BatchOperation batchOperation)
+      DBHandle containerDB, BatchOperation batchOperation)
       throws IOException {
     if (newDeletionBlocks > 0) {
       // Finally commit the DB counters.
@@ -424,14 +463,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
         metadataTable
-            .putWithBatch(batchOperation, OzoneConsts.DELETE_TRANSACTION_KEY,
+            .putWithBatch(batchOperation, containerData.latestDeleteTxnKey(),
                 delTX.getTxID());
       }
 
       long pendingDeleteBlocks =
           containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
       metadataTable
-          .putWithBatch(batchOperation, OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+          .putWithBatch(batchOperation,
+              containerData.pendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
       // update pending deletion blocks count and delete transaction ID in
@@ -501,5 +541,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  private interface DeletionMarker {
+    void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
+        BatchOperation batch, long txnID, DeletedBlocksTransaction delTX)
+        throws IOException;
   }
 }

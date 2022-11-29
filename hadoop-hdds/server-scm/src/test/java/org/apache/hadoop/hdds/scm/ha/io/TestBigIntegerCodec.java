@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 
@@ -37,6 +37,6 @@ public class TestBigIntegerCodec {
 
     BigInteger actual =
         (BigInteger) bigIntegerCodec.deserialize(BigInteger.class, byteString);
-    Assert.assertEquals(bigInteger, actual);
+    Assertions.assertEquals(bigInteger, actual);
   }
 }

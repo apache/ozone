@@ -36,14 +36,13 @@ import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -61,7 +60,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
-import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
@@ -69,22 +67,22 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.SELF_SIGNED_CA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the Default CA Server.
  */
 public class TestDefaultCAServer {
   private static OzoneConfiguration conf = new OzoneConfiguration();
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private MockCAStore caStore;
 
-  @Before
-  public void init() throws IOException {
-    conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
+  @BeforeEach
+  public void init(@TempDir Path tempDir) throws IOException {
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     caStore = new MockCAStore();
   }
 
@@ -288,7 +286,6 @@ public class TestDefaultCAServer {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
               CRLReason.lookup(CRLReason.keyCompromise), now);
-          result.isDone();
           result.get();
         });
   }
@@ -326,21 +323,20 @@ public class TestDefaultCAServer {
           Future<X509CertificateHolder> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
-          holder.isDone();
           holder.get();
         });
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testIntermediaryCAWithEmpty()
-      throws Exception {
+  @Test
+  public void testIntermediaryCAWithEmpty() {
 
     CertificateServer scmCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
         RandomStringUtils.randomAlphabetic(4), caStore,
         new DefaultProfile(), Paths.get("scm").toString());
 
-    scmCA.init(new SecurityConfig(conf), INTERMEDIARY_CA);
+    assertThrows(IllegalStateException.class,
+        () -> scmCA.init(new SecurityConfig(conf), INTERMEDIARY_CA));
   }
 
   @Test
@@ -362,7 +358,7 @@ public class TestDefaultCAServer {
         new SCMCertificateClient(new SecurityConfig(conf));
 
     CertificateClient.InitResponse response = scmCertificateClient.init();
-    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, response);
+    assertEquals(CertificateClient.InitResponse.GETCERT, response);
 
     // Generate cert
     KeyPair keyPair =
@@ -378,15 +374,17 @@ public class TestDefaultCAServer {
 
     Future<X509CertificateHolder> holder = rootCA.requestCertificate(csr,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
-    Assert.assertTrue(holder.isDone());
+    assertTrue(holder.isDone());
 
     X509CertificateHolder certificateHolder = holder.get();
 
 
-    Assert.assertNotNull(certificateHolder);
-    Assert.assertEquals(10, certificateHolder.getNotAfter().toInstant()
+    assertNotNull(certificateHolder);
+    LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
         .atZone(ZoneId.systemDefault())
-        .toLocalDate().compareTo(LocalDate.now()));
+        .toLocalDate();
+    LocalDate now = LocalDate.now();
+    assertEquals(0, invalidAfterDate.compareTo(now.plusDays(3650)));
 
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 

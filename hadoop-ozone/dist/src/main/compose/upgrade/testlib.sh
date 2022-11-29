@@ -94,20 +94,23 @@ run_test() {
     RESULT=1
   fi
 
-  generate_report 'upgrade' "$RESULT_DIR"
   copy_results "$test_subdir" "$ALL_RESULT_DIR"
 }
 
 ## @description Generates data on the cluster.
 ## @param The prefix to use for data generated.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
 generate() {
-    execute_robot_test scm -v PREFIX:"$1" upgrade/generate.robot
+    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/generate.robot
 }
 
 ## @description Validates that data exists on the cluster.
 ## @param The prefix of the data to be validated.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
 validate() {
-    execute_robot_test scm -v PREFIX:"$1" upgrade/validate.robot
+    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/validate.robot
 }
 
 ## @description Checks that the metadata layout version of the provided node matches what is expected.
@@ -146,4 +149,12 @@ check_om_mlv() {
 ## @param The metadata layout version expected for that service.
 check_scm_mlv() {
   check_mlv "$1" /data/metadata/scm/current/VERSION "$2"
+}
+
+check_ec_is_disabled() {
+  execute_robot_test scm --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
+}
+
+check_ec_is_enabled() {
+  execute_robot_test scm --include post-finalized-ec-tests ec/upgrade-ec-check.robot
 }

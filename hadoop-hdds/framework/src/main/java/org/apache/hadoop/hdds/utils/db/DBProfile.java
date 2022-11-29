@@ -20,12 +20,12 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
-import org.rocksdb.ColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.rocksdb.CompactionStyle;
-import org.rocksdb.DBOptions;
-import org.rocksdb.LRUCache;
 
 import java.math.BigDecimal;
 
@@ -47,45 +47,52 @@ public enum DBProfile {
     }
 
     @Override
-    public ColumnFamilyOptions getColumnFamilyOptions() {
+    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
       // Write Buffer Size -- set to 128 MB
       final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
 
-      return new ColumnFamilyOptions()
-          .setLevelCompactionDynamicLevelBytes(true)
+      ManagedColumnFamilyOptions managedColumnFamilyOptions =
+          new ManagedColumnFamilyOptions();
+
+      managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
           .setWriteBufferSize(writeBufferSize)
           .setTableFormatConfig(getBlockBasedTableConfig());
+
+      return managedColumnFamilyOptions;
     }
 
     @Override
-    public DBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions() {
       final int maxBackgroundCompactions = 4;
       final int maxBackgroundFlushes = 2;
       final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
       final boolean createIfMissing = true;
       final boolean createMissingColumnFamilies = true;
-      return new DBOptions()
+      ManagedDBOptions dbOptions = new ManagedDBOptions();
+      dbOptions
           .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
           .setMaxBackgroundCompactions(maxBackgroundCompactions)
           .setMaxBackgroundFlushes(maxBackgroundFlushes)
           .setBytesPerSync(bytesPerSync)
           .setCreateIfMissing(createIfMissing)
           .setCreateMissingColumnFamilies(createMissingColumnFamilies);
+      return dbOptions;
     }
 
     @Override
-    public BlockBasedTableConfig getBlockBasedTableConfig() {
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
       // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
       final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
 
       // Set the Default block size to 16KB
       final long blockSize = toLong(StorageUnit.KB.toBytes(16));
 
-      return new BlockBasedTableConfig()
-          .setBlockCache(new LRUCache(blockCacheSize))
-          .setBlockSize(blockSize)
-          .setPinL0FilterAndIndexBlocksInCache(true)
-          .setFilterPolicy(new BloomFilter());
+      ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
+      config.setBlockCache(new ManagedLRUCache(blockCacheSize))
+            .setBlockSize(blockSize)
+            .setPinL0FilterAndIndexBlocksInCache(true)
+            .setFilterPolicy(new ManagedBloomFilter());
+      return config;
     }
 
   },
@@ -96,32 +103,34 @@ public enum DBProfile {
     }
 
     @Override
-    public DBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions() {
       final long readAheadSize = toLong(StorageUnit.MB.toBytes(4.00));
-      return SSD.getDBOptions().setCompactionReadaheadSize(readAheadSize);
+      ManagedDBOptions dbOptions = SSD.getDBOptions();
+      dbOptions.setCompactionReadaheadSize(readAheadSize);
+      return dbOptions;
     }
 
     @Override
-    public ColumnFamilyOptions getColumnFamilyOptions() {
-      ColumnFamilyOptions columnFamilyOptions = SSD.getColumnFamilyOptions();
-      columnFamilyOptions.setCompactionStyle(CompactionStyle.LEVEL);
-      return columnFamilyOptions;
+    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
+      cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
+      return cfOptions;
     }
 
     @Override
-    public BlockBasedTableConfig getBlockBasedTableConfig() {
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
       return SSD.getBlockBasedTableConfig();
     }
   };
 
-  private static long toLong(double value) {
+  public static long toLong(double value) {
     BigDecimal temp = BigDecimal.valueOf(value);
     return temp.longValue();
   }
 
-  public abstract DBOptions getDBOptions();
+  public abstract ManagedDBOptions getDBOptions();
 
-  public abstract ColumnFamilyOptions getColumnFamilyOptions();
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions();
 
-  public abstract BlockBasedTableConfig getBlockBasedTableConfig();
+  public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig();
 }

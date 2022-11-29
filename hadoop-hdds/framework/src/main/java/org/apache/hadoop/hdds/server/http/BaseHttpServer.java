@@ -45,6 +45,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.createDir;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
@@ -194,9 +195,12 @@ public abstract class BaseHttpServer {
       final InetSocketAddress httpsAddr, String name) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
 
+    String userString = conf.get(OZONE_ADMINISTRATORS, "");
+    String groupString = conf.get(OZONE_ADMINISTRATORS_GROUPS, "");
+
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
-        .setConf(conf).setACL(new AccessControlList(conf.get(
-            OZONE_ADMINISTRATORS, " ")));
+        .setConf(conf)
+        .setACL(new AccessControlList(userString, groupString));
 
     // initialize the webserver for uploading/downloading files.
     if (policy.isHttpEnabled()) {

@@ -28,8 +28,11 @@ ${BUCKET}             generated
 
 *** Test Cases ***
 
-Head Bucket not existent
+Head Bucket
     ${result} =         Execute AWSS3APICli     head-bucket --bucket ${BUCKET}
+
+Head Bucket not existent
+    [tags]    no-bucket-type
     ${randStr} =        Generate Ozone String
     ${result} =         Execute AWSS3APICli and checkrc      head-bucket --bucket ozonenosuchbucketqqweqwe-${randStr}  255
                         Should contain          ${result}    404

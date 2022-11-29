@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.Set;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -80,9 +82,9 @@ public class DeletedBlockLogImpl
   private final ContainerManager containerManager;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
-  private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
   // Maps txId to its retry counts;
-  private Map<Long, Integer> transactionToRetryCountMap;
+  private final Map<Long, Integer> transactionToRetryCountMap;
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
@@ -152,7 +154,8 @@ public class DeletedBlockLogImpl
    * @throws IOException
    */
   @Override
-  public void incrementCount(List<Long> txIDs) throws IOException {
+  public void incrementCount(List<Long> txIDs)
+      throws IOException, TimeoutException {
     lock.lock();
     try {
       ArrayList<Long> txIDsToUpdate = new ArrayList<>();
@@ -179,6 +182,28 @@ public class DeletedBlockLogImpl
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   */
+  @Override
+  public int resetCount(List<Long> txIDs) throws IOException, TimeoutException {
+    lock.lock();
+    try {
+      if (txIDs == null || txIDs.isEmpty()) {
+        txIDs = getFailedTransactions().stream()
+            .map(DeletedBlocksTransaction::getTxID)
+            .collect(Collectors.toList());
+      }
+      for (Long txID: txIDs) {
+        transactionToRetryCountMap.computeIfPresent(txID, (key, value) -> 0);
+      }
+      return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
+          new ArrayList<>(new HashSet<>(txIDs)));
+    } finally {
+      lock.unlock();
+    }
+  }
 
   private DeletedBlocksTransaction constructNewTransaction(
       long txID, long containerID, List<Long> blocks) {
@@ -264,7 +289,7 @@ public class DeletedBlockLogImpl
       try {
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
         metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
-      } catch (IOException e) {
+      } catch (IOException | TimeoutException e) {
         LOG.warn("Could not commit delete block transactions: "
             + txIDsToBeDeleted, e);
       }
@@ -342,7 +367,7 @@ public class DeletedBlockLogImpl
    */
   @Override
   public void addTransactions(Map<Long, List<Long>> containerBlocksMap)
-      throws IOException {
+      throws IOException, TimeoutException {
     lock.lock();
     try {
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
@@ -368,17 +393,22 @@ public class DeletedBlockLogImpl
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions) {
     try {
+      DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
+          .newBuilder(tx)
+          .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
+          .build();
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueOf(tx.getContainerID()));
+          .getContainerReplicas(
+              ContainerID.valueOf(updatedTxn.getContainerID()));
       for (ContainerReplica replica : replicas) {
         UUID dnID = replica.getDatanodeDetails().getUuid();
         Set<UUID> dnsWithTransactionCommitted =
-            transactionToDNsCommitMap.get(tx.getTxID());
+            transactionToDNsCommitMap.get(updatedTxn.getTxID());
         if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
             .contains(dnID)) {
           // Transaction need not be sent to dns which have
           // already committed it
-          transactions.addTransactionToDN(dnID, tx);
+          transactions.addTransactionToDN(dnID, updatedTxn);
         }
       }
     } catch (IOException e) {
@@ -388,7 +418,7 @@ public class DeletedBlockLogImpl
 
   @Override
   public DatanodeDeletedBlockTransactions getTransactions(
-      int blockDeletionLimit) throws IOException {
+      int blockDeletionLimit) throws IOException, TimeoutException {
     lock.lock();
     try {
       DatanodeDeletedBlockTransactions transactions =
@@ -396,16 +426,18 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        int numBlocksAdded = 0;
         ArrayList<Long> txIDs = new ArrayList<>();
-        while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
+        // Here takes block replica count as the threshold to avoid the case
+        // that part of replicas committed the TXN and recorded in the
+        // transactionToDNsCommitMap, while they are counted in the threshold.
+        while (iter.hasNext() &&
+            transactions.getBlocksDeleted() < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              numBlocksAdded += txn.getLocalIDCount();
               getTransaction(txn, transactions);
               transactionToDNsCommitMap
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
@@ -442,7 +474,7 @@ public class DeletedBlockLogImpl
       commitTransactions(ackProto.getResultsList(),
           UUID.fromString(ackProto.getDnId()));
       metrics.incrBlockDeletionCommandSuccess();
-    } else if (status == CommandStatus.Status.FAILED){
+    } else if (status == CommandStatus.Status.FAILED) {
       metrics.incrBlockDeletionCommandFailure();
     } else {
       LOG.error("Delete Block Command is not executed yet.");

@@ -100,7 +100,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
-      checkACLs(ozoneManager, volumeName, bucketName, keyName,
+      checkACLsWithFSO(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -127,13 +127,17 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      String ozonePathKey = omMetadataManager.getOzonePathKey(
-              omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager.getBucketId(volumeName,
+              bucketName);
+      String ozonePathKey = omMetadataManager.getOzonePathKey(volumeId,
+              bucketId, omKeyInfo.getParentObjectID(),
+              omKeyInfo.getFileName());
 
       if (keyStatus.isDirectory()) {
         // Check if there are any sub path exists under the user requested path
-        if (!recursive && OMFileRequest.hasChildren(omKeyInfo,
-                omMetadataManager)) {
+        if (!recursive &&
+            OMFileRequest.hasChildren(omKeyInfo, omMetadataManager)) {
           throw new OMException("Directory is not empty. Key:" + keyName,
                   DIRECTORY_NOT_EMPTY);
         }
@@ -164,14 +168,14 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omClientResponse = new OMKeyDeleteResponseWithFSO(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
           keyName, omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject(), keyStatus.isDirectory());
+          omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyDeleteResponseWithFSO(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);

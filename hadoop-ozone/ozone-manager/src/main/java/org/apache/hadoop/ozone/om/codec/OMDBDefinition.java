@@ -27,7 +27,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -179,11 +182,42 @@ public class OMDBDefinition implements DBDefinition {
 
   public static final DBColumnFamilyDefinition<String, String>
       META_TABLE = new DBColumnFamilyDefinition<>(
-      OmMetadataManagerImpl.META_TABLE,
-      String.class,
-      new StringCodec(),
-      String.class,
-      new StringCodec());
+          OmMetadataManagerImpl.META_TABLE,
+          String.class,
+          new StringCodec(),
+          String.class,
+          new StringCodec());
+
+  // Tables for multi-tenancy
+
+  public static final DBColumnFamilyDefinition<String, OmDBAccessIdInfo>
+            TENANT_ACCESS_ID_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE,
+                    String.class,  // accessId
+                    new StringCodec(),
+                    OmDBAccessIdInfo.class,  // tenantId, secret, principal
+                    new OmDBAccessIdInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo>
+            PRINCIPAL_TO_ACCESS_IDS_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE,
+                    String.class,  // User principal
+                    new StringCodec(),
+                    OmDBUserPrincipalInfo.class,  // List of accessIds
+                    new OmDBUserPrincipalInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBTenantState>
+            TENANT_STATE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_STATE_TABLE,
+                    String.class,  // tenantId (tenant name)
+                    new StringCodec(),
+                    OmDBTenantState.class,
+                    new OmDBTenantStateCodec());
+
+  // End tables for S3 multi-tenancy
 
   @Override
   public String getName() {
@@ -201,7 +235,9 @@ public class OMDBDefinition implements DBDefinition {
         VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
-        FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE};
+        FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
+        TENANT_ACCESS_ID_TABLE,
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE};
   }
 }
 

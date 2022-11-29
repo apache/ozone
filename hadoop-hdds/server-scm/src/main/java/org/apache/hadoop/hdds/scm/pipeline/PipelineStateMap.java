@@ -26,7 +26,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -136,7 +145,7 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID of the pipeline to be retrieved
    * @return Pipeline
-   * @throws IOException if pipeline is not found
+   * @throws PipelineNotFoundException if pipeline is not found
    */
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID,
@@ -196,7 +205,7 @@ class PipelineStateMap {
     if (state == PipelineState.OPEN) {
       return new ArrayList<>(
           query2OpenPipelines.getOrDefault(
-              replicationConfig, Collections.EMPTY_LIST));
+              replicationConfig, Collections.emptyList()));
     }
 
     List<Pipeline> pipelines = new ArrayList<>();
@@ -208,6 +217,36 @@ class PipelineStateMap {
     }
 
     return pipelines;
+  }
+
+  /**
+   * Get a count of pipelines with the given replicationConfig and state.
+   * This method is most efficient when getting a count for OPEN pipeline
+   * as the result can be obtained directly from the cached open list.
+   *
+   * @param replicationConfig - ReplicationConfig
+   * @param state             - Required PipelineState
+   * @return Count of pipelines with the specified replication config and state
+   */
+  int getPipelineCount(ReplicationConfig replicationConfig,
+      PipelineState state) {
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
+
+    if (state == PipelineState.OPEN) {
+      return query2OpenPipelines.getOrDefault(
+              replicationConfig, Collections.emptyList()).size();
+    }
+
+    int count = 0;
+    for (Pipeline pipeline : pipelineMap.values()) {
+      if (pipeline.getReplicationConfig().equals(replicationConfig)
+          && pipeline.getPipelineState() == state) {
+        count++;
+      }
+    }
+    return count;
   }
 
   /**
@@ -230,12 +269,12 @@ class PipelineStateMap {
     Preconditions
         .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
     Preconditions
-        .checkNotNull(excludeDns, "Pipeline exclude list cannot be null");
+        .checkNotNull(excludePipelines, "Pipeline exclude list cannot be null");
 
     List<Pipeline> pipelines = null;
     if (state == PipelineState.OPEN) {
       pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
-          replicationConfig, Collections.EMPTY_LIST));
+          replicationConfig, Collections.emptyList()));
     } else {
       pipelines = new ArrayList<>(pipelineMap.values());
     }
@@ -265,7 +304,7 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID
    * @return Set of containerIDs belonging to the pipeline
-   * @throws IOException if pipeline is not found
+   * @throws PipelineNotFoundException if pipeline is not found
    */
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
@@ -285,7 +324,7 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID
    * @return Number of containers belonging to the pipeline
-   * @throws IOException if pipeline is not found
+   * @throws PipelineNotFoundException if pipeline is not found
    */
   int getNumberOfContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
@@ -350,7 +389,7 @@ class PipelineStateMap {
    *                   to be updated
    * @param state - new state of the pipeline
    * @return Pipeline with the updated state
-   * @throws IOException if pipeline does not exist
+   * @throws PipelineNotFoundException if pipeline does not exist
    */
   Pipeline updatePipelineState(PipelineID pipelineID, PipelineState state)
       throws PipelineNotFoundException {

@@ -115,7 +115,7 @@ public class TestReconAsPassiveScm {
     LambdaTestUtils.intercept(UnsupportedOperationException.class,
         "Trying to create pipeline in Recon, which is prohibited!",
         () -> reconPipelineManager
-            .createPipeline(new RatisReplicationConfig(ONE)));
+            .createPipeline(RatisReplicationConfig.getInstance(ONE)));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
@@ -130,7 +130,7 @@ public class TestReconAsPassiveScm {
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(new RatisReplicationConfig(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -138,8 +138,8 @@ public class TestReconAsPassiveScm {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Verify Recon picked up the new container that was created.
-    assertEquals(scmContainerManager.getContainerIDs(),
-        reconContainerManager.getContainerIDs());
+    assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);
@@ -171,7 +171,7 @@ public class TestReconAsPassiveScm {
     // Create container in SCM.
     ContainerInfo containerInfo =
         scmContainerManager
-            .allocateContainer(new RatisReplicationConfig(ONE), "test");
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
@@ -182,7 +182,7 @@ public class TestReconAsPassiveScm {
 
     // Close a pipeline
     Optional<Pipeline> pipelineToClose = scmPipelineManager
-        .getPipelines(new RatisReplicationConfig(ONE))
+        .getPipelines(RatisReplicationConfig.getInstance(ONE))
         .stream()
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();

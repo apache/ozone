@@ -53,7 +53,7 @@ public class DefaultCAProfile extends DefaultProfile {
       PKIProfile pkiProfile) {
     BasicConstraints constraints =
         BasicConstraints.getInstance(ext.getParsedValue());
-    if(constraints.isCA()) {
+    if (constraints.isCA()) {
       if (pkiProfile.isCA()) {
         return true;
       }

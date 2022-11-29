@@ -116,7 +116,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
     }
   }
 
-  public boolean isAtTheEnd(){
+  public boolean isAtTheEnd() {
     return getCurrentFileName().equals(END_MARKER);
   }
   @Override

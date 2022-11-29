@@ -50,6 +50,8 @@ public final class SCMNodeMetrics implements MetricsSource {
   private @Metric MutableCounterLong numHBProcessingFailed;
   private @Metric MutableCounterLong numNodeReportProcessed;
   private @Metric MutableCounterLong numNodeReportProcessingFailed;
+  private @Metric MutableCounterLong numNodeCommandQueueReportProcessed;
+  private @Metric MutableCounterLong numNodeCommandQueueReportProcessingFailed;
   private @Metric String textMetric;
 
   private final MetricsRegistry registry;
@@ -112,6 +114,20 @@ public final class SCMNodeMetrics implements MetricsSource {
   }
 
   /**
+   * Increments number of Command Queue reports processed.
+   */
+  void incNumNodeCommandQueueReportProcessed() {
+    numNodeCommandQueueReportProcessed.incr();
+  }
+
+  /**
+   * Increments number of Command Queue reports where processing failed.
+   */
+  void incNumNodeCommandQueueReportProcessingFailed() {
+    numNodeCommandQueueReportProcessingFailed.incr();
+  }
+
+  /**
    * Get aggregated counter and gauge metrics.
    */
   @Override
@@ -129,12 +145,12 @@ public final class SCMNodeMetrics implements MetricsSource {
      *     ...
      */
     MetricsRecordBuilder metrics = collector.addRecord(registry.info());
-    for(Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
-      for(Map.Entry<String, Integer> h : e.getValue().entrySet()) {
+    for (Map.Entry<String, Map<String, Integer>> e : nodeCount.entrySet()) {
+      for (Map.Entry<String, Integer> h : e.getValue().entrySet()) {
         metrics.addGauge(
             Interns.info(
-                StringUtils.camelize(e.getKey()+"_"+h.getKey()+"_nodes"),
-                "Number of "+e.getKey()+" "+h.getKey()+" datanodes"),
+                StringUtils.camelize(e.getKey() + "_" + h.getKey() + "_nodes"),
+                "Number of " + e.getKey() + " " + h.getKey() + " datanodes"),
             h.getValue());
       }
     }

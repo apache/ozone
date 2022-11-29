@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -65,6 +66,7 @@ import picocli.CommandLine.ParentCommand;
 /**
  * Base class for simplified performance tests.
  */
+@SuppressWarnings("java:S2245") // no need for secure random
 public class BaseFreonGenerator {
 
   private static final Logger LOG =
@@ -208,7 +210,7 @@ public class BaseFreonGenerator {
   }
 
   private void shutdown() {
-    if (failureCounter.get() > 0 && !failAtEnd) {
+    if (failureCounter.get() > 0) {
       progressBar.terminate();
     } else {
       progressBar.shutdown();
@@ -248,7 +250,8 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    LOG.info("Executing test with prefix {}", prefix);
+    LOG.info("Executing test with prefix {} " +
+        "and number-of-tests {}", prefix, testNo);
 
     pathSchema = new PathSchema(prefix);
 
@@ -299,6 +302,11 @@ public class BaseFreonGenerator {
         Math.round((System.currentTimeMillis() - startTime) / 1000.0));
     messages.add("Failures: " + failureCounter.get());
     messages.add("Successful executions: " + successCounter.get());
+    if (failureCounter.get() > 0) {
+      messages.add("Expected " + testNo
+          + " --number-of-tests objects!, successfully executed "
+          + successCounter.get());
+    }
 
     Consumer<String> print = freonCommand.isInteractive()
         ? System.out::println
@@ -309,7 +317,7 @@ public class BaseFreonGenerator {
   /**
    * Print out reports with the given message.
    */
-  public void print(String msg){
+  public void print(String msg) {
     Consumer<String> print = freonCommand.isInteractive()
             ? System.out::println
             : LOG::info;
@@ -345,19 +353,24 @@ public class BaseFreonGenerator {
     return HAUtils.getScmContainerClient(ozoneConf);
   }
 
+  @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public static Pipeline findPipelineForTest(String pipelineId,
       StorageContainerLocationProtocol client, Logger log) throws IOException {
-    List<Pipeline> pipelines = client.listPipelines();
+    Stream<Pipeline> pipelines = client.listPipelines().stream();
     Pipeline pipeline;
+    if (log.isDebugEnabled()) {
+      pipelines = pipelines
+          .peek(p -> log.debug("Found pipeline {}", p.getId().getId()));
+    }
     if (pipelineId != null && pipelineId.length() > 0) {
-      pipeline = pipelines.stream()
+      pipeline = pipelines
           .filter(p -> p.getId().toString().equals(pipelineId))
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException(
               "Pipeline ID is defined, but there is no such pipeline: "
                   + pipelineId));
     } else {
-      pipeline = pipelines.stream()
+      pipeline = pipelines
           .filter(p -> p.getReplicationConfig().getRequiredNodes() == 3)
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException(

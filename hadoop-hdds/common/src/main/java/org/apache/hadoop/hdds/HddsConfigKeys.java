@@ -26,6 +26,10 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.interval";
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
+  public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
+      "hdds.recon.heartbeat.interval";
+  public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
+      "60s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -151,7 +155,7 @@ public final class HddsConfigKeys {
    */
   public static final String HDDS_X509_MAX_DURATION = "hdds.x509.max.duration";
   // Limit Certificate duration to a max value of 5 years.
-  public static final String HDDS_X509_MAX_DURATION_DEFAULT= "P1865D";
+  public static final String HDDS_X509_MAX_DURATION_DEFAULT = "P1865D";
   public static final String HDDS_X509_SIGNATURE_ALGO =
       "hdds.x509.signature.algorithm";
   public static final String HDDS_X509_SIGNATURE_ALGO_DEFAULT = "SHA256withRSA";
@@ -181,6 +185,16 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_DEFAULT_DURATION_DEFAULT = "P365D";
 
   /**
+   * Duration of the grace period within which a certificate should be
+   * renewed before the current one expires.
+   * Default is 28 days.
+   */
+  public static final String HDDS_X509_RENEW_GRACE_DURATION =
+      "hdds.x509.renew.grace.duration";
+
+  public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
+
+  /**
    * Do not instantiate.
    */
   private HddsConfigKeys() {
@@ -199,6 +213,19 @@ public final class HddsConfigKeys {
   public static final String HDDS_GRPC_TLS_TEST_CERT = "hdds.grpc.tls" +
       ".test.cert";
   public static final boolean HDDS_GRPC_TLS_TEST_CERT_DEFAULT = false;
+
+  /**
+   * The default time interval used to check if either of the truststore or
+   * keystore certificates file has changed and needs reloading.
+   */
+  public static final String HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL =
+      "hdds.security.ssl.keystore.reload.interval";
+  public static final String HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL =
+      "hdds.security.ssl.truststore.reload.interval";
+  public static final String
+      HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
+  public static final String
+      HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
 
   // Comma separated acls (users, groups) allowing clients accessing
   // datanode container protocol
@@ -270,4 +297,6 @@ public final class HddsConfigKeys {
   public static final boolean
           HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT = true;
 
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
+      "ozone.audit.log.debug.cmd.list.dnaudit";
 }

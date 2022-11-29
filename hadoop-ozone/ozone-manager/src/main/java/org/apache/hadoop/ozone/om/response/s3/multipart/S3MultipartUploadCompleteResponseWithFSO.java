@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -47,13 +50,21 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
+  private long volumeId;
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
       @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull List<OmKeyInfo> unUsedParts) {
-    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts);
+      @Nonnull List<OmKeyInfo> unUsedParts,
+      @Nonnull BucketLayout bucketLayout,
+      @Nonnull OmBucketInfo omBucketInfo,
+      RepeatedOmKeyInfo keysToDelete, @Nonnull long volumeId) {
+    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
+        bucketLayout, omBucketInfo, keysToDelete);
+    this.volumeId = volumeId;
   }
 
   /**
@@ -61,8 +72,8 @@ public class S3MultipartUploadCompleteResponseWithFSO
    * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadCompleteResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 
@@ -75,7 +86,8 @@ public class S3MultipartUploadCompleteResponseWithFSO
             getOmKeyInfo().getBucketName(), getOmKeyInfo().getKeyName());
 
     OMFileRequest
-        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo());
+        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo(),
+            volumeId, getOmBucketInfo().getObjectID());
 
     return ozoneKey;
 

@@ -41,6 +41,7 @@ public class ReplicateContainerCommand
 
   private final long containerID;
   private final List<DatanodeDetails> sourceDatanodes;
+  private int replicaIndex = 0;
 
   public ReplicateContainerCommand(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -57,6 +58,10 @@ public class ReplicateContainerCommand
     this.sourceDatanodes = sourceDatanodes;
   }
 
+  public void setReplicaIndex(int index) {
+    replicaIndex = index;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
@@ -70,6 +75,7 @@ public class ReplicateContainerCommand
     for (DatanodeDetails dd : sourceDatanodes) {
       builder.addSources(dd.getProtoBufMessage());
     }
+    builder.setReplicaIndex(replicaIndex);
     return builder.build();
   }
 
@@ -83,9 +89,13 @@ public class ReplicateContainerCommand
             .map(DatanodeDetails::getFromProtoBuf)
             .collect(Collectors.toList());
 
-    return new ReplicateContainerCommand(protoMessage.getContainerID(),
-        datanodeDetails, protoMessage.getCmdId());
-
+    ReplicateContainerCommand cmd =
+        new ReplicateContainerCommand(protoMessage.getContainerID(),
+            datanodeDetails, protoMessage.getCmdId());
+    if (protoMessage.hasReplicaIndex()) {
+      cmd.setReplicaIndex(protoMessage.getReplicaIndex());
+    }
+    return cmd;
   }
 
   public long getContainerID() {
@@ -94,5 +104,9 @@ public class ReplicateContainerCommand
 
   public List<DatanodeDetails> getSourceDatanodes() {
     return sourceDatanodes;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
   }
 }

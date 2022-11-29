@@ -25,6 +25,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -41,10 +42,21 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -118,7 +130,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
-       .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+        .setCreateBucketRequest(newCreateBucketRequest.build()).build();
   }
 
   @Override
@@ -139,18 +151,24 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    String omLayout = ozoneManager.getOMMetadataLayout();
     OmBucketInfo omBucketInfo = null;
-    if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
-        .equals(BucketLayoutProto.LEGACY)) {
-      // Bucket Layout argument was not passed during bucket creation.
-      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
-      BucketLayout defaultType = BucketLayout.fromString(omDefaultBucketLayout);
-      omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo, defaultType);
+
+    // bucketInfo.hasBucketLayout() would be true when user sets bucket layout.
+    // Now, OM will create bucket with the user specified bucket layout.
+    // When the value is not specified by the user, OM will use
+    // "ozone.default.bucket.layout" configured value for the newer ozone
+    // client and LEGACY for an older ozone client.
+    if (!bucketInfo.hasBucketLayout()) {
+      BucketLayout defaultBucketLayout =
+          getDefaultBucketLayout(ozoneManager, volumeName, bucketName);
+      omBucketInfo =
+          OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
     } else {
       omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
     }
-
+    if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
+      omMetrics.incNumFSOBucketCreates();
+    }
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
@@ -239,14 +257,55 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     // return response.
     if (exception == null) {
-      LOG.debug("created bucket: {} in volume: {}", bucketName, volumeName);
+      LOG.info("created bucket: {} of layout {} in volume: {}", bucketName,
+          omBucketInfo.getBucketLayout(), volumeName);
       omMetrics.incNumBuckets();
+      if (isECBucket(bucketInfo)) {
+        omMetrics.incEcBucketsTotal();
+      }
       return omClientResponse;
     } else {
       omMetrics.incNumBucketCreateFails();
+      if (isECBucket(bucketInfo)) {
+        omMetrics.incEcBucketCreateFailsTotal();
+      }
       LOG.error("Bucket creation failed for bucket:{} in volume:{}",
           bucketName, volumeName, exception);
       return omClientResponse;
+    }
+  }
+
+  private boolean isECBucket(BucketInfo bucketInfo) {
+    return bucketInfo.hasDefaultReplicationConfig() && bucketInfo
+        .getDefaultReplicationConfig().hasEcReplicationConfig();
+  }
+
+  private BucketLayout getDefaultBucketLayout(OzoneManager ozoneManager,
+      String volumeName, String bucketName) {
+
+    if (getOmRequest().getVersion() <
+        ClientVersion.BUCKET_LAYOUT_SUPPORT.toProtoValue()) {
+
+      // Older client will default bucket layout to LEGACY to
+      // make its operations backward compatible.
+      LOG.info("Bucket Layout not present for volume/bucket = {}/{}, "
+              + "initialising with default bucket layout" +
+              ": {} as client is an older version: {}", volumeName,
+          bucketName, BucketLayout.LEGACY, getOmRequest().getVersion());
+      return BucketLayout.LEGACY;
+    } else {
+      // Newer client will default to the configured value.
+      String omDefaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
+      BucketLayout defaultBuckLayout =
+          BucketLayout.fromString(omDefaultBucketLayout);
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Bucket Layout not present for volume/bucket = {}/{}, "
+                + "initialising with default bucket layout" + ": {}",
+            volumeName, bucketName, omDefaultBucketLayout);
+      }
+
+      return defaultBuckLayout;
     }
   }
 
@@ -254,6 +313,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   /**
    * Add default acls for bucket. These acls are inherited from volume
    * default acl list.
+   *
    * @param omBucketInfo
    * @param omVolumeArgs
    */
@@ -337,21 +397,67 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
-    for(OmBucketInfo bucketInfo : bucketList) {
+    for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }
-    if(volumeQuotaInBytes < totalBucketQuota
+    if (volumeQuotaInBytes < totalBucketQuota
         && volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           " set to:" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
 
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest disallowCreateBucketWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCreateBucketRequest()
+          .getBucketInfo().hasDefaultReplicationConfig()
+          && req.getCreateBucketRequest().getBucketInfo()
+          .getDefaultReplicationConfig().hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
+  public static OMRequest disallowCreateBucketWithBucketLayoutDuringPreFinalize(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+      if (req.getCreateBucketRequest()
+          .getBucketInfo().hasBucketLayout()
+          &&
+          !BucketLayout.fromProto(req.getCreateBucketRequest().getBucketInfo()
+              .getBucketLayout()).isLegacy()) {
+        throw new OMException("Cluster does not have the Bucket Layout"
+            + " support feature finalized yet, but the request contains"
+            + " a non LEGACY bucket type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
 }

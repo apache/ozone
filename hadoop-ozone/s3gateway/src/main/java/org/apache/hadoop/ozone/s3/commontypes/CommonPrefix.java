@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.commontypes;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 /**
  * Directory name ("key prefix") in case of listing.
@@ -27,6 +28,7 @@ import javax.xml.bind.annotation.XmlElement;
 @XmlAccessorType(XmlAccessType.FIELD)
 public class CommonPrefix {
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Prefix")
   private String prefix;
 

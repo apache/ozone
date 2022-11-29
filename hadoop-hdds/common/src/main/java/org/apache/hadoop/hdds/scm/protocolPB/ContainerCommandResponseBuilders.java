@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -165,6 +166,16 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
+  public static ContainerCommandResponseProto getListBlockResponse(
+      ContainerCommandRequestProto msg, List<BlockData> data) {
+
+    ListBlockResponseProto.Builder builder =
+        ListBlockResponseProto.newBuilder();
+    builder.addAllBlockData(data);
+    return getSuccessResponseBuilder(msg)
+        .setListBlock(builder)
+        .build();
+  }
   /**
    * Returns successful getCommittedBlockLength Response.
    * @param msg - Request.
@@ -232,7 +243,7 @@ public final class ContainerCommandResponseBuilders {
       // V0 has all response data in a single ByteBuffer
       ByteString combinedData = ByteString.EMPTY;
       for (ByteString buffer : dataBuffers) {
-        combinedData.concat(buffer);
+        combinedData = combinedData.concat(buffer);
       }
       readChunk = ReadChunkResponseProto.newBuilder()
           .setChunkData(info)

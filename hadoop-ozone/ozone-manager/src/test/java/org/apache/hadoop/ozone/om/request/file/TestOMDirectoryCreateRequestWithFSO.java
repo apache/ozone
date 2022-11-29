@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
@@ -90,8 +90,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
             folder.newFolder().getAbsolutePath());
-    TestOMRequestUtils.configureFSOptimizedPaths(ozoneConfiguration,
-            true, OMConfigKeys.OZONE_OM_METADATA_LAYOUT_PREFIX);
+    OMRequestTestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -115,8 +114,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String bucketName = "bucket1";
     String keyName = "a/b/c";
 
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -139,13 +138,12 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
 
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -166,7 +164,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
             == OzoneManagerProtocolProtos.Status.OK);
-    verifyDirectoriesInDB(dirs, bucketID);
+    verifyDirectoriesInDB(dirs, volumeId, bucketId);
   }
 
   @Test
@@ -219,7 +217,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
@@ -242,25 +240,26 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
 
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     int objID = 100;
 
     //1. Create root
     OmDirectoryInfo omDirInfo =
-            TestOMRequestUtils.createOmDirectoryInfo(dirs.get(0), objID++,
-                    bucketID);
-    TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo, 5000,
+            OMRequestTestUtils.createOmDirectoryInfo(dirs.get(0), objID++,
+                    bucketId);
+    OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
+            volumeName, bucketName, 5000,
             omMetadataManager);
     //2. Create sub-directory under root
-    omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(dirs.get(1), objID++,
+    omDirInfo = OMRequestTestUtils.createOmDirectoryInfo(dirs.get(1), objID++,
             omDirInfo.getObjectID());
-    TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo, 5000,
+    OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
+            volumeName, bucketName, 5000,
             omMetadataManager);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -282,7 +281,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
             == OzoneManagerProtocolProtos.Status.OK);
 
     // Key should exist in DB and cache.
-    verifyDirectoriesInDB(dirs, bucketID);
+    verifyDirectoriesInDB(dirs, volumeId, bucketId);
   }
 
   @Test
@@ -294,26 +293,25 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
 
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
 
     // bucketID is the parent
-    long parentID = bucketID;
+    long parentID = bucketId;
 
     // add all the directories into DirectoryTable
     for (int indx = 0; indx < dirs.size(); indx++) {
       long objID = 100 + indx;
       long txnID = 5000 + indx;
       // for index=0, parentID is bucketID
-      OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
+      OmDirectoryInfo omDirInfo = OMRequestTestUtils.createOmDirectoryInfo(
               dirs.get(indx), objID, parentID);
-      TestOMRequestUtils.addDirKeyToDirTable(false, omDirInfo,
-              txnID, omMetadataManager);
+      OMRequestTestUtils.addDirKeyToDirTable(false, omDirInfo,
+              volumeName, bucketName, txnID, omMetadataManager);
 
       parentID = omDirInfo.getObjectID();
     }
@@ -340,8 +338,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             0, ozoneManager.getMetrics().getNumKeys());
 
     // Key should exist in DB and doesn't added to cache.
-    verifyDirectoriesInDB(dirs, bucketID);
-    verifyDirectoriesNotInCache(dirs, bucketID);
+    verifyDirectoriesInDB(dirs, volumeId, bucketId);
+    verifyDirectoriesNotInCache(dirs, volumeId, bucketId);
   }
 
   /**
@@ -357,8 +355,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -370,10 +368,10 @@ public class TestOMDirectoryCreateRequestWithFSO {
       long objID = 100 + indx;
       long txnID = 5000 + indx;
       // for index=0, parentID is bucketID
-      OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
+      OmDirectoryInfo omDirInfo = OMRequestTestUtils.createOmDirectoryInfo(
               dirs.get(indx), objID, parentID);
-      TestOMRequestUtils.addDirKeyToDirTable(false, omDirInfo,
-              txnID, omMetadataManager);
+      OMRequestTestUtils.addDirKeyToDirTable(false, omDirInfo,
+              volumeName, bucketName, txnID, omMetadataManager);
 
       parentID = omDirInfo.getObjectID();
     }
@@ -382,10 +380,14 @@ public class TestOMDirectoryCreateRequestWithFSO {
     long txnID = 50000;
 
     // Add a file into the FileTable, this is to simulate "file exists" check.
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, objID++);
-    String ozoneFileName = parentID + "/" + dirs.get(dirs.size() - 1);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omBucketInfo.getObjectID();
+
+    final String ozoneFileName = omMetadataManager.getOzonePathKey(
+            volumeId, bucketId, parentID, dirs.get(dirs.size() - 1));
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneFileName),
@@ -438,7 +440,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -449,18 +451,22 @@ public class TestOMDirectoryCreateRequestWithFSO {
     long txnID = 5000;
 
     // for index=0, parentID is bucketID
-    OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
+    OmDirectoryInfo omDirInfo = OMRequestTestUtils.createOmDirectoryInfo(
             dirs.get(0), objID++, parentID);
-    TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
-            txnID, omMetadataManager);
+    OMRequestTestUtils.addDirKeyToDirTable(true, omDirInfo,
+            volumeName, bucketName, txnID, omMetadataManager);
     parentID = omDirInfo.getObjectID();
 
     // Add a key in second level.
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, objID);
 
-    String ozoneKey = parentID + "/" + dirs.get(1);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omBucketInfo.getObjectID();
+
+    final String ozoneKey = omMetadataManager.getOzonePathKey(
+            volumeId, bucketId, parentID, dirs.get(1));
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneKey),
@@ -507,12 +513,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 255);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
@@ -533,7 +538,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
 
-    verifyDirectoriesInDB(dirs, bucketID);
+    verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
     Assert.assertEquals(dirs.size(), omMetrics.getNumKeys());
   }
@@ -546,8 +551,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 256);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
@@ -582,12 +587,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
     String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
@@ -608,7 +612,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
 
-    verifyDirectoriesInDB(dirs, bucketID);
+    verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
     Assert.assertEquals(dirs.size(), omMetrics.getNumKeys());
   }
@@ -628,15 +632,17 @@ public class TestOMDirectoryCreateRequestWithFSO {
     return buf.toString();
   }
 
-  private void verifyDirectoriesInDB(List<String> dirs, long bucketID)
+  private void verifyDirectoriesInDB(List<String> dirs,
+                                     long volumeId, long bucketId)
           throws IOException {
     // bucketID is the parent
-    long parentID = bucketID;
+    long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
       String dbKey = "";
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              parentID, dirName);
       OmDirectoryInfo omDirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
       Assert.assertNotNull("Invalid directory!", omDirInfo);
@@ -647,15 +653,17 @@ public class TestOMDirectoryCreateRequestWithFSO {
     }
   }
 
-  private void verifyDirectoriesNotInCache(List<String> dirs, long bucketID)
+  private void verifyDirectoriesNotInCache(List<String> dirs,
+                                           long volumeId, long bucketId)
           throws IOException {
     // bucketID is the parent
-    long parentID = bucketID;
+    long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
       String dbKey = "";
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              parentID, dirName);
       CacheValue<OmDirectoryInfo> omDirInfoCacheValue =
               omMetadataManager.getDirectoryTable()
                       .getCacheValue(new CacheKey<>(dbKey));

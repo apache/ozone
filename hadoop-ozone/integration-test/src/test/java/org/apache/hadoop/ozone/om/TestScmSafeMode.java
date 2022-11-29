@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -57,6 +56,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -69,7 +69,7 @@ import static org.junit.Assert.fail;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore
+@Ignore("HDDS-3260")
 public class TestScmSafeMode {
 
   private static final Logger LOG = LoggerFactory
@@ -247,7 +247,8 @@ public class TestScmSafeMode {
             HddsProtos.LifeCycleEvent.FINALIZE);
         mapping.updateContainerState(c.containerID(),
             LifeCycleEvent.CLOSE);
-      } catch (IOException | InvalidStateTransitionException e) {
+      } catch (IOException | InvalidStateTransitionException |
+               TimeoutException e) {
         LOG.info("Failed to change state of open containers.", e);
       }
     });
@@ -314,8 +315,6 @@ public class TestScmSafeMode {
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());
     final List<ContainerInfo> containers = scm.getContainerManager()
         .getContainers();
-    scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SCMSafeModeManager.SafeModeStatus(true, true));
     GenericTestUtils.waitFor(() -> {
       return clientProtocolServer.getSafeModeStatus();
     }, 50, 1000 * 30);

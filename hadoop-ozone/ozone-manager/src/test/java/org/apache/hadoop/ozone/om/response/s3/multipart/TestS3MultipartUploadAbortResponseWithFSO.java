@@ -22,9 +22,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -44,17 +46,26 @@ public class TestS3MultipartUploadAbortResponseWithFSO
   }
 
   @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     String fileName = StringUtils.substringAfter(keyName, dirName);
-    return omMetadataManager.getMultipartKey(parentID, fileName,
-        multipartUploadID);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
   }
 
   @Override
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+      OzoneManagerProtocolProtos.OMResponse omResponse, long volumeId,
+      long bucketId) {
 
     String mpuDBKey =
         omMetadataManager.getMultipartKey(omKeyInfo.getVolumeName(),
@@ -62,7 +73,18 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         multipartKeyInfo.getUploadID());
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>());
+        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
+        getBucketLayout(), volumeId, bucketId);
+  }
+
+  @Override
+  protected S3InitiateMultipartUploadResponse
+      getS3InitiateMultipartUploadResponse(
+      String volumeName, String bucketName, String keyName,
+      String multipartUploadID, long volumeId, long bucketId) {
+    return createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+        keyName,
+        multipartUploadID, new ArrayList<>(), volumeId, bucketId);
   }
 
   @Override
@@ -71,12 +93,14 @@ public class TestS3MultipartUploadAbortResponseWithFSO
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseWithFSO(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo);
+        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        getBucketLayout());
   }
 
   @Override
   public OzoneManagerProtocolProtos.PartKeyInfo createPartKeyInfo(
-      String volumeName, String bucketName, String keyName, int partNumber) {
+      String volumeName, String bucketName, String keyName, int partNumber)
+          throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     return createPartKeyInfoFSO(volumeName, bucketName, parentID, fileName,

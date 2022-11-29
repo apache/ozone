@@ -189,7 +189,7 @@ public class TestCommitWatcher {
     for (int i = 0; i < capacity; i++) {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
+              .getWriteChunkRequest(pipeline, blockID, chunkSize);
       // add the data to the buffer pool
       final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
@@ -264,7 +264,7 @@ public class TestCommitWatcher {
     for (int i = 0; i < capacity; i++) {
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
+              .getWriteChunkRequest(pipeline, blockID, chunkSize);
       // add the data to the buffer pool
       final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
@@ -314,7 +314,7 @@ public class TestCommitWatcher {
       // is updated to the latest index in putBlock response.
       watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
       Assert.fail("Expected exception not thrown");
-    } catch(IOException ioe) {
+    } catch (IOException ioe) {
       // with retry count set to noRetry and a lower watch request
       // timeout, watch request will eventually
       // fail with TimeoutIOException from ratis client or the client

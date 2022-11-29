@@ -39,13 +39,13 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCSException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -60,13 +60,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 public class TestCertificateSignRequest {
 
   private static OzoneConfiguration conf = new OzoneConfiguration();
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private SecurityConfig securityConfig;
 
-  @Before
-  public void init() throws IOException {
-    conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
+  @BeforeEach
+  public void init(@TempDir Path tempDir) throws IOException {
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
   }
 
@@ -93,33 +91,33 @@ public class TestCertificateSignRequest {
     // Check the Subject Name is in the expected format.
     String dnName = String.format(SecurityUtil.getDistinguishedNameFormat(),
         subject, scmID, clusterID);
-    Assert.assertEquals(csr.getSubject().toString(), dnName);
+    Assertions.assertEquals(dnName, csr.getSubject().toString());
 
     // Verify the public key info match
     byte[] encoded = keyPair.getPublic().getEncoded();
     SubjectPublicKeyInfo subjectPublicKeyInfo =
         SubjectPublicKeyInfo.getInstance(ASN1Sequence.getInstance(encoded));
     SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();
-    Assert.assertEquals(csrPublicKeyInfo, subjectPublicKeyInfo);
+    Assertions.assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
 
     // Verify CSR with attribute for extensions
-    Assert.assertEquals(1, csr.getAttributes().length);
+    Assertions.assertEquals(1, csr.getAttributes().length);
     Extensions extensions = SecurityUtil.getPkcs9Extensions(csr);
 
     // Verify key usage extension
     Extension keyUsageExt = extensions.getExtension(Extension.keyUsage);
-    Assert.assertEquals(true, keyUsageExt.isCritical());
+    Assertions.assertTrue(keyUsageExt.isCritical());
 
 
     // Verify San extension not set
-    Assert.assertEquals(null,
+    Assertions.assertNull(
         extensions.getExtension(Extension.subjectAlternativeName));
 
     // Verify signature in CSR
     ContentVerifierProvider verifierProvider =
         new JcaContentVerifierProviderBuilder().setProvider(securityConfig
             .getProvider()).build(csr.getSubjectPublicKeyInfo());
-    Assert.assertEquals(true, csr.isSignatureValid(verifierProvider));
+    Assertions.assertTrue(csr.isSignatureValid(verifierProvider));
   }
 
   @Test
@@ -153,22 +151,22 @@ public class TestCertificateSignRequest {
     // Check the Subject Name is in the expected format.
     String dnName = String.format(SecurityUtil.getDistinguishedNameFormat(),
         subject, scmID, clusterID);
-    Assert.assertEquals(csr.getSubject().toString(), dnName);
+    Assertions.assertEquals(dnName, csr.getSubject().toString());
 
     // Verify the public key info match
     byte[] encoded = keyPair.getPublic().getEncoded();
     SubjectPublicKeyInfo subjectPublicKeyInfo =
         SubjectPublicKeyInfo.getInstance(ASN1Sequence.getInstance(encoded));
     SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();
-    Assert.assertEquals(csrPublicKeyInfo, subjectPublicKeyInfo);
+    Assertions.assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
 
     // Verify CSR with attribute for extensions
-    Assert.assertEquals(1, csr.getAttributes().length);
+    Assertions.assertEquals(1, csr.getAttributes().length);
     Extensions extensions = SecurityUtil.getPkcs9Extensions(csr);
 
     // Verify key usage extension
     Extension sanExt = extensions.getExtension(Extension.keyUsage);
-    Assert.assertEquals(true, sanExt.isCritical());
+    Assertions.assertTrue(sanExt.isCritical());
 
     verifyServiceId(extensions);
 
@@ -176,7 +174,7 @@ public class TestCertificateSignRequest {
     ContentVerifierProvider verifierProvider =
         new JcaContentVerifierProviderBuilder().setProvider(securityConfig
             .getProvider()).build(csr.getSubjectPublicKeyInfo());
-    Assert.assertEquals(true, csr.isSignatureValid(verifierProvider));
+    Assertions.assertTrue(csr.isSignatureValid(verifierProvider));
   }
 
   @Test
@@ -200,7 +198,7 @@ public class TestCertificateSignRequest {
     try {
       builder.setKey(null);
       builder.build();
-      Assert.fail("Null Key should have failed.");
+      Assertions.fail("Null Key should have failed.");
     } catch (NullPointerException | IllegalArgumentException e) {
       builder.setKey(keyPair);
     }
@@ -209,7 +207,7 @@ public class TestCertificateSignRequest {
     try {
       builder.setSubject(null);
       builder.build();
-      Assert.fail("Null/Blank Subject should have thrown.");
+      Assertions.fail("Null/Blank Subject should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setSubject(subject);
     }
@@ -217,7 +215,7 @@ public class TestCertificateSignRequest {
     try {
       builder.setSubject("");
       builder.build();
-      Assert.fail("Null/Blank Subject should have thrown.");
+      Assertions.fail("Null/Blank Subject should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setSubject(subject);
     }
@@ -226,7 +224,7 @@ public class TestCertificateSignRequest {
     try {
       builder.addIpAddress("255.255.255.*");
       builder.build();
-      Assert.fail("Invalid ip address");
+      Assertions.fail("Invalid ip address");
     } catch (IllegalArgumentException e) {
     }
 
@@ -235,17 +233,17 @@ public class TestCertificateSignRequest {
     // Check the Subject Name is in the expected format.
     String dnName = String.format(SecurityUtil.getDistinguishedNameFormat(),
         subject, scmID, clusterID);
-    Assert.assertEquals(csr.getSubject().toString(), dnName);
+    Assertions.assertEquals(dnName, csr.getSubject().toString());
 
     // Verify the public key info match
     byte[] encoded = keyPair.getPublic().getEncoded();
     SubjectPublicKeyInfo subjectPublicKeyInfo =
         SubjectPublicKeyInfo.getInstance(ASN1Sequence.getInstance(encoded));
     SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();
-    Assert.assertEquals(csrPublicKeyInfo, subjectPublicKeyInfo);
+    Assertions.assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
 
     // Verify CSR with attribute for extensions
-    Assert.assertEquals(1, csr.getAttributes().length);
+    Assertions.assertEquals(1, csr.getAttributes().length);
   }
 
   @Test
@@ -271,7 +269,7 @@ public class TestCertificateSignRequest {
 
     // Verify de-serialized CSR matches with the original CSR
     PKCS10CertificationRequest dsCsr = new PKCS10CertificationRequest(csrBytes);
-    Assert.assertEquals(csr, dsCsr);
+    Assertions.assertEquals(csr, dsCsr);
   }
 
   private void verifyServiceId(Extensions extensions) {
@@ -279,19 +277,19 @@ public class TestCertificateSignRequest {
         GeneralNames.fromExtensions(
             extensions, Extension.subjectAlternativeName);
     GeneralName[] names = gns.getNames();
-    for(int i=0; i < names.length; i++) {
-      if(names[i].getTagNo() == GeneralName.otherName) {
+    for (int i = 0; i < names.length; i++) {
+      if (names[i].getTagNo() == GeneralName.otherName) {
         ASN1Encodable asn1Encodable = names[i].getName();
         Iterator iterator = ((DLSequence) asn1Encodable).iterator();
         while (iterator.hasNext()) {
           Object o = iterator.next();
           if (o instanceof ASN1ObjectIdentifier) {
             String oid = o.toString();
-            Assert.assertEquals(oid, "2.16.840.1.113730.3.1.34");
+            Assertions.assertEquals("2.16.840.1.113730.3.1.34", oid);
           }
           if (o instanceof DERTaggedObject) {
             String serviceName = ((DERTaggedObject)o).getObject().toString();
-            Assert.assertEquals(serviceName, "OzoneMarketingCluster003");
+            Assertions.assertEquals("OzoneMarketingCluster003", serviceName);
           }
         }
       }

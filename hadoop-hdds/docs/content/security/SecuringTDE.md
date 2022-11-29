@@ -33,7 +33,7 @@ when a bucket is created.
 
 To use TDE, admin must setup a Key Management Server and provide that URI to
 Ozone/HDFS. Since Ozone and HDFS can use the same Key Management Server, this
- configuration can be provided via *hdfs-site.xml*.
+ configuration can be provided via *core-site.xml*.
 
 Property| Value
 -----------------------------------|-----------------------------------------
@@ -49,7 +49,7 @@ To create an encrypted bucket, client need to:
   how you would use HDFS encryption zones.
 
   ```bash
-  hadoop key create encKey
+  hadoop key create enckey
   ```
   The above command creates an encryption key for the bucket you want to protect.
   Once the key is created, you can tell Ozone to use that key when you are
@@ -58,11 +58,11 @@ To create an encrypted bucket, client need to:
    * Assign the encryption key to a bucket.
 
   ```bash
-  ozone sh bucket create -k encKey /vol/encryptedBucket
+  ozone sh bucket create -k enckey /vol/encryptedbucket
   ```
 
-After this command, all data written to the _encryptedBucket_ will be encrypted
-via the encKey and while reading the clients will talk to Key Management
+After this command, all data written to the _encryptedbucket_ will be encrypted
+via the enckey and while reading the clients will talk to Key Management
 Server and read the key and decrypt it. In other words, the data stored
 inside Ozone is always encrypted. The fact that data is encrypted at rest
 will be completely transparent to the clients and end users.
@@ -71,19 +71,46 @@ will be completely transparent to the clients and end users.
 
 There are two ways to create an encrypted bucket that can be accessed via S3 Gateway.
 
-####1. Create a bucket using shell under "/s3v" volume
+#### Option 1. Create a bucket using shell under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey /s3v/encryptedBucket
+  ozone sh bucket create -k enckey --layout=OBJECT_STORE /s3v/encryptedbucket
   ```
-####2. Create a link to an encrypted bucket under "/s3v" volume
+
+#### Option 2. Create a link to an encrypted bucket under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey /vol/encryptedBucket
-  ozone sh bucket link  /vol/encryptedBucket /s3v/linkencryptedbucket
+  ozone sh bucket create -k enckey --layout=OBJECT_STORE /vol/encryptedbucket
+  ozone sh bucket link /vol/encryptedbucket /s3v/linkencryptedbucket
   ```
-Note: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
+
+Note 1: An encrypted bucket cannot be created via S3 APIs. It must be done using Ozone shell commands as shown above.
 After creating an encrypted bucket, all the keys added to this bucket using s3g will be encrypted.
+
+Note 2: `--layout=OBJECT_STORE` is specified in the above examples
+for full compatibility with S3 (which is the default value for the `--layout`
+argument, but explicitly added here to make a point).
+
+Bucket created with the `OBJECT_STORE` type will NOT be accessible via
+HCFS (ofs or o3fs) at all. And such access will be rejected. For instance:
+
+  ```bash
+  $ ozone fs -ls ofs://ozone1/s3v/encryptedbucket/
+  -ls: Bucket: encryptedbucket has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+  ```
+
+  ```bash
+  $ ozone fs -ls o3fs://encryptedbucket.s3v.ozone1/
+  22/02/07 00:00:00 WARN fs.FileSystem: Failed to initialize fileystem o3fs://encryptedbucket.s3v.ozone1/: java.lang.IllegalArgumentException: Bucket: encryptedbucket has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+  -ls: Bucket: encryptedbucket has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
+  ```
+
+If one wants the bucket to be accessible from both S3G and HCFS (ofs and o3fs)
+at the same time, use `--layout=FILE_SYSTEM_OPTIMIZED` instead.
+
+However, in buckets with `FILE_SYSTEM_OPTIMIZED` layout, some irregular S3 key
+names may be rejected or normalized, which can be undesired.
+See [Prefix based File System Optimization]({{< relref "../feature/PrefixFSO.md" >}}) for more information.
 
 In non-secure mode, the user running the S3Gateway daemon process is the proxy user, 
 while in secure mode the S3Gateway Kerberos principal (ozone.s3g.kerberos.principal) is the proxy user. 
@@ -111,12 +138,11 @@ The below two configurations must be added to the kms-site.xml to allow the S3Ga
          This is the host where the S3Gateway is running. Set this to '*' to allow
          requests from any hosts to be proxied.
   </description>
-
 </property>
-
 ```
 
-###KMS Authorization
+### KMS Authorization
+
 If Ranger authorization is enabled for KMS, then decrypt key permission should be given to
 access key id user(currently access key is kerberos principal) to decrypt the encrypted key 
 to read/write a key in the encrypted bucket.

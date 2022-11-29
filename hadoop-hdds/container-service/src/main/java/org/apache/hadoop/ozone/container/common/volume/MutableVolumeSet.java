@@ -121,6 +121,10 @@ public class MutableVolumeSet implements VolumeSet {
       this.volumeFactory = new MetadataVolumeFactory(conf, usageCheckFactory,
           this);
       maxVolumeFailuresTolerated = dnConf.getFailedMetadataVolumesTolerated();
+    } else if (volumeType == StorageVolume.VolumeType.DB_VOLUME) {
+      this.volumeFactory = new DbVolumeFactory(conf, usageCheckFactory,
+          this, datanodeUuid, clusterID);
+      maxVolumeFailuresTolerated = dnConf.getFailedDbVolumesTolerated();
     } else {
       this.volumeFactory = new HddsVolumeFactory(conf, usageCheckFactory,
           this, datanodeUuid, clusterID);
@@ -150,6 +154,8 @@ public class MutableVolumeSet implements VolumeSet {
     Collection<String> rawLocations;
     if (volumeType == StorageVolume.VolumeType.META_VOLUME) {
       rawLocations = HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
+    } else if (volumeType == StorageVolume.VolumeType.DB_VOLUME) {
+      rawLocations = HddsServerUtil.getDatanodeDbDirs(conf);
     } else {
       rawLocations = HddsServerUtil.getDatanodeStorageDirs(conf);
     }
@@ -290,7 +296,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public void refreshAllVolumeUsage() {
-    volumeMap.forEach((k, v)-> v.refreshVolumeInfo());
+    volumeMap.forEach((k, v) -> v.refreshVolumeInfo());
   }
 
   /**
@@ -446,6 +452,11 @@ public class MutableVolumeSet implements VolumeSet {
   @VisibleForTesting
   public Map<String, StorageVolume> getVolumeMap() {
     return ImmutableMap.copyOf(volumeMap);
+  }
+
+  @VisibleForTesting
+  public void setVolumeMap(Map<String, StorageVolume> map) {
+    this.volumeMap = map;
   }
 
   @VisibleForTesting

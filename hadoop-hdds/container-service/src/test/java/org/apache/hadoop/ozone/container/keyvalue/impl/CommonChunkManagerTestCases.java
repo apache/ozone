@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,10 +36,10 @@ import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Common test cases for ChunkManager implementation tests.
@@ -214,7 +214,7 @@ public abstract class CommonChunkManagerTestCases
 
     BlockData blockData = new BlockData(blockID);
     // WHEN
-    for (int i = 0; i< count; i++) {
+    for (int i = 0; i < count; i++) {
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
           i * len, len);
       chunkManager.writeChunk(container, blockID, info, data, context);
@@ -225,10 +225,9 @@ public abstract class CommonChunkManagerTestCases
 
     // THEN
     checkWriteIOStats(len * count, count);
-    assertTrue(getHddsVolume().getVolumeIOStats().getWriteTime() > 0);
 
     // WHEN
-    for (int i = 0; i< count; i++) {
+    for (int i = 0; i < count; i++) {
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
           i * len, len);
       chunkManager.readChunk(container, blockID, info, context);

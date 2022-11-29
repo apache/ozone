@@ -18,12 +18,18 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,19 +52,21 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRES
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 
 /**
  * SCM HA node details.
@@ -141,7 +149,51 @@ public class SCMHANodeDetails {
     return new SCMHANodeDetails(scmNodeDetails, Collections.emptyList());
   }
 
-  public static SCMHANodeDetails loadSCMHAConfig(OzoneConfiguration conf)
+  /** Validates SCM HA Config.
+    For Non Initialized SCM the value is taken directly based on the config
+   {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY}
+   which defaults to
+   {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT}
+   For Previously Initialized SCM the values are taken from the version file
+   Ratis SCM -> Non Ratis SCM & vice versa is not supported
+   This values is validated with the config provided.
+  **/
+  private static void validateSCMHAConfig(SCMStorageConfig scmStorageConfig,
+                                          OzoneConfiguration conf) {
+    Storage.StorageState state = scmStorageConfig.getState();
+    boolean scmHAEnableDefault = state == Storage.StorageState.INITIALIZED
+        ? scmStorageConfig.isSCMHAEnabled()
+        : SCMHAUtils.isSCMHAEnabled(conf);
+    boolean scmHAEnabled = SCMHAUtils.isSCMHAEnabled(conf);
+
+    if (Storage.StorageState.INITIALIZED.equals(state) &&
+            scmHAEnabled != scmHAEnableDefault) {
+      String errorMessage = String.format("Current State of SCM: %s",
+              scmHAEnableDefault ? "Ratis SCM is enabled "
+              : "SCM is running in Non-HA without Ratis")
+              + " Ratis SCM -> Non Ratis SCM or " +
+              "Non HA SCM -> HA SCM is not supported";
+      if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
+        throw new ConfigurationException(String.format("Invalid Config %s " +
+                "Provided ConfigValue: %s, Expected Config Value: %s. %s",
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAEnabled,
+            scmHAEnableDefault, errorMessage));
+      } else {
+        LOG.warn("Invalid config {}. The config was not specified, " +
+                        "but the default value {} conflicts with " +
+                        "the expected config value {}. " +
+                        "Falling back to the expected value. {}",
+                ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+                ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT,
+                scmHAEnableDefault, errorMessage);
+      }
+    }
+    DefaultConfigManager.setConfigValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+        scmHAEnableDefault);
+  }
+
+  public static SCMHANodeDetails loadSCMHAConfig(OzoneConfiguration conf,
+                                                 SCMStorageConfig storageConfig)
       throws IOException {
     InetSocketAddress localRpcAddress = null;
     String localScmServiceId = null;
@@ -155,7 +207,7 @@ public class SCMHANodeDetails {
         ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
 
     LOG.info("ServiceID for StorageContainerManager is {}", localScmServiceId);
-
+    validateSCMHAConfig(storageConfig, conf);
     if (localScmServiceId == null) {
       // There is no internal scm service id is being set, fall back to ozone
       // .scm.service.ids.
@@ -227,13 +279,18 @@ public class SCMHANodeDetails {
           throw e;
         }
 
-        if (addr.isUnresolved()) {
+        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+        if (OzoneNetUtils.isUnresolved(flexibleFqdnResolutionEnabled, addr)) {
           LOG.error("Address for SCM {} : {} couldn't be resolved. Proceeding "
                   + "with unresolved host to create Ratis ring.", nodeId,
               rpcAddrStr);
         }
 
-        if (!addr.isUnresolved() && !isPeer && ConfUtils.isAddressLocal(addr)) {
+        if (!isPeer
+                && OzoneNetUtils
+                .isAddressLocal(flexibleFqdnResolutionEnabled, addr)) {
           localRpcAddress = addr;
           localScmServiceId = serviceId;
           localScmNodeId = nodeId;

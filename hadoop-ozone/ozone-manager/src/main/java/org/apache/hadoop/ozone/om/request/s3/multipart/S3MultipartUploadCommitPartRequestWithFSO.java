@@ -54,14 +54,15 @@ public class S3MultipartUploadCommitPartRequestWithFSO
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     long parentID = OMFileRequest
-        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
+        .getParentID(volumeId, bucketId, pathComponents, keyName,
+                omMetadataManager);
 
-    return omMetadataManager.getOpenFileName(parentID, fileName, clientID);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientID);
   }
 
   @Override
@@ -83,6 +84,6 @@ public class S3MultipartUploadCommitPartRequestWithFSO
 
     return new S3MultipartUploadCommitPartResponseWithFSO(build, multipartKey,
         openKey, multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-        ozoneManager.isRatisEnabled(), omBucketInfo);
+        ozoneManager.isRatisEnabled(), omBucketInfo, getBucketLayout());
   }
 }

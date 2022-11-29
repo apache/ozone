@@ -20,25 +20,22 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 
 /**
  * Test class for {@link SCMSecurityProtocolServer}.
  * */
+@Timeout(20)
 public class TestSCMSecurityProtocolServer {
   private SCMSecurityProtocolServer securityProtocolServer;
   private OzoneConfiguration config;
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(20);
-
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     config = new OzoneConfiguration();
     config.set(OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
@@ -47,7 +44,7 @@ public class TestSCMSecurityProtocolServer {
         null, null, null);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (securityProtocolServer != null) {
       securityProtocolServer.stop();

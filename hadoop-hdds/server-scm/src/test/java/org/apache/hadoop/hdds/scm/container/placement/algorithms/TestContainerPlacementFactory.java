@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -40,9 +40,9 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
@@ -68,7 +68,7 @@ public class TestContainerPlacementFactory {
   // node manager
   private NodeManager nodeManager;
 
-  @Before
+  @BeforeEach
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
@@ -97,11 +97,11 @@ public class TestContainerPlacementFactory {
           datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = TestUtils.createStorageReport(
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          TestUtils.createMetadataStorageReport(
+          HddsTestUtils.createMetadataStorageReport(
           "/metadata1-" + datanodeInfo.getUuidString(),
           STORAGE_CAPACITY, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -114,19 +114,19 @@ public class TestContainerPlacementFactory {
       dnInfos.add(datanodeInfo);
     }
 
-    StorageReportProto storage2 = TestUtils.createStorageReport(
+    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
         dnInfos.get(2).getUuid(),
         "/data1-" + dnInfos.get(2).getUuidString(),
         STORAGE_CAPACITY, 90L, 10L, null);
     dnInfos.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
-    StorageReportProto storage3 = TestUtils.createStorageReport(
+    StorageReportProto storage3 = HddsTestUtils.createStorageReport(
         dnInfos.get(3).getUuid(),
         "/data1-" + dnInfos.get(3).getUuidString(),
         STORAGE_CAPACITY, 80L, 20L, null);
     dnInfos.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
-    StorageReportProto storage4 = TestUtils.createStorageReport(
+    StorageReportProto storage4 = HddsTestUtils.createStorageReport(
         dnInfos.get(4).getUuid(),
         "/data1-" + dnInfos.get(4).getUuidString(),
         STORAGE_CAPACITY, 70L, 30L, null);
@@ -149,12 +149,12 @@ public class TestContainerPlacementFactory {
     int nodeNum = 3;
     List<DatanodeDetails> datanodeDetails =
         policy.chooseDatanodes(null, null, nodeNum, 15, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertTrue(cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertTrue(cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(1)));
-    Assert.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(2)));
-    Assert.assertFalse(cluster.isSameParent(datanodeDetails.get(1),
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(1),
         datanodeDetails.get(2)));
   }
 
@@ -162,7 +162,15 @@ public class TestContainerPlacementFactory {
   public void testDefaultPolicy() throws IOException {
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, null, null, true, null);
-    Assert.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
+    Assertions.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
+  }
+
+  @Test
+  public void testECPolicy() throws IOException {
+    PlacementPolicy policy = ContainerPlacementPolicyFactory
+        .getECPolicy(conf, null, null, true, null);
+    Assertions.assertSame(SCMContainerPlacementRackScatter.class,
+        policy.getClass());
   }
 
   /**
@@ -171,7 +179,9 @@ public class TestContainerPlacementFactory {
   public static class DummyImpl implements PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
-        List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+        List<DatanodeDetails> usedNodes,
+        List<DatanodeDetails> excludedNodes,
+        List<DatanodeDetails> favoredNodes,
         int nodesRequired, long metadataSizeRequired, long dataSizeRequired) {
       return null;
     }
@@ -183,19 +193,24 @@ public class TestContainerPlacementFactory {
     }
   }
 
-  @Test(expected = SCMException.class)
-  public void testConstuctorNotFound() throws SCMException {
+  @Test
+  public void testConstuctorNotFound() {
     // set a placement class which does't have the right constructor implemented
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         DummyImpl.class.getName());
-    ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null);
+
+    Assertions.assertThrows(SCMException.class, () ->
+        ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null)
+    );
   }
 
-  @Test(expected = RuntimeException.class)
-  public void testClassNotImplemented() throws SCMException {
+  @Test
+  public void testClassNotImplemented() {
     // set a placement class not implemented
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         "org.apache.hadoop.hdds.scm.container.placement.algorithm.HelloWorld");
-    ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null);
+    Assertions.assertThrows(RuntimeException.class, () ->
+        ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null)
+    );
   }
 }

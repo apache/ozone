@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -54,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -65,11 +67,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -101,6 +105,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private OzoneClientAdapter adapter;
   private BasicRootedOzoneClientAdapterImpl adapterImpl;
 
+  private int listingPageSize =
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
       "ofs://om-service-id/path/to/key  OR " +
@@ -110,6 +117,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
+    listingPageSize = conf.getInt(
+        OZONE_FS_LISTING_PAGE_SIZE,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
+        OZONE_FS_LISTING_PAGE_SIZE,
+        OZONE_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -194,8 +207,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
-    return new FSDataInputStream(
-        new OzoneFSInputStream(adapter.readFile(key), statistics));
+    return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
+  }
+
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new OzoneFSInputStream(inputStream, statistics);
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -446,7 +462,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         throws IOException {
       super(f);
       this.recursive = recursive;
-      if (getStatus().isDirectory()
+      if (getStatus().isDir()
           && !this.recursive
           && listStatus(f).length != 0) {
         throw new PathIsNotEmptyDirectoryException(f.toString());
@@ -469,6 +485,68 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   /**
+   * To be used only by recursiveBucketDelete().
+   */
+  private class DeleteIteratorWithFSO extends OzoneListingIterator {
+    private final OzoneBucket bucket;
+    private final BasicRootedOzoneClientAdapterImpl adapterImpl;
+    private boolean recursive;
+    private Path f;
+    DeleteIteratorWithFSO(Path f, boolean recursive)
+        throws IOException {
+      super(f, true);
+      this.f = f;
+      this.recursive = recursive;
+      // Initialize bucket here to reduce number of RPC calls
+      OFSPath ofsPath = new OFSPath(f);
+      adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
+      this.bucket = adapterImpl.getBucket(ofsPath, false);
+      LOG.debug("Deleting bucket with name {} is via DeleteIteratorWithFSO.",
+          bucket.getName());
+    }
+
+    @Override
+    boolean processKeyPath(List<String> keyPathList) throws IOException {
+      LOG.trace("Deleting keys: {}", keyPathList);
+      boolean succeed = keyPathList.isEmpty();
+      if (recursive && !succeed) {
+        succeed = adapterImpl.deleteObjects(keyPathList);
+      } else {
+        // Non empty paths cannot be deleted when recursive flag is false
+        if (!keyPathList.isEmpty()) {
+          throw new PathIsNotEmptyDirectoryException(f.toString());
+        }
+      }
+      return succeed;
+    }
+  }
+
+  private class DeleteIteratorFactory {
+    private Path path;
+    private boolean recursive;
+    private OFSPath ofsPath;
+
+    DeleteIteratorFactory(Path f, boolean recursive) {
+      this.path = f;
+      this.recursive = recursive;
+      this.ofsPath = new OFSPath(f);
+    }
+
+    OzoneListingIterator getDeleteIterator()
+        throws IOException {
+      OzoneListingIterator deleteIterator;
+      if (ofsPath.isBucket() &&
+          isFSObucket(ofsPath.getVolumeName(), ofsPath.getBucketName())) {
+        deleteIterator = new DeleteIteratorWithFSO(path, recursive);
+      } else {
+        deleteIterator = new DeleteIterator(path, recursive);
+      }
+      return deleteIterator;
+    }
+  }
+
+
+  /**
    * Deletes the children of the input dir path by iterating though the
    * DeleteIterator.
    *
@@ -479,7 +557,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private boolean innerDelete(Path f, boolean recursive) throws IOException {
     LOG.trace("delete() path:{} recursive:{}", f, recursive);
     try {
-      DeleteIterator iterator = new DeleteIterator(f, recursive);
+      OzoneListingIterator iterator =
+          new DeleteIteratorFactory(f, recursive).getDeleteIterator();
       return iterator.iterate();
     } catch (FileNotFoundException e) {
       if (LOG.isDebugEnabled()) {
@@ -488,6 +567,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
   }
+
 
   /**
    * {@inheritDoc}
@@ -506,10 +586,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       status = getFileStatus(f);
     } catch (FileNotFoundException ex) {
       LOG.warn("delete: Path does not exist: {}", f);
-      return false;
-    }
-
-    if (status == null) {
       return false;
     }
 
@@ -567,7 +643,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
-      result = innerDelete(f, recursive);
+      boolean isBucketLink = false;
+      // check for bucket link
+      if (ofsPath.isBucket()) {
+        isBucketLink = adapterImpl.getBucket(ofsPath, false)
+            .isLink();
+      }
+
+      // if link, don't delete contents
+      if (isBucketLink) {
+        result = true;
+      } else {
+        result = innerDelete(f, recursive);
+      }
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {
@@ -598,6 +686,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     return result;
+  }
+
+  private boolean isFSObucket(String volumeName, String bucketName)
+      throws IOException {
+    OzoneVolume volume =
+        adapterImpl.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    return bucket.getBucketLayout().isFileSystemOptimized();
   }
 
   /**
@@ -648,12 +744,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
+    return convertFileStatusArr(listStatusAdapter(f));
+  }
+
+  private FileStatus[] convertFileStatusArr(
+          List<FileStatusAdapter> adapterArr) {
+    FileStatus[] fileStatuses = new FileStatus[adapterArr.size()];
+    int index = 0;
+    for (FileStatusAdapter statusAdapter : adapterArr) {
+      fileStatuses[index++] = convertFileStatus(statusAdapter);      
+    }
+    return fileStatuses;
+  }
+
+  
+  public List<FileStatusAdapter> listStatusAdapter(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-    int numEntries = LISTING_PAGE_SIZE;
-    LinkedList<FileStatus> statuses = new LinkedList<>();
-    List<FileStatus> tmpStatusList;
+    int numEntries = listingPageSize;
+    LinkedList<FileStatusAdapter> statuses = new LinkedList<>();
+    List<FileStatusAdapter> tmpStatusList;
     String startPath = "";
 
     do {
@@ -661,11 +772,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           adapter.listStatus(pathToKey(f), false, startPath,
               numEntries, uri, workingDir, getUsername())
               .stream()
-              .map(this::convertFileStatus)
               .collect(Collectors.toList());
 
       if (!tmpStatusList.isEmpty()) {
-        if (startPath.isEmpty()) {
+        if (startPath.isEmpty() || !statuses.getLast().getPath().toString()
+            .equals(tmpStatusList.get(0).getPath().toString())) {
           statuses.addAll(tmpStatusList);
         } else {
           statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
@@ -677,7 +788,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // exhausted.
     } while (tmpStatusList.size() == numEntries);
 
-    return statuses.toArray(new FileStatus[0]);
+    return statuses;
   }
 
   @Override
@@ -769,7 +880,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   @Override
-  public FileStatus getFileStatus(Path f) throws IOException {
+  public FileStatus getFileStatus(Path f) throws IOException {    
+    return convertFileStatus(getFileStatusAdapter(f));
+  }
+
+  public FileStatusAdapter getFileStatusAdapter(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
@@ -779,16 +894,20 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (key.equals("NONE")) {
       throw new FileNotFoundException("File not found. path /NONE.");
     }
-    FileStatus fileStatus = null;
+    FileStatusAdapter fileStatus = null;
     try {
-      fileStatus = convertFileStatus(
-          adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
-    } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
-          ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
-        throw new FileNotFoundException("File not found. path:" + f);
+      fileStatus = 
+        adapter.getFileStatus(key, uri, qualifiedPath, getUsername());
+    } catch (IOException e) {
+      if (e instanceof OMException) {
+        OMException ex = (OMException) e;
+        if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
+            ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
+          throw new FileNotFoundException("File not found. path:" + f);
+        }
       }
+      throw e;
     }
     return fileStatus;
   }
@@ -832,7 +951,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public FileChecksum getFileChecksum(Path f, long length) throws IOException {
     incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
-    return super.getFileChecksum(f, length);
+    String key = pathToKey(f);
+    return adapter.getFileChecksum(key, length);
   }
 
   @Override
@@ -874,6 +994,133 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
+  }
+
+  @Override
+  public RemoteIterator<FileStatus> listStatusIterator(Path f)
+      throws IOException {
+    return new OzoneFileStatusIterator<>(f);
+  }
+
+  /**
+   * A private class implementation for iterating list of file status.
+   *
+   * @param <T> the type of the file status.
+   */
+  private final class OzoneFileStatusIterator<T extends FileStatus>
+      implements RemoteIterator<T> {
+    private List<FileStatus> thisListing;
+    private int i;
+    private Path p;
+    private T curStat = null;
+    private String startPath = "";
+
+    /**
+     * Constructor to initialize OzoneFileStatusIterator.
+     * Get the first batch of entry for iteration.
+     *
+     * @param p path to file/directory.
+     * @throws IOException
+     */
+    private OzoneFileStatusIterator(Path p) throws IOException {
+      this.p = p;
+      // fetch the first batch of entries in the directory
+      thisListing = listFileStatus(p, startPath);
+      if (thisListing != null && !thisListing.isEmpty()) {
+        startPath = pathToKey(
+            thisListing.get(thisListing.size() - 1).getPath());
+        LOG.debug("Got {} file status, next start path {}",
+            thisListing.size(), startPath);
+      }
+      i = 0;
+    }
+
+    /**
+     * @return true if next entry exists false otherwise.
+     * @throws IOException
+     */
+    @Override
+    public boolean hasNext() throws IOException {
+      while (curStat == null && hasNextNoFilter()) {
+        T next;
+        FileStatus fileStat = thisListing.get(i++);
+        next = (T) (fileStat);
+        curStat = next;
+      }
+      return curStat != null;
+    }
+
+    /**
+     * Checks the next available entry from partial listing if not exhausted
+     * or fetches new batch for listing.
+     *
+     * @return true if next entry exists false otherwise.
+     * @throws IOException
+     */
+    private boolean hasNextNoFilter() throws IOException {
+      if (thisListing == null) {
+        return false;
+      }
+      if (i >= thisListing.size()) {
+        if (startPath != null && (thisListing.size() == listingPageSize ||
+            thisListing.size() == listingPageSize - 1)) {
+          // current listing is exhausted & fetch a new listing
+          thisListing = listFileStatus(p, startPath);
+          if (thisListing != null && !thisListing.isEmpty()) {
+            startPath = pathToKey(
+                thisListing.get(thisListing.size() - 1).getPath());
+            LOG.debug("Got {} file status, next start path {}",
+                thisListing.size(), startPath);
+          } else {
+            return false;
+          }
+          i = 0;
+        }
+      }
+      return (i < thisListing.size());
+    }
+
+    /**
+     * @return next entry.
+     * @throws IOException
+     */
+    @Override
+    public T next() throws IOException {
+      if (hasNext()) {
+        T tmp = curStat;
+        curStat = null;
+        return tmp;
+      }
+      throw new java.util.NoSuchElementException("No more entry in " + p);
+    }
+  }
+
+  /**
+   * Get all the file status for input path and startPath.
+   *
+   * @param f
+   * @param startPath
+   * @return list of file status.
+   * @throws IOException
+   */
+  private List<FileStatus> listFileStatus(Path f, String startPath)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
+    statistics.incrementReadOps(1);
+    LOG.trace("listFileStatus() path:{}", f);
+    List<FileStatus> statusList;
+    statusList =
+        adapter.listStatus(pathToKey(f), false, startPath,
+                listingPageSize, uri, workingDir, getUsername())
+            .stream()
+            .map(this::convertFileStatus)
+            .collect(Collectors.toList());
+
+    if (!statusList.isEmpty() && !startPath.isEmpty()) {
+      // Excluding the 1st file status element from list.
+      statusList.remove(0);
+    }
+    return statusList;
   }
 
   /**
@@ -940,20 +1187,30 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   private abstract class OzoneListingIterator {
     private final Path path;
-    private final FileStatus status;
+    private final FileStatusAdapter status;
     private String pathKey;
-    private Iterator<BasicKeyInfo> keyIterator;
+    private Iterator<BasicKeyInfo> keyIterator = null;
+    private boolean isFSO;
 
-    OzoneListingIterator(Path path)
+    OzoneListingIterator(Path path, boolean isFSO)
         throws IOException {
       this.path = path;
-      this.status = getFileStatus(path);
+      this.status = getFileStatusAdapter(path);
       this.pathKey = pathToKey(path);
-      if (status.isDirectory()) {
-        this.pathKey = addTrailingSlashIfNeeded(pathKey);
+      this.isFSO = isFSO;
+      if (!isFSO) {
+        if (status.isDir()) {
+          this.pathKey = addTrailingSlashIfNeeded(pathKey);
+        }
+        keyIterator = adapter.listKeys(pathKey);
       }
-      keyIterator = adapter.listKeys(pathKey);
     }
+
+    OzoneListingIterator(Path path) throws IOException {
+      // non FSO implementation
+      this(path, false);
+    }
+
 
     /**
      * The output of processKey determines if further iteration through the
@@ -972,6 +1229,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * stopped and returned with false indicating that all the keys could not
      * be processed successfully.
      *
+     * If isFSO is true, call is from DeleteIteratorWithFSO and the list of keys
+     * will only contain immediate children i.e top level dirs and files
+     *
      * @return true if all keys are processed successfully, false otherwise.
      * @throws IOException
      */
@@ -980,26 +1240,43 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       List<String> keyPathList = new ArrayList<>();
       int batchSize = getConf().getInt(OZONE_FS_ITERATE_BATCH_SIZE,
           OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT);
-      if (status.isDirectory()) {
+      if (status.isDir()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey);
         String ofsPathPrefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
-        while (keyIterator.hasNext()) {
-          BasicKeyInfo key = keyIterator.next();
-          // Convert key to full path before passing it to processKeyPath
-          // TODO: This conversion is redundant. But want to use only full path
-          //  outside AdapterImpl. - Maybe a refactor later.
-          String keyPath = ofsPathPrefix + key.getName();
-          LOG.trace("iterating key path: {}", keyPath);
-          if (!key.getName().equals("")) {
-            keyPathList.add(keyPath);
+        if (isFSO) {
+          List<FileStatusAdapter> fileStatuses;
+          fileStatuses = listStatusAdapter(path);
+          for (FileStatusAdapter fileStatus : fileStatuses) {
+            String keyName =
+                new OFSPath(fileStatus.getPath().toString()).getKeyName();
+            keyPathList.add(ofsPathPrefix + keyName);
           }
           if (keyPathList.size() >= batchSize) {
             if (!processKeyPath(keyPathList)) {
               return false;
             } else {
               keyPathList.clear();
+            }
+          }
+        } else {
+          while (keyIterator.hasNext()) {
+            BasicKeyInfo key = keyIterator.next();
+            // Convert key to full path before passing it to processKeyPath
+            // TODO: This conversion is redundant. But want to use only
+            //  full path outside AdapterImpl. - Maybe a refactor later.
+            String keyPath = ofsPathPrefix + key.getName();
+            LOG.trace("iterating key path: {}", keyPath);
+            if (!key.getName().equals("")) {
+              keyPathList.add(keyPath);
+            }
+            if (keyPathList.size() >= batchSize) {
+              if (!processKeyPath(keyPathList)) {
+                return false;
+              } else {
+                keyPathList.clear();
+              }
             }
           }
         }
@@ -1021,10 +1298,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     boolean pathIsDirectory() {
-      return status.isDirectory();
+      return status.isDir();
     }
 
-    FileStatus getStatus() {
+    FileStatusAdapter getStatus() {
       return status;
     }
   }
@@ -1073,6 +1350,39 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return fileStatus;
     }
     return new LocatedFileStatus(fileStatus, blockLocations);
+  }
+
+  @Override
+  public ContentSummary getContentSummary(Path f) throws IOException {
+    FileStatusAdapter status = getFileStatusAdapter(f);
+
+    if (status.isFile()) {
+      // f is a file
+      long length = status.getLength();
+      long spaceConsumed = status.getDiskConsumed();
+
+      return new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed).build();
+    }
+    // f is a directory
+    long[] summary = {0, 0, 0, 1};
+    int i = 0;
+    for (FileStatusAdapter s : listStatusAdapter(f)) {
+      long length = s.getLength();
+      long spaceConsumed = s.getDiskConsumed();
+      ContentSummary c = s.isDir() ? getContentSummary(s.getPath()) :
+          new ContentSummary.Builder().length(length).
+          fileCount(1).directoryCount(0).spaceConsumed(spaceConsumed).build();
+
+      summary[0] += c.getLength();
+      summary[1] += c.getSpaceConsumed();
+      summary[2] += c.getFileCount();
+      summary[3] += c.getDirectoryCount();
+    }
+
+    return new ContentSummary.Builder().length(summary[0]).
+        fileCount(summary[2]).directoryCount(summary[3]).
+        spaceConsumed(summary[1]).build();
   }
 
 }

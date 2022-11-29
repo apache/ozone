@@ -60,15 +60,19 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   @Override
   public Object invoke(final Object proxy, final Method method,
                        final Object[] args) throws Throwable {
+    // Javadoc for InvocationHandler#invoke specifies that args will be null
+    // if the method takes no arguments. Convert this to an empty array for
+    // easier handling.
+    Object[] convertedArgs = (args == null) ? new Object[]{} : args;
     try {
       long startTime = Time.monotonicNow();
       final Object result =
           ratisHandler != null && method.isAnnotationPresent(Replicate.class) ?
-              invokeRatis(method, args) :
-              invokeLocal(method, args);
+              invokeRatis(method, convertedArgs) :
+              invokeLocal(method, convertedArgs);
       LOG.debug("Call: {} took {} ms", method, Time.monotonicNow() - startTime);
       return result;
-    } catch(InvocationTargetException iEx) {
+    } catch (InvocationTargetException iEx) {
       throw iEx.getCause();
     }
   }
@@ -88,7 +92,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
-    long startTime = Time.monotonicNowNanos();
+    LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    // TODO: Add metric here to track time taken by Ratis
     Preconditions.checkNotNull(ratisHandler);
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
         method.getName(), method.getParameterTypes(), args);
@@ -99,7 +104,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     // via ratis. So, in this special scenario we use RaftClient.
     final SCMRatisResponse response;
     if (method.getName().equals("storeValidCertificate") &&
-        args[args.length -1].equals(HddsProtos.NodeType.SCM)) {
+        args[args.length - 1].equals(HddsProtos.NodeType.SCM)) {
       response =
           HASecurityUtils.submitScmCertsToRatis(
               ratisHandler.getDivision().getGroup(),
@@ -110,8 +115,6 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       response = ratisHandler.submitRequest(
           scmRatisRequest);
     }
-    LOG.info("Invoking method {} on target {}, cost {}us",
-        method, ratisHandler, (Time.monotonicNowNanos() - startTime) / 1000.0);
 
     if (response.isSuccess()) {
       return response.getResult();

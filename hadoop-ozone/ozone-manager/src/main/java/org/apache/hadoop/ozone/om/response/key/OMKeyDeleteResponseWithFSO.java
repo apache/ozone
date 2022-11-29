@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
@@ -39,27 +40,31 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
  * Response for DeleteKey request.
  */
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
-    DELETED_TABLE, DELETED_DIR_TABLE})
+    DELETED_TABLE, DELETED_DIR_TABLE, BUCKET_TABLE})
 public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
   private boolean isDeleteDirectory;
   private String keyName;
+  private long volumeId;
 
+  @SuppressWarnings("parameternumber")
   public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull String keyName, @Nonnull OmKeyInfo omKeyInfo,
       boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull boolean isDeleteDirectory) {
+      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo);
     this.keyName = keyName;
     this.isDeleteDirectory = isDeleteDirectory;
+    this.volumeId = volumeId;
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
+                                    @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override
@@ -68,8 +73,9 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
-    String ozoneDbKey = omMetadataManager.getOzonePathKey(
-            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName());
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+        getOmBucketInfo().getObjectID(), getOmKeyInfo().getParentObjectID(),
+        getOmKeyInfo().getFileName());
 
     if (isDeleteDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,

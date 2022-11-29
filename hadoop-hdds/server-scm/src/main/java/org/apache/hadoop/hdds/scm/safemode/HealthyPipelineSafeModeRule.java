@@ -25,9 +25,11 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 
@@ -53,12 +55,14 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
   private final PipelineManager pipelineManager;
   private final int minHealthyPipelines;
+  private final SCMContext scmContext;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
-      PipelineManager pipelineManager,
-      SCMSafeModeManager manager, ConfigurationSource configuration) {
+      PipelineManager pipelineManager, SCMSafeModeManager manager,
+      ConfigurationSource configuration, SCMContext scmContext) {
     super(manager, ruleName, eventQueue);
     this.pipelineManager = pipelineManager;
+    this.scmContext = scmContext;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
@@ -101,7 +105,16 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized boolean validate() {
-    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    boolean shouldRunSafemodeCheck =
+        FinalizationManager.shouldCreateNewPipelines(
+            scmContext.getFinalizationCheckpoint());
+    if (!shouldRunSafemodeCheck) {
+      LOG.info("All SCM pipelines are closed due to ongoing upgrade " +
+          "finalization. Bypassing healthy pipeline safemode rule.");
+      return true;
+    } else {
+      return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    }
   }
 
   @Override
@@ -142,7 +155,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   private synchronized void initializeRule(boolean refresh) {
     int pipelineCount = pipelineManager.getPipelines(
-        new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         Pipeline.PipelineState.OPEN).size();
 
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,

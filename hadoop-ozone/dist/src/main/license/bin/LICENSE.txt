@@ -209,6 +209,7 @@ See licenses/ for text of these licenses.
 EPL
 =====================
 
+   org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
    org.eclipse.jetty:jetty-security
@@ -231,6 +232,7 @@ CDDL
 =====================
 
    com.sun.istack:istack-commons-runtime
+   com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
    com.sun.jersey:jersey-json
    com.sun.jersey:jersey-server
@@ -265,6 +267,8 @@ CDDL
 Apache License
 =====================
 
+   ch.qos.reload4j:reload4j
+   com.carrotsearch:hppc
    com.fasterxml.jackson.core:jackson-annotations
    com.fasterxml.jackson.core:jackson-core
    com.fasterxml.jackson.core:jackson-databind
@@ -309,7 +313,11 @@ Apache License
    io.netty:netty-handler
    io.netty:netty-handler-proxy
    io.netty:netty-resolver
+   io.netty:netty-tcnative
+   io.netty:netty-tcnative-boringssl-static
+   io.netty:netty-tcnative-classes
    io.netty:netty-transport
+   io.netty:netty-transport-classes-epoll
    io.netty:netty-transport-native-epoll
    io.netty:netty-transport-native-unix-common
    io.opencensus:opencensus-api
@@ -320,16 +328,16 @@ Apache License
    io.opentracing:opentracing-util
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
-   log4j:log4j
    net.minidev:accessors-smart
    net.minidev:json-smart
+   net.java.dev.jna:jna
+   net.java.dev.jna:jna-platform
    org.bouncycastle:bcpkix-jdk15on
    org.bouncycastle:bcprov-jdk15on
    org.codehaus.jackson:jackson-core-asl
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl
    org.codehaus.jackson:jackson-xc
-   org.codehaus.jettison:jettison
    org.hamcrest:hamcrest-all
    org.javassist:javassist
    org.jboss.weld.servlet:weld-servlet
@@ -350,10 +358,11 @@ Apache License
 MIT
 =====================
 
+   com.kstruct:gethostname4j
    net.sf.jopt-simple:jopt-simple
    org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:slf4j-api
-   org.slf4j:slf4j-log4j12
+   org.slf4j:slf4j-reload4j
 
 
 EPL 2.0

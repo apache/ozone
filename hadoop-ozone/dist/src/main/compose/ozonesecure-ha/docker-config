@@ -55,6 +55,7 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
+OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
@@ -71,7 +72,7 @@ HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
 CORE-SITE.XML_hadoop.security.authentication=kerberos
-CORE-SITE.XML_hadoop.security.auth_to_local=RULE:[2:$1](testuser2.*) RULE:[2:$1](testuser.*) RULE:[2:$1@$0](.*)s/.*/root/
+CORE-SITE.XML_hadoop.security.auth_to_local="DEFAULT"
 CORE-SITE.XML_hadoop.security.key.provider.path=kms://http@kms:9600/kms
 
 
@@ -89,7 +90,7 @@ OZONE-SITE.XML_ozone.httpfs.kerberos.keytab.file=/etc/security/keytabs/httpfs.ke
 OZONE-SITE.XML_ozone.httpfs.kerberos.principal=httpfs/httpfs@EXAMPLE.COM
 
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_dfs.datanode.keytab.file=/etc/security/keytabs/dn.keytab
+HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM
 HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 

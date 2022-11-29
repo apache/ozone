@@ -19,18 +19,22 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -38,27 +42,29 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.Rule;
-
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
 /**
  * Base class for Ozone Manager HA tests.
@@ -74,6 +80,8 @@ public class TestStorageContainerManagerHA {
   private String scmServiceId;
   private static int numOfSCMs = 3;
 
+  private static final Logger LOG = LoggerFactory
+      .getLogger(TestStorageContainerManagerHA.class);
 
   @Rule
   public Timeout timeout = new Timeout(300_000);
@@ -85,7 +93,7 @@ public class TestStorageContainerManagerHA {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
@@ -107,11 +115,12 @@ public class TestStorageContainerManagerHA {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
+    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test
@@ -155,7 +164,7 @@ public class TestStorageContainerManagerHA {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes(UTF_8).length, STAND_ALONE, ONE,
+        .createKey(keyName, value.getBytes(UTF_8).length, RATIS, ONE,
             new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
@@ -170,10 +179,10 @@ public class TestStorageContainerManagerHA {
     is.close();
     final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true).build();
+        .build();
     final OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     final List<OmKeyLocationInfo> keyLocationInfos =
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
@@ -226,13 +235,53 @@ public class TestStorageContainerManagerHA {
     conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
         scm1.getSCMNodeId());
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf1));
-    scm1.getScmHAManager().shutdown();
+    scm1.getScmHAManager().stop();
     Assert.assertTrue(
         StorageContainerManager.scmInit(conf1, scm1.getClusterId()));
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
     Assert.assertTrue(
         StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
   }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testHAConfig(boolean isRatisEnabled) throws Exception {
+    StorageContainerManager scm0 = cluster.getStorageContainerManager(0);
+    scm0.stop();
+    boolean isDeleted = scm0.getScmStorageConfig().getVersionFile().delete();
+    Assert.assertTrue(isDeleted);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, isRatisEnabled);
+    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
+    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
+    scmStorageConfig.getCurrentDir().delete();
+    scmStorageConfig.setSCMHAFlag(isRatisEnabled);
+    DefaultConfigManager.clearDefaultConfigs();
+    scmStorageConfig.initialize();
+    scm0.scmInit(conf, clusterId);
+    Assert.assertEquals(DefaultConfigManager.getValue(
+        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled),
+        isRatisEnabled);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidHAConfig(boolean isRatisEnabled) throws Exception {
+    StorageContainerManager scm0 = cluster.getStorageContainerManager(0);
+    scm0.stop();
+    boolean isDeleted = scm0.getScmStorageConfig().getVersionFile().delete();
+    Assert.assertTrue(isDeleted);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, isRatisEnabled);
+    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
+    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
+    scmStorageConfig.getCurrentDir().delete();
+    scmStorageConfig.setSCMHAFlag(!isRatisEnabled);
+    DefaultConfigManager.clearDefaultConfigs();
+    scmStorageConfig.initialize();
+    Assertions.assertThrows(ConfigurationException.class,
+            () -> StorageContainerManager.scmInit(conf, clusterId));
+  }
+
+
 
   @Test
   public void testBootStrapSCM() throws Exception {
@@ -243,6 +292,7 @@ public class TestStorageContainerManagerHA {
     final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf2);
     scmStorageConfig.setClusterId(UUID.randomUUID().toString());
     scmStorageConfig.getCurrentDir().delete();
+    scmStorageConfig.setSCMHAFlag(true);
     scmStorageConfig.initialize();
     conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
         false);
@@ -250,5 +300,17 @@ public class TestStorageContainerManagerHA {
     conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
         true);
     Assert.assertTrue(StorageContainerManager.scmBootstrap(conf2));
+  }
+
+  @Test
+  public void testGetRatisRolesDetail() throws IOException {
+    Set<String> resultSet = new HashSet<>();
+    for (StorageContainerManager scm: cluster.getStorageContainerManagers()) {
+      resultSet.addAll(scm.getScmHAManager().getRatisServer().getRatisRoles());
+    }
+    System.out.println(resultSet);
+    Assert.assertEquals(3, resultSet.size());
+    Assert.assertEquals(1,
+        resultSet.stream().filter(x -> x.contains("LEADER")).count());
   }
 }

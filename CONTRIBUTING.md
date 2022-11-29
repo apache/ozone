@@ -20,7 +20,8 @@ We welcome contributions of:
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
       * Blockade tests (python + blockade) 
-      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`, `ozone genesis`), which can be used to test cluster and report problems.
+      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`),
+        which can be used to test cluster and report problems.
  * **Bug reports** pointing out broken functionality, docs, or suggestions for improvements are always welcome!
  
 ## Who To Contact
@@ -31,7 +32,7 @@ If you have any questions, please don't hesitate to contact
  * **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite)
  * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/OZONE/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
-## Building from the source code
+## Building from source
 
 ### Requirements
 
@@ -39,100 +40,103 @@ Requirements to compile the code:
 
 * Unix System
 * JDK 1.8 or higher
-* Maven 3.5 or later
+* Maven 3.6 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
-
-Additional requirements to run your first pseudo cluster:
-
-* docker
-* docker-compose
-
-Additional requirements to execute different type of tests:
-
-* [Robot framework](https://robotframework.org/) (for executing acceptance tests)
-* docker-compose (to start pseudo cluster, also used for blockade and acceptance tests)
-* [blockade](https://pypi.org/project/blockade/) To execute network fault-injection testing.
-* [jq](https://stedolan.github.io/jq/) (for executing acceptance tests)
-
-Optional dependencies:
-
-* [hugo](https://gohugo.io/) to include the documentation in the web ui.
 
 (Standard development tools such as make, gcc, etc. are required.)
 
 ### Build the project
 
-After installing the requirements (especially maven) the build is as simple as:
+After installing the requirements (especially Maven) build is as simple as:
 
 ```
-mvn clean install -DskipTests
+mvn clean verify -DskipTests
 ```
 
-And you can start your first cluster:
+### Useful Maven build options
+
+  * Use `-DskipShade` to skip shaded Ozone FS jar file creation. Saves time, but you can't test integration with other software that uses Ozone as a Hadoop-compatible file system.
+  * Use `-DskipRecon` to skip building Recon Web UI. It saves about 2 minutes.
+  * Use `-Pdist` to build the binary tarball, similar to the one that gets released
+
+## Running Ozone in Docker
+
+Additional requirements for running Ozone in pseudo cluster (including acceptance tests):
+
+* docker
+* docker-compose
+* [jq](https://stedolan.github.io/jq/) (utility used heavily by acceptance tests)
+
+After building Ozone locally, you can start your first pseudo cluster:
 
 ```
 cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
-docker-compose up -d --scale datanode=3
+OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 ```
 
-### Helper scripts
+See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/current/start.html).
 
-`hadoop-ozone/dev-support/checks` directory contains helper scripts to build and check your code. (Including findbugs and checkstyle). Use them if you don't know the exact maven goals / parameters.
-
-These scripts are executed by the CI servers, so it's always good to run them locally before creating a PR.
-
-### Maven build options:
-
-  * Use `-DskipShade` to exclude ozonefs jar file creation from the release. It's way more faster, but you can't test Hadoop Compatible file system.
-  * Use `-DskipRecon` to exclude the Recon build (Web UI and monitoring) from the build. It saves about 2 additional minutes.
-  * Use `-Pdist` to build a distribution (Without this profile you won't have the final tar file)
-  * Use `-Pdocker-build` to build a docker image which includes Ozone
-  * Use `-Ddocker.image=repo/name` to define the name of your docker image
-  * USe `-Pdocker-push` to push the created docker image to the docker registry
-  
 ## Contribute your modifications
 
-We use github pull requests instead of uploading patches to JIRA. The main contribution workflow is as follows:
+We use GitHub pull requests for contributing changes to the repository. The main workflow is as follows:
 
-  1. Fork `apache/ozone` github repository (first time)
-  2. Create a new Jira in HDDS project (eg. HDDS-1234)
-  3. Create a local branch for your contribution (eg. `git checkout -b HDDS-1234`)
-  4. Create your commits and push your branches to your personal fork.
-  5. Create a pull request on github UI 
-      * Please include the Jira link, problem description and testing instruction
-  6. Set the Jira to "Patch Available" state
-  7. Address any review comments if applicable by pushing new commits to the PR.
-  8. When addressing review comments, there is no need to squash your commits. This makes it easy for reviewers to only review the incremental changes. The committer will take care to squash all your commits before merging to master.
+  1. Fork [`apache/ozone`](https://github.com/apache/ozone) repository (first time) and clone it to your local machine
+  2. Enable the `build-branch` GitHub Actions workflow (defined in `.github/workflows/post-commit.yml`) in your fork
+  3. Ensure a Jira issue corresponding to the change exists in the [HDDS project](https://issues.apache.org/jira/projects/HDDS/) (eg. HDDS-1234)
+     * Please search Jira before creating a new issue, someone might have already reported the same.
+     * If this is your first issue, you might not be able to assign it to yourself.  If so, please make a comment in the issue, indicating that your are working on it.
+  4. Create a local branch for your contribution (eg. `git checkout -b HDDS-1234`)
+  5. Make your changes locally.
+     * For complex changes, committing each logical part is recommended.
+  6. Push your changes to your fork of Ozone
+  7. Wait for the `build-branch` workflow to complete successfully for your commit.
+  8. Create a pull request for your changes
+     * Please include the Jira link, problem description and testing instruction (follow the [template](https://github.com/apache/ozone/blob/master/.github/pull_request_template.md))
+  9. Set the Jira issue to "Patch Available" state
+  10. Address any review comments if applicable
+      * Create new, incremental commits in your branch.  This makes it easy for reviewers to only review the new changes. The committer will take care to squash all your commits when merging the pull request.
+      * Push your commits in a batch, when no more changes are expected.  This reduces the burden on automated CI checks.
+      * If you need to bring your PR up-to-date with the base branch (usually `master`), e.g. to resolve conflicts, please do so by merge, not rebase: `git merge --no-edit origin/master`.
+      * In general, please try to avoid force-push when updating the PR.  Here are some great articles that explain why:
+        * https://developers.mattermost.com/blog/submitting-great-prs/#4-avoid-force-pushing
+        * https://www.freecodecamp.org/news/optimize-pull-requests-for-reviewer-happiness#request-a-review
     
 ## Code convention and tests
 
-We follow the code convention of Hadoop project (2 spaces instead of tabs, 80 char line width, ASF licence headers). The code checked with checkstyle, findbugs and various test frameworks.
+Basic code conventions followed by Ozone:
 
-Please don't post / commit any code with any code violations (all checks are not checking the introduced violations as checks in Hadoop but all the available violations).
+ * 2 spaces indentation
+ * 80-char line length limit
+ * Apache license header required in most files
+ * no `@author` tags, authorship is indicated by Git history
+
+These are checked by tools like Checkstyle and RAT.
 
 ### Check your contribution
 
-The easiest way to check your contribution is using the simplified shell scripts under `hadoop-ozone/dev-support/checks`. The problems will be printed out on the standard output.
+The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozone/tree/master/hadoop-ozone/dev-support/checks) contains scripts to build and check Ozone.  Most of these are executed by CI for every commit and pull request.  Running them before creating a pull request is strongly recommended.  This can be achieved by enabling the `build-branch` workflow in your fork and letting GitHub run all of the checks, but most of the checks can also be run locally.
 
-For example:
-```
-hadoop-ozone/dev-support/checks/rat.sh
-hadoop-ozone/dev-support/checks/checkstyle.sh
-hadoop-ozone/dev-support/checks/findbugs.sh
-```
+ 1. `build.sh`: compiles Ozone
+ 2. quick checks (less than 2 minutes)
+    * `author.sh`: checks for `@author` tags
+    * `bats.sh`: unit test for shell scripts
+    * `rat.sh`: checks for Apache license header
+    * `docs.sh`: sanity checks for [Ozone documentation](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs)
+    * `dependency.sh`: compares list of jars in build output with known list
+    * `checkstyle.sh`: Checkstyle
+ 3. moderate (around 10 minutes)
+    * `findbugs.sh`: SpotBugs
+    * `kubernetes.sh`: very limited set of tests run in Kubernetes environment
+ 4. slow (around 1 hour or more)
+    * `unit.sh`: pure unit tests
+    * `integration.sh`: Java-based tests using single JVM "mini cluster"
+    * `acceptance.sh`: rather complete set of tests in Docker Compose-based environment
 
-Execution of rat and checkstyle are very fast. Findbugs is slightly slower. Executing unit.sh takes about 30 minutes.
+The set of tests run by `integration` and `acceptance` may be limited via arguments, please see the scripts for details.  This is used by CI to run them in multiple splits to avoid taking too much time.
 
-The same scripts are executed by the github PR checker.
+Some scripts require third-party tools, but most of these are installed during the first run, if needed.
 
-It's always good practice (and fast) to test with the related docker-compose based pseudo clusters:
-
-```
-cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
-./test.sh
-```
-
-(To test S3 use `compose/ozones3`, to test security use `compose/ozonsecure`, etc.
+Most scripts (except `build.sh`) output results in `target/<name>`, e.g. `target/docs`.
 
 ### False positive findbugs violation
 
@@ -148,7 +152,7 @@ private synchronized void addEntryTodnsToUuidMap(
 
 ## Using IDE
 
-As Ozone uses Apache Maven it can be developed from any IDE. As IntelliJ is a common choice, here are some suggestions to use it for Ozone development:
+As Ozone uses Apache Maven it can be developed from any IDE.  IntelliJ IDEA is a common choice, here are some suggestions to use it for Ozone development.
 
 ### Run Ozone from IntelliJ
 
@@ -185,12 +189,23 @@ Checkstyle plugin may help to detect violations directly from the IDE.
 
 ### Common problems
 
+#### Too large generated classes
+
 IntelliJ may not pick up protoc generated classes as they can be very huge. If the protoc files can't be compiled try the following:
 
 1. Open _Help_ -> _Edit custom properties_ menu.
 2. Add `idea.max.intellisense.filesize=10000` entry
 3. Restart your IDE
 
+#### Bad class file
+
+Sometimes during incremental build IDEA encounters the following error:
+
+`bad class file: hadoop-hdds/common/target/classes/org/apache/hadoop/ozone/common/ChunkBufferImplWithByteBufferList$1.class`
+
+Usually this can be fixed by removing the class file (outside of the IDE), but sometimes only by a full Rebuild.
+
 
 ## CI
+
 The Ozone project uses Github Actions for its CI system.  The configuration is described in detail [here](.github/ci.md).

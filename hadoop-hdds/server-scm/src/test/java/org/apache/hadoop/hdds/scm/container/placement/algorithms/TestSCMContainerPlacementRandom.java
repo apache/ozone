@@ -27,19 +27,19 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.Assert;
-import org.junit.Test;
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertTrue;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
 
@@ -63,11 +63,11 @@ public class TestSCMContainerPlacementRandom {
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = TestUtils.createStorageReport(
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          TestUtils.createMetadataStorageReport(
+          HddsTestUtils.createMetadataStorageReport(
               "/metadata1-" + datanodeInfo.getUuidString(),
               100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -78,7 +78,7 @@ public class TestSCMContainerPlacementRandom {
       datanodes.add(datanodeInfo);
     }
 
-    StorageReportProto storage2 = TestUtils.createStorageReport(
+    StorageReportProto storage2 = HddsTestUtils.createStorageReport(
         datanodes.get(2).getUuid(),
         "/data1-" + datanodes.get(2).getUuidString(),
         100L, 90L, 10L, null);
@@ -103,18 +103,18 @@ public class TestSCMContainerPlacementRandom {
           .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
-      Assert.assertEquals(1, datanodeDetails.size());
+      Assertions.assertEquals(1, datanodeDetails.size());
       DatanodeDetails datanode0Details = datanodeDetails.get(0);
 
-      Assert.assertNotEquals(
-          "Datanode 0 should not been selected: excluded by parameter",
-          datanodes.get(0), datanode0Details);
-      Assert.assertNotEquals(
-          "Datanode 1 should not been selected: excluded by parameter",
-          datanodes.get(1), datanode0Details);
-      Assert.assertNotEquals(
-          "Datanode 2 should not been selected: not enough space there",
-          datanodes.get(2), datanode0Details);
+      Assertions.assertNotEquals(
+          datanodes.get(0), datanode0Details,
+          "Datanode 0 should not been selected: excluded by parameter");
+      Assertions.assertNotEquals(
+          datanodes.get(1), datanode0Details,
+          "Datanode 1 should not been selected: excluded by parameter");
+      Assertions.assertNotEquals(
+          datanodes.get(2), datanode0Details,
+          "Datanode 2 should not been selected: not enough space there");
 
     }
   }
@@ -172,11 +172,11 @@ public class TestSCMContainerPlacementRandom {
           NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto());
 
-      StorageReportProto storage1 = TestUtils.createStorageReport(
+      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
-          TestUtils.createMetadataStorageReport(
+          HddsTestUtils.createMetadataStorageReport(
               "/metadata1-" + datanodeInfo.getUuidString(),
               100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
@@ -187,7 +187,7 @@ public class TestSCMContainerPlacementRandom {
       datanodes.add(datanodeInfo);
     }
 
-    StorageReportProto storage1 = TestUtils.createStorageReport(
+    StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         datanodes.get(1).getUuid(),
         "/data1-" + datanodes.get(1).getUuidString(),
         100L, 90L, 10L, null);
@@ -195,7 +195,7 @@ public class TestSCMContainerPlacementRandom {
         new ArrayList<>(Arrays.asList(storage1)));
 
     MetadataStorageReportProto metaStorage2 =
-        TestUtils.createMetadataStorageReport(
+        HddsTestUtils.createMetadataStorageReport(
             "/metadata1-" + datanodes.get(2).getUuidString(),
             100L, 90, 10L, null);
     datanodes.get(2).updateMetaDataStorageReports(
@@ -215,11 +215,11 @@ public class TestSCMContainerPlacementRandom {
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
             null);
 
-    Assert.assertTrue(
+    Assertions.assertTrue(
         scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
-    Assert.assertFalse(
+    Assertions.assertFalse(
         scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
-    Assert.assertFalse(
+    Assertions.assertFalse(
         scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
 
   }

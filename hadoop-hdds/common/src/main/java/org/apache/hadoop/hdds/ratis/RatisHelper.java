@@ -26,10 +26,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
@@ -63,6 +66,8 @@ import org.slf4j.LoggerFactory;
 public final class RatisHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
+
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
@@ -96,7 +101,18 @@ public final class RatisHelper {
   }
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
-    return id.getIpAddress() + ":" + id.getPort(port).getValue();
+    if (datanodeUseHostName()) {
+      final String address =
+              id.getHostName() + ":" + id.getPort(port).getValue();
+      LOG.debug("Datanode is using hostname for raft peer address: {}",
+              address);
+      return address;
+    } else {
+      final String address =
+              id.getIpAddress() + ":" + id.getPort(port).getValue();
+      LOG.debug("Datanode is using IP for raft peer address: {}", address);
+      return address;
+    }
   }
 
   public static RaftPeerId toRaftPeerId(DatanodeDetails id) {
@@ -136,7 +152,7 @@ public final class RatisHelper {
   }
 
   private static RaftGroup newRaftGroup(Collection<RaftPeer> peers) {
-    return peers.isEmpty()? emptyRaftGroup()
+    return peers.isEmpty() ? emptyRaftGroup()
         : RaftGroup.valueOf(DUMMY_GROUP_ID, peers);
   }
 
@@ -182,9 +198,9 @@ public final class RatisHelper {
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
-  public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
-    return newRaftClient(getRpcType(conf), leader,
+  public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient(
+      ConfigurationSource conf) {
+    return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
@@ -212,26 +228,72 @@ public final class RatisHelper {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
-    final RaftProperties properties = new RaftProperties();
-
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    final RaftProperties properties = newRaftProperties(rpcType);
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
 
-    RaftClient.Builder builder =  RaftClient.newBuilder()
+    return RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)
         .setProperties(properties)
-        .setRetryPolicy(retryPolicy);
+        .setParameters(setClientTlsConf(rpcType, tlsConfig))
+        .setRetryPolicy(retryPolicy)
+        .build();
+  }
 
+  public static Parameters setClientTlsConf(RpcType rpcType,
+      GrpcTlsConfig tlsConfig) {
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
       Parameters parameters = new Parameters();
-      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
-      builder.setParameters(parameters);
+      setAdminTlsConf(parameters, tlsConfig);
+      setClientTlsConf(parameters, tlsConfig);
+      return parameters;
     }
-    return builder.build();
+    return null;
+  }
+
+  private static void setAdminTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Admin.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  private static void setClientTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  public static Parameters setServerTlsConf(
+      GrpcTlsConfig serverConf, GrpcTlsConfig clientConf) {
+    final Parameters parameters = new Parameters();
+    if (serverConf != null) {
+      GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
+      GrpcConfigKeys.TLS.setConf(parameters, serverConf);
+      setAdminTlsConf(parameters, serverConf);
+    }
+    setClientTlsConf(parameters, clientConf);
+    return parameters;
+  }
+
+  public static Parameters setServerTlsConf(GrpcTlsConfig tlsConf) {
+    return setServerTlsConf(tlsConf, tlsConf);
+  }
+
+  public static RaftProperties newRaftProperties(RpcType rpcType) {
+    final RaftProperties properties = new RaftProperties();
+    setRpcType(properties, rpcType);
+    return properties;
+  }
+
+  public static RaftProperties setRpcType(RaftProperties properties,
+      RpcType rpcType) {
+    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    return properties;
   }
 
   /**
@@ -287,7 +349,7 @@ public final class RatisHelper {
 
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsWithPrefix(
+    return configuration.getPropsMatchPrefixAndTrimPrefix(
         StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
   }
 
@@ -320,6 +382,12 @@ public final class RatisHelper {
       Collection<RaftProtos.CommitInfoProto> commitInfos) {
     return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
         .min(Long::compareTo).orElse(null);
+  }
+
+  private static boolean datanodeUseHostName() {
+    return CONF.getBoolean(
+            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private static <U> Class<? extends U> getClass(String name,

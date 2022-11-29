@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -97,7 +96,6 @@ public class TestCloseContainerHandlingByClient {
     config.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(config);
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setQuietMode(false);
@@ -143,9 +141,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -177,9 +174,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -212,9 +208,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -273,9 +268,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -318,9 +312,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);
@@ -381,9 +374,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
@@ -416,9 +408,8 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setReplicationConfig(new RatisReplicationConfig(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
 
     waitForContainerClose(key);

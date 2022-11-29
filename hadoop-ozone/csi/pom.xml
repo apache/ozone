@@ -20,13 +20,17 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-csi</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone CSI service</description>
   <name>Apache Ozone CSI service</name>
   <packaging>jar</packaging>
+
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+  </properties>
 
   <dependencies>
     <dependency>
@@ -67,28 +71,37 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
-      <version>${grpc-compile.version}</version>
+      <version>${io.grpc.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-transport-native-epoll</artifactId>
+      <classifier>linux-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler-proxy</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec-http2</artifactId>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-transport-native-unix-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
+      <groupId>ch.qos.reload4j</groupId>
+      <artifactId>reload4j</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
+      <artifactId>slf4j-reload4j</artifactId>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-protobuf</artifactId>
-      <version>${grpc-compile.version}</version>
+      <version>${io.grpc.version}</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.protobuf</groupId>
@@ -99,7 +112,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
-      <version>${grpc-compile.version}</version>
+      <version>${io.grpc.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -167,7 +180,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>
-                io.grpc:protoc-gen-grpc-java:${grpc-compile.version}:exe:${os.detected.classifier}
+                io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}
               </pluginArtifact>
             </configuration>
           </execution>

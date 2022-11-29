@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 
 import org.junit.Assert;
@@ -60,8 +59,7 @@ public class TestStringToSignProducer {
     final SignatureInfo signatureInfo =
         new AuthorizationV4HeaderParser(authHeader, "123") {
           @Override
-          public void validateDateRange(Credential credentialObj)
-              throws OS3Exception {
+          public void validateDateRange(Credential credentialObj) {
             //NOOP
           }
         }.parseSignature();

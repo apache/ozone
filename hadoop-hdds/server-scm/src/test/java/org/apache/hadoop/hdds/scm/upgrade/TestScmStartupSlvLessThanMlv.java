@@ -23,15 +23,14 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * Tests that SCM will throw an exception on creation when it reads in a
@@ -39,18 +38,18 @@ import java.io.IOException;
  * software layout version.
  */
 public class TestScmStartupSlvLessThanMlv {
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
 
   @Test
-  public void testStartupSlvLessThanMlv() throws Exception {
+  public void testStartupSlvLessThanMlv(@TempDir Path tempDir)
+      throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File scmSubdir = tempFolder.newFolder("scm", "current");
+    File scmSubdir = tempDir.resolve("scm").resolve("current").toFile();
+    Assertions.assertTrue(scmSubdir.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
-        tempFolder.getRoot().getAbsolutePath());
+        tempDir.toAbsolutePath().toString());
 
     // Set metadata layout version larger then software layout version.
     int largestSlv = 0;
@@ -61,15 +60,13 @@ public class TestScmStartupSlvLessThanMlv {
 
     // Create version file with MLV > SLV, which should fail the SCM
     // construction.
-    TestUpgradeUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv);
+    UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv);
 
-    try {
-      new StorageContainerManager(conf);
-      Assert.fail("Expected IOException due to incorrect MLV on SCM creation.");
-    } catch(IOException e) {
-      String expectedMessage = String.format("Metadata layout version (%s) > " +
-          "software layout version (%s)", mlv, largestSlv);
-      GenericTestUtils.assertExceptionContains(expectedMessage, e);
-    }
+    Throwable t = Assertions.assertThrows(IOException.class,
+        () -> new StorageContainerManager(conf));
+    String expectedMessage = String.format("Cannot initialize VersionManager." +
+            " Metadata layout version (%s) > software layout version (%s)",
+        mlv, largestSlv);
+    Assertions.assertEquals(expectedMessage, t.getMessage());
   }
 }

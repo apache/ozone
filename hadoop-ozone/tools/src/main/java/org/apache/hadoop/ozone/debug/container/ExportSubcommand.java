@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
 import org.slf4j.Logger;
@@ -29,6 +30,8 @@ import picocli.CommandLine.ParentCommand;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.concurrent.Callable;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
  * Handles {@code ozone debug container export} command.
@@ -51,8 +54,12 @@ public class ExportSubcommand implements Callable<Void> {
 
   @CommandLine.Option(names = {"--dest"},
       defaultValue = "/tmp",
-      description = "Destination directory")
+      description = "Destination directory to hold exported container files")
   private String destination;
+
+  @CommandLine.Option(names = {"--count"},
+      description = "Count of containers to export")
+  private long containerCount = 1;
 
   @Override
   public Void call() throws Exception {
@@ -61,18 +68,22 @@ public class ExportSubcommand implements Callable<Void> {
     final ContainerReplicationSource replicationSource =
         new OnDemandContainerReplicationSource(parent.getController());
 
-    LOG.info("Starting to replication");
-
-    replicationSource.prepare(containerId);
-    LOG.info("Preparation is done");
-
-    final File destinationFile =
-        new File(destination, "container-" + containerId + ".tar.gz");
-    try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
-      replicationSource.copyData(containerId, fos);
+    for (int i = 0; i < containerCount; i++) {
+      replicationSource.prepare(containerId);
+      final File destinationFile =
+          new File(destination, "container-" + containerId + ".tar.gz");
+      try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
+        try {
+          replicationSource.copyData(containerId, fos);
+        } catch (StorageContainerException e) {
+          if (e.getResult() == CONTAINER_NOT_FOUND) {
+            continue;
+          }
+        }
+      }
+      LOG.info("Container {} is exported to {}", containerId, destinationFile);
+      containerId++;
     }
-    LOG.info("Container is exported to {}", destinationFile);
-
     return null;
   }
 }

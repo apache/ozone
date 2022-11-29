@@ -30,15 +30,14 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -46,28 +45,24 @@ import java.security.NoSuchProviderException;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Test Class for Root Certificate generation.
  */
 public class TestRootCertificate {
   private static OzoneConfiguration conf = new OzoneConfiguration();
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private SecurityConfig securityConfig;
 
-  @Before
-  public void init() throws IOException {
-    conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
+  @BeforeEach
+  public void init(@TempDir Path tempDir) {
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
   }
 
@@ -76,8 +71,8 @@ public class TestRootCertificate {
       throws SCMSecurityException, NoSuchProviderException,
       NoSuchAlgorithmException, CertificateException,
       SignatureException, InvalidKeyException, IOException {
-    LocalDate notBefore = LocalDate.now();
-    LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -98,34 +93,34 @@ public class TestRootCertificate {
     X509CertificateHolder certificateHolder = builder.build();
 
     //Assert that we indeed have a self signed certificate.
-    Assert.assertEquals(certificateHolder.getIssuer(),
+    Assertions.assertEquals(certificateHolder.getIssuer(),
         certificateHolder.getSubject());
 
 
     // Make sure that NotBefore is before the current Date
-    Date invalidDate = java.sql.Date.valueOf(
-        notBefore.minus(1, ChronoUnit.DAYS));
-    Assert.assertFalse(
+    Date invalidDate = Date.from(
+        notBefore.minusDays(1).atZone(ZoneId.systemDefault()).toInstant());
+    Assertions.assertFalse(
         certificateHolder.getNotBefore()
             .before(invalidDate));
 
     //Make sure the end date is honored.
-    invalidDate = java.sql.Date.valueOf(
-        notAfter.plus(1, ChronoUnit.DAYS));
-    Assert.assertFalse(
+    invalidDate = Date.from(
+        notAfter.plusDays(1).atZone(ZoneId.systemDefault()).toInstant());
+    Assertions.assertFalse(
         certificateHolder.getNotAfter()
             .after(invalidDate));
 
     // Check the Subject Name and Issuer Name is in the expected format.
     String dnName = String.format(SelfSignedCertificate.getNameFormat(),
         subject, scmID, clusterID);
-    Assert.assertEquals(certificateHolder.getIssuer().toString(), dnName);
-    Assert.assertEquals(certificateHolder.getSubject().toString(), dnName);
+    Assertions.assertEquals(dnName, certificateHolder.getIssuer().toString());
+    Assertions.assertEquals(dnName, certificateHolder.getSubject().toString());
 
     // We did not ask for this Certificate to be a CertificateServer
     // certificate, hence that
     // extension should be null.
-    Assert.assertNull(
+    Assertions.assertNull(
         certificateHolder.getExtension(Extension.basicConstraints));
 
     // Extract the Certificate and verify that certificate matches the public
@@ -136,11 +131,11 @@ public class TestRootCertificate {
   }
 
   @Test
-  public void testCACert()
+  public void testCACert(@TempDir Path basePath)
       throws SCMSecurityException, NoSuchProviderException,
       NoSuchAlgorithmException, IOException, CertificateException {
-    LocalDate notBefore = LocalDate.now();
-    LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -165,7 +160,7 @@ public class TestRootCertificate {
       OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
           ip -> {
             builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
+            if (validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             }
           });
@@ -183,27 +178,24 @@ public class TestRootCertificate {
     Extension basicExt =
         certificateHolder.getExtension(Extension.basicConstraints);
 
-    Assert.assertNotNull(basicExt);
-    Assert.assertTrue(basicExt.isCritical());
+    Assertions.assertNotNull(basicExt);
+    Assertions.assertTrue(basicExt.isCritical());
 
     // Since this code assigns ONE for the root certificate, we check if the
     // serial number is the expected number.
-    Assert.assertEquals(certificateHolder.getSerialNumber(), BigInteger.ONE);
+    Assertions.assertEquals(BigInteger.ONE,
+        certificateHolder.getSerialNumber());
 
     CertificateCodec codec = new CertificateCodec(securityConfig, "scm");
     String pemString = codec.getPEMEncodedString(certificateHolder);
 
-    File basePath = temporaryFolder.newFolder();
-    if (!basePath.exists()) {
-      Assert.assertTrue(basePath.mkdirs());
-    }
-    codec.writeCertificate(basePath.toPath(), "pemcertificate.crt",
+    codec.writeCertificate(basePath, "pemcertificate.crt",
         pemString, false);
 
     X509CertificateHolder loadedCert =
-        codec.readCertificate(basePath.toPath(), "pemcertificate.crt");
-    assertNotNull(loadedCert);
-    assertEquals(certificateHolder.getSerialNumber(),
+        codec.readCertificate(basePath, "pemcertificate.crt");
+    Assertions.assertNotNull(loadedCert);
+    Assertions.assertEquals(certificateHolder.getSerialNumber(),
         loadedCert.getSerialNumber());
   }
 
@@ -211,8 +203,8 @@ public class TestRootCertificate {
   public void testInvalidParamFails()
       throws SCMSecurityException, NoSuchProviderException,
       NoSuchAlgorithmException, IOException {
-    LocalDate notBefore = LocalDate.now();
-    LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -233,7 +225,7 @@ public class TestRootCertificate {
     try {
       builder.setKey(null);
       builder.build();
-      Assert.fail("Null Key should have failed.");
+      Assertions.fail("Null Key should have failed.");
     } catch (NullPointerException | IllegalArgumentException e) {
       builder.setKey(keyPair);
     }
@@ -242,7 +234,7 @@ public class TestRootCertificate {
     try {
       builder.setSubject("");
       builder.build();
-      Assert.fail("Null/Blank Subject should have thrown.");
+      Assertions.fail("Null/Blank Subject should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setSubject(subject);
     }
@@ -251,7 +243,7 @@ public class TestRootCertificate {
     try {
       builder.setScmID(null);
       builder.build();
-      Assert.fail("Null/Blank SCM ID should have thrown.");
+      Assertions.fail("Null/Blank SCM ID should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setScmID(scmID);
     }
@@ -261,7 +253,7 @@ public class TestRootCertificate {
     try {
       builder.setClusterID(null);
       builder.build();
-      Assert.fail("Null/Blank Cluster ID should have thrown.");
+      Assertions.fail("Null/Blank Cluster ID should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setClusterID(clusterID);
     }
@@ -273,7 +265,7 @@ public class TestRootCertificate {
       builder.setBeginDate(notAfter);
       builder.setEndDate(notBefore);
       builder.build();
-      Assert.fail("Illegal dates should have thrown.");
+      Assertions.fail("Illegal dates should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setBeginDate(notBefore);
       builder.setEndDate(notAfter);
@@ -287,12 +279,12 @@ public class TestRootCertificate {
       X509Certificate cert =
           new JcaX509CertificateConverter().getCertificate(certificateHolder);
       cert.verify(wrongKey.getPublic());
-      Assert.fail("Invalid Key, should have thrown.");
+      Assertions.fail("Invalid Key, should have thrown.");
     } catch (SCMSecurityException | CertificateException
         | SignatureException | InvalidKeyException e) {
       builder.setKey(keyPair);
     }
     // Assert that we can create a certificate with all sane params.
-    Assert.assertNotNull(builder.build());
+    Assertions.assertNotNull(builder.build());
   }
 }

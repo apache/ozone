@@ -47,7 +47,7 @@ public class EnumCodec implements Codec {
     } catch (NoSuchMethodException | IllegalAccessException
         | InvocationTargetException ex) {
       throw new InvalidProtocolBufferException(
-          "GeneratedMessage cannot be decoded!" + ex.getMessage());
+          "Message cannot be decoded!" + ex.getMessage());
     }
   }
 }

@@ -43,7 +43,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.101
   datanode1:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -65,7 +65,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.102
   datanode2:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -87,7 +87,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.103
   datanode3:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -109,7 +109,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.104
   om1:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om1
     volumes:
       - ../..:/opt/hadoop
@@ -134,7 +134,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.111
   om2:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om2
     volumes:
       - ../..:/opt/hadoop
@@ -159,7 +159,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.112
   om3:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om3
     volumes:
       - ../..:/opt/hadoop
@@ -196,14 +196,14 @@ services:
       - ./docker-config
     command: [ "/opt/hadoop/bin/ozone","httpfs" ]
     environment:
-      OZONE_CLASSPATH: "/opt/hadoop/share/ozone/lib/ozone-filesystem-1.2.0-SNAPSHOT.jar:/opt/hadoop/share/ozone/lib/ozone-filesystem-common-1.2.0-SNAPSHOT.jar:/opt/hadoop/share/ozone/lib/ozone-filesystem-hadoop3-1.2.0-SNAPSHOT.jar"
+      OZONE_CLASSPATH: "/opt/hadoop/share/ozone/lib/ozone-filesystem-1.3.0-SNAPSHOT.jar:/opt/hadoop/share/ozone/lib/ozone-filesystem-common-1.3.0-SNAPSHOT.jar:/opt/hadoop/share/ozone/lib/ozone-filesystem-hadoop3-1.3.0-SNAPSHOT.jar"
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
     networks:
       ozone_net:
         ipv4_address: 172.25.0.119
   s3g:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: s3g
     volumes:
       - ../..:/opt/hadoop
@@ -220,7 +220,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.114
   scm1.org:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm1.org
     volumes:
       - ../..:/opt/hadoop
@@ -247,7 +247,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.116
   scm2.org:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm2.org
     volumes:
       - ../..:/opt/hadoop
@@ -275,7 +275,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.117
   scm3.org:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm3.org
     volumes:
       - ../..:/opt/hadoop
@@ -303,7 +303,7 @@ services:
       ozone_net:
         ipv4_address: 172.25.0.118
   recon:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: recon
     volumes:
       - ../..:/opt/hadoop

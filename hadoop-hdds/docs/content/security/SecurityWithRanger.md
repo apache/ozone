@@ -46,6 +46,13 @@ Property|Value
 ozone.acl.enabled         | true
 ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer
 
+To use the RangerOzoneAuthorizer, you also need to add the following environment variables to ozone-env.sh:
+```
+export OZONE_CLASSPATH="${OZONE_HOME}/share/ozone/lib/libext/*"
+```
+* The location of the ranger-ozone-plugin jars depends on where the Ranger Plugin is installed.
+* If the ranger-ozone-plugin jars is installed on another node, copy it to the Ozone installation directory.
+
 The Ranger permissions corresponding to the Ozone operations are as follows:
 
 | operation&permission | Volume  permission | Bucket permission | Key permission |

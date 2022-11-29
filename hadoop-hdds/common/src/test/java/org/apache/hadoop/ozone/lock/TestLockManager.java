@@ -20,8 +20,9 @@ package org.apache.hadoop.ozone.lock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,7 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class TestLockManager {
 
-  @Test(timeout = 1000)
+  @Test
+  @Timeout(1)
   public void testWriteLockWithDifferentResource() {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
@@ -40,7 +42,7 @@ public class TestLockManager {
     manager.writeLock("/resourceTwo");
     manager.writeUnlock("/resourceOne");
     manager.writeUnlock("/resourceTwo");
-    Assert.assertTrue(true);
+    Assertions.assertTrue(true);
   }
 
   @Test
@@ -58,16 +60,17 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get write lock on same object,
     // it will wait.
-    Assert.assertFalse(gotLock.get());
+    Assertions.assertFalse(gotLock.get());
     manager.writeUnlock("/resourceOne");
     // Since we have released the write lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assert.assertTrue(gotLock.get());
+    Assertions.assertTrue(gotLock.get());
   }
 
-  @Test(timeout = 1000)
+  @Test
+  @Timeout(1)
   public void testReadLockWithDifferentResource() {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
@@ -75,7 +78,7 @@ public class TestLockManager {
     manager.readLock("/resourceTwo");
     manager.readUnlock("/resourceOne");
     manager.readUnlock("/resourceTwo");
-    Assert.assertTrue(true);
+    Assertions.assertTrue(true);
   }
 
   @Test
@@ -92,7 +95,7 @@ public class TestLockManager {
     // Let's give some time for the other thread to run
     Thread.sleep(100);
     // Since the new thread is trying to get read lock, it should work.
-    Assert.assertTrue(gotLock.get());
+    Assertions.assertTrue(gotLock.get());
     manager.readUnlock("/resourceOne");
   }
 
@@ -111,13 +114,13 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get read lock on same object,
     // it will wait.
-    Assert.assertFalse(gotLock.get());
+    Assertions.assertFalse(gotLock.get());
     manager.writeUnlock("/resourceOne");
     // Since we have released the write lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assert.assertTrue(gotLock.get());
+    Assertions.assertTrue(gotLock.get());
   }
 
   @Test
@@ -135,13 +138,13 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get write lock on same object,
     // it will wait.
-    Assert.assertFalse(gotLock.get());
+    Assertions.assertFalse(gotLock.get());
     manager.readUnlock("/resourceOne");
     // Since we have released the read lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assert.assertTrue(gotLock.get());
+    Assertions.assertTrue(gotLock.get());
   }
 
   @Test
@@ -160,17 +163,17 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get write lock on same object,
     // it will wait.
-    Assert.assertFalse(gotLock.get());
+    Assertions.assertFalse(gotLock.get());
     manager.readUnlock("/resourceOne");
     //We have only released one read lock, we still hold another read lock.
     Thread.sleep(100);
-    Assert.assertFalse(gotLock.get());
+    Assertions.assertFalse(gotLock.get());
     manager.readUnlock("/resourceOne");
     // Since we have released the read lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assert.assertTrue(gotLock.get());
+    Assertions.assertTrue(gotLock.get());
   }
 
   @Test
@@ -198,6 +201,6 @@ public class TestLockManager {
     }
     GenericTestUtils.waitFor(() -> done.get() == count, 100,
         10 * count * sleep);
-    Assert.assertEquals(count, done.get());
+    Assertions.assertEquals(count, done.get());
   }
 }

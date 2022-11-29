@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -236,7 +235,7 @@ public class ChunkInputStream extends InputStream
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (pos < 0 || pos >= length) {
+    if (pos < 0 || pos > length) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception
@@ -282,6 +281,7 @@ public class ChunkInputStream extends InputStream
 
   @Override
   public synchronized void close() {
+    releaseBuffers();
     releaseClient();
   }
 
@@ -424,20 +424,12 @@ public class ChunkInputStream extends InputStream
       throws IOException {
     ReadChunkResponseProto readChunkResponse;
 
-    try {
-      List<CheckedBiFunction> validators =
-          ContainerProtocolCalls.getValidatorList();
-      validators.add(validator);
+    List<CheckedBiFunction> validators =
+        ContainerProtocolCalls.getValidatorList();
+    validators.add(validator);
 
-      readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
-          readChunkInfo, blockID, validators, token);
-
-    } catch (IOException e) {
-      if (e instanceof StorageContainerException) {
-        throw e;
-      }
-      throw new IOException("Unexpected OzoneException: " + e.toString(), e);
-    }
+    readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
+        readChunkInfo, blockID, validators, token);
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()

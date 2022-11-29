@@ -20,10 +20,11 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
-import org.rocksdb.RocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,18 +37,29 @@ public class RDBStoreIterator
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreIterator.class);
 
-  private final RocksIterator rocksDBIterator;
+  private final ManagedRocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
+  // This is for schemas that use a fixed-length
+  // prefix for each key.
+  private byte[] prefix;
 
-  public RDBStoreIterator(RocksIterator iterator) {
-    this.rocksDBIterator = iterator;
-    seekToFirst();
+  public RDBStoreIterator(ManagedRocksIterator iterator) {
+    this(iterator, null);
   }
 
-  public RDBStoreIterator(RocksIterator iterator, RDBTable table) {
-    this(iterator);
+  public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table) {
+    this(iterator, table, null);
+  }
+
+  public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table,
+      byte[] prefix) {
+    this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
+    if (prefix != null) {
+      this.prefix = Arrays.copyOf(prefix, prefix.length);
+    }
+    seekToFirst();
   }
 
   @Override
@@ -59,9 +71,9 @@ public class RDBStoreIterator
   }
 
   private void setCurrentEntry() {
-    if (rocksDBIterator.isValid()) {
-      currentEntry = ByteArrayKeyValue.create(rocksDBIterator.key(),
-          rocksDBIterator.value());
+    if (rocksDBIterator.get().isValid()) {
+      currentEntry = ByteArrayKeyValue.create(rocksDBIterator.get().key(),
+          rocksDBIterator.get().value());
     } else {
       currentEntry = null;
     }
@@ -69,14 +81,15 @@ public class RDBStoreIterator
 
   @Override
   public boolean hasNext() {
-    return rocksDBIterator.isValid();
+    return rocksDBIterator.get().isValid() &&
+        (prefix == null || startsWith(prefix, rocksDBIterator.get().key()));
   }
 
   @Override
   public ByteArrayKeyValue next() {
     setCurrentEntry();
     if (currentEntry != null) {
-      rocksDBIterator.next();
+      rocksDBIterator.get().next();
       return currentEntry;
     }
     throw new NoSuchElementException("RocksDB Store has no more elements");
@@ -84,19 +97,27 @@ public class RDBStoreIterator
 
   @Override
   public void seekToFirst() {
-    rocksDBIterator.seekToFirst();
+    if (prefix == null) {
+      rocksDBIterator.get().seekToFirst();
+    } else {
+      rocksDBIterator.get().seek(prefix);
+    }
     setCurrentEntry();
   }
 
   @Override
   public void seekToLast() {
-    rocksDBIterator.seekToLast();
+    if (prefix == null) {
+      rocksDBIterator.get().seekToLast();
+    } else {
+      throw new UnsupportedOperationException("seekToLast");
+    }
     setCurrentEntry();
   }
 
   @Override
   public ByteArrayKeyValue seek(byte[] key) {
-    rocksDBIterator.seek(key);
+    rocksDBIterator.get().seek(key);
     setCurrentEntry();
     return currentEntry;
   }
@@ -116,5 +137,26 @@ public class RDBStoreIterator
   @Override
   public void close() throws IOException {
     rocksDBIterator.close();
+  }
+
+  private static boolean startsWith(byte[] prefix, byte[] value) {
+    if (prefix == null) {
+      return true;
+    }
+    if (value == null) {
+      return false;
+    }
+
+    int length = prefix.length;
+    if (value.length < length) {
+      return false;
+    }
+
+    for (int i = 0; i < length; i++) {
+      if (value[i] != prefix[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

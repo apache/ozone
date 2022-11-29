@@ -44,7 +44,7 @@ public class X509CertificateCodec implements Codec<X509Certificate> {
   @Override
   public X509Certificate fromPersistedFormat(byte[] rawData)
       throws IOException {
-    try{
+    try {
       String s = new String(rawData, StandardCharsets.UTF_8);
       return CertificateCodec.getX509Certificate(s);
     } catch (CertificateException exp) {

@@ -44,7 +44,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  */
 @InterfaceAudience.Private
-@Metrics(about="HttpFSServer metrics", context="httpfs")
+@Metrics(about = "HttpFSServer metrics", context = "httpfs")
 public class HttpFSServerMetrics {
 
   private static final String DFS_METRICS_SESSION_ID_KEY
@@ -82,8 +82,8 @@ public class HttpFSServerMetrics {
     String sessionId = conf.get(DFS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create("HttpFSServer", sessionId, ms);
-    String name = "ServerActivity-"+ (serverName.isEmpty()
-        ? "UndefinedServer"+ ThreadLocalRandom.current().nextInt()
+    String name = "ServerActivity-" + (serverName.isEmpty()
+        ? "UndefinedServer" + ThreadLocalRandom.current().nextInt()
         : serverName.replace(':', '-'));
 
     return ms.register(name, null, new HttpFSServerMetrics(name,

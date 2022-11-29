@@ -44,12 +44,6 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getClientRpcPort();
 
   /**
-   * Get container report info that includes container IO stats of nodes.
-   * @return The datanodeUUid to report json string mapping
-   */
-  Map<String, String> getContainerReport();
-
-  /**
    * Returns safe mode status.
    * @return boolean
    */
@@ -80,4 +74,7 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
    */
   String getPrimordialNode();
 
+  String getRatisLogDirectory();
+
+  String getRocksDbDirectory();
 }

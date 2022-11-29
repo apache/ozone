@@ -24,7 +24,6 @@ OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
-
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
@@ -35,8 +34,24 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
+# If SCM sends container close commands as part of upgrade finalization while
+# datanodes are doing a leader election, all 3 replicas may end up in the
+# CLOSING state. The replication manager must be running to later move them to
+# a CLOSED state so the datanodes can progress with finalization.
+#
+# This config sets the amount of time SCM will wait after safemode exit to
+# start the replication manager and pipeline scrubber. The default of 5 minutes
+# is fine in real clusters to prevent unnecessary over-replication,
+# but it is too long for this test.
+OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=5s
+# If datanodes take too long to close pipelines during finalization, let the
+# scrubber force close them to move the test forward.
+OZONE-SITE.XML_ozone.scm.pipeline.scrub.interval=1m
+OZONE-SITE.XML_ozone.scm.pipeline.allocated.timeout=2m
+
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.address=recon:9891
 
 no_proxy=om1,om2,om3,scm,s3g,kdc,localhost,127.0.0.1
 

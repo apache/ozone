@@ -17,6 +17,14 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -31,6 +39,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -50,6 +60,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -75,7 +86,7 @@ public class MockOmTransport implements OmTransport {
   }
 
   public MockOmTransport() {
-    this.blockAllocator = new SinglePipelineBlockAllocator();
+    this(new SinglePipelineBlockAllocator(new OzoneConfiguration()));
   }
 
   @Override
@@ -120,6 +131,9 @@ public class MockOmTransport implements OmTransport {
     case AllocateBlock:
       return response(payload, r -> r.setAllocateBlockResponse(
           allocateBlock(payload.getAllocateBlockRequest())));
+    case GetKeyInfo:
+      return response(payload, r -> r.setGetKeyInfoResponse(
+          getKeyInfo(payload.getGetKeyInfoRequest())));
     default:
       throw new IllegalArgumentException(
           "Mock version of om call " + payload.getCmdType()
@@ -129,10 +143,18 @@ public class MockOmTransport implements OmTransport {
 
   private OzoneManagerProtocolProtos.AllocateBlockResponse allocateBlock(
       OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest) {
-    return OzoneManagerProtocolProtos.AllocateBlockResponse.newBuilder()
-        .setKeyLocation(
-            blockAllocator.allocateBlock(allocateBlockRequest.getKeyArgs())
-                .iterator().next()).build();
+    Iterator<? extends OzoneManagerProtocolProtos.KeyLocation> iterator =
+        blockAllocator.allocateBlock(allocateBlockRequest.getKeyArgs(),
+            ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList()))
+            .iterator();
+    OzoneManagerProtocolProtos.AllocateBlockResponse.Builder builder =
+        OzoneManagerProtocolProtos.AllocateBlockResponse.newBuilder()
+            .setKeyLocation(iterator.next());
+    while (iterator.hasNext()) {
+      builder.mergeKeyLocation(iterator.next());
+    }
+    return builder.build();
+
   }
 
   private DeleteVolumeResponse deleteVolume(
@@ -151,13 +173,39 @@ public class MockOmTransport implements OmTransport {
         .build();
   }
 
+  private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request) {
+    final KeyArgs keyArgs = request.getKeyArgs();
+    return GetKeyInfoResponse.newBuilder()
+        .setKeyInfo(
+            keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
+                .get(keyArgs.getKeyName()))
+        .build();
+  }
+
   private CommitKeyResponse commitKey(CommitKeyRequest commitKeyRequest) {
     final KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
-    final KeyInfo remove =
+    final KeyInfo openKey =
         openKeys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
             .remove(keyArgs.getKeyName());
+    final KeyInfo.Builder committedKeyInfoWithLocations =
+        KeyInfo.newBuilder().setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(keyArgs.getKeyName())
+            .setCreationTime(openKey.getCreationTime())
+            .setModificationTime(openKey.getModificationTime())
+            .setDataSize(keyArgs.getDataSize()).setLatestVersion(0L)
+            .addKeyLocationList(KeyLocationList.newBuilder()
+                .addAllKeyLocations(keyArgs.getKeyLocationsList()));
+    // Just inherit replication config details from open Key
+    if (openKey.hasEcReplicationConfig()) {
+      committedKeyInfoWithLocations
+          .setEcReplicationConfig(openKey.getEcReplicationConfig());
+    } else if (openKey.hasFactor()) {
+      committedKeyInfoWithLocations.setFactor(openKey.getFactor());
+    }
+    committedKeyInfoWithLocations.setType(openKey.getType());
     keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
-        .put(keyArgs.getKeyName(), remove);
+        .put(keyArgs.getKeyName(), committedKeyInfoWithLocations.build());
     return CommitKeyResponse.newBuilder()
         .build();
   }
@@ -165,33 +213,95 @@ public class MockOmTransport implements OmTransport {
   private CreateKeyResponse createKey(CreateKeyRequest createKeyRequest) {
     final KeyArgs keyArgs = createKeyRequest.getKeyArgs();
     final long now = System.currentTimeMillis();
-    final KeyInfo keyInfo = KeyInfo.newBuilder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .setCreationTime(now)
-        .setModificationTime(now)
-        .setType(keyArgs.getType())
-        .setFactor(keyArgs.getFactor())
-        .setDataSize(keyArgs.getDataSize())
-        .setLatestVersion(0L)
-        .addKeyLocationList(KeyLocationList.newBuilder()
-            .addAllKeyLocations(
-                blockAllocator.allocateBlock(createKeyRequest.getKeyArgs()))
-            .build())
-        .build();
+    final BucketInfo bucketInfo =
+        buckets.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName());
+
+    final KeyInfo.Builder keyInfoBuilder =
+        KeyInfo.newBuilder().setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(keyArgs.getKeyName()).setCreationTime(now)
+            .setModificationTime(now).setDataSize(keyArgs.getDataSize())
+            .setLatestVersion(0L).addKeyLocationList(
+            KeyLocationList.newBuilder().addAllKeyLocations(
+                blockAllocator.allocateBlock(createKeyRequest.getKeyArgs(),
+                    new ExcludeList()))
+                .build());
+
+    if (keyArgs.getType() == HddsProtos.ReplicationType.NONE) {
+      // 1. Client did not pass replication config.
+      // Now lets try bucket defaults
+      if (bucketInfo.getDefaultReplicationConfig() != null) {
+        // Since Bucket defaults are available, let's inherit
+        final HddsProtos.ReplicationType type =
+            bucketInfo.getDefaultReplicationConfig().getType();
+        keyInfoBuilder
+            .setType(bucketInfo.getDefaultReplicationConfig().getType());
+        switch (type) {
+        case EC:
+          keyInfoBuilder.setEcReplicationConfig(
+              bucketInfo.getDefaultReplicationConfig()
+                  .getEcReplicationConfig());
+          break;
+        case RATIS:
+        case STAND_ALONE:
+          keyInfoBuilder
+              .setFactor(bucketInfo.getDefaultReplicationConfig().getFactor());
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unknown replication type: " + type);
+        }
+      } else {
+        keyInfoBuilder.setType(HddsProtos.ReplicationType.RATIS);
+        keyInfoBuilder.setFactor(HddsProtos.ReplicationFactor.THREE);
+      }
+    } else {
+      // 1. Client passed the replication config.
+      // Let's use it.
+      final HddsProtos.ReplicationType type = keyArgs.getType();
+      keyInfoBuilder.setType(type);
+      switch (type) {
+      case EC:
+        keyInfoBuilder.setEcReplicationConfig(keyArgs.getEcReplicationConfig());
+        break;
+      case RATIS:
+      case STAND_ALONE:
+        keyInfoBuilder.setFactor(keyArgs.getFactor());
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unknown replication type: " + type);
+      }
+    }
+
+    final KeyInfo keyInfo = keyInfoBuilder.build();
     openKeys.get(keyInfo.getVolumeName()).get(keyInfo.getBucketName())
         .put(keyInfo.getKeyName(), keyInfo);
-    return CreateKeyResponse.newBuilder()
-        .setOpenVersion(0L)
-        .setKeyInfo(keyInfo)
+    return CreateKeyResponse.newBuilder().setOpenVersion(0L).setKeyInfo(keyInfo)
         .build();
   }
 
   private InfoBucketResponse infoBucket(InfoBucketRequest infoBucketRequest) {
+    BucketInfo bucketInfo = buckets.get(infoBucketRequest.getVolumeName())
+        .get(infoBucketRequest.getBucketName());
+    if (!bucketInfo.hasDefaultReplicationConfig()) {
+      final ReplicationConfig replicationConfig = ReplicationConfig
+          .getDefault(new OzoneConfiguration());
+
+      bucketInfo = bucketInfo.toBuilder().setDefaultReplicationConfig(
+          new DefaultReplicationConfig(
+              ReplicationType.fromProto(replicationConfig.getReplicationType()),
+              replicationConfig
+                  .getReplicationType() != HddsProtos.ReplicationType.EC ?
+                  ReplicationFactor
+                      .valueOf(replicationConfig.getRequiredNodes()) :
+                  null, replicationConfig
+              .getReplicationType() == HddsProtos.ReplicationType.EC ?
+              (ECReplicationConfig) replicationConfig :
+              null).toProto()).build();
+    }
     return InfoBucketResponse.newBuilder()
-        .setBucketInfo(buckets.get(infoBucketRequest.getVolumeName())
-            .get(infoBucketRequest.getBucketName()))
+        .setBucketInfo(bucketInfo)
         .build();
   }
 
@@ -256,6 +366,10 @@ public class MockOmTransport implements OmTransport {
     keys.get(bucketInfo.getVolumeName())
         .put(bucketInfo.getBucketName(), new HashMap<>());
     return CreateBucketResponse.newBuilder().build();
+  }
+
+  public Map<String, Map<String, Map<String, KeyInfo>>> getKeys() {
+    return this.keys;
   }
 
   @Override

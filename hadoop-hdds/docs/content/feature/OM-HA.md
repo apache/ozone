@@ -35,7 +35,8 @@ This document explain the HA setup of Ozone Manager (OM) HA, please check [this 
 
 A single Ozone Manager uses [RocksDB](https://github.com/facebook/rocksdb/) to persist metadata (volumes, buckets, keys) locally. HA version of Ozone Manager does exactly the same but all the data is replicated with the help of the RAFT consensus algorithm to follower Ozone Manager instances.
 
-![OM HA](HA-OM.png)
+![HA OM](HA-OM.png)
+
 Client connects to the Leader Ozone Manager which process the request and schedule the replication with RAFT. When the request is replicated to all the followers the leader can return with the response.
 
 ## Configuration
@@ -52,10 +53,10 @@ One Ozone configuration (`ozone-site.xml`) can support multiple Ozone HA cluster
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
  
- ```
+```XML
 <property>
    <name>ozone.om.service.ids</name>
-   <value>cluster1,cluster2</value>
+   <value>cluster1</value>
 </property>
 ```
 
@@ -105,9 +106,46 @@ Raft can guarantee the replication of any request if the request is persisted to
 
 RocksDB instance are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process is not yet wrote them the key data is cached in the memory.
 
-![Double buffer](HA-OM-doublebuffer.png)
+![HA - OM Double Buffer](HA-OM-doublebuffer.png)
 
 The details of this approach discussed in a separated [design doc]({{< ref "design/omha.md" >}}) but it's integral part of the OM HA design.
+
+## OM Bootstrap
+
+To convert a non-HA OM to be HA or to add new OM nodes to existing HA OM ring, new OM node(s) need to be bootstrapped.
+
+Before bootstrapping a new OM node, all the existing OM's on-disk configuration file (ozone-site.xml) must be updated with the configuration details
+of the new OM such nodeId, address, port etc. Note that the existing OM's need not be restarted. They will reload the configuration from disk when
+they receive a bootstrap request from the bootstrapping node.
+
+To bootstrap an OM, the following command needs to be run:
+
+```shell
+ozone om [global options (optional)] --bootstrap
+```
+
+The bootstrap command will first verify that all the OMs have the updated configuration file and fail the command otherwise. This check can be skipped
+using the _force_ option. The _force_ option allows to continue with the bootstrap when one of the existing OMs is down or not responding.
+
+```shell
+ozone om [global options (optional)] --bootstrap --force
+```
+
+Note that using the _force_ option during bootstrap could crash the OM process if it does not have updated configurations.
+
+## OM Decommission
+
+To decommission an OM and remove the node from the OM HA ring, the following steps need to be executed.
+1. Stop the OzoneManager process only on the node which needs to be decommissioned. <p> **Note -** Do not stop the decommissioning OM if there are
+   only two OMs in the ring as both the OMs would be needed to reach consensus to update the Ratis configuration.</p>
+2. Add the _OM NodeId_ of the to be decommissioned OM node to the _ozone.om.decommissioned.nodes.<omServiceId>_ property in _ozone-site.xml_ of all
+   other OMs.
+3. Run the following command to decommission an OM node.
+```shell
+ozone admin om decommission -id=<om-service-id> -nodeid=<decommissioning-om-node-id> -hostname=<decommissioning-om-node-address> [optional --force]
+```
+The _force_option will skip checking whether OM configurations in _ozone-site.xml_ have been updated with the decommissioned node added to
+_ozone.om.decommissioned.nodes_ property. <p>**Note -** It is recommended to bootstrap another OM node before decommissioning one to maintain HA.</p>
 
 ## References
 

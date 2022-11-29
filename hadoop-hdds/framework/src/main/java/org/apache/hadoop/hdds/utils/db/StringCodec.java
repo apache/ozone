@@ -37,7 +37,7 @@ public class StringCodec implements Codec<String> {
   }
 
   @Override
-  public String fromPersistedFormat(byte[] rawData) throws IOException {
+  public String fromPersistedFormat(byte[] rawData) {
     if (rawData != null) {
       return StringUtils.bytes2String(rawData);
     } else {

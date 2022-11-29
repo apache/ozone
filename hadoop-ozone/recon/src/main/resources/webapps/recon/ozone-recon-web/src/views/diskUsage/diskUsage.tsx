@@ -152,26 +152,39 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         subpaths.push(other);
       }
 
-      const pathLabels = subpaths.map(subpath => {
-        // The return subPath must be normalized in a format with
-        // a leading slash and without trailing slash
-        const pieces = subpath.path.split('/');
-        const subpathName = pieces[pieces.length - 1];
-        // Differentiate key without trailing slash
-        return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
-      });
+      let pathLabels, values, percentage, sizeStr, pieces, subpathName;
 
-      const values = subpaths.map(subpath => {
-        return subpath.size / dataSize;
-      });
+      if (duResponse.subPathCount === 0 || subpaths === 0) {
+        pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
+        subpathName = pieces[pieces.length - 1];
+        pathLabels = [subpathName];
+        values = [0.1];
+        percentage = [100.00];
+        sizeStr = [this.byteToSize(duResponse.size, 1)];
+      }
+      else {
+        pathLabels = subpaths.map(subpath => {
+          // The return subPath must be normalized in a format with
+          // a leading slash and without trailing slash
+          pieces = subpath.path.split('/');
+          subpathName = pieces[pieces.length - 1];
+          // Differentiate key without trailing slash
+          return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
+        });
 
-      const percentage = values.map(value => {
-        return (value * 100).toFixed(2);
-      });
+        values = subpaths.map(subpath => {
+          return subpath.size / dataSize;
+        });
 
-      const sizeStr = subpaths.map(subpath => {
-        return this.byteToSize(subpath.size, 1);
-      });
+        percentage = values.map(value => {
+          return (value * 100).toFixed(2);
+        });
+
+        sizeStr = subpaths.map(subpath => {
+          return this.byteToSize(subpath.size, 1);
+        });
+      }
+    
       this.setState({
         // Normalized path
         isLoading: false,
@@ -407,13 +420,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  ((duResponse.size > 0 && duResponse.subPathCount === 0) ?
-                    <div style={{height: 800}}>
-                      <br/> {' '}
-                      <h3>This object is a key with a file size of {this.byteToSize(duResponse.size, 1)}.<br/> {' '}
-                        You can also view its metadata details by clicking the top right button.
-                      </h3>
-                    </div> :
+                  <div style={{height: 800}}>
                     <Plot
                       data={plotData}
                       layout={
@@ -421,18 +428,19 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                           width: 800,
                           height: 750,
                           font: {
-                            family: 'Arial',
-                            size: 14
+                            family: 'Roboto, sans-serif',
+                            size: 15
                           },
                           showlegend: true,
                           title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
                         }
                       }
-                      onClick={e => this.clickPieSection(e, returnPath)}/>) :
-                  <div style={{height: 800}}><br/>
-                    <h3>This object is empty. Add files to it to see a visualization on disk usage.<br/> {' '}
+                      onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
+                  </div>
+                    :
+                  <div style={{height: 800}} className='metadatainformation'><br/>
+                    This object is empty. Add files to it to see a visualization on disk usage.{' '}<br/>
                       You can also view its metadata details by clicking the top right button.
-                    </h3>
                   </div>}
                 <DetailPanel path={returnPath} keys={panelKeys} values={panelValues} visible={showPanel}/>
               </Row>

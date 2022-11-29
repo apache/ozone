@@ -17,16 +17,20 @@
 
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
-
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class contains set of dns and containers which ozone client provides
@@ -34,15 +38,24 @@ import java.util.UUID;
  */
 public class ExcludeList {
 
-  private final Set<DatanodeDetails> datanodes;
+  private final Map<DatanodeDetails, Long> datanodes;
   private final Set<ContainerID> containerIds;
   private final Set<PipelineID> pipelineIds;
+  private long expiryTime = 0;
+  private java.time.Clock clock;
 
 
   public ExcludeList() {
-    datanodes = new HashSet<>();
+    datanodes = new ConcurrentHashMap<>();
     containerIds = new HashSet<>();
     pipelineIds = new HashSet<>();
+    clock = new MonotonicClock(ZoneOffset.UTC);
+  }
+
+  public ExcludeList(long autoExpiryTime, java.time.Clock clock) {
+    this();
+    this.expiryTime = autoExpiryTime;
+    this.clock = clock;
   }
 
   public Set<ContainerID> getContainerIds() {
@@ -50,7 +63,23 @@ public class ExcludeList {
   }
 
   public Set<DatanodeDetails> getDatanodes() {
-    return datanodes;
+    Set<DatanodeDetails> dns = new HashSet<>();
+    if (expiryTime > 0) {
+      Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
+          datanodes.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Map.Entry<DatanodeDetails, Long> entry = iterator.next();
+        Long storedExpiryTime = entry.getValue();
+        if (clock.millis() > storedExpiryTime) {
+          iterator.remove(); // removing
+        } else {
+          dns.add(entry.getKey());
+        }
+      }
+    } else {
+      dns = datanodes.keySet();
+    }
+    return dns;
   }
 
   public void addDatanodes(Collection<DatanodeDetails> dns) {
@@ -58,7 +87,7 @@ public class ExcludeList {
   }
 
   public void addDatanode(DatanodeDetails dn) {
-    datanodes.add(dn);
+    datanodes.put(dn, clock.millis() + expiryTime);
   }
 
   public void addConatinerId(ContainerID containerId) {
@@ -78,9 +107,7 @@ public class ExcludeList {
         HddsProtos.ExcludeListProto.newBuilder();
     containerIds
         .forEach(id -> builder.addContainerIds(id.getId()));
-    datanodes.forEach(dn -> {
-      builder.addDatanodes(dn.getUuidString());
-    });
+    getDatanodes().forEach(dn -> builder.addDatanodes(dn.getUuidString()));
     pipelineIds.forEach(pipelineID -> {
       builder.addPipelineIds(pipelineID.getProtobuf());
     });
@@ -105,7 +132,7 @@ public class ExcludeList {
   }
 
   public boolean isEmpty() {
-    return datanodes.isEmpty() && containerIds.isEmpty() && pipelineIds
+    return getDatanodes().isEmpty() && containerIds.isEmpty() && pipelineIds
         .isEmpty();
   }
 
@@ -118,9 +145,10 @@ public class ExcludeList {
   @Override
   public String toString() {
     return "ExcludeList {" +
-        "datanodes = " + datanodes +
+        "datanodes = " + getDatanodes() +
         ", containerIds = " + containerIds +
         ", pipelineIds = " + pipelineIds +
         '}';
   }
+
 }

@@ -30,7 +30,7 @@ prefix: /
 type: ROOT
 
 # Layer name
-defaultName: root
+defaultName: datacenter
 
 # Sub layer
 # The sub layer property defines as a list which can reflect a node tree, though
@@ -38,24 +38,12 @@ defaultName: root
 sublayer:
   -
     cost: 1
-    prefix: dc
-    defaultName: datacenter
+    prefix: rack
+    defaultName: rack
     type: INNER_NODE
     sublayer:
-      -
-        cost: 1
-        prefix: rack
-        defaultName: rack
-        type: INNER_NODE
-        sublayer:
-            -
-              cost: 1
-              prefix: ng
-              defaultName: nodegroup
-              type: INNER_NODE
-              sublayer:
-                -
-                  defaultName: node
-                  type: LEAF_NODE
-                  prefix: node
+        -
+          defaultName: node
+          type: LEAF_NODE
+          prefix: node
 ...

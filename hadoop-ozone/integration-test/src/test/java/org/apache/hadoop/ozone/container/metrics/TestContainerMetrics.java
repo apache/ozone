@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
@@ -40,7 +39,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -98,7 +96,7 @@ public class TestContainerMetrics {
       VolumeSet volumeSet = new MutableVolumeSet(
           datanodeDetails.getUuidString(), conf,
           null, StorageVolume.VolumeType.DATA_VOLUME, null);
-      ContainerSet containerSet = new ContainerSet();
+      ContainerSet containerSet = new ContainerSet(1000);
       DatanodeStateMachine stateMachine = Mockito.mock(
           DatanodeStateMachine.class);
       StateContext context = Mockito.mock(StateContext.class);
@@ -113,7 +111,7 @@ public class TestContainerMetrics {
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
                 containerSet, volumeSet, metrics,
-                TestHddsDispatcher.NO_OP_ICR_SENDER));
+                c -> { }));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
           volumeSet, handlers, context, metrics, null);
@@ -125,21 +123,15 @@ public class TestContainerMetrics {
       server.start();
       client.connect();
 
-      // Create container
-      ContainerCommandRequestProto request = ContainerTestHelper
-          .getCreateContainerRequest(containerID, pipeline);
-      ContainerCommandResponseProto response = client.sendCommand(request);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
-          response.getResult());
-
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       ContainerTestHelper.getWriteChunkRequest(
-          pipeline, blockID, 1024, null);
+          pipeline, blockID, 1024);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
-              pipeline, blockID, 1024, null);
-      response = client.sendCommand(writeChunkRequest);
+              pipeline, blockID, 1024);
+      ContainerCommandResponseProto response =
+              client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
@@ -183,7 +175,7 @@ public class TestContainerMetrics {
       }
       // clean up volume dir
       File file = new File(path);
-      if(file.exists()) {
+      if (file.exists()) {
         FileUtil.fullyDelete(file);
       }
     }

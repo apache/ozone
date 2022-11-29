@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
@@ -52,15 +53,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,7 +71,6 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
@@ -97,7 +97,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     testDir = GenericTestUtils.getTestDir(
         TestSecureOzoneRpcClient.class.getSimpleName());
@@ -113,13 +113,13 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+        .setNumDatanodes(14)
         .setScmId(SCM_ID)
         .setClusterId(CLUSTER_ID)
         .setCertificateClient(certificateClientTest)
         .build();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 *60, certificateClientTest.getCertificate().
+        60 * 60, certificateClientTest.getCertificate().
         getSerialNumber().toString());
     secretManager.start(certificateClientTest);
     cluster.getOzoneManager().startSecretManager();
@@ -159,22 +159,26 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
 
+      long committedBytes = ozoneManager.getMetrics().getDataCommittedBytes();
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         out.write(value.getBytes(UTF_8));
       }
 
+      Assert.assertEquals(committedBytes + value.getBytes(UTF_8).length,
+              ozoneManager.getMetrics().getDataCommittedBytes());
+
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
       byte[] fileContent;
-      try(OzoneInputStream is = bucket.readKey(keyName)) {
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
         is.read(fileContent);
       }
 
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, ReplicationType.STAND_ALONE,
+          keyName, ReplicationType.RATIS,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, UTF_8));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
@@ -189,7 +193,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    * 2. writeChunk
    * */
   @Test
-  @Ignore("Needs to be moved out of this class as  client setup is static")
+  @Disabled("Needs to be moved out of this class as  client setup is static")
   public void testKeyOpFailureWithoutBlockToken() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -203,7 +207,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS,
           ReplicationFactor.ONE, new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
@@ -244,7 +248,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
         .setCreateVolumeRequest(CreateVolumeRequest.newBuilder().
             setVolumeInfo(VolumeInfo.newBuilder().setVolume(volumeName)
@@ -266,7 +270,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     // Read Request
     OMRequest readRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(UUID.randomUUID().toString())
         .setInfoVolumeRequest(InfoVolumeRequest.newBuilder()
             .setVolumeName(volumeName).build())
@@ -311,7 +315,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     HddsProtos.ReplicationType replicationType =
         HddsProtos.ReplicationType.valueOf(type.toString());
@@ -340,9 +343,9 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 

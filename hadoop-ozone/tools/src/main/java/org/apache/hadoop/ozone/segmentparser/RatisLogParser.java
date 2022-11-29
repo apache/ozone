@@ -42,11 +42,6 @@ import picocli.CommandLine;
 @MetaInfServices(SubcommandWithParent.class)
 public class RatisLogParser extends GenericCli implements SubcommandWithParent {
 
-  @Override
-  public void execute(String[] argv) {
-    super.execute(argv);
-  }
-
   public static void main(String[] args) {
     new RatisLogParser().run(args);
   }

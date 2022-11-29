@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -94,16 +95,15 @@ public class ReconNodeManager extends SCMNodeManager {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
         SCMContext.emptyContext(), scmLayoutVersionManager);
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
-        HddsServerUtil.getScmHeartbeatInterval(conf);
+        HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }
 
   private void loadExistingNodes() {
-    try {
+    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+             iterator = nodeDB.iterator()) {
       int nodeCount = 0;
-      TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
-          iterator = nodeDB.iterator();
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
         register(datanodeDetails, null, null,
@@ -252,6 +252,15 @@ public class ReconNodeManager extends SCMNodeManager {
         reportedDn.getPersistedOpStateExpiryEpochSec());
   }
 
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+
   @Override
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
@@ -293,5 +302,23 @@ public class ReconNodeManager extends SCMNodeManager {
       long currentTime) {
     return currentTime - getLastHeartbeat(datanodeDetails) >=
         reconDatanodeOutdatedTime;
+  }
+
+  public void reinitialize(Table<UUID, DatanodeDetails> nodeTable) {
+    this.nodeDB = nodeTable;
+    loadExistingNodes();
+  }
+
+  @VisibleForTesting
+  public long getNodeDBKeyCount() throws IOException {
+    long nodeCount = 0;
+    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+        iterator = nodeDB.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        nodeCount++;
+      }
+      return nodeCount;
+    }
   }
 }

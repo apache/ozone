@@ -20,17 +20,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-docs</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone/HDDS Documentation</description>
   <name>Apache Ozone/HDDS Documentation</name>
   <packaging>jar</packaging>
 
-  <dependencies>
+  <properties>
+    <skipDocs>false</skipDocs>
+  </properties>
 
-  </dependencies>
   <build>
     <plugins>
       <plugin>
@@ -42,11 +43,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <goal>exec</goal>
             </goals>
             <phase>compile</phase>
+            <configuration>
+              <executable>../../hadoop-ozone/dev-support/checks/docs.sh</executable>
+              <skip>${skipDocs}</skip>
+            </configuration>
           </execution>
         </executions>
-        <configuration>
-          <executable>dev-support/bin/generate-site.sh</executable>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.rat</groupId>

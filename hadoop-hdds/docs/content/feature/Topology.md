@@ -64,10 +64,10 @@ Rack information can be identified with the help of an external script:
 ```XML
 <property>
    <name>net.topology.node.switch.mapping.impl</name>
-   <value>org.apache.hadoop.net.TableMapping</value>
+   <value>org.apache.hadoop.net.ScriptBasedMapping</value>
 </property>
 <property>
-   <name>org.apache.hadoop.net.ScriptBasedMapping</name>
+   <name>net.topology.script.file.name</name>
    <value>/usr/local/bin/rack.sh</value>
 </property>
 ```

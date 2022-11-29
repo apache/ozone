@@ -17,10 +17,13 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import picocli.CommandLine.ExitCode;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -28,7 +31,10 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import static org.junit.Assert.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
@@ -45,14 +51,14 @@ public class TestStorageContainerManagerStarter {
 
   private MockSCMStarter mock;
 
-  @Before
+  @BeforeEach
   public void setUpStreams() throws UnsupportedEncodingException {
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     mock = new MockSCMStarter();
   }
 
-  @After
+  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -60,102 +66,91 @@ public class TestStorageContainerManagerStarter {
 
   @Test
   public void testCallsStartWhenServerStarted() throws Exception {
-    executeCommand();
+    assertEquals(ExitCode.OK, executeCommand());
     assertTrue(mock.startCalled);
   }
 
   @Test
   public void testExceptionThrownWhenStartFails() throws Exception {
     mock.throwOnStart = true;
-    try {
-      executeCommand();
-      fail("Exception show have been thrown");
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE, executeCommand());
   }
 
   @Test
   public void testStartNotCalledWithInvalidParam() throws Exception {
-    executeCommand("--invalid");
+    assertEquals(ExitCode.USAGE, executeCommand("--invalid"));
     assertFalse(mock.startCalled);
   }
 
   @Test
   public void testPassingInitSwitchCallsInit() {
-    executeCommand("--init");
+    assertEquals(ExitCode.OK, executeCommand("--init"));
     assertTrue(mock.initCalled);
   }
 
   @Test
   public void testPassingBootStrapSwitchCallsBootStrap() {
-    executeCommand("--bootstrap");
+    assertEquals(ExitCode.OK, executeCommand("--bootstrap"));
     assertTrue(mock.bootStrapCalled);
   }
 
   @Test
   public void testInitSwitchAcceptsClusterIdSSwitch() {
-    executeCommand("--init", "--clusterid=abcdefg");
+    assertEquals(ExitCode.OK, executeCommand("--init", "--clusterid=abcdefg"));
     assertEquals("abcdefg", mock.clusterId);
   }
 
   @Test
   public void testInitSwitchWithInvalidParamDoesNotRun() {
-    executeCommand("--init", "--clusterid=abcdefg", "--invalid");
+    assertEquals(ExitCode.USAGE,
+            executeCommand("--init", "--clusterid=abcdefg", "--invalid"));
     assertFalse(mock.initCalled);
   }
 
   @Test
   public void testBootStrapSwitchWithInvalidParamDoesNotRun() {
-    executeCommand("--bootstrap", "--clusterid=abcdefg", "--invalid");
+    assertEquals(ExitCode.USAGE,
+            executeCommand("--bootstrap", "--clusterid=abcdefg", "--invalid"));
     assertFalse(mock.bootStrapCalled);
   }
 
   @Test
   public void testUnSuccessfulInitThrowsException() {
     mock.throwOnInit = true;
-    try {
-      executeCommand("--init");
-      fail("Exception show have been thrown");
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE,
+            executeCommand("--init"));
   }
 
   @Test
   public void testUnSuccessfulBootStrapThrowsException() {
     mock.throwOnBootstrap = true;
-    try {
-      executeCommand("--bootstrap");
-      fail("Exception show have been thrown");
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertEquals(GenericCli.EXECUTION_ERROR_EXIT_CODE,
+            executeCommand("--bootstrap"));
   }
 
   @Test
   public void testGenClusterIdRunsGenerate() {
-    executeCommand("--genclusterid");
+    assertEquals(ExitCode.OK, executeCommand("--genclusterid"));
     assertTrue(mock.generateCalled);
   }
 
   @Test
   public void testGenClusterIdWithInvalidParamDoesNotRun() {
-    executeCommand("--genclusterid", "--invalid");
+    assertEquals(ExitCode.USAGE, executeCommand("--genclusterid", "--invalid"));
     assertFalse(mock.generateCalled);
   }
 
   @Test
   public void testUsagePrintedOnInvalidInput()
       throws UnsupportedEncodingException {
-    executeCommand("--invalid");
+    assertEquals(ExitCode.USAGE, executeCommand("--invalid"));
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
     Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
-  private void executeCommand(String... args) {
-    new StorageContainerManagerStarter(mock).execute(args);
+  private int executeCommand(String... args) {
+    return new StorageContainerManagerStarter(mock).execute(args);
   }
 
   static class MockSCMStarter implements SCMStarterInterface {

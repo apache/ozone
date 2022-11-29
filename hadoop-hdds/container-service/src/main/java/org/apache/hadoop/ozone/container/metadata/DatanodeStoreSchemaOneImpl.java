@@ -34,10 +34,9 @@ public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreSchemaOneImpl(ConfigurationSource config,
-      long containerID, String dbPath, boolean openReadOnly)
-      throws IOException {
-    super(config, containerID, new DatanodeSchemaOneDBDefinition(dbPath),
+  public DatanodeStoreSchemaOneImpl(ConfigurationSource config, String dbPath,
+      boolean openReadOnly) throws IOException {
+    super(config, new DatanodeSchemaOneDBDefinition(dbPath, config),
         openReadOnly);
   }
 

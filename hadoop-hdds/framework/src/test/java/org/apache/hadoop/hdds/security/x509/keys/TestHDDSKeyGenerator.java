@@ -29,9 +29,9 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test class for HDDS Key Generator.
@@ -39,7 +39,7 @@ import org.junit.Test;
 public class TestHDDSKeyGenerator {
   private SecurityConfig config;
 
-  @Before
+  @BeforeEach
   public void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS,  GenericTestUtils.getTempPath("testpath"));
@@ -58,11 +58,11 @@ public class TestHDDSKeyGenerator {
       throws NoSuchProviderException, NoSuchAlgorithmException {
     HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config.getConfiguration());
     KeyPair keyPair = keyGen.generateKey();
-    Assert.assertEquals(config.getKeyAlgo(),
+    Assertions.assertEquals(config.getKeyAlgo(),
         keyPair.getPrivate().getAlgorithm());
     PKCS8EncodedKeySpec keySpec =
         new PKCS8EncodedKeySpec(keyPair.getPrivate().getEncoded());
-    Assert.assertEquals("PKCS#8", keySpec.getFormat());
+    Assertions.assertEquals("PKCS#8", keySpec.getFormat());
   }
 
   /**
@@ -79,8 +79,8 @@ public class TestHDDSKeyGenerator {
     HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config.getConfiguration());
     KeyPair keyPair = keyGen.generateKey(4096);
     PublicKey publicKey = keyPair.getPublic();
-    if(publicKey instanceof RSAPublicKey) {
-      Assert.assertEquals(4096,
+    if (publicKey instanceof RSAPublicKey) {
+      Assertions.assertEquals(4096,
           ((RSAPublicKey)(publicKey)).getModulus().bitLength());
     }
   }

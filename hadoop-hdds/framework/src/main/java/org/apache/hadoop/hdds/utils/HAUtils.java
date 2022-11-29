@@ -201,7 +201,7 @@ public final class HAUtils {
       // an inconsistent state and this marker file will fail it from
       // starting up.
       Files.createFile(markerFile);
-      Files.move(checkpointPath, oldDB.toPath());
+      FileUtils.moveDirectory(checkpointPath, oldDB.toPath());
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata "
@@ -251,28 +251,28 @@ public final class HAUtils {
       OzoneConfiguration tempConfig, Path dbDir, String dbName,
       DBDefinition definition)
       throws Exception {
-    DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
-        dbName, definition);
 
-    // Get the table name with TransactionInfo as the value. The transaction
-    // info table name are different in SCM and SCM.
+    try (DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
+        dbName, definition)) {
 
-    // In case, a new table gets added where the value is TransactionInfo, this
-    // logic may not work.
+      // Get the table name with TransactionInfo as the value. The transaction
+      // info table name are different in SCM and SCM.
 
+      // In case, a new table gets added where the value is TransactionInfo,
+      // this logic may not work.
 
-    Table<String, TransactionInfo> transactionInfoTable =
-        getTransactionInfoTable(dbStore, definition);
+      Table<String, TransactionInfo> transactionInfoTable =
+          getTransactionInfoTable(dbStore, definition);
 
-    TransactionInfo transactionInfo =
-        transactionInfoTable.get(TRANSACTION_INFO_KEY);
-    dbStore.close();
+      TransactionInfo transactionInfo =
+          transactionInfoTable.get(TRANSACTION_INFO_KEY);
 
-    if (transactionInfo == null) {
-      throw new IOException("Failed to read TransactionInfo from DB " +
-          definition.getName() + " at " + dbDir);
+      if (transactionInfo == null) {
+        throw new IOException("Failed to read TransactionInfo from DB " +
+            definition.getName() + " at " + dbDir);
+      }
+      return transactionInfo;
     }
-    return transactionInfo;
   }
 
   public static Table<String, TransactionInfo> getTransactionInfoTable(
@@ -404,7 +404,7 @@ public final class HAUtils {
           return getCAListWithRetry(() -> waitForCACerts(
               scmSecurityProtocolClient::listCACertificate,
               expectedCount), waitDuration);
-        } else{
+        } else {
           return scmSecurityProtocolClient.listCACertificate();
         }
       }

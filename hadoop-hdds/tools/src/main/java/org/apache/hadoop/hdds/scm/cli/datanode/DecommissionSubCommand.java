@@ -52,7 +52,7 @@ public class DecommissionSubCommand extends ScmSubcommand {
           String.join("\n", hosts));
       if (errors.size() > 0) {
         for (DatanodeAdminError error : errors) {
-          System.err.println("Error: " + error.getHostname() +": "
+          System.err.println("Error: " + error.getHostname() + ": "
               + error.getError());
         }
         // Throwing the exception will cause a non-zero exit status for the

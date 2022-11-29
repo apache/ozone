@@ -43,8 +43,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar.gz archive.
@@ -71,7 +73,7 @@ public class TarContainerPacker
       throws IOException {
     byte[] descriptorFileContent = null;
     KeyValueContainerData containerData = container.getContainerData();
-    Path dbRoot = containerData.getDbFile().toPath();
+    Path dbRoot = getDbPath(containerData);
     Path chunksRoot = Paths.get(containerData.getChunksPath());
 
     try (InputStream decompressed = decompress(input);
@@ -84,11 +86,13 @@ public class TarContainerPacker
         if (name.startsWith(DB_DIR_NAME + "/")) {
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          extractEntry(archiveInput, size, dbRoot, destinationPath);
+          extractEntry(entry, archiveInput, size, dbRoot,
+              destinationPath);
         } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          extractEntry(archiveInput, size, chunksRoot, destinationPath);
+          extractEntry(entry, archiveInput, size, chunksRoot,
+              destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
@@ -109,27 +113,32 @@ public class TarContainerPacker
     }
   }
 
-  private void extractEntry(InputStream input, long size,
-                            Path ancestor, Path path) throws IOException {
+  private void extractEntry(ArchiveEntry entry, InputStream input, long size,
+      Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
-    Path parent = path.getParent();
-    if (parent != null) {
-      Files.createDirectories(parent);
-    }
 
-    try (OutputStream fileOutput = new FileOutputStream(path.toFile());
-         OutputStream output = new BufferedOutputStream(fileOutput)) {
-      int bufferSize = 1024;
-      byte[] buffer = new byte[bufferSize + 1];
-      long remaining = size;
-      while (remaining > 0) {
-        int len = (int) Math.min(remaining, bufferSize);
-        int read = input.read(buffer, 0, len);
-        if (read >= 0) {
-          remaining -= read;
-          output.write(buffer, 0, read);
-        } else {
-          remaining = 0;
+    if (entry.isDirectory()) {
+      Files.createDirectories(path);
+    } else {
+      Path parent = path.getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
+
+      try (OutputStream fileOutput = new FileOutputStream(path.toFile());
+           OutputStream output = new BufferedOutputStream(fileOutput)) {
+        int bufferSize = 1024;
+        byte[] buffer = new byte[bufferSize + 1];
+        long remaining = size;
+        while (remaining > 0) {
+          int len = (int) Math.min(remaining, bufferSize);
+          int read = input.read(buffer, 0, len);
+          if (read >= 0) {
+            remaining -= read;
+            output.write(buffer, 0, read);
+          } else {
+            remaining = 0;
+          }
         }
       }
     }
@@ -152,7 +161,7 @@ public class TarContainerPacker
     try (OutputStream compressed = compress(output);
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
-      includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
+      includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
@@ -191,6 +200,15 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
+  public static Path getDbPath(KeyValueContainerData containerData) {
+    if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+      return DatanodeStoreSchemaThreeImpl.getDumpDir(
+          new File(containerData.getMetadataPath())).toPath();
+    } else {
+      return containerData.getDbFile().toPath();
+    }
+  }
+
   private byte[] readEntry(InputStream input, final long size)
       throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -209,6 +227,12 @@ public class TarContainerPacker
   private void includePath(Path dir, String subdir,
       ArchiveOutputStream archiveOutput) throws IOException {
 
+    // Add a directory entry before adding files, in case the directory is
+    // empty.
+    ArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
+    archiveOutput.putArchiveEntry(entry);
+
+    // Add files in the directory.
     try (Stream<Path> dirEntries = Files.list(dir)) {
       for (Path path : dirEntries.collect(toList())) {
         String entryName = subdir + "/" + path.getFileName();

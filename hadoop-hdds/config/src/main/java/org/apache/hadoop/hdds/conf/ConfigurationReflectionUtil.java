@@ -93,6 +93,10 @@ public final class ConfigurationReflectionUtil {
             forcedFieldSet(field, configuration,
                 from.getLong(key, Long.parseLong(defaultValue)));
             break;
+          case DOUBLE:
+            forcedFieldSet(field, configuration,
+                from.getDouble(key, Double.parseDouble(defaultValue)));
+            break;
           case TIME:
             forcedFieldSet(field, configuration,
                 from.getTimeDuration(key, defaultValue,
@@ -151,6 +155,8 @@ public final class ConfigurationReflectionUtil {
       type = ConfigType.INT;
     } else if (parameterType == Long.class || parameterType == long.class) {
       type = ConfigType.LONG;
+    } else if (parameterType == Double.class || parameterType == double.class) {
+      type = ConfigType.DOUBLE;
     } else if (parameterType == Boolean.class
         || parameterType == boolean.class) {
       type = ConfigType.BOOLEAN;
@@ -243,6 +249,9 @@ public final class ConfigurationReflectionUtil {
             break;
           case LONG:
             config.setLong(key, field.getLong(configObject));
+            break;
+          case DOUBLE:
+            config.setDouble(key, field.getDouble(configObject));
             break;
           case TIME:
             config.setTimeDuration(key, field.getLong(configObject),

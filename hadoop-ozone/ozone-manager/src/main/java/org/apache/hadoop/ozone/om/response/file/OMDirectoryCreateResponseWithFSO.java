@@ -20,10 +20,11 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +39,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
  * Response for create directory request.
  */
 @CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE})
-public class OMDirectoryCreateResponseWithFSO extends OMClientResponse {
+public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponseWithFSO.class);
@@ -46,15 +47,20 @@ public class OMDirectoryCreateResponseWithFSO extends OMClientResponse {
   private OmDirectoryInfo dirInfo;
   private List<OmDirectoryInfo> parentDirInfos;
   private Result result;
+  private long volumeId;
+  private long bucketId;
 
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                                     @Nonnull OmDirectoryInfo dirInfo,
-                                     @Nonnull List<OmDirectoryInfo> pDirInfos,
-                                     @Nonnull Result result) {
-    super(omResponse);
+      @Nonnull long volumeId, @Nonnull long bucketId,
+      @Nonnull OmDirectoryInfo dirInfo,
+      @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
     this.result = result;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -80,7 +86,8 @@ public class OMDirectoryCreateResponseWithFSO extends OMClientResponse {
       if (parentDirInfos != null) {
         for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
           String parentKey = omMetadataManager
-                  .getOzonePathKey(parentDirInfo.getParentObjectID(),
+                  .getOzonePathKey(volumeId, bucketId,
+                          parentDirInfo.getParentObjectID(),
                           parentDirInfo.getName());
           LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
                   parentDirInfo);
@@ -89,7 +96,7 @@ public class OMDirectoryCreateResponseWithFSO extends OMClientResponse {
         }
       }
 
-      String dirKey = omMetadataManager.getOzonePathKey(
+      String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               dirInfo.getParentObjectID(), dirInfo.getName());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation, dirKey,
               dirInfo);

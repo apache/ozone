@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import java.io.File;
 
@@ -97,7 +98,7 @@ public final class KeyValueContainerLocationUtil {
    * @param containerId
    * @return container sub directory
    */
-  private static String getContainerSubDirectory(long containerId){
+  private static String getContainerSubDirectory(long containerId) {
     int directory = (int) ((containerId >> 9) & 0xFF);
     return Storage.CONTAINER_DIR + directory;
   }
@@ -105,9 +106,12 @@ public final class KeyValueContainerLocationUtil {
   /**
    * Return containerDB File.
    */
-  public static File getContainerDBFile(File containerMetaDataPath,
-      long containerID) {
-    return new File(containerMetaDataPath, containerID + OzoneConsts
-        .DN_CONTAINER_DB);
+  public static File getContainerDBFile(KeyValueContainerData containerData) {
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      return new File(containerData.getVolume().getDbParentDir(),
+          OzoneConsts.CONTAINER_DB_NAME);
+    }
+    return new File(containerData.getMetadataPath(),
+        containerData.getContainerID() + OzoneConsts.DN_CONTAINER_DB);
   }
 }

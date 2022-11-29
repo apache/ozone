@@ -31,10 +31,10 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test prometheus Sink.
@@ -71,7 +71,7 @@ public class TestPrometheusMetricsSink {
   private static final int COUNTER_1 = 123;
   private static final int COUNTER_2 = 234;
 
-  @Before
+  @BeforeEach
   public void init() {
     metrics = DefaultMetricsSystem.instance();
 
@@ -80,7 +80,7 @@ public class TestPrometheusMetricsSink {
     metrics.register("Prometheus", "Prometheus", sink);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     metrics.stop();
     metrics.shutdown();
@@ -98,10 +98,10 @@ public class TestPrometheusMetricsSink {
     String writtenMetrics = publishMetricsAndGetOutput();
 
     //THEN
-    Assert.assertTrue(
-        "The expected metric line is missing from prometheus metrics output",
+    Assertions.assertTrue(
         writtenMetrics.contains(
-            "test_metrics_num_bucket_create_fails{context=\"dfs\"")
+            "test_metrics_num_bucket_create_fails{context=\"dfs\""),
+        "The expected metric line is missing from prometheus metrics output"
     );
   }
 
@@ -120,16 +120,13 @@ public class TestPrometheusMetricsSink {
     String writtenMetrics = publishMetricsAndGetOutput();
 
     // THEN
-    Assert.assertTrue(
-        "The expected metric line is missing from prometheus metrics output",
-        writtenMetrics.contains(
-            "rpc_metrics_counter{port=\"2345\""));
+    Assertions.assertTrue(
+        writtenMetrics.contains("rpc_metrics_counter{port=\"2345\""),
+        "The expected metric line is missing from prometheus metrics output");
 
-    Assert.assertTrue(
-        "The expected metric line is missing from prometheus metrics "
-            + "output",
-        writtenMetrics.contains(
-            "rpc_metrics_counter{port=\"1234\""));
+    Assertions.assertTrue(
+        writtenMetrics.contains("rpc_metrics_counter{port=\"1234\""),
+        "The expected metric line is missing from prometheus metrics output");
   }
 
   @Test
@@ -147,20 +144,20 @@ public class TestPrometheusMetricsSink {
     String writtenMetrics = publishMetricsAndGetOutput();
 
     // THEN
-    Assert.assertEquals(1, StringUtils.countMatches(writtenMetrics,
+    Assertions.assertEquals(1, StringUtils.countMatches(writtenMetrics,
         "# TYPE same_name_counter"));
   }
 
   @Test
   public void testNamingCamelCase() {
     //THEN
-    Assert.assertEquals("rpc_time_some_metrics",
+    Assertions.assertEquals("rpc_time_some_metrics",
         sink.prometheusName("RpcTime", "SomeMetrics"));
 
-    Assert.assertEquals("om_rpc_time_om_info_keys",
+    Assertions.assertEquals("om_rpc_time_om_info_keys",
         sink.prometheusName("OMRpcTime", "OMInfoKeys"));
 
-    Assert.assertEquals("rpc_time_small",
+    Assertions.assertEquals("rpc_time_small",
         sink.prometheusName("RpcTime", "small"));
   }
 
@@ -168,7 +165,7 @@ public class TestPrometheusMetricsSink {
   public void testNamingRocksDB() {
     //RocksDB metrics are handled differently.
     // THEN
-    Assert.assertEquals("rocksdb_om_db_num_open_connections",
+    Assertions.assertEquals("rocksdb_om_db_num_open_connections",
         sink.prometheusName("Rocksdb_om.db", "num_open_connections"));
   }
 
@@ -180,7 +177,7 @@ public class TestPrometheusMetricsSink {
         + "RATIS-THREE-47659e3d-40c9-43b3-9792-4982fc279aba";
 
     // THEN
-    Assert.assertEquals(
+    Assertions.assertEquals(
         "scm_pipeline_metrics_"
             + "num_blocks_allocated_"
             + "ratis_three_47659e3d_40c9_43b3_9792_4982fc279aba",
@@ -194,7 +191,7 @@ public class TestPrometheusMetricsSink {
     String metricName = "GcTimeMillisG1 Young Generation";
 
     // THEN
-    Assert.assertEquals(
+    Assertions.assertEquals(
         "jvm_metrics_gc_time_millis_g1_young_generation",
         sink.prometheusName(recordName, metricName));
   }

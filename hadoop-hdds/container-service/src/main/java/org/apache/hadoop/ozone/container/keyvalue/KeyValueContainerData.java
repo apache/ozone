@@ -28,11 +28,13 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -42,14 +44,18 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
+import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
+import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -83,6 +89,8 @@ public class KeyValueContainerData extends ContainerData {
 
   private long blockCommitSequenceId;
 
+  private int replicaIndex;
+
   static {
     // Initialize YAML fields
     KV_YAML_FIELDS = Lists.newArrayList();
@@ -96,23 +104,25 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Constructs KeyValueContainerData object.
    * @param id - ContainerId
-   * @param layOutVersion chunk layout
+   * @param layoutVersion container layout
    * @param size - maximum size of the container in bytes
    */
-  public KeyValueContainerData(long id, ChunkLayOutVersion layOutVersion,
+  public KeyValueContainerData(long id, ContainerLayoutVersion layoutVersion,
       long size, String originPipelineId, String originNodeId) {
-    super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
+    super(ContainerProtos.ContainerType.KeyValueContainer, id, layoutVersion,
         size, originPipelineId, originNodeId);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
   }
 
-  public KeyValueContainerData(ContainerData source) {
+  public KeyValueContainerData(KeyValueContainerData source) {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
+    this.schemaVersion = source.getSchemaVersion();
+    this.replicaIndex = source.getReplicaIndex();
   }
 
   /**
@@ -258,6 +268,7 @@ public class KeyValueContainerData extends ContainerData {
     builder.setContainerID(this.getContainerID());
     builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
+    builder.setBlockCount(this.getBlockCount());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
@@ -270,7 +281,7 @@ public class KeyValueContainerData extends ContainerData {
       builder.setBytesUsed(this.getBytesUsed());
     }
 
-    if(this.getContainerType() != null) {
+    if (this.getContainerType() != null) {
       builder.setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
     }
 
@@ -286,21 +297,117 @@ public class KeyValueContainerData extends ContainerData {
    * @param db - Reference to container DB.
    * @param batchOperation - Batch Operation to batch DB operations.
    * @param deletedBlockCount - Number of blocks deleted.
+   * @param releasedBytes - Number of bytes released.
    * @throws IOException
    */
-  public void updateAndCommitDBCounters(
-      ReferenceCountedDB db, BatchOperation batchOperation,
-      int deletedBlockCount) throws IOException {
+  public void updateAndCommitDBCounters(DBHandle db,
+      BatchOperation batchOperation, int deletedBlockCount,
+      long releasedBytes) throws IOException {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
-    metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED,
-            getBytesUsed());
-    metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
-            getKeyCount() - deletedBlockCount);
-    metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,
-            (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
+    metadataTable.putWithBatch(batchOperation, bytesUsedKey(),
+            getBytesUsed() - releasedBytes);
+    metadataTable.putWithBatch(batchOperation, blockCountKey(),
+            getBlockCount() - deletedBlockCount);
+    metadataTable.putWithBatch(batchOperation, pendingDeleteBlockCountKey(),
+        getNumPendingDeletionBlocks() - deletedBlockCount);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
+  }
+
+  // NOTE: Below are some helper functions to format keys according
+  // to container schemas, we should use them instead of using
+  // raw const variables defined.
+
+  public String blockKey(long localID) {
+    return formatKey(Long.toString(localID));
+  }
+
+  public String deletingBlockKey(long localID) {
+    return formatKey(DELETING_KEY_PREFIX + localID);
+  }
+
+  public String deleteTxnKey(long txnID) {
+    return formatKey(Long.toString(txnID));
+  }
+
+  public String latestDeleteTxnKey() {
+    return formatKey(DELETE_TRANSACTION_KEY);
+  }
+
+  public String bcsIdKey() {
+    return formatKey(BLOCK_COMMIT_SEQUENCE_ID);
+  }
+
+  public String blockCountKey() {
+    return formatKey(BLOCK_COUNT);
+  }
+
+  public String bytesUsedKey() {
+    return formatKey(CONTAINER_BYTES_USED);
+  }
+
+  public String pendingDeleteBlockCountKey() {
+    return formatKey(PENDING_DELETE_BLOCK_COUNT);
+  }
+
+  public String deletingBlockKeyPrefix() {
+    return formatKey(DELETING_KEY_PREFIX);
+  }
+
+  public KeyPrefixFilter getUnprefixedKeyFilter() {
+    String schemaPrefix = containerPrefix();
+    return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
+  }
+
+  public KeyPrefixFilter getDeletingBlockKeyFilter() {
+    return new KeyPrefixFilter().addFilter(deletingBlockKeyPrefix());
+  }
+
+  /**
+   * Schema v3 use a prefix as startKey,
+   * for other schemas just return null.
+   * @return
+   */
+  public String startKeyEmpty() {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      return getContainerKeyPrefix(getContainerID());
+    }
+    return null;
+  }
+
+  /**
+   * Schema v3 use containerID as key prefix,
+   * for other schemas just return null.
+   * @return
+   */
+  public String containerPrefix() {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      return getContainerKeyPrefix(getContainerID());
+    }
+    return "";
+  }
+
+  /**
+   * Format the raw key to a schema specific format key.
+   * Schema v3 use container ID as key prefix,
+   * for other schemas just return the raw key.
+   * @param key raw key
+   * @return formatted key
+   */
+  private String formatKey(String key) {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      key = getContainerKeyPrefix(getContainerID()) + key;
+    }
+    return key;
   }
 }

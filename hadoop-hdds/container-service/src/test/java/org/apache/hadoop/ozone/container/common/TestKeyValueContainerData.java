@@ -19,14 +19,17 @@
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
 
@@ -41,15 +44,20 @@ public class TestKeyValueContainerData {
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
+  private final String schemaVersion;
+  private final OzoneConfiguration conf;
 
-  public TestKeyValueContainerData(ChunkLayOutVersion layout) {
-    this.layout = layout;
+  public TestKeyValueContainerData(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Test
@@ -64,10 +72,12 @@ public class TestKeyValueContainerData {
     AtomicLong val = new AtomicLong(0);
     UUID pipelineId = UUID.randomUUID();
     UUID datanodeId = UUID.randomUUID();
+    HddsVolume vol = Mockito.mock(HddsVolume.class);
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
         layout,
         MAXSIZE, pipelineId.toString(), datanodeId.toString());
+    kvData.setVolume(vol);
 
     assertEquals(containerType, kvData.getContainerType());
     assertEquals(containerId, kvData.getContainerID());
@@ -79,7 +89,7 @@ public class TestKeyValueContainerData {
     assertEquals(val.get(), kvData.getWriteBytes());
     assertEquals(val.get(), kvData.getReadCount());
     assertEquals(val.get(), kvData.getWriteCount());
-    assertEquals(val.get(), kvData.getKeyCount());
+    assertEquals(val.get(), kvData.getBlockCount());
     assertEquals(val.get(), kvData.getNumPendingDeletionBlocks());
     assertEquals(MAXSIZE, kvData.getMaxSize());
 
@@ -87,14 +97,15 @@ public class TestKeyValueContainerData {
     kvData.setContainerDBType(containerDBType);
     kvData.setChunksPath(path);
     kvData.setMetadataPath(path);
+    kvData.setReplicaIndex(4);
     kvData.incrReadBytes(10);
     kvData.incrWriteBytes(10);
     kvData.incrReadCount();
     kvData.incrWriteCount();
-    kvData.incrKeyCount();
+    kvData.incrBlockCount();
     kvData.incrPendingDeletionBlocks(1);
     kvData.setSchemaVersion(
-        VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
+        VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
 
     assertEquals(state, kvData.getState());
     assertEquals(containerDBType, kvData.getContainerDBType());
@@ -105,12 +116,18 @@ public class TestKeyValueContainerData {
     assertEquals(10, kvData.getWriteBytes());
     assertEquals(1, kvData.getReadCount());
     assertEquals(1, kvData.getWriteCount());
-    assertEquals(1, kvData.getKeyCount());
+    assertEquals(1, kvData.getBlockCount());
     assertEquals(1, kvData.getNumPendingDeletionBlocks());
     assertEquals(pipelineId.toString(), kvData.getOriginPipelineId());
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());
-    assertEquals(VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(),
+    assertEquals(VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf),
         kvData.getSchemaVersion());
+
+    KeyValueContainerData newKvData = new KeyValueContainerData(kvData);
+    assertEquals(kvData.getReplicaIndex(), newKvData.getReplicaIndex());
+    assertEquals(0, newKvData.getNumPendingDeletionBlocks());
+    assertEquals(0, newKvData.getDeleteTransactionId());
+    assertEquals(kvData.getSchemaVersion(), newKvData.getSchemaVersion());
   }
 
 }

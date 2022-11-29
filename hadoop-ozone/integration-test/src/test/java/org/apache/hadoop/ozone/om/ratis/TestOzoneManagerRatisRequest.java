@@ -17,15 +17,18 @@
  */
 package org.apache.hadoop.ozone.om.ratis;
 
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -35,6 +38,7 @@ import org.mockito.Mockito;
 
 import java.util.ArrayList;
 
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
 /**
@@ -58,14 +62,31 @@ public class TestOzoneManagerRatisRequest {
 
     String volumeName = "vol1";
     String bucketName = "invalidBuck";
-    OzoneManagerProtocolProtos.OMRequest omRequest = TestOMRequestUtils
+
+    // Add entry to Volume Table.
+    omMetadataManager.getVolumeTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+        new CacheValue<>(
+            Optional.of(
+                OmVolumeArgs.newBuilder()
+                    .setVolume(volumeName)
+                    .setOwnerName("owner")
+                    .setAdminName("admin")
+                    .build()), 100L));
+
+    OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
         .createCompleteMPURequest(volumeName, bucketName, "mpuKey", "mpuKeyID",
             new ArrayList<>());
 
-    OMClientRequest req =
-        OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-    Assert.assertNotNull(req);
-    Assert.assertTrue("Unexpected request on invalid bucket",
-        req instanceof S3MultipartUploadCompleteRequest);
+    try {
+      // Request creation flow should throw exception if the bucket associated
+      // with the request doesn't exist.
+      OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+      fail("Expected OMException: Bucket not found");
+    } catch (OMException oe) {
+      // Expected exception.
+      Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
+          oe.getResult());
+    }
   }
 }

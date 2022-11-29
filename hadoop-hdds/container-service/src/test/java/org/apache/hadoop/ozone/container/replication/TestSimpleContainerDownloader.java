@@ -25,15 +25,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test SimpleContainerDownloader.
@@ -53,11 +53,11 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes)
-            .get(1L, TimeUnit.SECONDS);
+        downloader.getContainerDataFromReplicas(1L, datanodes);
 
     //THEN
-    Assert.assertEquals(datanodes.get(0).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(0).getUuidString(),
+        result.toString());
   }
 
   @Test
@@ -72,12 +72,12 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes)
-            .get(1L, TimeUnit.SECONDS);
+        downloader.getContainerDataFromReplicas(1L, datanodes);
 
     //THEN
     //first datanode is failed, second worked
-    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+        result.toString());
   }
 
   @Test
@@ -91,18 +91,19 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes)
-            .get(1L, TimeUnit.SECONDS);
+        downloader.getContainerDataFromReplicas(1L, datanodes);
 
     //THEN
     //first datanode is failed, second worked
-    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+        result.toString());
   }
 
   /**
    * Test if different datanode is used for each download attempt.
    */
-  @Test(timeout = 10_000L)
+  @Test
+  @Timeout(10)
   public void testRandomSelection()
       throws ExecutionException, InterruptedException {
 
@@ -125,15 +126,14 @@ public class TestSimpleContainerDownloader {
     //WHEN executed, THEN at least once the second datanode should be
     //returned.
     for (int i = 0; i < 10000; i++) {
-      Path path =
-          downloader.getContainerDataFromReplicas(1L, datanodes).get();
+      Path path = downloader.getContainerDataFromReplicas(1L, datanodes);
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }
     }
 
     //there is 1/3^10_000 chance for false positive, which is practically 0.
-    Assert.fail(
+    Assertions.fail(
         "Datanodes are selected 10000 times but second datanode was never "
             + "used.");
   }

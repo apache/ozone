@@ -55,7 +55,7 @@ public final class SCMContainerPlacementRackAware
   private final NetworkTopology networkTopology;
   private boolean fallback;
   private static final int RACK_LEVEL = 1;
-  private static final int MAX_RETRY= 3;
+  private static final int MAX_RETRY = 3;
   private final SCMContainerPlacementMetrics metrics;
   // Used to check the placement policy is validated in the parent class
   private static final int REQUIRED_RACKS = 2;
@@ -84,7 +84,8 @@ public final class SCMContainerPlacementRackAware
    * There are two scenarios, one is choosing all nodes for a new pipeline.
    * Another is choosing node to meet replication requirement.
    *
-   *
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred. This is a hint to the
    *                     allocator, whether the favored nodes will be used
@@ -97,10 +98,12 @@ public final class SCMContainerPlacementRackAware
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
-      throws SCMException {
+  protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequired,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
@@ -118,7 +121,7 @@ public final class SCMContainerPlacementRackAware
       mutableFavoredNodes.addAll(favoredNodes);
       mutableFavoredNodes.removeAll(excludedNodes);
     }
-    int favoredNodeNum = mutableFavoredNodes == null? 0 :
+    int favoredNodeNum = mutableFavoredNodes == null ? 0 :
         mutableFavoredNodes.size();
 
     List<DatanodeDetails> chosenNodes = new ArrayList<>();
@@ -195,7 +198,7 @@ public final class SCMContainerPlacementRackAware
       // in the same rack, then choose nodes on different racks, otherwise,
       // choose one on the same rack as one of excluded nodes, remaining chosen
       // are on different racks.
-      for(int i = 0; i < excludedNodesCount; i++) {
+      for (int i = 0; i < excludedNodesCount; i++) {
         for (int j = i + 1; j < excludedNodesCount; j++) {
           if (networkTopology.isSameParent(
               excludedNodes.get(i), excludedNodes.get(j))) {
@@ -257,7 +260,7 @@ public final class SCMContainerPlacementRackAware
     int maxRetry = MAX_RETRY;
     List<String> excludedNodesForCapacity = null;
     boolean isFallbacked = false;
-    while(true) {
+    while (true) {
       metrics.incrDatanodeChooseAttemptCount();
       DatanodeDetails node = null;
       if (affinityNodes != null) {
@@ -326,7 +329,8 @@ public final class SCMContainerPlacementRackAware
   /**
    * Choose a batch of datanodes on different rack than excludedNodes or
    * chosenNodes.
-   *
+   * TODO HDDS-7226: Update Implementation to accomodate for already used
+   * nodes to conform to existing placement policy.
    *
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
    * @param chosenNodes - list of nodes already chosen. These nodes should also
@@ -348,8 +352,8 @@ public final class SCMContainerPlacementRackAware
     Preconditions.checkArgument(chosenNodes != null);
     List<DatanodeDetails> excludedNodeList = excludedNodes != null ?
         excludedNodes : chosenNodes;
-    int favoredNodeNum = favoredNodes == null? 0 : favoredNodes.size();
-    while(true) {
+    int favoredNodeNum = favoredNodes == null ? 0 : favoredNodes.size();
+    while (true) {
       DatanodeDetails favoredNode = favoredNodeNum > favorIndex ?
           favoredNodes.get(favorIndex) : null;
       DatanodeDetails chosenNode;

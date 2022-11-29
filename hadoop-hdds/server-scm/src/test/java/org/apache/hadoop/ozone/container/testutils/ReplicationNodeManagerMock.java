@@ -18,7 +18,9 @@ package org.apache.hadoop.ozone.container.testutils;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -183,7 +185,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return DatanodeUsageInfo of the specified datanode
    */
   @Override
-  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn){
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
     return null;
   }
 
@@ -282,6 +284,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void addContainer(DatanodeDetails datanodeDetails,
                            ContainerID containerId)
       throws NodeNotFoundException {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 
@@ -395,6 +403,14 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+  /**
    * Empty implementation for processNodeReport.
    * @param dnUuid
    * @param nodeReport
@@ -414,6 +430,38 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void processLayoutVersionReport(DatanodeDetails dnUuid,
                                 LayoutVersionProto layoutVersionReport) {
     // do nothing.
+  }
+
+  @Override
+  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
+      CommandQueueReportProto commandReport,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
+    // Do nothing.
+  }
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  @Override
+  public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) {
+    return -1;
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
   }
 
   @Override

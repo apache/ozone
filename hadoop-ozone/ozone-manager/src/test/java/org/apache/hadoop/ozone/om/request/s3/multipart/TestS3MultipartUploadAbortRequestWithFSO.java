@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -58,15 +59,23 @@ public class TestS3MultipartUploadAbortRequestWithFSO
   protected void createParentPath(String volumeName, String bucketName)
       throws Exception {
     // Create parent dirs for the path
-    parentID = TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
+    parentID = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
         dirName, omMetadataManager);
   }
 
   @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     String fileName = StringUtils.substringAfter(keyName, dirName);
-    return omMetadataManager.getMultipartKey(parentID, fileName,
-        multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
