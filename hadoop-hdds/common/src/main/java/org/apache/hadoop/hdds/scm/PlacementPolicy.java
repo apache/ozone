@@ -67,7 +67,7 @@ public interface PlacementPolicy<Replica> {
    */
   ContainerPlacementStatus validateContainerPlacement(
           List<DatanodeDetails> dns, int replicas);
-  Map<Replica, Integer> replicasToCopy(Set<Replica> replicas,
+  Set<Replica> replicasToCopy(Set<Replica> replicas,
                                        int expectedCountPerUniqueReplica,
                                        int expectedUniqueGroups);
 }

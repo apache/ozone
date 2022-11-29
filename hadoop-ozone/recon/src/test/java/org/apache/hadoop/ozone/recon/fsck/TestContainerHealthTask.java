@@ -373,7 +373,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     }
 
     @Override
-    public Map<ContainerReplica, Integer> replicasToCopy(
+    public Set<ContainerReplica> replicasToCopy(
             Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
             int expectedUniqueGroups) {
       return null;

@@ -442,52 +442,34 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   @Override
-  public Map<ContainerReplica, Integer> replicasToCopy(
+  public Set<ContainerReplica> replicasToCopy(
          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplicas,
          int expectedUniqueGroups) {
-    Map<Integer, ContainerReplica> replicaIdMap = new HashMap<>();
     Map<Node, Set<ContainerReplica>> placementGroupReplicaIdMap
-            = new HashMap<>();
-    for (ContainerReplica replica:replicas) {
-      Integer replicaId = replica.getReplicaIndex();
-      Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
-      if (!replicaIdMap.containsKey(replicaId)) {
-        replicaIdMap.put(replicaId, replica);
-      }
-      placementGroupReplicaIdMap.compute(placementGroup,
-              (rid, placementGroupReplicas) -> {
-                if (placementGroupReplicas == null) {
-                  placementGroupReplicas = Sets.newHashSet();
-                }
-                placementGroupReplicas.add(replica);
-                return placementGroupReplicas;
-              });
-    }
-    int misreplicationCnt = Math.max(getRequiredRackCount(
-        expectedUniqueGroups * expectedCountPerUniqueReplicas)
+            = replicas.stream().collect(Collectors.groupingBy(replica ->
+            this.getPlacementGroup(replica.getDatanodeDetails()),
+            Collectors.toSet()));
+
+    int totalNumberOfReplicas =
+            expectedUniqueGroups * expectedCountPerUniqueReplicas;
+    int requiredNumberOfPlacementGroups = getRequiredRackCount(
+            expectedUniqueGroups * expectedCountPerUniqueReplicas);
+    int replicasPerPlacementGroup =
+            totalNumberOfReplicas/requiredNumberOfPlacementGroups;
+    int misreplicationCnt = Math.max(requiredNumberOfPlacementGroups
         - placementGroupReplicaIdMap.size(), 0);
-    Map<Integer, Integer> copyRIDMap = new HashMap<>();
+    Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
 
     for (Set<ContainerReplica> replicaSet: placementGroupReplicaIdMap
             .values()) {
-      if (misreplicationCnt > 0 && replicaSet.size() > 1) {
-        Map<Integer, Long> cntMap = replicaSet.stream()
+      if (misreplicationCnt > copyReplicaSet.size() && replicaSet.size() >
+              replicasPerPlacementGroup) {
+        copyReplicaSet.addAll(replicaSet.stream()
                 .limit(Math.min(replicaSet.size() - 1, misreplicationCnt))
-                .collect(Collectors.groupingBy(
-                        ContainerReplica::getReplicaIndex,
-                        Collectors.counting()));
-        for (Map.Entry<Integer, Long> ridCntEntry : cntMap.entrySet()) {
-          int additionalReplica = Math.toIntExact(ridCntEntry.getValue());
-          copyRIDMap.compute(ridCntEntry.getKey(),
-                  (replicaIdx, cnt) -> (cnt == null ? 0 : cnt)
-                  + additionalReplica);
-          misreplicationCnt -= additionalReplica;
-        }
+                .collect(Collectors.toSet()));
       }
     }
-    return copyRIDMap.entrySet().stream()
-            .collect(Collectors.toMap(e -> replicaIdMap.get(e.getKey()),
-                    Map.Entry::getValue));
+    return copyReplicaSet;
   }
 
   protected Node getPlacementGroup(DatanodeDetails dn) {

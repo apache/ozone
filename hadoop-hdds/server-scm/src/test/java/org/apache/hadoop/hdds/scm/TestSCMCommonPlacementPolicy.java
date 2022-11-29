@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -76,30 +77,27 @@ public class TestSCMCommonPlacementPolicy {
             new DummyPlacementPolicy(nodeManager, conf);
     List<DatanodeDetails> list =
             nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    Map<Integer, ContainerReplica> replicas =
+    List<ContainerReplica> replicas =
             IntStream.range(1, 5).mapToObj(i ->
                     ContainerReplica.newBuilder()
                             .setContainerID(new ContainerID(1))
                             .setContainerState(CLOSED)
                             .setReplicaIndex(i)
             .setDatanodeDetails(list.get(i - 1)).build())
-                    .collect(Collectors.toMap(ContainerReplica::getReplicaIndex,
-                            Function.identity()));
-    replicas.put(5, ContainerReplica.newBuilder()
+                    .collect(Collectors.toList());
+    replicas.add(ContainerReplica.newBuilder()
             .setContainerID(new ContainerID(1))
             .setContainerState(CLOSED)
             .setReplicaIndex(5)
             .setDatanodeDetails(list.get(5)).build());
 
-    Map<ContainerReplica, Integer> replicasToCopy =
-            dummyPlacementPolicy.replicasToCopy(replicas.values()
-                            .stream().collect(Collectors.toSet()),
+    Set<ContainerReplica> replicasToCopy =
+            dummyPlacementPolicy.replicasToCopy(Sets.newHashSet(replicas),
             1, 5);
-    Assertions.assertTrue(replicasToCopy.keySet().stream().findFirst()
-            .map(replica -> Arrays.asList(replicas.get(1), replicas.get(5))
+    Assertions.assertTrue(replicasToCopy.stream().findFirst()
+            .map(replica -> Arrays.asList(replicas.get(0), replicas.get(4))
                     .contains(replica)).orElse(false));
-    Assertions.assertTrue(replicasToCopy.values().stream()
-            .allMatch(i -> i == 1));
+    Assertions.assertEquals(1, replicasToCopy.size());
   }
 
   private static class DummyPlacementPolicy extends
