@@ -55,6 +55,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   private boolean quotaInBytesSet = false;
   private boolean quotaInNamespaceSet = false;
   private DefaultReplicationConfig defaultReplicationConfig = null;
+  private boolean defaultReplicationConfigSet = false;
   /**
    * Bucket Owner Name.
    */
@@ -151,10 +152,18 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
+   * Returns true if defaultReplicationConfig has been set to a non default value.
+   */
+  public boolean hasDefaultReplicationConfig() {
+    return defaultReplicationConfigSet;
+  }
+
+  /**
    * Sets the Bucket default replication config.
    */
   private void setDefaultReplicationConfig(
       DefaultReplicationConfig defaultReplicationConfig) {
+    this.defaultReplicationConfigSet = true;
     this.defaultReplicationConfig = defaultReplicationConfig;
   }
 
@@ -217,6 +226,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private boolean quotaInNamespaceSet = false;
     private long quotaInNamespace;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private boolean defaultReplicationConfigSet = false;
     private String ownerName;
     /**
      * Constructs a builder.
@@ -265,6 +275,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setDefaultReplicationConfig(
         DefaultReplicationConfig defaultRepConfig) {
+      this.defaultReplicationConfigSet = true;
       this.defaultReplicationConfig = defaultRepConfig;
       return this;
     }
@@ -284,7 +295,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       OmBucketArgs omBucketArgs =
           new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
               storageType, metadata, ownerName);
-      omBucketArgs.setDefaultReplicationConfig(defaultReplicationConfig);
+      if(defaultReplicationConfigSet) {
+        omBucketArgs.setDefaultReplicationConfig(defaultReplicationConfig);
+      }
       if (quotaInBytesSet) {
         omBucketArgs.setQuotaInBytes(quotaInBytes);
       }
@@ -316,7 +329,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET)) {
       builder.setQuotaInNamespace(quotaInNamespace);
     }
-    if (defaultReplicationConfig != null) {
+    if (defaultReplicationConfigSet && defaultReplicationConfig != null) {
       builder.setDefaultReplicationConfig(defaultReplicationConfig.toProto());
     }
     if (ownerName != null) {
@@ -343,9 +356,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
                 bucketArgs.getOwnerName() : null);
     // OmBucketArgs ctor already has more arguments, so setting the default
     // replication config separately.
-    omBucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig()));
-
+    if (bucketArgs.hasDefaultReplicationConfig()) {
+      omBucketArgs.setDefaultReplicationConfig(
+              new DefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig()));
+    }
     if (bucketArgs.hasQuotaInBytes()) {
       omBucketArgs.setQuotaInBytes(bucketArgs.getQuotaInBytes());
     }

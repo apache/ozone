@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.junit.Assert;
 import org.junit.Test;
+
+import static org.apache.hadoop.hdds.client.ReplicationType.EC;
 
 /**
  * Tests for the OmBucketArgs class.
@@ -57,5 +61,36 @@ public class TestOmBucketArgs {
 
     Assert.assertEquals(true, argsFromProto.hasQuotaInBytes());
     Assert.assertEquals(true, argsFromProto.hasQuotaInNamespace());
+  }
+
+  @Test
+  public void testDefaultReplicationConfigIsSetCorrectly() {
+    OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
+            .setBucketName("bucket")
+            .setVolumeName("volume")
+            .build();
+
+    Assert.assertEquals(false, bucketArgs.hasDefaultReplicationConfig());
+
+    OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
+            bucketArgs.getProtobuf());
+
+    Assert.assertEquals(false, argsFromProto.hasDefaultReplicationConfig());
+    Assert.assertEquals(null, argsFromProto.getDefaultReplicationConfig());
+
+    bucketArgs = OmBucketArgs.newBuilder()
+            .setBucketName("bucket")
+            .setVolumeName("volume")
+            .setDefaultReplicationConfig(new DefaultReplicationConfig(
+                    EC, new ECReplicationConfig(3, 2)))
+            .build();
+
+    Assert.assertEquals(true, bucketArgs.hasDefaultReplicationConfig());
+
+    argsFromProto = OmBucketArgs.getFromProtobuf(
+            bucketArgs.getProtobuf());
+
+    Assert.assertEquals(true, argsFromProto.hasDefaultReplicationConfig());
+    Assert.assertEquals(EC, argsFromProto.getDefaultReplicationConfig().getType());
   }
 }
