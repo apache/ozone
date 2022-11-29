@@ -2391,6 +2391,24 @@
     </description>
   </property>
   <property>
+    <name>hdds.security.ssl.keystore.reload.interval</name>
+    <value>60s</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the keystore
+      certificates file has changed and needs reloading. Default is 60s. Unit could be
+      defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.ssl.truststore.reload.interval</name>
+    <value>60s</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the truststore
+      certificates file has changed and needs reloading. Default is 60s. Unit could
+      be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
     <name>ozone.om.security.client.protocol.acl</name>
     <value>*</value>
     <tag>SECURITY</tag>
@@ -3406,6 +3424,16 @@
   </property>
 
   <property>
+    <name>ozone.recon.nssummary.flush.db.max.threshold</name>
+    <value>150000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for NSSummary task in hashmap before flushing to
+      recon rocks DB namespaceSummaryTable
+    </description>
+  </property>
+
+  <property>
     <name>ozone.recon.scm.snapshot.task.initial.delay</name>
     <value>1m</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
@@ -3421,4 +3449,5 @@
       Interval in MINUTES by Recon to request SCM DB Snapshot.
     </description>
   </property>
+
 </configuration>

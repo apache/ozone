@@ -144,6 +144,12 @@ public final class  ReconServerConfigKeys {
   public static final String
       OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
 
+  public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
+      "ozone.recon.nssummary.flush.db.max.threshold";
+
+  public static final long
+      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.scm.snapshot.task.interval.delay";
 
@@ -155,7 +161,6 @@ public final class  ReconServerConfigKeys {
 
   public static final String
       OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
-
   /**
    * Private constructor for utility class.
    */
