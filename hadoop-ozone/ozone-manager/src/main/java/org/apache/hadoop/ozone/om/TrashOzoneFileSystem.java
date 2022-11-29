@@ -91,6 +91,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     this.userName =
           UserGroupInformation.getCurrentUser().getShortUserName();
     this.runCount = new AtomicLong(0);
+    setConf(ozoneManager.getConfiguration());
   }
 
   private RaftClientRequest getRatisRequest(
@@ -284,6 +285,8 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private OmKeyArgs constructOmKeyArgs(Path path) {
+    /*OzoneConfiguration conf = getConf() == null ? new OzoneConfiguration() :
+        OzoneConfiguration.of(getConf());*/
     OFSPath ofsPath = new OFSPath(path, OzoneConfiguration.of(getConf()));
     String volume = ofsPath.getVolumeName();
     String bucket = ofsPath.getBucketName();
