@@ -1111,6 +1111,9 @@ message DeleteKeyArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    // This will be set when the request is received in pre-Execute. This
+    // value is used in deletion service.
+    optional uint64 modificationTime = 4;
 }
 
 message DeleteKeysResponse {
@@ -1175,6 +1178,9 @@ message PurgePathRequest {
 message DeleteOpenKeysRequest {
   repeated OpenKeyBucket openKeysPerBucket = 1;
   optional BucketLayoutProto bucketLayout = 2;
+  // This will be set when the request is received in pre-Execute. This
+  // value is used in deletion service.
+  optional uint64 modificationTime = 3;
 }
 
 message OpenKeyBucket {

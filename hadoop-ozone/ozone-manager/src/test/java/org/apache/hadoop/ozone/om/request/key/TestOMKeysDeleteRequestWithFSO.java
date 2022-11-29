@@ -22,7 +22,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
+import org.junit.Assert;
 
 import java.util.ArrayList;
 import java.util.UUID;
@@ -39,7 +41,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
 
     createPreRequisites();
     OmKeysDeleteRequestWithFSO omKeysDeleteRequest =
-        new OmKeysDeleteRequestWithFSO(getOmRequest(),
+        new OmKeysDeleteRequestWithFSO(doPreExecute(getOmRequest()),
             getBucketLayout());
     checkDeleteKeysResponse(omKeysDeleteRequest);
 
@@ -55,7 +57,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
                 .addAllKeys(getDeleteKeyList()).addKeys("dummy"))).build());
 
     OmKeysDeleteRequestWithFSO omKeysDeleteRequest =
-        new OmKeysDeleteRequestWithFSO(getOmRequest(),
+        new OmKeysDeleteRequestWithFSO(doPreExecute(getOmRequest()),
             getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
   }
@@ -100,6 +102,19 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
         .setDeleteKeysRequest(
             OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder()
                 .setDeleteKeys(deleteKeyArgs).build()).build());
+  }
+
+  private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
+
+    OmKeysDeleteRequestWithFSO omKeyDeleteRequest =
+            new OmKeysDeleteRequestWithFSO(getOmRequest(), getBucketLayout());
+
+    OMRequest modifiedOmRequest = omKeyDeleteRequest.preExecute(ozoneManager);
+
+    // Will not be equal, as UserInfo will be set.
+    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
+
+    return modifiedOmRequest;
   }
 
   @Override

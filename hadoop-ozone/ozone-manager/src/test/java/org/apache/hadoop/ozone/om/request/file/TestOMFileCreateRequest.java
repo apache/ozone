@@ -349,7 +349,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager,
+            OMRequestTestUtils.newTrxnLogIndex(),
             ozoneManagerDoubleBufferHelper);
 
     if (fail) {

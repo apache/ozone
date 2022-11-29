@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.DeleteTablePrefix;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -48,11 +48,12 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
   private long volumeId;
 
   public OMKeysDeleteResponseWithFSO(
-      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @NotNull List<OmKeyInfo> keyDeleteList,
-      @NotNull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
-      @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
-    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo);
+          @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
+          @NotNull DeleteTablePrefix deleteTablePrefix,
+          @NotNull List<OmKeyInfo> keyDeleteList,
+          @NotNull List<OmKeyInfo> dirDeleteList,
+          @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
+    super(omResponse, deleteTablePrefix, keyDeleteList, omBucketInfo);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }
@@ -60,8 +61,6 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    Table<String, OmKeyInfo> keyTable =
-        omMetadataManager.getKeyTable(getBucketLayout());
 
     final long bucketId = getOmBucketInfo().getObjectID();
     // remove dirs from DirTable and add to DeletedDirTable
@@ -77,20 +76,22 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
     }
 
     // remove keys from FileTable and add to DeletedTable
-    for (OmKeyInfo omKeyInfo : getOmKeyInfoList()) {
-      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-          omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
-      String deletedKey = omMetadataManager
-          .getOzoneKey(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-              omKeyInfo.getKeyName());
-      addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
-          ozoneDbKey, deletedKey, omKeyInfo);
-    }
+    deleteFromKeyTable(omMetadataManager, batchOperation);
+    insertToDeleteTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
             getOmBucketInfo().getBucketName()), getOmBucketInfo());
+  }
+
+  @Override
+  protected String getKeyToDelete(OMMetadataManager omMetadataManager,
+         OmKeyInfo omKeyInfo1) throws IOException {
+    String ozoneDBKey = omMetadataManager.getOzonePathKey(
+            volumeId, getOmBucketInfo().getObjectID(),
+            omKeyInfo1.getParentObjectID(), omKeyInfo1.getFileName());
+    return ozoneDBKey;
   }
 
   @Override

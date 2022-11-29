@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -40,8 +42,12 @@ public class RepeatedOmKeyInfo {
   }
 
   public RepeatedOmKeyInfo(OmKeyInfo omKeyInfos) {
-    this.omKeyInfoList = new ArrayList<>();
+    this();
     this.omKeyInfoList.add(omKeyInfos);
+  }
+
+  public RepeatedOmKeyInfo() {
+    this.omKeyInfoList = new ArrayList<>();
   }
 
   public void addOmKeyInfo(OmKeyInfo info) {
@@ -102,5 +108,21 @@ public class RepeatedOmKeyInfo {
 
   public RepeatedOmKeyInfo copyObject() {
     return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
+  }
+
+  /**
+   * If this key is in a GDPR enforced bucket, then before moving
+   * KeyInfo to deletedTable, remove the GDPR related metadata and
+   * FileEncryptionInfo from KeyInfo.
+   */
+  public void clearGDPRdata() {
+    for (OmKeyInfo keyInfo : omKeyInfoList) {
+      if (Boolean.valueOf(keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
+        keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
+        keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
+        keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
+        keyInfo.clearFileEncryptionInfo();
+      }
+    }
   }
 }

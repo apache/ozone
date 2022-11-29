@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.DeleteTablePrefix;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -33,6 +35,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteOpenKeysRequest;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +61,20 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   public OMOpenKeysDeleteRequest(OMRequest omRequest,
                                  BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    DeleteOpenKeysRequest request = getOmRequest().getDeleteOpenKeysRequest();
+    Preconditions.checkNotNull(request);
+
+    OzoneManagerProtocolProtos.DeleteOpenKeysRequest.Builder builder =
+        request.toBuilder()
+            .setModificationTime(Time.now());
+
+    return getOmRequest().toBuilder()
+            .setDeleteOpenKeysRequest(builder.build())
+            .setUserInfo(getUserIfNotExists(ozoneManager)).build();
   }
 
   @Override
@@ -96,8 +114,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             openKeyBucket, deletedOpenKeys);
       }
 
+      DeleteTablePrefix prefix = new DeleteTablePrefix(
+          trxnLogIndex, ozoneManager.isRatisEnabled());
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
+          prefix, deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -111,8 +131,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
               omDoubleBufferHelper);
     }
 
-    processResults(omMetrics, numSubmittedOpenKeys, deletedOpenKeys.size(),
-        deleteOpenKeysRequest, result);
+    processResults(omMetrics, numSubmittedOpenKeys,
+        deletedOpenKeys.size(), deleteOpenKeysRequest, result);
 
     return omClientResponse;
   }

@@ -19,9 +19,11 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.DeleteTablePrefix;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -96,7 +98,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     return validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper, BucketLayout.DEFAULT);
+        omDoubleBufferHelper, getBucketLayout());
   }
 
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
@@ -171,10 +173,11 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       // be used by DeleteKeyService only, not used for any client response
       // validation, so we don't need to add to cache.
       // TODO: Revisit if we need it later.
-
+      DeleteTablePrefix prefix = new DeleteTablePrefix(
+              trxnLogIndex, ozoneManager.isRatisEnabled());
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
-              .build(), omKeyInfo, ozoneManager.isRatisEnabled(),
+              .build(), prefix, Arrays.asList(omKeyInfo),
           omBucketInfo.copyObject());
 
       result = Result.SUCCESS;

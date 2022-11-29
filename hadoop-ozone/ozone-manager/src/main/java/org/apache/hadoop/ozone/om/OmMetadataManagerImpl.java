@@ -154,10 +154,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
    * |----------------------------------------------------------------------|
-   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
+   * | deletedTable(*)    | /volumeName/bucketName/keyName->RepeatedKeyInfo |
+   * |                    | (timestampHex)-(trxnIndex) -> RepeatedKeyInfo   |
    * |----------------------------------------------------------------------|
    * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
    * |----------------------------------------------------------------------|
+   * (*) Either case exists; see HDDS-5905 for the latest progress.
    *
    * Prefix Tables:
    * |----------------------------------------------------------------------|

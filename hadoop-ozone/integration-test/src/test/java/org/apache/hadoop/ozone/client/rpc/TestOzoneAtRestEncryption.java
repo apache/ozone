@@ -47,6 +47,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -349,30 +352,45 @@ public class TestOzoneAtRestEncryption {
     //As TDE is enabled, the TDE encryption details should not be null.
     Assert.assertNotNull(key.getFileEncryptionInfo());
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    // To retrieve the entry in delete table, timestamp is mocked and saved
+
     //Step 3
     bucket.deleteKey(key.getName());
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
     GenericTestUtils.waitFor(() -> {
       try {
-        return omMetadataManager.getDeletedTable().isExist(objectKey);
+        TableIterator<String, ? extends TypedTable.KeyValue<String,
+            RepeatedOmKeyInfo>> it = omMetadataManager.getDeletedTable()
+                .iterator();
+        while (it.hasNext()) {
+          Table.KeyValue<String, RepeatedOmKeyInfo> v = it.next();
+
+          // We have no way to identify the transaction log index. So just
+          // scan all keys in the delete table and find the OmKeyInfo.
+          for (OmKeyInfo omKeyInfo: v.getValue().getOmKeyInfoList()) {
+            if (omKeyInfo.getVolumeName().equals(key.getVolumeName()) &&
+                    omKeyInfo.getBucketName().equals(key.getBucketName()) &&
+                    omKeyInfo.getKeyName().equals(key.getName())) {
+
+              Map<String, String> metadata = omKeyInfo.getMetadata();
+              Assert.assertFalse(metadata.containsKey(OzoneConsts.GDPR_FLAG));
+              Assert.assertFalse(
+                      metadata.containsKey(OzoneConsts.GDPR_SECRET));
+              Assert.assertFalse(
+                      metadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+              Assert.assertNull(omKeyInfo.getFileEncryptionInfo());
+
+              return true;
+            }
+          }
+        }
+        return false;
       } catch (IOException e) {
         return false;
       }
     }, 500, 100000);
-    RepeatedOmKeyInfo deletedKeys =
-        omMetadataManager.getDeletedTable().get(objectKey);
-    Map<String, String> deletedKeyMetadata =
-        deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-    Assert.assertFalse(
-        deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
-    Assert.assertNull(
-        deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,
