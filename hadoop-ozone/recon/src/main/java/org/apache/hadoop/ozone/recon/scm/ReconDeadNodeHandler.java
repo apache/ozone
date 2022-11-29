@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,12 +44,16 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
 
   private StorageContainerServiceProvider scmClient;
 
+  private ContainerHealthTask containerHealthTask;
+
   public ReconDeadNodeHandler(NodeManager nodeManager,
                               PipelineManager pipelineManager,
                               ContainerManager containerManager,
-                              StorageContainerServiceProvider scmClient) {
+                              StorageContainerServiceProvider scmClient,
+                              ContainerHealthTask containerHealthTask) {
     super(nodeManager, pipelineManager, containerManager);
     this.scmClient = scmClient;
+    this.containerHealthTask = containerHealthTask;
   }
 
   @Override
@@ -71,6 +76,7 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
         LOG.warn("Node {} has reached DEAD state, but SCM does not have " +
             "information about it.", datanodeDetails);
       }
+      containerHealthTask.triggerContainerHealthCheck();
     } catch (Exception ioEx) {
       LOG.error("Error trying to verify Node operational state from SCM.",
           ioEx);
