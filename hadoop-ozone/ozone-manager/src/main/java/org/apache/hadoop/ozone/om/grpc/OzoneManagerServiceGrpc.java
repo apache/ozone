@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.grpc;
 
 import io.grpc.Status;
 import com.google.protobuf.RpcController;
@@ -47,8 +47,8 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-  private OzoneManagerProtocolServerSideTranslatorPB omTranslator;
-  private OzoneDelegationTokenSecretManager delegationTokenMgr;
+  private final OzoneManagerProtocolServerSideTranslatorPB omTranslator;
+  private final OzoneDelegationTokenSecretManager delegationTokenMgr;
   private final SecurityConfig secConfig;
 
   OzoneManagerServiceGrpc(

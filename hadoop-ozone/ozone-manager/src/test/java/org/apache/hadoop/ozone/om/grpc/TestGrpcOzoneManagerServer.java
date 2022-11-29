@@ -16,8 +16,9 @@
  *
  */
 
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.grpc;
 
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
