@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 import java.io.IOException;
@@ -29,7 +30,7 @@ import java.util.Set;
  * A PlacementPolicy support choosing datanodes to build
  * pipelines or containers with specified constraints.
  */
-public interface PlacementPolicy<Replica, PlacementGroup> {
+public interface PlacementPolicy<Replica> {
 
   default List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
@@ -68,17 +69,8 @@ public interface PlacementPolicy<Replica, PlacementGroup> {
   ContainerPlacementStatus validateContainerPlacement(
           List<DatanodeDetails> dns, int replicas);
   Map<Replica, Integer> replicasToCopy(Set<Replica> replicas,
-                                       int expectedCountPerUniqueReplica,
-                                       int expectedUniqueGroups);
+                                       ReplicationConfig replicationConfig);
 
   Set<Replica> replicasToRemove(Set<Replica> replicas,
-                                int expectedCountPerUniqueReplica,
-                                int expectedUniqueGroups);
-
-
-  /** Gets the group of from the datanode based on the placement.
-   * @param dn
-   * @return PlacementGroup
-   */
-  PlacementGroup getPlacementGroup(DatanodeDetails dn);
+                                ReplicationConfig replicationConfig);
 }

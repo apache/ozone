@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -47,7 +48,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -346,7 +346,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
    * to validateContainerPlacement, then it will return an invalid placement.
    */
   private static class MockPlacementPolicy implements
-          PlacementPolicy<ContainerReplica, Node> {
+          PlacementPolicy<ContainerReplica> {
 
     private UUID misRepWhenDnPresent = null;
 
@@ -375,22 +375,18 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     @Override
     public Map<ContainerReplica, Integer> replicasToCopy(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
+            Set<ContainerReplica> replicas,
+            ReplicationConfig replicationConfig) {
       return null;
     }
 
     @Override
     public Set<ContainerReplica> replicasToRemove(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
+            Set<ContainerReplica> replicas,
+            ReplicationConfig replicationConfig) {
       return null;
     }
 
-    @Override
-    public Node getPlacementGroup(DatanodeDetails dn) {
-      return dn.getParent();
-    }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
       for (DatanodeDetails dn : dns) {

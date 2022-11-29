@@ -31,4 +31,14 @@ public interface ReplicatedReplicationConfig extends ReplicationConfig {
    * @return the replication factor
    */
   HddsProtos.ReplicationFactor getReplicationFactor();
+
+  @Override
+  default int getReplicationFactorOfUniqueReplica() {
+    return getReplicationFactor().getNumber();
+  }
+
+  @Override
+  default int getNumberOfUniqueReplica() {
+    return 1;
+  }
 }

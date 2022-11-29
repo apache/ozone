@@ -223,4 +223,8 @@ public interface ReplicationConfig {
 
   String configFormat();
 
+  int getReplicationFactorOfUniqueReplica();
+
+  int getNumberOfUniqueReplica();
+
 }

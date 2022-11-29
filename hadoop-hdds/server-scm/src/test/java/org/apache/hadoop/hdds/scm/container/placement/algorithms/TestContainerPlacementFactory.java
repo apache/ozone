@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -37,7 +38,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -181,7 +181,7 @@ public class TestContainerPlacementFactory {
    * A dummy container placement implementation for test.
    */
   public static class DummyImpl implements
-          PlacementPolicy<ContainerReplica, Node> {
+          PlacementPolicy<ContainerReplica> {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,
@@ -199,22 +199,19 @@ public class TestContainerPlacementFactory {
 
     @Override
     public Map<ContainerReplica, Integer> replicasToCopy(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
+            Set<ContainerReplica> replicas,
+            ReplicationConfig replicationConfig) {
       return null;
     }
 
     @Override
     public Set<ContainerReplica> replicasToRemove(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
+            Set<ContainerReplica> replicas,
+            ReplicationConfig replicationConfig) {
       return null;
     }
 
-    @Override
-    public Node getPlacementGroup(DatanodeDetails dn) {
-      return dn.getParent();
-    }
+
   }
 
   @Test

@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -58,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * functions which are common to placement policies.
  */
 public abstract class SCMCommonPlacementPolicy implements
-        PlacementPolicy<ContainerReplica, Node> {
+        PlacementPolicy<ContainerReplica> {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
@@ -457,7 +458,7 @@ public abstract class SCMCommonPlacementPolicy implements
   }
   @Override
   public Set<ContainerReplica> replicasToRemove(Set<ContainerReplica> replicas,
-         int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
+         ReplicationConfig replicationConfig) {
     Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
     Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
             = new HashMap<>();
@@ -500,7 +501,8 @@ public abstract class SCMCommonPlacementPolicy implements
               .map(Map.Entry::getKey)
               .collect(Collectors.toList()));
 
-      while (replicaIdMap.get(rid).size() > expectedCountPerUniqueReplica) {
+      while (replicaIdMap.get(rid).size() >
+              replicationConfig.getReplicationFactorOfUniqueReplica()) {
         Node rack = pq.poll();
         Set<ContainerReplica> replicaSet =
                 placementGroupReplicaIdMap.get(rack).get(rid);
@@ -524,8 +526,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
   @Override
   public Map<ContainerReplica, Integer> replicasToCopy(
-         Set<ContainerReplica> replicas, int expectedCountPerUniqueReplicas,
-         int expectedUniqueGroups) {
+         Set<ContainerReplica> replicas, ReplicationConfig replicationConfig) {
     Map<Integer, ContainerReplica> replicaIdMap = new HashMap<>();
     Map<Node, Set<ContainerReplica>> placementGroupReplicaIdMap
             = new HashMap<>();
@@ -545,7 +546,7 @@ public abstract class SCMCommonPlacementPolicy implements
               });
     }
     int misreplicationCnt = Math.max(getRequiredRackCount(
-        expectedUniqueGroups * expectedCountPerUniqueReplicas)
+        replicationConfig.getRequiredNodes())
         - placementGroupReplicaIdMap.size(), 0);
     Map<Integer, Integer> copyRIDMap = new HashMap<>();
 
@@ -556,9 +557,10 @@ public abstract class SCMCommonPlacementPolicy implements
                 .limit(Math.min(replicaSet.size() - 1, misreplicationCnt))
                 .collect(Collectors.groupingBy(replicaIdentifierFunction,
                         Collectors.counting()));
-        for (Integer rid : cntMap.keySet()) {
-          int additionalReplica = Math.toIntExact(cntMap.get(rid));
-          copyRIDMap.compute(rid, (replicaIdx, cnt) -> (cnt == null ? 0 : cnt)
+        for (Map.Entry<Integer, Long> ridCntEntry : cntMap.entrySet()) {
+          int additionalReplica = Math.toIntExact(ridCntEntry.getValue());
+          copyRIDMap.compute(ridCntEntry.getKey(),
+                  (replicaIdx, cnt) -> (cnt == null ? 0 : cnt)
                   + additionalReplica);
           misreplicationCnt -= additionalReplica;
         }
@@ -569,8 +571,7 @@ public abstract class SCMCommonPlacementPolicy implements
                     Map.Entry::getValue));
   }
 
-  @Override
-  public Node getPlacementGroup(DatanodeDetails dn) {
+  protected Node getPlacementGroup(DatanodeDetails dn) {
     return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
   }
 

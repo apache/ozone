@@ -209,4 +209,14 @@ public class ECReplicationConfig implements ReplicationConfig {
   public String configFormat() {
     return HddsProtos.ReplicationType.EC.name() + "/" + data + "-" + parity;
   }
+
+  @Override
+  public int getReplicationFactorOfUniqueReplica() {
+    return 1;
+  }
+
+  @Override
+  public int getNumberOfUniqueReplica() {
+    return data + parity;
+  }
 }
