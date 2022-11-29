@@ -18,22 +18,8 @@
 package org.apache.hadoop.hdds.scm;
 
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Random;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -47,10 +33,18 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Random;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * This policy implements a set of invariants which are common
@@ -455,7 +449,7 @@ public abstract class SCMCommonPlacementPolicy implements
     int requiredNumberOfPlacementGroups = getRequiredRackCount(
             expectedUniqueGroups * expectedCountPerUniqueReplicas);
     int replicasPerPlacementGroup =
-            totalNumberOfReplicas/requiredNumberOfPlacementGroups;
+            totalNumberOfReplicas / requiredNumberOfPlacementGroups;
     int misreplicationCnt = Math.max(requiredNumberOfPlacementGroups
         - placementGroupReplicaIdMap.size(), 0);
     Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
