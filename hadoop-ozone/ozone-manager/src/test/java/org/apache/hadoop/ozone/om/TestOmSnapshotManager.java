@@ -132,7 +132,6 @@ public class TestOmSnapshotManager {
   public void testHardLinkCreation() throws IOException {
     byte[] dummyData = {0};
 
-
     // Create dummy files to be linked to.
     File snapDir1 = new File(testDir.toString(),
         OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");

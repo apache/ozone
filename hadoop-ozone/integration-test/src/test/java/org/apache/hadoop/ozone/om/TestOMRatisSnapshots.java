@@ -240,11 +240,7 @@ public class TestOMRatisSnapshots {
         .setBucketName(bucketName)
         .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
     OmKeyInfo omKeyInfo = null;
-    try {
-      omKeyInfo = followerOM.lookupKey(omKeyArgs);
-    } catch (Exception e) {
-      Assertions.fail("received exception: " + e);
-    }
+    omKeyInfo = followerOM.lookupKey(omKeyArgs);
     Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
   }

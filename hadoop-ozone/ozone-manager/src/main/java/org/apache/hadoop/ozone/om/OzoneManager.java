@@ -3609,16 +3609,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     File dbBackup = new File(dbBackupDir, oldDB.getName());
     File dbSnapshotsDir = new File(dbDir, OM_SNAPSHOT_DIR);
     File dbSnapshotsBackup = new File(dbBackupDir, OM_SNAPSHOT_DIR);
-    try {
-      Files.move(oldDB.toPath(), dbBackup.toPath());
-      if (dbSnapshotsDir.exists()) {
-        Files.move(dbSnapshotsDir.toPath(),
-            dbSnapshotsBackup.toPath());
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to create a backup of the current DB. Aborting " +
-          "snapshot installation.");
-      throw e;
+    Files.move(oldDB.toPath(), dbBackup.toPath());
+    if (dbSnapshotsDir.exists()) {
+      Files.move(dbSnapshotsDir.toPath(),
+          dbSnapshotsBackup.toPath());
     }
 
     // Move the new DB checkpoint into the om metadata dir
@@ -3662,7 +3656,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       Files.move(incomingSnapshotsDir, dbSnapshotsDir);
       OmSnapshotManager.createHardLinks(dbPath);
     }
-
   }
 
   /**
