@@ -234,7 +234,7 @@ public class TestOMRatisSnapshots {
         volumeName, bucketName, newKeys.get(0))));
      */
 
-    // read back data from the OM snapshot
+    // Read back data from the OM snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -559,7 +559,7 @@ public class TestOMRatisSnapshots {
 
   private void createSnapshot(OzoneManager leaderOM, List<String> keys)
       throws TimeoutException, InterruptedException, IOException {
-    // Avoid double buffer issue waiting for keys
+    // Avoid double buffer issue waiting for keys.
     GenericTestUtils.waitFor(() -> {
       try {
         OmKeyInfo key = leaderOM.getMetadataManager()
@@ -573,7 +573,7 @@ public class TestOMRatisSnapshots {
     }, 100, 10000);
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
-    // allow the snapshot to be written to the info table
+    // Allow the snapshot to be written to the info table.
     GenericTestUtils.waitFor(() -> {
       try {
         SnapshotInfo snapshotInfo =

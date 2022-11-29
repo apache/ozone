@@ -140,7 +140,7 @@ public class RocksDBCheckpointDiffer {
    * Constructor.
    * Note that previous compaction logs are loaded by RDBStore after this
    * object's initialization by calling loadAllCompactionLogs().
-   * @param snapshotDiffDir parent directory for diff state
+   * @param snapshotDiffDir Parent directory for diff state.
    * @param sstBackupDir Name of the SST backup dir under metadata dir.
    * @param compactionLogDirName Name of the compaction log dir.
    */

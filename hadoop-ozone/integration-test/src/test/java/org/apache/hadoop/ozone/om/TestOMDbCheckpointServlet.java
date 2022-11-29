@@ -293,17 +293,17 @@ public class TestOMDbCheckpointServlet {
   @Test
   public void testWriteDbDataToStream() throws Exception {
     prepSnapshotData();
-    // set http param to include snapshot data
+    // Set http param to include snapshot data.
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
 
-    // get the tarball
+    // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream);
     }
 
-    // Untar the file into a temp folder to be examined
+    // Untar the file into a temp folder to be examined.
     String testDirName = folder.newFolder().getAbsolutePath();
     int testDirLength = testDirName.length() + 1;
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
@@ -312,12 +312,12 @@ public class TestOMDbCheckpointServlet {
     newDbDir.mkdirs();
     FileUtil.unTar(tempFile, newDbDir);
 
-    // Move snapshot dir to correct location
+    // Move snapshot dir to correct location.
     new File(newDbDirName, OM_SNAPSHOT_DIR)
         .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR));
 
 
-    // Confirm the checkpoint directories match, (after remove extras)
+    // Confirm the checkpoint directories match, (after remove extras).
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     Set<String> initialCheckpointSet = getFiles(checkpointLocation,
         checkpointLocation.toString().length() + 1);
@@ -341,7 +341,7 @@ public class TestOMDbCheckpointServlet {
     Set<String> finalFullSet =
         getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
 
-    // check each line in the hard link file
+    // Check each line in the hard link file.
     Stream<String> lines = Files.lines(Paths.get(newDbDirName,
         OM_HARDLINK_FILE));
 
@@ -374,22 +374,22 @@ public class TestOMDbCheckpointServlet {
       throws Exception {
     prepSnapshotData();
 
-    // set http param to exclude snapshot data
+    // Set http param to exclude snapshot data.
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn(null);
 
-    // get the tarball
+    // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream);
     }
 
-    // Untar the file into a temp folder to be examined
+    // Untar the file into a temp folder to be examined.
     String testDirName = folder.newFolder().getAbsolutePath();
     int testDirLength = testDirName.length() + 1;
     FileUtil.unTar(tempFile, new File(testDirName));
 
-    // Confirm the checkpoint directories match
+    // Confirm the checkpoint directories match.
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     Set<String> initialCheckpointSet = getFiles(checkpointLocation,
         checkpointLocation.toString().length() + 1);
@@ -408,14 +408,14 @@ public class TestOMDbCheckpointServlet {
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
 
-    // Create dummy keys for snapshotting
+    // Create dummy keys for snapshotting.
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
         "content");
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
         "content");
 
-    // this sleep can be removed after this is fixed:
-    //  https://issues.apache.org/jira/browse/HDDS-7279
+    // This sleep can be removed after this is fixed:
+    // https://issues.apache.org/jira/browse/HDDS-7279
     Thread.sleep(2000);
     snapshotDirName =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
@@ -423,9 +423,9 @@ public class TestOMDbCheckpointServlet {
         createSnapshot(bucket.getVolumeName(), bucket.getName());
 
 
-    // create fabricated links to snapshot dirs
-    //  to confirm that links are recognized even if
-    //  they are don't point to the checkpoint directory
+    // Create fabricated links to snapshot dirs
+    // to confirm that links are recognized even if
+    // they are don't point to the checkpoint directory.
     Path fabricatedFile = Paths.get(snapshotDirName, "fabricatedFile");
     Path fabricatedLink = Paths.get(snapshotDirName2, "fabricatedFile");
 
@@ -433,7 +433,7 @@ public class TestOMDbCheckpointServlet {
         "fabricatedData".getBytes(StandardCharsets.UTF_8));
     Files.createLink(fabricatedLink, fabricatedFile);
 
-    // simulate links from the compaction dir
+    // Simulate links from the compaction dir.
     compactionDirPath = Paths.get(metaDir.toString(),
         OM_SNAPSHOT_DIFF_DIR, OM_COMPACTION_BACKUP_DIR);
     Path fabricatedLink2 = Paths.get(compactionDirPath.toString(),
@@ -472,7 +472,7 @@ public class TestOMDbCheckpointServlet {
     return getFiles(path, truncateLength, new HashSet<>());
   }
 
-  // Get all files below path, recursively, (skipping fabricated files)
+  // Get all files below path, recursively, (skipping fabricated files).
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private Set<String> getFiles(Path path, int truncateLength,
       Set<String> fileSet) throws IOException {
@@ -489,12 +489,12 @@ public class TestOMDbCheckpointServlet {
     return fileSet;
   }
 
-  // tests to see that fabricated link lines in hardlink file are
-  //  properly formatted "dir1/fabricatedFile dir2/fabricatedFile"
+  // Tests to see that fabricated link lines in hardlink file are
+  // properly formatted "dir1/fabricatedFile dir2/fabricatedFile".
   //
-  //  The "fabricated" files/links are ones I've created by hand to
-  //  fully test the code, (as opposed to the "natural" files/links
-  //  created by the create snapshot process.)
+  // The "fabricated" files/links are ones I've created by hand to
+  // fully test the code, (as opposed to the "natural" files/links
+  // created by the create snapshot process).
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkFabricatedLines(Set<String> directories, List<String> lines,
                               String testDirName) {
@@ -530,8 +530,8 @@ public class TestOMDbCheckpointServlet {
     }
   }
 
-  // validates line in hard link file. should look something like:
-  //  "dir1/x.sst x.sst"
+  // Validates line in hard link file. should look something like:
+  // "dir1/x.sst x.sst".
   private void checkLine(String shortSnapshotLocation,
                             String shortSnapshotLocation2,
                             String line) {

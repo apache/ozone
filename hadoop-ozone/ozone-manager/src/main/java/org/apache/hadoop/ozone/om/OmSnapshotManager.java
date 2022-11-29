@@ -296,9 +296,9 @@ public final class OmSnapshotManager {
    * dir1/fileTo dir2/fileFrom
    *    for files in another directory, (either another snapshot dir or
    *    sst compaction backup directory)
-   * @param truncateLength length of initial path to trim in file path
-   * @param hardLinkFiles a map of link->file paths
-   * @return Path to the file of links created
+   * @param truncateLength - Length of initial path to trim in file path.
+   * @param hardLinkFiles - Map of link->file paths.
+   * @return Path to the file of links created.
    */
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   static Path createHardLinkList(int truncateLength,
@@ -308,7 +308,7 @@ public final class OmSnapshotManager {
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
       String fixedFile = truncateFileName(truncateLength, entry.getValue());
-      // If this file is from the active db, strip the path
+      // If this file is from the active db, strip the path.
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         fixedFile = Paths.get(fixedFile).getFileName().toString();
       }
@@ -321,7 +321,7 @@ public final class OmSnapshotManager {
     return data;
   }
 
-  // get the filename without the introductory metadata directory
+  // Get the filename without the introductory metadata directory
   static String truncateFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
   }
@@ -331,11 +331,11 @@ public final class OmSnapshotManager {
     File hardLinkFile = new File(dbPath.toString(),
         OM_HARDLINK_FILE);
     if (hardLinkFile.exists()) {
-      // Read file
+      // Read file.
       List<String> lines =
           Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());
 
-      // Create a link for each line
+      // Create a link for each line.
       for (String l : lines) {
         String from = l.split("\t")[1];
         String to = l.split("\t")[0];
@@ -351,15 +351,15 @@ public final class OmSnapshotManager {
   }
 
 
-  // Prepend the full path to the hard link entry entry
+  // Prepend the full path to the hard link entry entry.
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private static Path getFullPath(Path dbPath, String fileName) {
     File file = new File(fileName);
-    // If there is no directory then this file belongs in the db
+    // If there is no directory then this file belongs in the db.
     if (file.getName().equals(fileName)) {
       return Paths.get(dbPath.toString(), fileName);
     }
-    // else this file belong in a directory parallel to the db
+    // Else this file belong in a directory parallel to the db.
     return Paths.get(dbPath.getParent().toString(), fileName);
   }
 

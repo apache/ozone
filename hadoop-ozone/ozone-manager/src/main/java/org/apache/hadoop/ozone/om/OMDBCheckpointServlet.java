@@ -118,10 +118,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   HttpServletRequest request,
                                   OutputStream destination)
       throws IOException, InterruptedException, CompressorException {
-    // Map of inodes to path
-    HashMap<Object, Path> copyFiles = new HashMap<>();
-    // Map of link to path
-    HashMap<Path, Path> hardLinkFiles = new HashMap<>();
+    // Map of inodes to path.
+    Map<Object, Path> copyFiles = new HashMap<>();
+    // Map of link to path.
+    Map<Path, Path> hardLinkFiles = new HashMap<>();
 
     getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
         includeSnapshotData(request));
@@ -146,7 +146,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   boolean includeSnapshotData)
       throws IOException, InterruptedException {
 
-    // Get the active fs files
+    // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
     processDir(dir, copyFiles, hardLinkFiles);
 
@@ -154,7 +154,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    // Get the snapshot files
+    // Get the snapshot files.
     waitForSnapshotDirs(checkpoint);
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
@@ -162,7 +162,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   // The snapshotInfo table may contain a snapshot that
-  //  doesn't yet exist on the fs, so wait a few seconds for it
+  // doesn't yet exist on the fs, so wait a few seconds for it.
   private void waitForSnapshotDirs(DBCheckpoint checkpoint)
       throws IOException, InterruptedException {
 
@@ -176,7 +176,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         iterator = checkpointMetadataManager
         .getSnapshotInfoTable().iterator()) {
 
-      // for each entry, wait for corresponding directory
+      // For each entry, wait for corresponding directory.
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
@@ -192,11 +192,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     while (!dir.toFile().exists()) {
       Thread.sleep(100);
       if (System.currentTimeMillis() > endTime) {
-        break;
+        throw new IOException("snapshot dir doesn't exist: " + dir);
       }
-    }
-    if (System.currentTimeMillis() > endTime) {
-      throw new IOException("snapshot dir doesn't exist: " + dir);
     }
   }
 
@@ -216,9 +213,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   private void processFile(Path file, Map<Object, Path> copyFiles,
                            Map<Path, Path> hardLinkFiles) throws IOException {
-    // get the inode
+    // Get the inode.
     Object key = OmSnapshotManager.getINode(file);
-    // If we already have the inode, store as hard link
+    // If we already have the inode, store as hard link.
     if (copyFiles.containsKey(key)) {
       hardLinkFiles.put(file, copyFiles.get(key));
     } else {
@@ -226,7 +223,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  // returns value of http request parameter
+  // Returns value of http request parameter.
   private boolean includeSnapshotData(HttpServletRequest request) {
     String includeParam =
         request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
@@ -245,7 +242,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
     int truncateLength = metaDirPath.toString().length() + 1;
 
-    // Go through each of the files to be copied and add to archive
+    // Go through each of the files to be copied and add to archive.
     for (Path file : copyFiles.values()) {
       String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
@@ -255,7 +252,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       includeFile(file.toFile(), fixedFile, archiveOutputStream);
     }
 
-    //  Create list of hard links
+    // Create list of hard links.
     if (!hardLinkFiles.isEmpty()) {
       Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
       includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,

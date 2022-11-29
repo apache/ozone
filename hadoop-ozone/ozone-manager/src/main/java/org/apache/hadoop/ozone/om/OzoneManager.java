@@ -3600,7 +3600,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         lastAppliedIndex + "_" + System.currentTimeMillis();
     File dbDir = oldDB.getParentFile();
 
-    // Backup the active fs and snapshot dirs
+    // Backup the active fs and snapshot dirs.
     File dbBackupDir = new File(dbDir, dbBackupName);
     if (!dbBackupDir.mkdirs()) {
       throw new IOException("Failed to make db backup dir: " +
@@ -3653,7 +3653,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return dbBackupDir;
   }
 
-  // move the new snapshot directory into place and create hard links
+  // Move the new snapshot directory into place and create hard links.
   private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
       throws IOException {
     Path incomingSnapshotsDir = Paths.get(dbPath.toString(),
