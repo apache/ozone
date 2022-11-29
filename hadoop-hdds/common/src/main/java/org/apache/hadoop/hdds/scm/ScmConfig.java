@@ -43,7 +43,7 @@ public class ScmConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = "The keytab file used by SCM daemon to login as "+
+      description = "The keytab file used by SCM daemon to login as " +
           "its service principal."
   )
   private String keytab;
@@ -79,10 +79,11 @@ public class ScmConfig {
 
   @Config(key = "block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "20000",
+      defaultValue = "100000",
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
           "Maximum number of blocks which SCM processes during an interval. "
+              + "The block num is counted at the replica level."
               + "If SCM has 100000 blocks which need to be deleted and the "
               + "configuration is 5000 then it would only send 5000 blocks "
               + "for deletion to the datanodes."

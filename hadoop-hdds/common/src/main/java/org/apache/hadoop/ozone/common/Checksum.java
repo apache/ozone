@@ -32,6 +32,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Ints;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,7 @@ public class Checksum {
   }
 
   public static ByteString int2ByteString(int n) {
-    return ByteString.copyFrom(Ints.toByteArray(n));
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(n));
   }
 
   private static Function<ByteBuffer, ByteString> newChecksumByteBufferFunction(

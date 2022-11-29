@@ -19,10 +19,9 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -30,33 +29,33 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for AllocateBlock request.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE})
-public class OMAllocateBlockResponse extends OMClientResponse {
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, BUCKET_TABLE})
+public class OMAllocateBlockResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
   private long clientID;
-  private OmBucketInfo omBucketInfo;
 
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, long clientID,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse);
+      @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.omKeyInfo = omKeyInfo;
     this.clientID = clientID;
-    this.omBucketInfo = omBucketInfo;
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMAllocateBlockResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
+                                 @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 
@@ -68,19 +67,10 @@ public class OMAllocateBlockResponse extends OMClientResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, openKey, omKeyInfo);
-
-    // update bucket usedBytes.
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName()), omBucketInfo);
   }
 
   protected OmKeyInfo getOmKeyInfo() {
     return omKeyInfo;
-  }
-
-  protected OmBucketInfo getOmBucketInfo() {
-    return omBucketInfo;
   }
 
   protected long getClientID() {

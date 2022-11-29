@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
@@ -43,6 +44,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -154,6 +159,8 @@ public class TestOzoneFileInterfaces {
 
   public void init() throws Exception {
     OzoneConfiguration conf = getOzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
     MiniOzoneCluster newCluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -516,7 +523,7 @@ public class TestOzoneFileInterfaces {
 
     assertEquals(0, blockLocations[0].getOffset());
     assertEquals(blockSize, blockLocations[1].getOffset());
-    assertEquals(2*blockSize, blockLocations[2].getOffset());
+    assertEquals(2 * blockSize, blockLocations[2].getOffset());
     assertEquals(blockSize, blockLocations[0].getLength());
     assertEquals(blockSize, blockLocations[1].getLength());
     assertEquals(837, blockLocations[2].getLength());
@@ -532,6 +539,44 @@ public class TestOzoneFileInterfaces {
 
     assertEquals("key1/key2",
         o3fs.pathToKey(new Path("o3fs://test1/key1/key2")));
+  }
+
+
+  /**
+   * Verify that FS throws exception when trying to access bucket with
+   * incompatible layout.
+   * @throws IOException
+   */
+  @Test
+  public void testFileSystemWithObjectStoreLayout() throws IOException {
+    String obsVolume = UUID.randomUUID().toString();
+
+    OzoneClient client = cluster.getClient();
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume and bucket
+    store.createVolume(obsVolume);
+    OzoneVolume volume = store.getVolume(obsVolume);
+    String obsBucket = UUID.randomUUID().toString();
+    // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
+    volume.createBucket(obsBucket,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
+
+    String obsRootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
+
+    OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
+    config.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, obsRootPath);
+
+    try {
+      fs = FileSystem.get(fs.getConf());
+      Assert.fail("Should throw Exception due incompatible bucket layout");
+    } catch (IllegalArgumentException iae) {
+      // Expected exception
+      Assert.assertTrue(iae.getMessage().contains(
+          "OBJECT_STORE, which does not support file system semantics"));
+    }
   }
 
   private String getCurrentUser() {

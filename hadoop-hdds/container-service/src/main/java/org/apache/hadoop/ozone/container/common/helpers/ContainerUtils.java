@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
@@ -46,7 +47,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -60,9 +61,6 @@ public final class ContainerUtils {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerUtils.class);
-
-  private static final ByteString REDACTED =
-      ByteString.copyFromUtf8("<redacted>");
 
   private ContainerUtils() {
     //never constructed.
@@ -193,11 +191,13 @@ public final class ContainerUtils {
             HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
             HddsConfigKeys.
                     HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
-    if(enabled) {
+    if (enabled) {
       String storedChecksum = containerData.getChecksum();
 
       Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-              containerData.getContainerType());
+          containerData.getContainerType(),
+          containerData instanceof KeyValueContainerData &&
+              ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
       containerData.computeAndSetChecksum(yaml);
       String computedChecksum = containerData.getChecksum();
 
@@ -244,74 +244,38 @@ public final class ContainerUtils {
   }
 
   /**
+   * Get the chunk directory from the containerData.
+   *
+   * @param containerData {@link ContainerData}
+   * @return the file of chunk directory
+   * @throws StorageContainerException
+   */
+  public static File getChunkDir(ContainerData containerData)
+      throws StorageContainerException {
+    Preconditions.checkNotNull(containerData, "Container data can't be null");
+
+    String chunksPath = containerData.getChunksPath();
+    if (chunksPath == null) {
+      LOG.error("Chunks path is null in the container data");
+      throw new StorageContainerException("Unable to get Chunks directory.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+
+    File chunksDir = new File(chunksPath);
+    if (!chunksDir.exists()) {
+      LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
+      throw new StorageContainerException("Chunks directory " +
+          chunksDir.getAbsolutePath() + " does not exist.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    return chunksDir;
+  }
+
+  /**
    * ContainerID can be decoded from the container base directory name.
    */
   public static long getContainerID(File containerBaseDir) {
     return Long.parseLong(containerBaseDir.getName());
   }
 
-  /**
-   * Remove binary data from request {@code msg}.  (May be incomplete, feel
-   * free to add any missing cleanups.)
-   */
-  public static ContainerCommandRequestProto processForDebug(
-      ContainerCommandRequestProto msg) {
-
-    if (msg == null) {
-      return null;
-    }
-
-    if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
-      ContainerCommandRequestProto.Builder builder = msg.toBuilder();
-      if (msg.hasWriteChunk()) {
-        builder.getWriteChunkBuilder().setData(REDACTED);
-      }
-      if (msg.hasPutSmallFile()) {
-        builder.getPutSmallFileBuilder().setData(REDACTED);
-      }
-      return builder.build();
-    }
-
-    return msg;
-  }
-
-  /**
-   * Remove binary data from response {@code msg}.  (May be incomplete, feel
-   * free to add any missing cleanups.)
-   */
-  public static ContainerCommandResponseProto processForDebug(
-      ContainerCommandResponseProto msg) {
-
-    if (msg == null) {
-      return null;
-    }
-
-    if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
-      ContainerCommandResponseProto.Builder builder = msg.toBuilder();
-      if (msg.hasReadChunk()) {
-        if (msg.getReadChunk().hasData()) {
-          builder.getReadChunkBuilder().setData(REDACTED);
-        }
-        if (msg.getReadChunk().hasDataBuffers()) {
-          builder.getReadChunkBuilder().getDataBuffersBuilder()
-              .clearBuffers()
-              .addBuffers(REDACTED);
-        }
-      }
-      if (msg.hasGetSmallFile()) {
-        if (msg.getGetSmallFile().getData().hasData()) {
-          builder.getGetSmallFileBuilder().getDataBuilder().setData(REDACTED);
-        }
-        if (msg.getGetSmallFile().getData().hasDataBuffers()) {
-          builder.getGetSmallFileBuilder().getDataBuilder()
-              .getDataBuffersBuilder()
-                  .clearBuffers()
-                  .addBuffers(REDACTED);
-        }
-      }
-      return builder.build();
-    }
-
-    return msg;
-  }
 }

@@ -182,7 +182,7 @@ public final class OzoneManagerPrepareState {
     File prepareMarkerFile = getPrepareMarkerFile();
     if (prepareMarkerFile.exists()) {
       byte[] data = new byte[(int) prepareMarkerFile.length()];
-      try(FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
+      try (FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
         stream.read(data);
       } catch (IOException e) {
         throwPrepareException(e, "Failed to read prepare marker " +
@@ -255,7 +255,7 @@ public final class OzoneManagerPrepareState {
     File parentDir = markerFile.getParentFile();
     Files.createDirectories(parentDir.toPath());
 
-    try(FileOutputStream stream = new FileOutputStream(markerFile)) {
+    try (FileOutputStream stream = new FileOutputStream(markerFile)) {
       stream.write(Long.toString(index).getBytes(StandardCharsets.UTF_8));
     }
 

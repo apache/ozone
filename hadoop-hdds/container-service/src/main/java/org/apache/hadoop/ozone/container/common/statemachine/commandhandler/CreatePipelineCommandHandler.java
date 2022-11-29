@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
+import java.util.function.BiFunction;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.AlreadyExistsException;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -51,7 +53,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(CreatePipelineCommandHandler.class);
 
   private final AtomicLong invocationCount = new AtomicLong(0);
-  private final ConfigurationSource conf;
+  private final BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient;
 
   private long totalTime;
 
@@ -59,7 +61,12 @@ public class CreatePipelineCommandHandler implements CommandHandler {
    * Constructs a createPipelineCommand handler.
    */
   public CreatePipelineCommandHandler(ConfigurationSource conf) {
-    this.conf = conf;
+    this(RatisHelper.newRaftClient(conf));
+  }
+
+  CreatePipelineCommandHandler(
+      BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient) {
+    this.newRaftClient = newRaftClient;
   }
 
   /**
@@ -94,7 +101,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
             d -> !d.getUuid().equals(dn.getUuid()))
             .forEach(d -> {
               final RaftPeer peer = RatisHelper.toRaftPeer(d);
-              try (RaftClient client = RatisHelper.newRaftClient(peer, conf,
+              try (RaftClient client = newRaftClient.apply(peer,
                   ozoneContainer.getTlsClientConfig())) {
                 client.getGroupManagementApi(peer.getId()).add(group);
               } catch (AlreadyExistsException ae) {
@@ -151,6 +158,11 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     if (invocationCount.get() > 0) {
       return totalTime / invocationCount.get();
     }
+    return 0;
+  }
+
+  @Override
+  public int getQueuedCount() {
     return 0;
   }
 }

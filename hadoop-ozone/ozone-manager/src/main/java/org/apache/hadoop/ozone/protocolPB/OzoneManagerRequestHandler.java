@@ -18,10 +18,18 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -29,7 +37,9 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -41,11 +51,19 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
@@ -53,15 +71,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
@@ -72,15 +95,25 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -108,6 +141,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
+  private static final int MAX_SIZE_KB = 2097151;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -182,6 +217,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getServiceListRequest());
         responseBuilder.setServiceListResponse(serviceListResponse);
         break;
+      case RangerBGSync:
+        RangerBGSyncResponse rangerBGSyncResponse = triggerRangerBGSync(
+            request.getRangerBGSyncRequest());
+        responseBuilder.setRangerBGSyncResponse(rangerBGSyncResponse);
+        break;
       case DBUpdates:
         DBUpdatesResponse dbUpdatesResponse = getOMDBUpdates(
             request.getDbUpdatesRequest());
@@ -217,6 +257,33 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
+      case GetS3VolumeContext:
+        GetS3VolumeContextResponse s3VolumeContextResponse =
+            getS3VolumeContext();
+        responseBuilder.setGetS3VolumeContextResponse(s3VolumeContextResponse);
+        break;
+      case TenantGetUserInfo:
+        impl.checkS3MultiTenancyEnabled();
+        TenantGetUserInfoResponse getUserInfoResponse = tenantGetUserInfo(
+            request.getTenantGetUserInfoRequest());
+        responseBuilder.setTenantGetUserInfoResponse(getUserInfoResponse);
+        break;
+      case ListTenant:
+        impl.checkS3MultiTenancyEnabled();
+        ListTenantResponse listTenantResponse = listTenant(
+            request.getListTenantRequest());
+        responseBuilder.setListTenantResponse(listTenantResponse);
+        break;
+      case TenantListUser:
+        impl.checkS3MultiTenancyEnabled();
+        TenantListUserResponse listUserResponse = tenantListUsers(
+            request.getTenantListUserRequest());
+        responseBuilder.setTenantListUserResponse(listUserResponse);
+        break;
+      case GetKeyInfo:
+        responseBuilder.setGetKeyInfoResponse(
+            getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -235,7 +302,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex) {
+      long transactionLogIndex) throws IOException {
     OMClientRequest omClientRequest = null;
     OMClientResponse omClientResponse = null;
     omClientRequest =
@@ -264,6 +331,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           dbUpdatesWrapper.getData().get(i)));
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
+    builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
     return builder.build();
   }
 
@@ -343,6 +411,49 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+  private TenantGetUserInfoResponse tenantGetUserInfo(
+      TenantGetUserInfoRequest request) throws IOException {
+
+    final TenantGetUserInfoResponse.Builder resp =
+        TenantGetUserInfoResponse.newBuilder();
+    final String userPrincipal = request.getUserPrincipal();
+
+    TenantUserInfoValue ret = impl.tenantGetUserInfo(userPrincipal);
+    // Note impl.tenantGetUserInfo() throws if errs
+    if (ret != null) {
+      resp.addAllAccessIdInfo(ret.getAccessIdInfoList());
+    }
+
+    return resp.build();
+  }
+
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+  private TenantListUserResponse tenantListUsers(
+      TenantListUserRequest request) throws IOException {
+    TenantListUserResponse.Builder builder =
+        TenantListUserResponse.newBuilder();
+    TenantUserList usersInTenant =
+        impl.listUsersInTenant(request.getTenantId(), request.getPrefix());
+    // Note impl.listUsersInTenant() throws if errs
+    if (usersInTenant != null) {
+      builder.addAllUserAccessIdInfo(usersInTenant.getUserAccessIds());
+    }
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(MULTITENANCY_SCHEMA)
+  private ListTenantResponse listTenant(
+      ListTenantRequest request) throws IOException {
+
+    final ListTenantResponse.Builder resp = ListTenantResponse.newBuilder();
+
+    TenantStateList ret = impl.listTenant();
+    resp.addAllTenantState(ret.getTenantStateList());
+
+    return resp.build();
+  }
+
   private ListVolumeResponse listVolumes(ListVolumeRequest request)
       throws IOException {
     ListVolumeResponse.Builder resp = ListVolumeResponse.newBuilder();
@@ -392,8 +503,86 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     resp.setKeyInfo(keyInfo.getProtobuf(keyArgs.getHeadOp(), clientVersion));
 
-
     return resp.build();
+  }
+
+  private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request,
+                                        int clientVersion) throws IOException {
+    KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
+        .setHeadOp(keyArgs.getHeadOp())
+        .setForceUpdateContainerCacheFromSCM(
+            keyArgs.getForceUpdateContainerCacheFromSCM())
+        .build();
+    KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
+        request.getAssumeS3Context());
+
+    return keyInfo.toProtobuf(clientVersion);
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupKey
+  )
+  public static OMResponse disallowLookupKeyResponseWithECReplicationConfig(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasLookupKeyResponse()) {
+      return resp;
+    }
+    if (resp.getLookupKeyResponse().getKeyInfo().hasEcReplicationConfig()) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is a key with Erasure Coded replication, which"
+              + " the client can not understand.\n"
+              + "Please upgrade the client before trying to read the key: "
+              + req.getLookupKeyRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupKeyResponse()
+          .build();
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupKey
+  )
+  public static OMResponse disallowLookupKeyWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasLookupKeyResponse()) {
+      return resp;
+    }
+    KeyInfo keyInfo = resp.getLookupKeyResponse().getKeyInfo();
+    // If the key is present inside a bucket using a non LEGACY bucket layout,
+    // then the client needs to be upgraded before proceeding.
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .equals(BucketLayout.LEGACY)) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is present inside a bucket with bucket layout " +
+              "features, which the client can not understand. Please upgrade" +
+              " the client to a compatible version before trying to read the" +
+              " key info for "
+              + req.getLookupKeyRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupKeyRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupKeyResponse()
+          .build();
+    }
+    return resp;
   }
 
   private ListBucketsResponse listBuckets(ListBucketsRequest request)
@@ -431,6 +620,74 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListKeys
+  )
+  public static OMResponse disallowListKeysResponseWithECReplicationConfig(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasListKeysResponse()) {
+      return resp;
+    }
+    List<KeyInfo> keys = resp.getListKeysResponse().getKeyInfoList();
+    for (KeyInfo key : keys) {
+      if (key.hasEcReplicationConfig()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys with Erasure Coded"
+                + " replication set, hence the client is not able to"
+                + " represent all the keys returned. Please upgrade the"
+                + " client to get the list of keys.")
+            .clearListKeysResponse()
+            .build();
+      }
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListKeys
+  )
+  public static OMResponse disallowListKeysWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasListKeysResponse()) {
+      return resp;
+    }
+
+    // Put volume and bucket pairs into a set to avoid duplicates.
+    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+    List<KeyInfo> keys = resp.getListKeysResponse().getKeyInfoList();
+    for (KeyInfo key : keys) {
+      if (key.hasVolumeName() && key.hasBucketName()) {
+        volumeBucketSet.add(
+            new ImmutablePair<>(key.getVolumeName(), key.getBucketName()));
+      }
+    }
+
+    for (Pair<String, String> volumeBucket : volumeBucketSet) {
+      // If any of the buckets have a non legacy layout, then the client is
+      // not compatible with the response.
+      if (!ctx.getBucketLayout(volumeBucket.getLeft(), volumeBucket.getRight())
+          .isLegacy()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys present inside bucket" +
+                " with bucket layout features, hence the client is not able " +
+                "to understand all the keys returned. Please upgrade the"
+                + " client to get the list of keys.")
+            .clearListKeysResponse()
+            .build();
+        break;
+      }
+    }
+    return resp;
+  }
+
   private ListTrashResponse listTrash(ListTrashRequest request,
       int clientVersion) throws IOException {
 
@@ -449,6 +706,81 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListTrash
+  )
+  public static OMResponse disallowListTrashWithECReplicationConfig(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasListTrashResponse()) {
+      return resp;
+    }
+    List<RepeatedKeyInfo> repeatedKeys =
+        resp.getListTrashResponse().getDeletedKeysList();
+    for (RepeatedKeyInfo repeatedKey : repeatedKeys) {
+      for (KeyInfo key : repeatedKey.getKeyInfoList()) {
+        if (key.hasEcReplicationConfig()) {
+          resp = resp.toBuilder()
+              .setStatus(Status.NOT_SUPPORTED_OPERATION)
+              .setMessage("The list of keys contains keys with Erasure Coded"
+                  + " replication set, hence the client is not able to"
+                  + " represent all the keys returned. Please upgrade the"
+                  + " client to get the list of keys.")
+              .clearListTrashResponse()
+              .build();
+        }
+      }
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListTrash
+  )
+  public static OMResponse disallowListTrashWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasListTrashResponse()) {
+      return resp;
+    }
+
+    // Add the volume and bucket pairs to a set to avoid duplicates.
+    List<RepeatedKeyInfo> repeatedKeys =
+        resp.getListTrashResponse().getDeletedKeysList();
+    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+
+    for (RepeatedKeyInfo repeatedKey : repeatedKeys) {
+      for (KeyInfo key : repeatedKey.getKeyInfoList()) {
+        if (key.hasVolumeName() && key.hasBucketName()) {
+          volumeBucketSet.add(
+              new ImmutablePair<>(key.getVolumeName(), key.getBucketName()));
+        }
+      }
+    }
+
+    // If any of the keys is present inside a bucket using a non LEGACY bucket
+    // layout, then the client needs to be upgraded before proceeding.
+    for (Pair<String, String> volumeBucket : volumeBucketSet) {
+      if (!ctx.getBucketLayout(volumeBucket.getLeft(), volumeBucket.getRight())
+          .isLegacy()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys present in buckets " +
+                " using bucket layout features, hence the client is not able to"
+                + " understand all the keys returned. Please upgrade the"
+                + " client to get the list of keys.")
+            .clearListTrashResponse()
+            .build();
+        break;
+      }
+    }
+    return resp;
   }
 
   private ServiceListResponse getServiceList(ServiceListRequest request)
@@ -499,13 +831,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     omPartInfoList.forEach(partInfo -> partInfoList.add(partInfo.getProto()));
 
-    response.setType(
-            omMultipartUploadListParts
-                    .getReplicationConfig()
-                    .getReplicationType());
-    response.setFactor(
-            ReplicationConfig.getLegacyFactor(
-                    omMultipartUploadListParts.getReplicationConfig()));
+    HddsProtos.ReplicationType repType = omMultipartUploadListParts
+        .getReplicationConfig()
+        .getReplicationType();
+    response.setType(repType);
+    if (repType == HddsProtos.ReplicationType.EC) {
+      response.setEcReplicationConfig(
+          ((ECReplicationConfig)omMultipartUploadListParts
+              .getReplicationConfig()).toProto());
+    } else {
+      response.setFactor(ReplicationConfig.getLegacyFactor(
+          omMultipartUploadListParts.getReplicationConfig()));
+    }
     response.setNextPartNumberMarker(
         omMultipartUploadListParts.getNextPartNumberMarker());
     response.setIsTruncated(omMultipartUploadListParts.isTruncated());
@@ -526,17 +863,27 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
         .stream()
-        .map(upload -> MultipartUploadInfo.newBuilder()
-            .setVolumeName(upload.getVolumeName())
-            .setBucketName(upload.getBucketName())
-            .setKeyName(upload.getKeyName())
-            .setUploadId(upload.getUploadId())
-            .setType(upload.getReplicationConfig().getReplicationType())
-            .setFactor(
-                    ReplicationConfig.getLegacyFactor(
-                            upload.getReplicationConfig()))
-            .setCreationTime(upload.getCreationTime().toEpochMilli())
-            .build())
+        .map(upload -> {
+          MultipartUploadInfo.Builder bldr = MultipartUploadInfo.newBuilder()
+              .setVolumeName(upload.getVolumeName())
+              .setBucketName(upload.getBucketName())
+              .setKeyName(upload.getKeyName())
+              .setUploadId(upload.getUploadId());
+
+          HddsProtos.ReplicationType repType = upload.getReplicationConfig()
+              .getReplicationType();
+          bldr.setType(repType);
+          if (repType == HddsProtos.ReplicationType.EC) {
+            bldr.setEcReplicationConfig(
+                ((ECReplicationConfig)upload.getReplicationConfig())
+                    .toProto());
+          } else {
+            bldr.setFactor(ReplicationConfig.getLegacyFactor(
+                upload.getReplicationConfig()));
+          }
+          bldr.setCreationTime(upload.getCreationTime().toEpochMilli());
+          return bldr.build();
+        })
         .collect(Collectors.toList());
 
     ListMultipartUploadsResponse response =
@@ -554,13 +901,108 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
         .build();
 
     GetFileStatusResponse.Builder rb = GetFileStatusResponse.newBuilder();
     rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion));
 
     return rb.build();
+  }
+
+  private RangerBGSyncResponse triggerRangerBGSync(
+      RangerBGSyncRequest rangerBGSyncRequest) throws IOException {
+
+    boolean res = impl.triggerRangerBGSync(rangerBGSyncRequest.getNoWait());
+
+    return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.GetFileStatus
+  )
+  public static OMResponse disallowGetFileStatusWithECReplicationConfig(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasGetFileStatusResponse()) {
+      return resp;
+    }
+    if (resp.getGetFileStatusResponse().getStatus().getKeyInfo()
+        .hasEcReplicationConfig()) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is a key with Erasure Coded replication, which"
+              + " the client can not understand."
+              + " Please upgrade the client before trying to read the key info"
+              + " for "
+              + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getBucketName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearGetFileStatusResponse()
+          .build();
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+          conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+          processingPhase = RequestProcessingPhase.POST_PROCESS,
+          requestType = Type.EchoRPC
+  )
+  public static OMResponse echoRPC(
+          OMRequest req, OMResponse resp, ValidationContext ctx)
+          throws ServiceException {
+    if (!resp.hasEchoRPCResponse()) {
+      return resp;
+    }
+    byte[] payloadBytes = new byte[0];
+    int payloadRespSize = Math.min(
+            req.getEchoRPCRequest().getPayloadSizeResp()
+                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
+    if (payloadRespSize > 0) {
+      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+    }
+    resp = resp.toBuilder()
+            .setMessage(new String(payloadBytes, StandardCharsets.UTF_8))
+            .clearEchoRPCResponse()
+            .build();
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.GetFileStatus
+  )
+  public static OMResponse disallowGetFileStatusWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasGetFileStatusResponse()) {
+      return resp;
+    }
+
+    // If the File is present inside a bucket with non LEGACY layout,
+    // then the client should be upgraded before proceeding.
+    KeyInfo keyInfo = resp.getGetFileStatusResponse().getStatus().getKeyInfo();
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .isLegacy()) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is present in a bucket using bucket layout features"
+              + " which the client can not understand."
+              + " Please upgrade the client before trying to read the key info"
+              + " for "
+              + req.getGetFileStatusRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getBucketName()
+              + "/" + req.getGetFileStatusRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearGetFileStatusResponse()
+          .build();
+    }
+    return resp;
   }
 
   private LookupFileResponse lookupFile(LookupFileRequest request,
@@ -570,13 +1012,71 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .build();
     return LookupFileResponse.newBuilder()
         .setKeyInfo(impl.lookupFile(omKeyArgs).getProtobuf(clientVersion))
         .build();
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithECReplicationConfig(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasLookupFileResponse()) {
+      return resp;
+    }
+    if (resp.getLookupFileResponse().getKeyInfo().hasEcReplicationConfig()) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("Key is a key with Erasure Coded replication, which the"
+              + " client can not understand."
+              + " Please upgrade the client before trying to read the key info"
+              + " for "
+              + req.getLookupFileRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupFileResponse()
+          .build();
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.LookupFile
+  )
+  public static OMResponse disallowLookupFileWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasLookupFileResponse()) {
+      return resp;
+    }
+    KeyInfo keyInfo = resp.getLookupFileResponse().getKeyInfo();
+    if (keyInfo.hasVolumeName() && keyInfo.hasBucketName() &&
+        !ctx.getBucketLayout(keyInfo.getVolumeName(), keyInfo.getBucketName())
+            .equals(BucketLayout.LEGACY)) {
+      resp = resp.toBuilder()
+          .setStatus(Status.NOT_SUPPORTED_OPERATION)
+          .setMessage("File is present inside a bucket with bucket layout " +
+              "features, which the client can not understand. Please upgrade" +
+              " the client to a compatible version before trying to read the" +
+              " key info for "
+              + req.getLookupFileRequest().getKeyArgs().getVolumeName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getBucketName()
+              + "/" + req.getLookupFileRequest().getKeyArgs().getKeyName()
+              + ".")
+          .clearLookupFileResponse()
+          .build();
+    }
+    return resp;
   }
 
   private ListStatusResponse listStatus(
@@ -586,11 +1086,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setHeadOp(keyArgs.getHeadOp())
         .build();
+    boolean allowPartialPrefixes =
+        request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), request.getNumEntries());
+            request.getStartKey(), request.getNumEntries(),
+            allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
         ListStatusResponse.newBuilder();
@@ -598,6 +1102,80 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
     return listStatusResponseBuilder.build();
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListStatus
+  )
+  public static OMResponse disallowListStatusResponseWithECReplicationConfig(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException {
+    if (!resp.hasListStatusResponse()) {
+      return resp;
+    }
+    List<OzoneFileStatusProto> statuses =
+        resp.getListStatusResponse().getStatusesList();
+    for (OzoneFileStatusProto status : statuses) {
+      if (status.getKeyInfo().hasEcReplicationConfig()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys contains keys with Erasure Coded"
+                + " replication set, hence the client is not able to"
+                + " represent all the keys returned."
+                + " Please upgrade the client to get the list of keys.")
+            .clearListStatusResponse()
+            .build();
+      }
+    }
+    return resp;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.POST_PROCESS,
+      requestType = Type.ListStatus
+  )
+  public static OMResponse disallowListStatusResponseWithBucketLayout(
+      OMRequest req, OMResponse resp, ValidationContext ctx)
+      throws ServiceException, IOException {
+    if (!resp.hasListStatusResponse()) {
+      return resp;
+    }
+
+    // Add the volume and bucket pairs to a set to avoid duplicate entries.
+    List<OzoneFileStatusProto> statuses =
+        resp.getListStatusResponse().getStatusesList();
+    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+
+    for (OzoneFileStatusProto status : statuses) {
+      KeyInfo keyInfo = status.getKeyInfo();
+      if (keyInfo.hasVolumeName() && keyInfo.hasBucketName()) {
+        volumeBucketSet.add(
+            new ImmutablePair<>(keyInfo.getVolumeName(),
+                keyInfo.getBucketName()));
+      }
+    }
+
+    // If any of the keys are present in a bucket with a non LEGACY bucket
+    // layout, then the client needs to be upgraded before proceeding.
+    for (Pair<String, String> volumeBucket : volumeBucketSet) {
+      if (!ctx.getBucketLayout(volumeBucket.getLeft(),
+          volumeBucket.getRight()).isLegacy()) {
+        resp = resp.toBuilder()
+            .setStatus(Status.NOT_SUPPORTED_OPERATION)
+            .setMessage("The list of keys is present in a bucket using bucket"
+                + " layout features, hence the client is not able to"
+                + " represent all the keys returned."
+                + " Please upgrade the client to get the list of keys.")
+            .clearListStatusResponse()
+            .build();
+        break;
+      }
+    }
+
+    return resp;
   }
 
   private FinalizeUpgradeProgressResponse reportUpgradeProgress(
@@ -630,6 +1208,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return PrepareStatusResponse.newBuilder()
         .setStatus(prepareState.getStatus())
         .setCurrentTxnIndex(prepareState.getIndex()).build();
+  }
+
+  private GetS3VolumeContextResponse getS3VolumeContext()
+      throws IOException {
+    return impl.getS3VolumeContext().getProtobuf();
   }
 
   public OzoneManager getOzoneManager() {

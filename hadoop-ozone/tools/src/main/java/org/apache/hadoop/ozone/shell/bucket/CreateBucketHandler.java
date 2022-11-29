@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -29,6 +30,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -51,12 +54,19 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
-  enum AllowedBucketLayouts {FILE_SYSTEM_OPTIMIZED, OBJECT_STORE}
+  @Option(names = {"--user", "-u"},
+          description = "Owner of the bucket. Defaults to current" +
+              " user if not specified")
+  private String ownerName;
+
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--layout", "-l" },
-      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
-      defaultValue = "OBJECT_STORE")
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
   private AllowedBucketLayouts allowedBucketLayout;
+
+  @CommandLine.Mixin
+  private ShellReplicationOptions replication;
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
@@ -68,12 +78,18 @@ public class CreateBucketHandler extends BucketHandler {
   public void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    BucketArgs.Builder bb;
-    BucketLayout bucketLayout =
-        BucketLayout.valueOf(allowedBucketLayout.toString());
-    bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketLayout(bucketLayout);
+    if (ownerName == null) {
+      ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
+    }
 
+    BucketArgs.Builder bb =
+        new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+            .setVersioning(false).setOwner(ownerName);
+    if (allowedBucketLayout != null) {
+      BucketLayout bucketLayout =
+          BucketLayout.fromString(allowedBucketLayout.toString());
+      bb.setBucketLayout(bucketLayout);
+    }
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {
@@ -92,6 +108,9 @@ public class CreateBucketHandler extends BucketHandler {
             bekName);
       }
     }
+
+    replication.fromParams(getConf()).ifPresent(config ->
+        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(

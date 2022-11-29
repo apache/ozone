@@ -151,6 +151,6 @@ public final class StringUtils {
 
   public static String appendIfNotPresent(String str, char c) {
     Preconditions.checkNotNull(str, "Input string is null");
-    return str.isEmpty() || str.charAt(str.length() - 1) != c ? str + c: str;
+    return str.isEmpty() || str.charAt(str.length() - 1) != c ? str + c : str;
   }
 }

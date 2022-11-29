@@ -34,6 +34,7 @@ function ozone_usage
   ozone_add_option "--loglevel level" "set the log4j level for this command"
   ozone_add_option "--workers" "turn on worker mode"
   ozone_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the OZONE_OPTS environment variable. Any defined in OZONE_CLIENT_OPTS will be append after these jvmargs"
+  ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
 
   ozone_add_subcommand "auditparser" client "runs audit parser tool"
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
@@ -43,7 +44,6 @@ function ozone_usage
   ozone_add_subcommand "freon" client "runs an ozone data generator"
   ozone_add_subcommand "fs" client "run a filesystem command on Ozone file system. Equivalent to 'hadoop fs'"
   ozone_add_subcommand "genconf" client "generate minimally required ozone configs and output to ozone-site.xml in specified path"
-  ozone_add_subcommand "genesis" client "runs a collection of ozone benchmarks to help with tuning."
   ozone_add_subcommand "getconf" client "get ozone config values from configuration"
   ozone_add_subcommand "jmxget" admin "get JMX exported values from NameNode or DataNode."
   ozone_add_subcommand "om" daemon "Ozone Manager"
@@ -54,6 +54,7 @@ function ozone_usage
   ozone_add_subcommand "recon" daemon "run the Recon service"
   ozone_add_subcommand "sh" client "command line interface for object store operations"
   ozone_add_subcommand "s3" client "command line interface for s3 related operations"
+  ozone_add_subcommand "tenant" client "command line interface for multi-tenant related operations"
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
@@ -73,11 +74,6 @@ function ozonecmd_case
   subcmd=$1
   shift
 
-  ozone_default_log4j="${OZONE_CONF_DIR}/log4j.properties"
-  ozone_shell_log4j="${OZONE_CONF_DIR}/ozone-shell-log4j.properties"
-  if [ ! -f "${ozone_shell_log4j}" ]; then
-    ozone_shell_log4j=${ozone_default_log4j}
-  fi
   # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false)
   # for disabling netty PooledByteBufAllocator thread caches for non-netty threads.
   # This parameter significantly reduces GC pressure for Datanode.
@@ -134,22 +130,6 @@ function ozonecmd_case
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
-    genesis)
-      ARTIFACT_LIB_DIR="${OZONE_HOME}/share/ozone/lib/ozone-tools"
-      mkdir -p "$ARTIFACT_LIB_DIR"
-      if [[ ! -f "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar" ]]; then
-        echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath exception)"
-        curl -o "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar"  https://repo1.maven.org/maven2/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar
-      fi
-
-      if [[ ! -f "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" ]]; then
-        echo "jopt jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: MIT License)"
-        curl -o "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" https://repo1.maven.org/maven2/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar
-      fi
-
-      OZONE_CLASSNAME=org.apache.hadoop.ozone.genesis.Genesis
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
-    ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
@@ -166,7 +146,6 @@ function ozonecmd_case
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
-      OZONE_SH_OPTS="${OZONE_SH_OPTS} -Dhadoop.log.file=ozone-shell.log -Dlog4j.configuration=file:${ozone_shell_log4j}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
@@ -185,6 +164,7 @@ function ozonecmd_case
     s3g)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
+      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties"
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
     ;;
     httpfs)
@@ -192,6 +172,10 @@ function ozonecmd_case
       OZONE_OPTS="${OZONE_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
+    ;;
+    tenant)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.tenant.TenantShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     csi)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -244,6 +228,19 @@ function ozonecmd_case
   esac
 }
 
+## @description  turn off logging for CLI by default
+## @audience     private
+function ozone_suppress_shell_log
+{
+  if [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
+      && [[ "${OZONE_CLASSNAME}" != "org.apache.hadoop.ozone.freon.Freon" ]] \
+      && [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
+      && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
+    OZONE_LOGLEVEL=OFF
+    OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
+  fi
+}
+
 # load functions
 for dir in "${OZONE_LIBEXEC_DIR}" "${OZONE_HOME}/libexec" "${HADOOP_LIBEXEC_DIR}" "${HADOOP_HOME}/libexec" "${bin}/../libexec"; do
   if [[ -e "${dir}/ozone-functions.sh" ]]; then
@@ -292,6 +289,9 @@ else
   ozonecmd_case "${OZONE_SUBCMD}" "${OZONE_SUBCMD_ARGS[@]}"
 fi
 
+ozone_validate_classpath
+
+ozone_suppress_shell_log
 ozone_assemble_classpath
 
 ozone_add_client_opts

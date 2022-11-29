@@ -17,7 +17,13 @@
  */
 package org.apache.hadoop.ozone;
 
+import java.io.Closeable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -32,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 
+import org.apache.ratis.util.IOUtils;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.Assert;
 
@@ -122,7 +129,7 @@ public final class OzoneTestUtils {
    */
   public static void performOperationOnKeyContainers(
       CheckedConsumer<BlockID, Exception> consumer,
-      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception{
+      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception {
 
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup :
         omKeyLocationInfoGroups) {
@@ -145,5 +152,21 @@ public final class OzoneTestUtils {
     } catch (OMException ex) {
       Assert.assertEquals(code, ex.getResult());
     }
+  }
+
+  public static List<ServerSocket> reservePorts(int count) {
+    List<ServerSocket> sockets = new ArrayList<>(count);
+    try {
+      for (int i = 0; i < count; i++) {
+        ServerSocket s = new ServerSocket();
+        sockets.add(s);
+        s.setReuseAddress(true);
+        s.bind(new InetSocketAddress(InetAddress.getByName(null), 0), 1);
+      }
+    } catch (IOException e) {
+      IOUtils.cleanup(null, sockets.toArray(new Closeable[0]));
+      throw new UncheckedIOException(e);
+    }
+    return sockets;
   }
 }

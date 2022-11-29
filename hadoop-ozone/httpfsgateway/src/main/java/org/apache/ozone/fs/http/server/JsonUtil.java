@@ -18,20 +18,39 @@
 package org.apache.ozone.fs.http.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.fs.*;
+
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
+import org.apache.hadoop.fs.QuotaUsage;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.XAttrHelper;
-import org.apache.hadoop.hdfs.protocol.*;
+import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /** JSON Utilities. */
 final class JsonUtil {
@@ -154,7 +173,7 @@ final class JsonUtil {
       return EMPTY_OBJECT_ARRAY;
     } else {
       final Object[] a = new Object[array.length];
-      for(int i = 0; i < array.length; i++) {
+      for (int i = 0; i < array.length; i++) {
         a[i] = toJsonMap(array[i]);
       }
       return a;
@@ -169,7 +188,7 @@ final class JsonUtil {
       return EMPTY_OBJECT_ARRAY;
     } else {
       final Object[] a = new Object[array.length];
-      for(int i = 0; i < array.length; i++) {
+      for (int i = 0; i < array.length; i++) {
         a[i] = array[i];
       }
       return a;
@@ -203,7 +222,7 @@ final class JsonUtil {
       return EMPTY_OBJECT_ARRAY;
     } else {
       final Object[] a = new Object[array.size()];
-      for(int i = 0; i < array.size(); i++) {
+      for (int i = 0; i < array.size(); i++) {
         a[i] = toJsonMap(array.get(i));
       }
       return a;
@@ -349,14 +368,14 @@ final class JsonUtil {
       return EMPTY_OBJECT_ARRAY;
     } else {
       final Object[] a = new Object[array.size()];
-      for(int i = 0; i < array.size(); i++) {
+      for (int i = 0; i < array.size(); i++) {
         a[i] = toJsonMap(array.get(i), encoding);
       }
       return a;
     }
   }
   
-  public static String toJsonString(final List<XAttr> xAttrs, 
+  public static String toJsonString(final List<XAttr> xAttrs,
       final XAttrCodec encoding) throws IOException {
     final Map<String, Object> finalMap = new TreeMap<String, Object>();
     finalMap.put("XAttrs", toJsonArray(xAttrs, encoding));
@@ -484,7 +503,7 @@ final class JsonUtil {
     }
     final Map<String, Object> m = new HashMap<>();
     Object[] blockLocations = new Object[locations.length];
-    for(int i=0; i<locations.length; i++) {
+    for (int i = 0; i < locations.length; i++) {
       blockLocations[i] = toJsonMap(locations[i]);
     }
     m.put(BlockLocation.class.getSimpleName(), blockLocations);

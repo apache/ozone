@@ -19,7 +19,13 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
@@ -32,20 +38,22 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 import org.junit.After;
+
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -67,29 +75,47 @@ public class TestKeyValueBlockIterator {
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
-  private ReferenceCountedDB db;
-  private final ChunkLayOutVersion layout;
+  private DBHandle db;
+  private final ContainerLayoutVersion layout;
+  private String schemaVersion;
+  private String datanodeID = UUID.randomUUID().toString();
+  private String clusterID = UUID.randomUUID().toString();
 
-  public TestKeyValueBlockIterator(ChunkLayOutVersion layout) {
-    this.layout = layout;
+  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo,
+      String keySeparator) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setContainerSchemaV3KeySeparator(keySeparator);
+    conf.setFromObject(dc);
   }
 
   @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {FILE_PER_CHUNK},
-        {FILE_PER_BLOCK}
-    });
+  public static Iterable<Object[]> data() {
+    List listA =
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each, ""})
+            .collect(toList());
+    List listB =
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each,
+                new DatanodeConfiguration().getContainerSchemaV3KeySeparator()})
+            .collect(toList());
+
+    listB.addAll(listA);
+    return listB;
   }
 
   @Before
   public void setUp() throws Exception {
     testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf, null,
+    volumeSet = new MutableVolumeSet(datanodeID, clusterID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
 
     containerData = new KeyValueContainerData(105L,
             layout,
@@ -97,8 +123,8 @@ public class TestKeyValueBlockIterator {
             UUID.randomUUID().toString());
     // Init the container.
     container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
-            .randomUUID().toString());
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterID);
     db = BlockUtils.getDB(containerData, conf);
   }
 
@@ -107,6 +133,7 @@ public class TestKeyValueBlockIterator {
   public void tearDown() throws Exception {
     db.close();
     db.cleanup();
+    BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
@@ -120,8 +147,8 @@ public class TestKeyValueBlockIterator {
 
     // Default filter used is all unprefixed blocks.
     List<Long> unprefixedBlockIDs = blockIDs.get("");
-    try(BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
 
       Iterator<Long> blockIDIter = unprefixedBlockIDs.iterator();
       while (keyValueBlockIterator.hasNext()) {
@@ -152,8 +179,8 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithNextBlock() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
-    try(BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
       assertEquals((long)blockIDs.get(0),
               keyValueBlockIterator.nextBlock().getLocalID());
       assertEquals((long)blockIDs.get(1),
@@ -171,8 +198,8 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithHasNext() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
-    try(BlockIterator<BlockData> blockIter =
-                db.getStore().getBlockIterator()) {
+    try (BlockIterator<BlockData> blockIter =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
 
       // Even calling multiple times hasNext() should not move entry forward.
       assertTrue(blockIter.hasNext());
@@ -209,9 +236,9 @@ public class TestKeyValueBlockIterator {
     int deletingBlocks = 5;
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
             normalBlocks, deletingBlocks);
-    try(BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator(
-                        MetadataKeyFilters.getDeletingKeyFilter())) {
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID,
+                        containerData.getDeletingBlockKeyFilter())) {
       List<Long> deletingBlockIDs =
               blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX);
       int counter = 0;
@@ -230,8 +257,8 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithOnlyDeletedBlocks() throws
       Exception {
     createContainerWithBlocks(CONTAINER_ID, 0, 5);
-    try(BlockIterator<BlockData> keyValueBlockIterator =
-                db.getStore().getBlockIterator()) {
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
       //As all blocks are deleted blocks, blocks does not match with normal key
       // filter.
       assertFalse(keyValueBlockIterator.hasNext());
@@ -273,13 +300,14 @@ public class TestKeyValueBlockIterator {
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
             prefixCounts);
     // Test deleting filter.
-    testWithFilter(MetadataKeyFilters.getDeletingKeyFilter(),
+    testWithFilter(containerData.getDeletingBlockKeyFilter(),
             blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX));
 
     // Test arbitrary filter.
+    String schemaPrefix = containerData.containerPrefix();
     MetadataKeyFilters.KeyPrefixFilter secondFilter =
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(secondPrefix);
+            .addFilter(schemaPrefix + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
 
@@ -288,8 +316,8 @@ public class TestKeyValueBlockIterator {
    */
   private void testWithFilter(MetadataKeyFilters.KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
-    try(BlockIterator<BlockData> iterator =
-                db.getStore().getBlockIterator(filter)) {
+    try (BlockIterator<BlockData> iterator =
+                db.getStore().getBlockIterator(CONTAINER_ID, filter)) {
       // Test seek.
       iterator.seekToFirst();
       long firstID = iterator.nextBlock().getLocalID();
@@ -364,8 +392,7 @@ public class TestKeyValueBlockIterator {
             Map<String, Integer> prefixCounts) throws Exception {
     // Create required block data.
     Map<String, List<Long>> blockIDs = new HashMap<>();
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
-        conf)) {
+    try (DBHandle metadataStore = BlockUtils.getDB(containerData, conf)) {
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);
@@ -376,6 +403,7 @@ public class TestKeyValueBlockIterator {
       // prefix.
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
+      String schemaPrefix = containerData.containerPrefix();
 
       for (Map.Entry<String, Integer> entry: prefixCounts.entrySet()) {
         String prefix = entry.getKey();
@@ -387,8 +415,8 @@ public class TestKeyValueBlockIterator {
           blockIndex++;
           BlockData blockData = new BlockData(blockID);
           blockData.setChunks(chunkList);
-          String localID = prefix + blockID.getLocalID();
-          blockDataTable.put(localID, blockData);
+          String blockKey = schemaPrefix + prefix + blockID.getLocalID();
+          blockDataTable.put(blockKey, blockData);
           blockIDs.get(prefix).add(blockID.getLocalID());
         }
       }

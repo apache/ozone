@@ -23,8 +23,10 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,10 +37,13 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -48,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.security.cert.CertificateExpiredException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -56,6 +62,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_LEN;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -64,7 +72,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
  * Tests ozone containers via secure grpc/netty.
  */
 @RunWith(Parameterized.class)
-@Ignore("TODO:HDDS-1157")
 public class TestOzoneContainerWithTLS {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneContainerWithTLS.class);
@@ -78,12 +85,12 @@ public class TestOzoneContainerWithTLS {
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
   private OzoneConfiguration conf;
-  private OzoneBlockTokenSecretManager secretManager;
+  private ContainerTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
-  private boolean blockTokenEnabled;
+  private boolean containerTokenEnabled;
 
-  public TestOzoneContainerWithTLS(boolean blockTokenEnabled) {
-    this.blockTokenEnabled = blockTokenEnabled;
+  public TestOzoneContainerWithTLS(boolean enableToken) {
+    this.containerTokenEnabled = enableToken;
   }
 
   @Parameterized.Parameters
@@ -112,26 +119,35 @@ public class TestOzoneContainerWithTLS {
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_ENABLED, true);
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
+    conf.setInt(HDDS_KEY_LEN, 1024);
+    conf.set(HDDS_X509_DEFAULT_DURATION, "PT5S"); // 5s
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    caClient = new CertificateClientTestImpl(conf);
-    secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
+    caClient = new CertificateClientTestImpl(conf, false);
+    secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
         expiryTime, caClient.getCertificate().
         getSerialNumber().toString());
   }
 
+  @Test(expected = CertificateExpiredException.class)
+  public void testCertificateLifetime() throws Exception {
+    // Sleep to wait for certificate expire
+    Thread.sleep(5000);
+    caClient.getCertificate().checkValidity();
+  }
+
   @Test
   public void testCreateOzoneContainer() throws Exception {
-    LOG.info("testCreateOzoneContainer with TLS and blockToken enabled: {}",
-        blockTokenEnabled);
-    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
-        blockTokenEnabled);
+    LOG.info("testCreateOzoneContainer with TLS and containerToken enabled: {}",
+        containerTokenEnabled);
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
+        containerTokenEnabled);
 
-    long containerID = ContainerTestHelper.getTestContainerID();
+    long containerId = ContainerTestHelper.getTestContainerID();
     OzoneContainer container = null;
     System.out.println(System.getProperties().getProperty("java.library.path"));
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
@@ -151,13 +167,16 @@ public class TestOzoneContainerWithTLS {
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
           Collections.singletonList(caClient.getCACertificate()));
 
-      if (blockTokenEnabled) {
+      if (containerTokenEnabled) {
         secretManager.start(caClient);
         client.connect();
-        createSecureContainerForTesting(client, containerID, null);
+        createSecureContainerForTesting(client, containerId,
+            secretManager.generateToken(
+                UserGroupInformation.getCurrentUser().getUserName(),
+                ContainerID.valueOf(containerId)));
       } else {
-        createContainerForTesting(client, containerID);
         client.connect();
+        createContainerForTesting(client, containerId);
       }
     } finally {
       if (container != null) {
@@ -177,7 +196,7 @@ public class TestOzoneContainerWithTLS {
   }
 
   public static void createSecureContainerForTesting(XceiverClientSpi client,
-      long containerID, Token<OzoneBlockTokenIdentifier> token)
+      long containerID, Token<ContainerTokenIdentifier> token)
       throws Exception {
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getCreateContainerSecureRequest(

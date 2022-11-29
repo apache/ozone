@@ -50,7 +50,12 @@ import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -131,9 +136,10 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
    * @return - count of reported containers.
    */
   public long getContainerCount() {
-    return nodeContainers.values().parallelStream().mapToLong((containerMap)->{
-      return containerMap.size();
-    }).sum();
+    return nodeContainers.values().parallelStream().mapToLong(
+        (containerMap) -> {
+          return containerMap.size();
+        }).sum();
   }
 
   /**
@@ -141,11 +147,13 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
    * @return - number of keys reported.
    */
   public long getKeyCount() {
-    return nodeContainers.values().parallelStream().mapToLong((containerMap)->{
-      return containerMap.values().parallelStream().mapToLong((container) -> {
-        return container.getKeyCount();
-      }).sum();
-    }).sum();
+    return nodeContainers.values().parallelStream().mapToLong(
+        (containerMap) -> {
+          return containerMap.values().parallelStream().mapToLong(
+              (container) -> {
+                return container.getKeyCount();
+              }).sum();
+        }).sum();
   }
 
   /**
@@ -153,11 +161,13 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
    * @return - number of bytes used.
    */
   public long getBytesUsed() {
-    return nodeContainers.values().parallelStream().mapToLong((containerMap)->{
-      return containerMap.values().parallelStream().mapToLong((container) -> {
-        return container.getUsed();
-      }).sum();
-    }).sum();
+    return nodeContainers.values().parallelStream().mapToLong(
+        (containerMap) -> {
+          return containerMap.values().parallelStream().mapToLong(
+              (container) -> {
+                return container.getUsed();
+              }).sum();
+        }).sum();
   }
 
   /**
@@ -259,7 +269,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     List<StorageReportProto> storageReports =
         nodeReport.getStorageReportList();
 
-    for(StorageReportProto report : storageReports) {
+    for (StorageReportProto report : storageReports) {
       nodeReportProto.addStorageReport(report);
     }
 
@@ -313,7 +323,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public int getContainerCountsForDatanode(DatanodeDetails datanodeDetails) {
     Map<String, ContainerReplicaProto> cr =
         nodeContainers.get(datanodeDetails);
-    if(cr != null) {
+    if (cr != null) {
       return cr.size();
     }
     return 0;

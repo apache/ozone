@@ -72,7 +72,6 @@ echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO PRE-FINALIZED ---"
 OUTPUT_NAME="$OZONE_UPGRADE_TO"-pre-finalized
 OZONE_KEEP_RESULTS=true start_docker_env
 callback with_new_version_pre_finalized
-
 prepare_oms
 stop_docker_env
 prepare_for_image "$OZONE_UPGRADE_FROM"

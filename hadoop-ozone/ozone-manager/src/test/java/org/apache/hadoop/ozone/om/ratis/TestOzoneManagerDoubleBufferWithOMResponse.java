@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
@@ -107,9 +107,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder().
-        setOmMetadataManager(omMetadataManager).
-        setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(omMetadataManager)
+        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setmaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .setIndexToTerm((i) -> term)
         .build();
@@ -284,7 +285,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private void doMixTransactions(String volumeName, int bucketCount,
       Queue<OMBucketDeleteResponse> deleteBucketQueue,
       Queue<OMBucketCreateResponse> bucketQueue) {
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       String bucketName = UUID.randomUUID().toString();
       long transactionID = trxId.incrementAndGet();
       OMBucketCreateResponse omBucketCreateResponse = createBucket(volumeName,
@@ -304,7 +305,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMClientResponse deleteBucket(String volumeName, String bucketName,
       long transactionID) {
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        TestOMRequestUtils.createDeleteBucketRequest(volumeName, bucketName);
+        OMRequestTestUtils.createDeleteBucketRequest(volumeName, bucketName);
 
     OMBucketDeleteRequest omBucketDeleteRequest =
         new OMBucketDeleteRequest(omRequest);
@@ -434,7 +435,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private void doTransactions(int bucketCount) {
     String volumeName = UUID.randomUUID().toString();
     createVolume(volumeName, trxId.incrementAndGet());
-    for (int i=0; i< bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       createBucket(volumeName, UUID.randomUUID().toString(),
           trxId.incrementAndGet());
     }
@@ -450,7 +451,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     String admin = OzoneConsts.OZONE;
     String owner = UUID.randomUUID().toString();
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        TestOMRequestUtils.createVolumeRequest(volumeName, admin, owner);
+        OMRequestTestUtils.createVolumeRequest(volumeName, admin, owner);
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(omRequest);
@@ -467,7 +468,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
       String bucketName, long transactionID)  {
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        TestOMRequestUtils.createBucketRequest(bucketName, volumeName, false,
+        OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
             OzoneManagerProtocolProtos.StorageTypeProto.DISK);
 
     OMBucketCreateRequest omBucketCreateRequest =

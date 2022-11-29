@@ -106,9 +106,8 @@ public class TestOmBlockVersioning {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(1000)
-        .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())
-        .setReplicationConfig(new StandaloneReplicationConfig(ONE))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .build();
 
     // 1st update, version 0
@@ -186,7 +185,6 @@ public class TestOmBlockVersioning {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(1000)
-        .setRefreshPipeline(true)
         .build();
 
     String dataString = RandomStringUtils.randomAlphabetic(100);
@@ -198,14 +196,13 @@ public class TestOmBlockVersioning {
     assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
 
-    // this write will create 2nd version, 2nd version will contain block from
-    // version 1, and add a new block
+    // When bucket versioning is disabled, overwriting a key doesn't increment
+    // its version count. Rather it always resets the version to 0
     TestDataUtil.createKey(bucket, keyName, dataString);
-
 
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
-    assertEquals(1, keyInfo.getLatestVersionLocations().getVersion());
+    assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
 
@@ -214,7 +211,7 @@ public class TestOmBlockVersioning {
 
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
-    assertEquals(2, keyInfo.getLatestVersionLocations().getVersion());
+    assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
         keyInfo.getLatestVersionLocations().getLocationList().size());
   }

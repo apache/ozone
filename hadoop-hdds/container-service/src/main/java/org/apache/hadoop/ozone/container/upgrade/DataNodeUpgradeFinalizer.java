@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_VALIDATION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
@@ -46,7 +48,7 @@ public class DataNodeUpgradeFinalizer extends
   @Override
   public void preFinalizeUpgrade(DatanodeStateMachine dsm)
       throws IOException {
-    if(!canFinalizeDataNode(dsm)) {
+    if (!canFinalizeDataNode(dsm)) {
       // DataNode is not yet ready to finalize.
       // Reset the Finalization state.
       getVersionManager().setUpgradeState(FINALIZATION_REQUIRED);
@@ -54,6 +56,7 @@ public class DataNodeUpgradeFinalizer extends
       logAndEmit(msg);
       throw new UpgradeException(msg, PREFINALIZE_VALIDATION_FAILED);
     }
+    getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
   private boolean canFinalizeDataNode(DatanodeStateMachine dsm) {
@@ -80,10 +83,20 @@ public class DataNodeUpgradeFinalizer extends
   }
 
   @Override
-  public void finalizeUpgrade(DatanodeStateMachine dsm)
-      throws UpgradeException {
-    super.finalizeUpgrade(lf -> ((HDDSLayoutFeature) lf)::datanodeAction,
-        dsm.getLayoutStorage());
+  public void finalizeLayoutFeature(LayoutFeature layoutFeature,
+      DatanodeStateMachine dsm) throws UpgradeException {
+    if (layoutFeature instanceof HDDSLayoutFeature) {
+      HDDSLayoutFeature hddslayoutFeature =  (HDDSLayoutFeature)layoutFeature;
+      super.finalizeLayoutFeature(hddslayoutFeature,
+          hddslayoutFeature
+              .datanodeAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+          dsm.getLayoutStorage());
+    } else {
+      String msg = String.format("Failed to finalize datanode layout feature " +
+          "%s. It is not an HDDS Layout Feature.", layoutFeature);
+      throw new UpgradeException(msg,
+          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+    }
   }
 
   @Override

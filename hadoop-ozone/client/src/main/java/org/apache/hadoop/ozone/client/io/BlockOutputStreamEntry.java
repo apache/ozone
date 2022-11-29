@@ -24,6 +24,7 @@ import java.util.Collections;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -42,7 +43,7 @@ import com.google.common.annotations.VisibleForTesting;
  *
  * The base implementation is handling Ratis-3 writes, with a single stream,
  * but there can be other implementations that are using a different way.
- * */
+ */
 public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
@@ -58,6 +59,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final Token<OzoneBlockTokenIdentifier> token;
 
   private BufferPool bufferPool;
+  private ContainerClientMetrics clientMetrics;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   BlockOutputStreamEntry(
@@ -67,7 +69,8 @@ public class BlockOutputStreamEntry extends OutputStream {
       long length,
       BufferPool bufferPool,
       Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config
+      OzoneClientConfig config,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     this.outputStream = null;
@@ -79,6 +82,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.length = length;
     this.currentPosition = 0;
     this.bufferPool = bufferPool;
+    this.clientMetrics = clientMetrics;
   }
 
   /**
@@ -100,7 +104,11 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token);
+        pipeline, bufferPool, config, token, clientMetrics);
+  }
+
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   @Override
@@ -248,7 +256,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   /**
    * Increases current position by one. Used in writes.
    */
-  void incCurrentPosition(){
+  void incCurrentPosition() {
     currentPosition++;
   }
 
@@ -276,11 +284,12 @@ public class BlockOutputStreamEntry extends OutputStream {
    * here.
    * @param id the last know ID of the block.
    */
-  void updateBlockID(BlockID id) {
+  @VisibleForTesting
+  protected void updateBlockID(BlockID id) {
     this.blockID = id;
   }
 
-  OzoneClientConfig getConf(){
+  OzoneClientConfig getConf() {
     return this.config;
   }
 
@@ -305,7 +314,7 @@ public class BlockOutputStreamEntry extends OutputStream {
    * OMKeyLocationInfo.
    * @return
    */
-  Pipeline getPipelineForOMLocationReport(){
+  Pipeline getPipelineForOMLocationReport() {
     return getPipeline();
   }
 
@@ -330,6 +339,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
+    private ContainerClientMetrics clientMetrics;
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -352,12 +362,10 @@ public class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
-
     public Builder setLength(long len) {
       this.length = len;
       return this;
     }
-
 
     public Builder setBufferPool(BufferPool pool) {
       this.bufferPool = pool;
@@ -373,6 +381,10 @@ public class BlockOutputStreamEntry extends OutputStream {
       this.token = bToken;
       return this;
     }
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
 
     public BlockOutputStreamEntry build() {
       return new BlockOutputStreamEntry(blockID,
@@ -381,7 +393,7 @@ public class BlockOutputStreamEntry extends OutputStream {
           pipeline,
           length,
           bufferPool,
-          token, config);
+          token, config, clientMetrics);
     }
   }
 }

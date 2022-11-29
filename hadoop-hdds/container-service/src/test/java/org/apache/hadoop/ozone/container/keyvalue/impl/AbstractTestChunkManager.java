@@ -21,21 +21,20 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -44,9 +43,9 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -65,24 +64,24 @@ public abstract class AbstractTestChunkManager {
   private byte[] header;
   private BlockManager blockManager;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  protected abstract ChunkLayoutTestInfo getStrategy();
+  protected abstract ContainerLayoutTestInfo getStrategy();
 
   protected ChunkManager createTestSubject() {
     blockManager = new BlockManagerImpl(new OzoneConfiguration());
     return getStrategy().createChunkManager(true, blockManager);
   }
 
-  @Before
-  public final void setUp() throws Exception {
+  @BeforeEach
+  public final void setUp(@TempDir File confDir) throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
     getStrategy().updateConfig(config);
     UUID datanodeId = UUID.randomUUID();
-    hddsVolume = new HddsVolume.Builder(folder.getRoot()
+    UUID clusterId = UUID.randomUUID();
+    hddsVolume = new HddsVolume.Builder(confDir
         .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
-        .toString()).build();
+        .toString()).clusterID(clusterId.toString()).build();
+    hddsVolume.format(clusterId.toString());
+    hddsVolume.createWorkingDir(clusterId.toString(), null);
 
     VolumeSet volumeSet = mock(MutableVolumeSet.class);
 
@@ -92,7 +91,7 @@ public abstract class AbstractTestChunkManager {
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
-        ChunkLayOutVersion.getConfiguredVersion(config),
+        ContainerLayoutVersion.getConfiguredVersion(config),
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 

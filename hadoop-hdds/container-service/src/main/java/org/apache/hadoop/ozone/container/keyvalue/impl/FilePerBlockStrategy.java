@@ -56,7 +56,7 @@ import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
@@ -86,7 +86,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static void checkLayoutVersion(Container container) {
     Preconditions.checkArgument(
-        container.getContainerData().getLayOutVersion() == FILE_PER_BLOCK);
+        container.getContainerData().getLayoutVersion() == FILE_PER_BLOCK);
   }
 
   @Override
@@ -137,7 +137,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     // check whether offset matches block file length if its an overwrite
     if (!overwrite) {
-      ChunkUtils.validateChunkSize(chunkFile, info);
+      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
     }
 
     ChunkUtils

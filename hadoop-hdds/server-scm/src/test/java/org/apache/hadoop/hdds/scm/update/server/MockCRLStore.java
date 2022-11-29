@@ -35,12 +35,12 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Mock CRL Store impl for test.
@@ -66,12 +67,12 @@ public class MockCRLStore implements CRLStore {
   private final X509CertificateHolder caCertificateHolder;
   private final Logger log;
 
-  public MockCRLStore(TemporaryFolder tempDir, Logger log) throws Exception {
+  public MockCRLStore(Path metadataDir, Logger log) throws Exception {
 
     this.log = log;
     config = new OzoneConfiguration();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.newFolder().getAbsolutePath());
+        metadataDir.toAbsolutePath().toString());
 
     securityConfig = new SecurityConfig(config);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
@@ -97,7 +98,8 @@ public class MockCRLStore implements CRLStore {
   }
 
   public Optional<Long> revokeCert(List<BigInteger> certs,
-                                   Instant revokeTime) throws IOException {
+                                   Instant revokeTime)
+      throws IOException, TimeoutException {
     log.debug("Revoke certs: {}", certs);
     Optional<Long> crlId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,

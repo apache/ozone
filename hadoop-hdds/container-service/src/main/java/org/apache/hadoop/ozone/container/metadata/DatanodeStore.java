@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -27,12 +27,13 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
  * Interface for interacting with datanode databases.
  */
-public interface DatanodeStore {
+public interface DatanodeStore extends Closeable {
 
   /**
    * Start datanode manager.
@@ -87,8 +88,15 @@ public interface DatanodeStore {
 
   void compactDB() throws IOException;
 
-  BlockIterator<BlockData> getBlockIterator();
+  BlockIterator<BlockData> getBlockIterator(long containerID)
+      throws IOException;
 
-  BlockIterator<BlockData>
-      getBlockIterator(MetadataKeyFilters.KeyPrefixFilter filter);
+  BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException;
+
+  /**
+   * Returns if the underlying DB is closed. This call is thread safe.
+   * @return true if the DB is closed.
+   */
+  boolean isClosed();
 }

@@ -59,14 +59,30 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.om.decommissioned.nodes" +
+        ".EXAMPLEOMSERVICEID");
+    xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.scm.nodes.EXAMPLESCMSERVICEID");
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
     configurationPropsToSkipCompare
         .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
+    // Currently replication and type configs moved to server side.
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_REPLICATION);
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_REPLICATION_TYPE);
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY);
+    configurationPropsToSkipCompare
+        .add(OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT);
     // This property is tested in TestHttpServer2 instead
     xmlPropsToSkipCompare.add(HttpServer2.HTTP_IDLE_TIMEOUT_MS_KEY);
+
+    // TODO: Remove this once ranger configs are finalized in HDDS-5836
+    configurationPrefixToSkipCompare.add("ozone.om.ranger");
+
     addPropertiesNotInXml();
   }
 
@@ -78,12 +94,19 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         OMConfigKeys.OZONE_OM_NODES_KEY,
+        OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
+        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
+        OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
+        OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS,
+        OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
+        OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
         ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
@@ -100,8 +123,16 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        OMConfigKeys.OZONE_OM_HA_PREFIX
+        OMConfigKeys.OZONE_OM_HA_PREFIX,
+        OMConfigKeys.OZONE_OM_TRANSPORT_CLASS,
+        OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
         // TODO HDDS-2856
+        OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT,
+        OMConfigKeys.OZONE_RANGER_OM_CONNECTION_TIMEOUT,
+        OMConfigKeys.OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT,
+        OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY,
+        OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
+        OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD
     ));
   }
 }

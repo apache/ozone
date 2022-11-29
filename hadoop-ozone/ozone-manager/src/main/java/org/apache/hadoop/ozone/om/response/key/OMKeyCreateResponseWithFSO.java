@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -28,29 +29,32 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import javax.annotation.Nonnull;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for CreateKey request - prefix layout.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE, OPEN_FILE_TABLE,
+    BUCKET_TABLE})
 public class OMKeyCreateResponseWithFSO extends OMFileCreateResponseWithFSO {
 
   public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                               @Nonnull OmKeyInfo omKeyInfo,
-                               @Nonnull List<OmDirectoryInfo> parentDirInfos,
-                               long openKeySessionID,
-                               @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmDirectoryInfo> parentDirInfos,
+      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
-            omBucketInfo);
+        omBucketInfo, volumeId);
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse, @Nonnull
+                                    BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 }

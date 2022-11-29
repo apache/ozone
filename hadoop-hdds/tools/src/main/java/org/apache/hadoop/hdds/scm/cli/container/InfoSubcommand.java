@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -25,10 +27,13 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,13 +72,23 @@ public class InfoSubcommand extends ScmSubcommand {
     final ContainerWithPipeline container = scmClient.
         getContainerWithPipeline(containerID);
     Preconditions.checkNotNull(container, "Container cannot be null");
+    List<ContainerReplicaInfo> replicas = null;
+    try {
+      replicas = scmClient.getContainerReplicas(containerID);
+    } catch (IOException e) {
+      LOG.error("Unable to retrieve the replica details", e);
+    }
 
     if (json) {
-      LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(container));
+      ContainerWithPipelineAndReplicas wrapper =
+          new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
+              container.getPipeline(), replicas);
+      LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
     } else {
       // Print container report info.
       LOG.info("Container id: {}", containerID);
-      boolean verbose = spec.root().userObject() instanceof GenericParentCommand
+      boolean verbose = spec != null
+          && spec.root().userObject() instanceof GenericParentCommand
           && ((GenericParentCommand) spec.root().userObject()).isVerbose();
       if (verbose) {
         LOG.info("Pipeline Info: {}", container.getPipeline());
@@ -87,10 +102,57 @@ public class InfoSubcommand extends ScmSubcommand {
           InfoSubcommand::buildDatanodeDetails)
           .collect(Collectors.joining(",\n"));
       LOG.info("Datanodes: [{}]", machinesStr);
+
+      // Print the replica details if available
+      if (replicas != null) {
+        String replicaStr = replicas.stream()
+            .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
+            .map(InfoSubcommand::buildReplicaDetails)
+            .collect(Collectors.joining(",\n"));
+        LOG.info("Replicas: [{}]", replicaStr);
+      }
     }
   }
 
   private static String buildDatanodeDetails(DatanodeDetails details) {
     return details.getUuidString() + "/" + details.getHostName();
+  }
+
+  private static String buildReplicaDetails(ContainerReplicaInfo replica) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("State: " + replica.getState() + ";");
+    if (replica.getReplicaIndex() != -1) {
+      sb.append(" ReplicaIndex: " + replica.getReplicaIndex() + ";");
+    }
+    sb.append(" Origin: " + replica.getPlaceOfBirth().toString() + ";");
+    sb.append(" Location: "
+        + buildDatanodeDetails(replica.getDatanodeDetails()));
+    return sb.toString();
+  }
+
+  private static class ContainerWithPipelineAndReplicas {
+
+    private ContainerInfo containerInfo;
+    private Pipeline pipeline;
+    private List<ContainerReplicaInfo> replicas;
+
+    ContainerWithPipelineAndReplicas(ContainerInfo container, Pipeline pipeline,
+                                     List<ContainerReplicaInfo> replicas) {
+      this.containerInfo = container;
+      this.pipeline = pipeline;
+      this.replicas = replicas;
+    }
+
+    public ContainerInfo getContainerInfo() {
+      return containerInfo;
+    }
+
+    public Pipeline getPipeline() {
+      return pipeline;
+    }
+
+    public List<ContainerReplicaInfo> getReplicas() {
+      return replicas;
+    }
   }
 }

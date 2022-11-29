@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -34,9 +37,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
+
 
 /**
  * This class tests OmKeyInfoCodec.
@@ -47,10 +51,18 @@ public class TestOmKeyInfoCodec {
   private static final String KEYNAME =
       "user/root/terasort/10G-input-6/part-m-00037";
 
+  private static FileChecksum checksum = createEmptyChecksum();
+
+  private static FileChecksum createEmptyChecksum() {
+    final int lenOfZeroBytes = 32;
+    byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
+    MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
+    return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+  }
 
   private OmKeyInfo getKeyInfo(int chunkNum) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-    Pipeline pipeline = TestUtils.getRandomPipeline();
+    Pipeline pipeline = HddsTestUtils.getRandomPipeline();
     for (int i = 0; i < chunkNum; i++) {
       BlockID blockID = new BlockID(i, i);
       OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
@@ -61,11 +73,12 @@ public class TestOmKeyInfoCodec {
     }
     OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
         OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationConfig(
-                new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEYNAME)
@@ -74,45 +87,41 @@ public class TestOmKeyInfoCodec {
         .setDataSize(100)
         .setOmKeyLocationInfos(
             Collections.singletonList(omKeyLocationInfoGroup))
+        .setFileChecksum(checksum)
         .build();
   }
 
   @Test
-  public void test() {
+  public void test() throws IOException {
     testOmKeyInfoCodecWithoutPipeline(1);
     testOmKeyInfoCodecWithoutPipeline(2);
     testOmKeyInfoCodecCompatibility(1);
     testOmKeyInfoCodecCompatibility(2);
   }
 
-  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum) {
+  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
+      throws IOException {
     OmKeyInfoCodec codec = new OmKeyInfoCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
-    try {
-      byte[] rawData = codec.toPersistedFormat(originKey);
-      OmKeyInfo key = codec.fromPersistedFormat(rawData);
-      System.out.println("Chunk number = " + chunkNum +
-          ", Serialized key size without pipeline = " + rawData.length);
-      assertNull(key.getLatestVersionLocations().getLocationList().get(0)
-          .getPipeline());
-    } catch (IOException e) {
-      fail("Should success");
-    }
+    byte[] rawData = codec.toPersistedFormat(originKey);
+    OmKeyInfo key = codec.fromPersistedFormat(rawData);
+    System.out.println("Chunk number = " + chunkNum +
+        ", Serialized key size without pipeline = " + rawData.length);
+    assertNull(key.getLatestVersionLocations().getLocationList().get(0)
+        .getPipeline());
+    assertNotNull(key.getFileChecksum());
+    assertEquals(key.getFileChecksum(), checksum);
   }
 
-  public void testOmKeyInfoCodecCompatibility(int chunkNum) {
+  public void testOmKeyInfoCodecCompatibility(int chunkNum) throws IOException {
     OmKeyInfoCodec codecWithoutPipeline = new OmKeyInfoCodec(true);
     OmKeyInfoCodec codecWithPipeline = new OmKeyInfoCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
-    try {
-      byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
-      OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
-      System.out.println("Chunk number = " + chunkNum +
-          ", Serialized key size with pipeline = " + rawData.length);
-      assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
-          .getPipeline());
-    } catch (IOException e) {
-      fail("Should success");
-    }
+    byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
+    OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
+    System.out.println("Chunk number = " + chunkNum +
+        ", Serialized key size with pipeline = " + rawData.length);
+    assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
+        .getPipeline());
   }
 }

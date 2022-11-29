@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.FIRST_UPGRADE_START_ACTION_FAILED;
@@ -27,6 +26,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOU
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
 
@@ -45,34 +47,74 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
- * UpgradeFinalizer implementation for the Storage Container Manager service.
+ * Base UpgradeFinalizer implementation to be extended by services.
  */
 public abstract class BasicUpgradeFinalizer
     <T, V extends AbstractLayoutVersionManager> implements UpgradeFinalizer<T> {
 
-  private V versionManager;
+  private final V versionManager;
   private String clientID;
   private T component;
-  private DefaultUpgradeFinalizationExecutor<T> finalizationExecutor;
+  private UpgradeFinalizationExecutor<T> finalizationExecutor;
+  // Ensures that there is only one finalization thread running at a time.
+  private final Lock finalizationLock;
 
-  private Queue<String> msgs = new ConcurrentLinkedQueue<>();
+  private final Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
 
   public BasicUpgradeFinalizer(V versionManager) {
+    this(versionManager, new DefaultUpgradeFinalizationExecutor<>());
+  }
+
+  public BasicUpgradeFinalizer(V versionManager,
+                               UpgradeFinalizationExecutor<T> executor) {
     this.versionManager = versionManager;
-    this.finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
+    this.finalizationExecutor = executor;
+    this.finalizationLock = new ReentrantLock();
   }
 
   public StatusAndMessages finalize(String upgradeClientID, T service)
       throws IOException {
-    StatusAndMessages response = initFinalize(upgradeClientID, service);
-    if (response.status() != FINALIZATION_REQUIRED) {
-      return response;
+    // In some components, finalization can be driven asynchronously by a
+    // thread, not a single serialized Ratis request.
+    // A second request could closely follow the first before it
+    // sets the finalization status to FINALIZATION_IN_PROGRESS.
+    // Therefore, a lock is used to make sure only one finalization thread is
+    // running at a time.
+    if (isFinalized(versionManager.getUpgradeState())) {
+      return FINALIZED_MSG;
     }
-    finalizationExecutor.execute(service, this);
-    return STARTING_MSG;
+    if (finalizationLock.tryLock()) {
+      try {
+        StatusAndMessages response = initFinalize(upgradeClientID, service);
+        // If we were able to enter the lock and finalization status is "in
+        // progress", we should resume finalization because the last attempt
+        // was interrupted. If an attempt was currently ongoing, the lock
+        // would have been held.
+        if (response.status() == FINALIZATION_REQUIRED ||
+            response.status() == FINALIZATION_IN_PROGRESS) {
+          finalizationExecutor.execute(service, this);
+          return STARTING_MSG;
+        }
+        // Else, the initial response we got from initFinalize can be used,
+        // since we do not need to start/resume finalization.
+        return response;
+      } catch (NotLeaderException e) {
+        LOG.info("Leader change encountered during finalization. This " +
+            "component will continue finalization as directed by the new " +
+            "leader.", e);
+        return FINALIZATION_IN_PROGRESS_MSG;
+      } finally {
+        finalizationLock.unlock();
+      }
+    } else {
+      // Finalization has not completed, but another thread holds the lock to
+      // run finalization.
+      return FINALIZATION_IN_PROGRESS_MSG;
+    }
   }
 
   public synchronized StatusAndMessages reportStatus(
@@ -94,15 +136,21 @@ public abstract class BasicUpgradeFinalizer
     return versionManager.getUpgradeState();
   }
 
+  /**
+   * Child classes may override this method to set when finalization has
+   * begun progress.
+   */
   protected void preFinalizeUpgrade(T service) throws IOException {
-    // No Op by default.
+    versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
+  /**
+   * Child classes may override this method to delay finalization being
+   * marked done until a set of post finalize actions complete.
+   */
   protected void postFinalizeUpgrade(T service) throws IOException {
-    // No Op by default.
+    versionManager.setUpgradeState(FINALIZATION_DONE);
   }
-
-  public abstract void finalizeUpgrade(T service) throws UpgradeException;
 
   @Override
   public void finalizeAndWaitForCompletion(
@@ -139,10 +187,12 @@ public abstract class BasicUpgradeFinalizer
     }
   }
 
+  @VisibleForTesting
   public boolean isFinalizationDone() {
     return isDone;
   }
 
+  @VisibleForTesting
   public void markFinalizationDone() {
     isDone = true;
   }
@@ -194,19 +244,15 @@ public abstract class BasicUpgradeFinalizer
         || status.equals(FINALIZATION_DONE);
   }
 
-  protected void finalizeUpgrade(Function<LayoutFeature,
-      Function<UpgradeActionType, Optional<? extends UpgradeAction>>>
-      aFunction, Storage storage) throws UpgradeException {
-    for (Object obj : versionManager.unfinalizedFeatures()) {
-      LayoutFeature lf = (LayoutFeature) obj;
-      Function<UpgradeActionType, Optional<? extends UpgradeAction>> function =
-          aFunction.apply(lf);
-      Optional<? extends UpgradeAction> action = function.apply(ON_FINALIZE);
-      runFinalizationAction(lf, action);
-      updateLayoutVersionInVersionFile(lf, storage);
-      versionManager.finalized(lf);
-    }
-    versionManager.completeFinalization();
+  public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
+      throws UpgradeException;
+
+  protected void finalizeLayoutFeature(LayoutFeature lf, Optional<?
+      extends UpgradeAction> action, Storage storage)
+      throws UpgradeException {
+    runFinalizationAction(lf, action);
+    updateLayoutVersionInVersionFile(lf, storage);
+    versionManager.finalized(lf);
   }
 
   protected void runFinalizationAction(LayoutFeature feature,
@@ -215,6 +261,7 @@ public abstract class BasicUpgradeFinalizer
     if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
     } else {
+      LOG.info("Running finalization actions for layout feature: {}", feature);
       try {
         action.get().execute(component);
       } catch (Exception e) {
@@ -362,7 +409,7 @@ public abstract class BasicUpgradeFinalizer
   }
 
   @VisibleForTesting
-  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor
+  public void setFinalizationExecutor(DefaultUpgradeFinalizationExecutor<T>
                                             executor) {
     finalizationExecutor = executor;
   }

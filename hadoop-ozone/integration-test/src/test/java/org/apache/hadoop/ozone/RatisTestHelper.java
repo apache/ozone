@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.newRaftClient;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
@@ -124,8 +123,8 @@ public interface RatisTestHelper {
       RpcType rpc, DatanodeDetails dd, Pipeline pipeline) throws IOException {
     final RaftPeer p = RatisHelper.toRaftPeer(dd);
     final OzoneConfiguration conf = new OzoneConfiguration();
-    final RaftClient client =
-        newRaftClient(rpc, p, RatisHelper.createRetryPolicy(conf), conf);
+    final RaftClient client = RatisHelper.newRaftClient(
+        rpc, p, RatisHelper.createRetryPolicy(conf), conf);
     client.getGroupManagementApi(p.getId())
         .add(RatisHelper.newRaftGroup(pipeline));
   }

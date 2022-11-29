@@ -139,9 +139,13 @@ message AllocateScmBlockRequestProto {
   required uint64 size = 1;
   required uint32 numBlocks = 2;
   required ReplicationType type = 3;
-  required hadoop.hdds.ReplicationFactor factor = 4;
+  optional hadoop.hdds.ReplicationFactor factor = 4;
   required string owner = 5;
   optional ExcludeListProto excludeList = 7;
+
+  //used for EC replicaiton instead of the replication factor
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
+
 }
 
 /**

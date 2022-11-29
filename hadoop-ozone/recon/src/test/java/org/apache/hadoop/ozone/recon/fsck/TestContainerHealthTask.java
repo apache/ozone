@@ -18,8 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
-import static junit.framework.TestCase.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -56,13 +57,15 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
+
+  @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testRun() throws Exception {
     UnhealthyContainersDao unHealthyContainersTableHandle =
@@ -98,7 +101,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.UNHEALTHY));
 
-    // return one UNHEALTHY replica for container ID 2 -> Missing
+    // return all UNHEALTHY replicas for container ID 2 -> UNDER_REPLICATED
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L, State.UNHEALTHY));
 
@@ -125,7 +128,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             State.CLOSED, State.CLOSED, State.CLOSED));
 
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
-    Assert.assertTrue(all.isEmpty());
+    Assertions.assertTrue(all.isEmpty());
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -145,8 +148,17 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(2, rec.getReplicaDelta().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(2L).get(0);
-    assertEquals("MISSING", rec.getContainerState());
+    assertEquals("UNDER_REPLICATED", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
+
+    List<UnhealthyContainers> unhealthyContainers =
+        containerHealthSchemaManager.getUnhealthyContainers(
+            ALL_REPLICAS_UNHEALTHY, 0, Integer.MAX_VALUE);
+    assertEquals(1, unhealthyContainers.size());
+    assertEquals(2L,
+        unhealthyContainers.get(0).getContainerId().longValue());
+    assertEquals(0,
+        unhealthyContainers.get(0).getActualReplicaCount().intValue());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(3L).get(0);
     assertEquals("MISSING", rec.getContainerState());
@@ -165,7 +177,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
-    Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
+    Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
         currentTime);
 
     // Now run the job again, to check that relevant records are updated or
@@ -260,7 +272,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         .thenReturn(new ContainerWithPipeline(mockDeletedContainer, null));
 
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
-    Assert.assertTrue(all.isEmpty());
+    Assertions.assertTrue(all.isEmpty());
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -281,7 +293,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
-    Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
+    Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
         currentTime);
   }
 
@@ -305,7 +317,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       ContainerInfo c = mock(ContainerInfo.class);
       when(c.getContainerID()).thenReturn((long)i);
       when(c.getReplicationConfig())
-          .thenReturn(new RatisReplicationConfig(
+          .thenReturn(RatisReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.THREE));
       when(c.containerID()).thenReturn(ContainerID.valueOf(i));
       containers.add(c);
@@ -317,8 +329,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ContainerInfo c = mock(ContainerInfo.class);
     when(c.getContainerID()).thenReturn((long)containerID);
     when(c.getReplicationConfig())
-        .thenReturn(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE));
+        .thenReturn(RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
     when(c.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(c.getState()).thenReturn(HddsProtos.LifeCycleState.DELETED);
     return c;
@@ -341,7 +353,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     @Override
     public List<DatanodeDetails> chooseDatanodes(
-        List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+        List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+        List<DatanodeDetails> favoredNodes,
         int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
         throws IOException {
       return null;
@@ -358,7 +371,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
-      for(DatanodeDetails dn : dns) {
+      for (DatanodeDetails dn : dns) {
         if (misRepWhenDnPresent != null
             && dn.getUuid().equals(misRepWhenDnPresent)) {
           return true;

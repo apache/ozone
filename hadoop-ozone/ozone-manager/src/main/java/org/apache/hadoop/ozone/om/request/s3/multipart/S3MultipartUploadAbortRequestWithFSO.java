@@ -52,7 +52,7 @@ public class S3MultipartUploadAbortRequestWithFSO
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponseWithFSO(createErrorOMResponse(
-        omResponse, exception));
+        omResponse, exception), getBucketLayout());
   }
 
   @Override
@@ -65,7 +65,7 @@ public class S3MultipartUploadAbortRequestWithFSO
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
         multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-        omBucketInfo.copyObject());
+        omBucketInfo.copyObject(), getBucketLayout());
     return omClientResp;
   }
 
@@ -76,15 +76,14 @@ public class S3MultipartUploadAbortRequestWithFSO
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
-    long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-        keyName, omMetadataManager);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
+            pathComponents, keyName, omMetadataManager);
 
-    String multipartKey = omMetadataManager.getMultipartKey(parentID,
-        fileName, multipartUploadID);
+    String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
 
     return multipartKey;
   }

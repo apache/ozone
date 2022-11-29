@@ -18,6 +18,10 @@
               {
                 "name": "CONTAINER_IS_MISSING",
                 "integer": 3
+              },
+              {
+                "name": "SCM_NOT_LEADER",
+                "integer": 4
               }
             ]
           },
@@ -107,6 +111,50 @@
               {
                 "name": "GetSafeModeRuleStatuses",
                 "integer": 21
+              },
+              {
+                "name": "DecommissionNodes",
+                "integer": 22
+              },
+              {
+                "name": "RecommissionNodes",
+                "integer": 23
+              },
+              {
+                "name": "StartMaintenanceNodes",
+                "integer": 24
+              },
+              {
+                "name": "DatanodeUsageInfo",
+                "integer": 25
+              },
+              {
+                "name": "GetExistContainerWithPipelinesInBatch",
+                "integer": 26
+              },
+              {
+                "name": "GetContainerToken",
+                "integer": 27
+              },
+              {
+                "name": "StartContainerBalancer",
+                "integer": 28
+              },
+              {
+                "name": "StopContainerBalancer",
+                "integer": 29
+              },
+              {
+                "name": "GetContainerBalancerStatus",
+                "integer": 30
+              },
+              {
+                "name": "FinalizeScmUpgrade",
+                "integer": 31
+              },
+              {
+                "name": "QueryUpgradeFinalizationProgress",
+                "integer": 32
               }
             ]
           },
@@ -124,6 +172,10 @@
               {
                 "name": "errorContainerMissing",
                 "integer": 3
+              },
+              {
+                "name": "scmNotLeader",
+                "integer": 4
               }
             ]
           },
@@ -154,6 +206,11 @@
                 "id": 2,
                 "name": "traceID",
                 "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "version",
+                "type": "uint32"
               },
               {
                 "id": 6,
@@ -259,6 +316,61 @@
                 "id": 26,
                 "name": "getSafeModeRuleStatusesRequest",
                 "type": "GetSafeModeRuleStatusesRequestProto"
+              },
+              {
+                "id": 27,
+                "name": "decommissionNodesRequest",
+                "type": "DecommissionNodesRequestProto"
+              },
+              {
+                "id": 28,
+                "name": "recommissionNodesRequest",
+                "type": "RecommissionNodesRequestProto"
+              },
+              {
+                "id": 29,
+                "name": "startMaintenanceNodesRequest",
+                "type": "StartMaintenanceNodesRequestProto"
+              },
+              {
+                "id": 30,
+                "name": "DatanodeUsageInfoRequest",
+                "type": "DatanodeUsageInfoRequestProto"
+              },
+              {
+                "id": 31,
+                "name": "getExistContainerWithPipelinesInBatchRequest",
+                "type": "GetExistContainerWithPipelinesInBatchRequestProto"
+              },
+              {
+                "id": 32,
+                "name": "containerTokenRequest",
+                "type": "GetContainerTokenRequestProto"
+              },
+              {
+                "id": 33,
+                "name": "startContainerBalancerRequest",
+                "type": "StartContainerBalancerRequestProto"
+              },
+              {
+                "id": 34,
+                "name": "stopContainerBalancerRequest",
+                "type": "StopContainerBalancerRequestProto"
+              },
+              {
+                "id": 35,
+                "name": "containerBalancerStatusRequest",
+                "type": "ContainerBalancerStatusRequestProto"
+              },
+              {
+                "id": 36,
+                "name": "finalizeScmUpgradeRequest",
+                "type": "FinalizeScmUpgradeRequestProto"
+              },
+              {
+                "id": 37,
+                "name": "queryUpgradeFinalizationProgressRequest",
+                "type": "QueryUpgradeFinalizationProgressRequestProto"
               }
             ]
           },
@@ -400,6 +512,61 @@
                 "id": 26,
                 "name": "getSafeModeRuleStatusesResponse",
                 "type": "GetSafeModeRuleStatusesResponseProto"
+              },
+              {
+                "id": 27,
+                "name": "decommissionNodesResponse",
+                "type": "DecommissionNodesResponseProto"
+              },
+              {
+                "id": 28,
+                "name": "recommissionNodesResponse",
+                "type": "RecommissionNodesResponseProto"
+              },
+              {
+                "id": 29,
+                "name": "startMaintenanceNodesResponse",
+                "type": "StartMaintenanceNodesResponseProto"
+              },
+              {
+                "id": 30,
+                "name": "DatanodeUsageInfoResponse",
+                "type": "DatanodeUsageInfoResponseProto"
+              },
+              {
+                "id": 31,
+                "name": "getExistContainerWithPipelinesInBatchResponse",
+                "type": "GetExistContainerWithPipelinesInBatchResponseProto"
+              },
+              {
+                "id": 32,
+                "name": "containerTokenResponse",
+                "type": "GetContainerTokenResponseProto"
+              },
+              {
+                "id": 33,
+                "name": "startContainerBalancerResponse",
+                "type": "StartContainerBalancerResponseProto"
+              },
+              {
+                "id": 34,
+                "name": "stopContainerBalancerResponse",
+                "type": "StopContainerBalancerResponseProto"
+              },
+              {
+                "id": 35,
+                "name": "containerBalancerStatusResponse",
+                "type": "ContainerBalancerStatusResponseProto"
+              },
+              {
+                "id": 36,
+                "name": "finalizeScmUpgradeResponse",
+                "type": "FinalizeScmUpgradeResponseProto"
+              },
+              {
+                "id": 37,
+                "name": "queryUpgradeFinalizationProgressResponse",
+                "type": "QueryUpgradeFinalizationProgressResponseProto"
               }
             ]
           },
@@ -515,6 +682,22 @@
             ]
           },
           {
+            "name": "GetExistContainerWithPipelinesInBatchRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerIDs",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              }
+            ]
+          },
+          {
             "name": "GetSafeModeRuleStatusesRequestProto"
           },
           {
@@ -560,6 +743,17 @@
             ]
           },
           {
+            "name": "GetExistContainerWithPipelinesInBatchResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerWithPipelines",
+                "type": "ContainerWithPipeline",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "SCMListContainerRequestProto",
             "fields": [
               {
@@ -576,6 +770,11 @@
                 "id": 3,
                 "name": "traceID",
                 "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "state",
+                "type": "LifeCycleState"
               }
             ]
           },
@@ -648,6 +847,11 @@
                 "id": 4,
                 "name": "traceID",
                 "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "opState",
+                "type": "NodeOperationalState"
               }
             ]
           },
@@ -658,6 +862,128 @@
                 "id": 1,
                 "name": "datanodes",
                 "type": "Node",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeUsageInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ipaddress",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "uuid",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "mostUsed",
+                "type": "bool"
+              },
+              {
+                "id": 4,
+                "name": "count",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "DatanodeUsageInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "info",
+                "type": "DatanodeUsageInfoProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DecommissionNodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hosts",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeAdminErrorResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "host",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "error",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "DecommissionNodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedHosts",
+                "type": "DatanodeAdminErrorResponseProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RecommissionNodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hosts",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RecommissionNodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedHosts",
+                "type": "DatanodeAdminErrorResponseProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "StartMaintenanceNodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hosts",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "endInHours",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "StartMaintenanceNodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedHosts",
+                "type": "DatanodeAdminErrorResponseProto",
                 "is_repeated": true
               }
             ]
@@ -890,6 +1216,184 @@
           },
           {
             "name": "ReplicationManagerStatusResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "isRunning",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "FinalizeScmUpgradeRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "upgradeClientId",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "FinalizeScmUpgradeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "hadoop.hdds.UpgradeFinalizationStatus"
+              }
+            ]
+          },
+          {
+            "name": "QueryUpgradeFinalizationProgressRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "upgradeClientId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "takeover",
+                "type": "bool"
+              },
+              {
+                "id": 3,
+                "name": "readonly",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "QueryUpgradeFinalizationProgressResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "hadoop.hdds.UpgradeFinalizationStatus"
+              }
+            ]
+          },
+          {
+            "name": "ContainerTokenSecretProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ownerId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "containerId",
+                "type": "ContainerID"
+              },
+              {
+                "id": 3,
+                "name": "expiryDate",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "certSerialId",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetContainerTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "ContainerID"
+              }
+            ]
+          },
+          {
+            "name": "GetContainerTokenResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "StartContainerBalancerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "threshold",
+                "type": "double"
+              },
+              {
+                "id": 3,
+                "name": "idleiterations",
+                "type": "int32"
+              },
+              {
+                "id": 4,
+                "name": "maxDatanodesRatioToInvolvePerIteration",
+                "type": "double"
+              },
+              {
+                "id": 5,
+                "name": "maxSizeToMovePerIterationInGB",
+                "type": "int64"
+              },
+              {
+                "id": 6,
+                "name": "maxSizeEnteringTargetInGB",
+                "type": "int64"
+              },
+              {
+                "id": 7,
+                "name": "maxSizeLeavingSourceInGB",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "StartContainerBalancerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "start",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "StopContainerBalancerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "StopContainerBalancerResponseProto"
+          },
+          {
+            "name": "ContainerBalancerStatusRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerStatusResponseProto",
             "fields": [
               {
                 "id": 1,

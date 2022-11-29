@@ -48,14 +48,13 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -75,6 +74,8 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataCheck
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -103,7 +104,7 @@ public class TestContainerPersistence {
   private static VolumeChoosingPolicy volumeChoosingPolicy;
 
   private ContainerSet containerSet;
-  private VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
   private BlockManager blockManager;
   private ChunkManager chunkManager;
 
@@ -115,15 +116,18 @@ public class TestContainerPersistence {
   @Rule
   public Timeout testTimeout = Timeout.seconds(300);
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
+  private final String schemaVersion;
 
-  public TestContainerPersistence(ChunkLayOutVersion layout) {
-    this.layout = layout;
+  public TestContainerPersistence(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @BeforeClass
@@ -143,9 +147,10 @@ public class TestContainerPersistence {
 
   @Before
   public void setupPaths() throws IOException {
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, SCM_ID, SCM_ID, conf);
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
         null);
@@ -158,6 +163,9 @@ public class TestContainerPersistence {
 
   @After
   public void cleanupDir() throws IOException {
+    // Cleanup cache
+    BlockUtils.shutdownCache(conf);
+
     // Clean up SCM metadata
     log.info("Deleting {}", hddsPath);
     FileUtils.deleteDirectory(new File(hddsPath));
@@ -220,7 +228,7 @@ public class TestContainerPersistence {
     Path meta = kvData.getDbFile().toPath().getParent();
     Assert.assertTrue(meta != null && Files.exists(meta));
 
-    ReferenceCountedDB store = null;
+    DBHandle store = null;
     try {
       store = BlockUtils.getDB(kvData, conf);
       Assert.assertNotNull(store);
@@ -264,6 +272,12 @@ public class TestContainerPersistence {
     containerSet.removeContainer(testContainerID1);
     Assert.assertFalse(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
+
+    // With schema v3, we don't have a container dedicated db,
+    // so skip check the behaviors related to it.
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      return;
+    }
 
     // Adding block to a deleted container should fail.
     exception.expect(StorageContainerException.class);
@@ -639,53 +653,6 @@ public class TestContainerPersistence {
             .getChunks().size() - 1));
     Assert.assertEquals(
         lastChunk.getChecksumData(), readChunk.getChecksumData());
-  }
-
-  /**
-   * Deletes a block and tries to read it back.
-   *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
-   */
-  @Test
-  public void testDeleteBlock() throws IOException, NoSuchAlgorithmException {
-    long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-    blockManager.putBlock(container, blockData);
-    blockManager.deleteBlock(container, blockID);
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the block.");
-    blockManager.getBlock(container, blockData.getBlockID());
-  }
-
-  /**
-   * Tries to Deletes a block twice.
-   *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
-   */
-  @Test
-  public void testDeleteBlockTwice() throws IOException,
-      NoSuchAlgorithmException {
-    long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-    blockManager.putBlock(container, blockData);
-    blockManager.deleteBlock(container, blockID);
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the block.");
-    blockManager.deleteBlock(container, blockID);
   }
 
   /**

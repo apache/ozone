@@ -104,7 +104,7 @@ public final class ShutdownHookManager {
               long ended = System.currentTimeMillis();
               LOG.debug(String.format(
                   "Completed shutdown in %.3f seconds; Timeouts: %d",
-                  (ended-started)/1000.0, timeoutCount));
+                  (ended - started) / 1000.0, timeoutCount));
               // each of the hooks have executed; now shut down the
               // executor itself.
               shutdownExecutor(new OzoneConfiguration());

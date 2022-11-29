@@ -41,10 +41,10 @@ public class S3MultipartUploadAbortResponseWithFSO
   public S3MultipartUploadAbortResponseWithFSO(@Nonnull OMResponse omResponse,
       String multipartKey, String multipartOpenKey,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, multipartOpenKey, omMultipartKeyInfo,
-        isRatisEnabled, omBucketInfo);
+        isRatisEnabled, omBucketInfo, bucketLayout);
   }
 
   /**
@@ -52,12 +52,7 @@ public class S3MultipartUploadAbortResponseWithFSO
    * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadAbortResponseWithFSO(
-      @Nonnull OMResponse omResponse) {
-    super(omResponse);
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+      @Nonnull OMResponse omResponse, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 }

@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -182,7 +183,6 @@ public class SCMBlockProtocolServer implements
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
-    boolean auditSuccess = true;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Allocating {} blocks of size {}, with {}",
@@ -196,19 +196,17 @@ public class SCMBlockProtocolServer implements
           blocks.add(block);
         }
       }
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.ALLOCATE_BLOCK, auditMap));
       return blocks;
+    } catch (TimeoutException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_BLOCK, auditMap, ex));
+      throw new IOException(ex);
     } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(SCMAction.ALLOCATE_BLOCK, auditMap, ex)
-      );
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw ex;
-    } finally {
-      if(auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.ALLOCATE_BLOCK, auditMap)
-        );
-      }
     }
   }
 
@@ -254,13 +252,13 @@ public class SCMBlockProtocolServer implements
       }
     }
     for (BlockGroup bg : keyBlocksInfoList) {
-      auditMap.put("KeyBlockToDelete", bg.toString());
       List<DeleteBlockResult> blockResult = new ArrayList<>();
       for (BlockID b : bg.getBlockIDList()) {
         blockResult.add(new DeleteBlockResult(b, resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
+    auditMap.put("KeyBlockToDelete", keyBlocksInfoList.toString());
     if (e == null) {
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap));
@@ -274,7 +272,7 @@ public class SCMBlockProtocolServer implements
   @Override
   public ScmInfo getScmInfo() throws IOException {
     boolean auditSuccess = true;
-    try{
+    try {
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
@@ -287,7 +285,7 @@ public class SCMBlockProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
@@ -305,17 +303,17 @@ public class SCMBlockProtocolServer implements
     auditMap.put("cluster", String.valueOf(request.getClusterId()));
     auditMap.put("addr", String.valueOf(request.getRatisAddr()));
     boolean auditSuccess = true;
-    try{
+    try {
       return scm.getScmHAManager().addSCM(request);
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logReadFailure(
+      AUDIT.logWriteFailure(
           buildAuditMessageForFailure(SCMAction.ADD_SCM, auditMap, ex)
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
-        AUDIT.logReadSuccess(
+      if (auditSuccess) {
+        AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
       }
@@ -326,12 +324,12 @@ public class SCMBlockProtocolServer implements
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException {
     boolean auditSuccess = true;
-    try{
+    try {
       NodeManager nodeManager = scm.getScmNodeManager();
       Node client = null;
       List<DatanodeDetails> possibleClients =
           nodeManager.getNodesByAddress(clientMachine);
-      if (possibleClients.size()>0){
+      if (possibleClients.size() > 0) {
         client = possibleClients.get(0);
       }
       List<Node> nodeList = new ArrayList();
@@ -353,7 +351,7 @@ public class SCMBlockProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, null)
         );

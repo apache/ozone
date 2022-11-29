@@ -478,7 +478,7 @@ public final class FSOperations {
     public FSConcat(String path, String[] sources) {
       this.sources = new Path[sources.length];
 
-      for(int i = 0; i < sources.length; i++) {
+      for (int i = 0; i < sources.length; i++) {
         this.sources[i] = new Path(sources[i]);
       }
 

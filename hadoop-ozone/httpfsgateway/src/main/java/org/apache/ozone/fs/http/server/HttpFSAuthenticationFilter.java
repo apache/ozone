@@ -68,7 +68,7 @@ public class HttpFSAuthenticationFilter
    */
   @Override
   protected Properties getConfiguration(String configPrefix,
-      FilterConfig filterConfig) throws ServletException{
+      FilterConfig filterConfig) throws ServletException {
     Properties props = new Properties();
     Configuration conf = HttpFSServerWebApp.get().getConfig();
 

@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -36,7 +37,12 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.ratis.protocol.exceptions.*;
+import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.ReconfigurationInProgressException;
+import org.apache.ratis.protocol.exceptions.ReconfigurationTimeoutException;
+import org.apache.ratis.protocol.exceptions.ResourceUnavailableException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +90,8 @@ public final class SCMHAUtils {
   // Check if SCM HA is enabled.
   public static boolean isSCMHAEnabled(ConfigurationSource conf) {
     return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+        DefaultConfigManager.getValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT));
   }
 
   public static String getPrimordialSCM(ConfigurationSource conf) {
@@ -191,9 +198,9 @@ public final class SCMHAUtils {
   public static OzoneConfiguration removeSelfId(
       OzoneConfiguration configuration, String selfId) {
     final OzoneConfiguration conf = new OzoneConfiguration(configuration);
-    String scmNodes = conf.get(ConfUtils
-        .addKeySuffixes(ScmConfigKeys.OZONE_SCM_NODES_KEY,
-            getScmServiceId(conf)));
+    String scmNodesKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_NODES_KEY, getScmServiceId(conf));
+    String scmNodes = conf.get(scmNodesKey);
     if (scmNodes != null) {
       String[] parts = scmNodes.split(",");
       List<String> partsLeft = new ArrayList<>();
@@ -202,7 +209,7 @@ public final class SCMHAUtils {
           partsLeft.add(part);
         }
       }
-      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partsLeft));
+      conf.set(scmNodesKey, String.join(",", partsLeft));
     }
     return conf;
   }
@@ -235,7 +242,7 @@ public final class SCMHAUtils {
   public static boolean isNonRetriableException(Exception e) {
     Throwable t =
         getExceptionForClass(e, StateMachineException.class);
-    return t == null ? false : true;
+    return t != null;
   }
 
   /**

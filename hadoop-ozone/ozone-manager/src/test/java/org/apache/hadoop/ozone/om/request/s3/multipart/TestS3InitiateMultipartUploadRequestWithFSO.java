@@ -19,12 +19,11 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -55,14 +54,12 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     String keyName = prefix + fileName;
 
     // Add volume and bucket to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketID = omBucketInfo.getObjectID();
-
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     OMRequest modifiedRequest = doPreExecuteInitiateMPUWithFSO(volumeName,
         bucketName, keyName);
 
@@ -77,15 +74,16 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
 
-    long parentID = verifyDirectoriesInDB(dirs, bucketID);
+    long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
     String multipartFileKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName,
             modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
                 .getMultipartUploadID());
 
-    String multipartOpenFileKey = omMetadataManager.getMultipartKey(parentID,
-            fileName, modifiedRequest.getInitiateMultiPartUploadRequest()
+    String multipartOpenFileKey = omMetadataManager.getMultipartKey(volumeId,
+            bucketId, parentID, fileName,
+            modifiedRequest.getInitiateMultiPartUploadRequest()
                     .getKeyArgs().getMultipartUploadID());
 
     OmKeyInfo omKeyInfo = omMetadataManager
@@ -119,15 +117,17 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
             .getCreationTime());
   }
 
-  private long verifyDirectoriesInDB(List<String> dirs, long bucketID)
+  private long verifyDirectoriesInDB(List<String> dirs, final long volumeId,
+                                     final long bucketId)
       throws IOException {
     // bucketID is the parent
-    long parentID = bucketID;
+    long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
       String dbKey = "";
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+              parentID, dirName);
       OmDirectoryInfo omDirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
       Assert.assertNotNull("Invalid directory!", omDirInfo);

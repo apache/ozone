@@ -113,7 +113,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       // old key and create operation on new key
 
       // check Acl fromKeyName
-      checkACLs(ozoneManager, volumeName, bucketName, fromKeyName,
+      checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
           IAccessAuthorizer.ACLType.DELETE);
 
       // check Acl toKeyName
@@ -149,7 +149,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                       volumeName, bucketName, toKeyName, 0);
 
       // Check if toKey exists.
-      if(toKeyFileStatus != null) {
+      if (toKeyFileStatus != null) {
         // Destination exists and following are different cases:
         OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
 
@@ -210,7 +210,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponseWithFSO(createErrorOMResponse(
-              omResponse, exception));
+              omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
@@ -246,9 +246,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   private OMClientResponse renameKey(long toKeyParentId,
       long trxnLogIndex, OmKeyInfo fromKeyValue, boolean isRenameDirectory,
       String toKeyName, long modificationTime, OMResponse.Builder omResponse,
-      OzoneManager ozoneManager) {
+      OzoneManager ozoneManager) throws IOException {
 
-    String dbFromKey = fromKeyValue.getPath();
+    final OMMetadataManager ommm = ozoneManager.getMetadataManager();
+    final long volumeId = ommm.getVolumeId(fromKeyValue.getVolumeName());
+    final long bucketId = ommm.getBucketId(fromKeyValue.getVolumeName(),
+            fromKeyValue.getBucketName());
+    final String dbFromKey = ommm.getOzonePathKey(volumeId, bucketId,
+            fromKeyValue.getParentObjectID(), fromKeyValue.getFileName());
     String toKeyFileName = OzoneFSUtils.getFileName(toKeyName);
 
     fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -261,7 +266,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     fromKeyValue.setModificationTime(modificationTime);
 
     // destination dbKeyName
-    String dbToKey = fromKeyValue.getPath();
+    String dbToKey = ommm.getOzonePathKey(volumeId, bucketId,
+            fromKeyValue.getParentObjectID(), toKeyFileName);
 
     // Add to cache.
     // dbFromKey should be deleted, dbToKey should be added with newly updated
@@ -289,7 +295,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
         omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-        dbFromKey, dbToKey, fromKeyValue, isRenameDirectory);
+        dbFromKey, dbToKey, fromKeyValue, isRenameDirectory,
+        getBucketLayout());
     return omClientResponse;
   }
 

@@ -125,13 +125,15 @@ public class GeneratorOm extends BaseGenerator implements
       long containerId = getContainerIdOffset() + index;
 
       int keyPerContainer = getKeysPerContainer(config);
-      BatchOperation omKeyTableBatchOperation = omDb.initBatchOperation();
-      for (long localId = 0; localId < keyPerContainer; localId++) {
-        BlockID blockId = new BlockID(containerId, localId);
-        writeOmData(localId, blockId, omKeyTableBatchOperation);
+      try (BatchOperation omKeyTableBatchOperation
+               = omDb.initBatchOperation()) {
+        for (long localId = 0; localId < keyPerContainer; localId++) {
+          BlockID blockId = new BlockID(containerId, localId);
+          writeOmData(localId, blockId, omKeyTableBatchOperation);
+        }
+        commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
+        return null;
       }
-      commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
-      return null;
     });
 
   }
@@ -206,7 +208,8 @@ public class GeneratorOm extends BaseGenerator implements
         .setDataSize(0)
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
-        .setReplicationConfig(new RatisReplicationConfig(ReplicationFactor.ONE))
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE))
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation,
         "/" + volumeName + "/" + bucketName + "/" + keyName, l3DirInfo);
@@ -263,7 +266,7 @@ public class GeneratorOm extends BaseGenerator implements
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
         .setReplicationConfig(
-            new StandaloneReplicationConfig(ReplicationFactor.THREE))
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addOmKeyLocationInfoGroup(infoGroup)
         .build();
     omKeyTable.putWithBatch(omKeyTableBatchOperation, keyName, keyInfo);

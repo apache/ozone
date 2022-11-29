@@ -33,7 +33,13 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.helpers.TenantStateList;
+import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
+import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -41,6 +47,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ObjectStore class is responsible for the client operations that can be
@@ -48,6 +56,10 @@ import org.apache.hadoop.security.token.Token;
  */
 public class ObjectStore {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ObjectStore.class);
+
+  private final ConfigurationSource conf;
   /**
    * The proxy used for connecting to the cluster and perform
    * client operations.
@@ -59,8 +71,7 @@ public class ObjectStore {
    * Cache size to be used for listVolume calls.
    */
   private int listCacheSize;
-
-  private String s3VolumeName;
+  private final String defaultS3Volume;
 
   /**
    * Creates an instance of ObjectStore.
@@ -68,17 +79,18 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
+    this.conf = conf;
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
+    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
   protected ObjectStore() {
     // For the unit test
-    OzoneConfiguration conf = new OzoneConfiguration();
-    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
+    this.conf = new OzoneConfiguration();
     proxy = null;
+    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
@@ -114,12 +126,12 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume = getVolume(s3VolumeName);
+    OzoneVolume volume = getS3Volume();
     volume.createBucket(bucketName);
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
-    return getVolume(s3VolumeName).getBucket(bucketName);
+    return getS3Volume().getBucket(bucketName);
   }
 
   /**
@@ -129,7 +141,7 @@ public class ObjectStore {
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
     try {
-      OzoneVolume volume = getVolume(s3VolumeName);
+      OzoneVolume volume = getS3Volume();
       volume.deleteBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {
@@ -140,7 +152,6 @@ public class ObjectStore {
     }
   }
 
-
   /**
    * Returns the volume information.
    * @param volumeName Name of the volume.
@@ -148,16 +159,143 @@ public class ObjectStore {
    * @throws IOException
    */
   public OzoneVolume getVolume(String volumeName) throws IOException {
-    OzoneVolume volume = proxy.getVolumeDetails(volumeName);
-    return volume;
+    return proxy.getVolumeDetails(volumeName);
+  }
+
+  public OzoneVolume getS3Volume() throws IOException {
+    final S3VolumeContext resp = proxy.getS3VolumeContext();
+    OmVolumeArgs volume = resp.getOmVolumeArgs();
+    return proxy.buildOzoneVolume(volume);
+  }
+
+  public S3VolumeContext getS3VolumeContext() throws IOException {
+    return proxy.getS3VolumeContext();
   }
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
     return proxy.getS3Secret(kerberosID);
   }
 
+  public S3SecretValue getS3Secret(String kerberosID, boolean createIfNotExist)
+          throws IOException {
+    return proxy.getS3Secret(kerberosID, createIfNotExist);
+  }
+
+  /**
+   * Set secretKey for accessId.
+   * @param accessId
+   * @param secretKey
+   * @return S3SecretValue <accessId, secretKey> pair
+   * @throws IOException
+   */
+  public S3SecretValue setS3Secret(String accessId, String secretKey)
+          throws IOException {
+    return proxy.setS3Secret(accessId, secretKey);
+  }
+
   public void revokeS3Secret(String kerberosID) throws IOException {
     proxy.revokeS3Secret(kerberosID);
+  }
+
+  /**
+   * Create a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  public void createTenant(String tenantId) throws IOException {
+    proxy.createTenant(tenantId);
+  }
+
+  /**
+   * Create a tenant with extra arguments.
+   *
+   * @param tenantId tenant name.
+   * @param tenantArgs extra tenant arguments like volume name.
+   * @throws IOException
+   */
+  public void createTenant(String tenantId, TenantArgs tenantArgs)
+      throws IOException {
+    proxy.createTenant(tenantId, tenantArgs);
+  }
+
+  /**
+   * Delete a tenant.
+   * @param tenantId tenant name.
+   * @throws IOException
+   * @return DeleteTenantState
+   */
+  public DeleteTenantState deleteTenant(String tenantId) throws IOException {
+    return proxy.deleteTenant(tenantId);
+  }
+
+  /**
+   * Assign user accessId to tenant.
+   * @param username user name to be assigned.
+   * @param tenantId tenant name.
+   * @param accessId Specified accessId.
+   * @throws IOException
+   */
+  // TODO: Rename this to tenantAssignUserAccessId ?
+  public S3SecretValue tenantAssignUserAccessId(
+      String username, String tenantId, String accessId) throws IOException {
+    return proxy.tenantAssignUserAccessId(username, tenantId, accessId);
+  }
+
+  /**
+   * Revoke user accessId to tenant.
+   * @param accessId accessId to be revoked.
+   * @throws IOException
+   */
+  public void tenantRevokeUserAccessId(String accessId) throws IOException {
+    proxy.tenantRevokeUserAccessId(accessId);
+  }
+
+  /**
+   * Assign admin role to an accessId in a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @param delegated true if making delegated admin.
+   * @throws IOException
+   */
+  public void tenantAssignAdmin(String accessId, String tenantId,
+                                boolean delegated) throws IOException {
+    proxy.tenantAssignAdmin(accessId, tenantId, delegated);
+  }
+
+  /**
+   * Revoke admin role of an accessId from a tenant.
+   * @param accessId access ID.
+   * @param tenantId tenant name.
+   * @throws IOException
+   */
+  public void tenantRevokeAdmin(String accessId, String tenantId)
+      throws IOException {
+    proxy.tenantRevokeAdmin(accessId, tenantId);
+  }
+
+  public TenantUserList listUsersInTenant(String tenantId, String userPrefix)
+      throws IOException {
+    return proxy.listUsersInTenant(tenantId, userPrefix);
+  }
+
+  /**
+   * Get tenant info for a user.
+   * @param userPrincipal Kerberos principal of a user.
+   * @return TenantUserInfo
+   * @throws IOException
+   */
+  public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
+      throws IOException {
+    return proxy.tenantGetUserInfo(userPrincipal);
+  }
+
+  /**
+   * List tenants.
+   * @return TenantStateList
+   * @throws IOException
+   */
+  public TenantStateList listTenant() throws IOException {
+    return proxy.listTenant();
   }
 
   /**
@@ -207,7 +345,7 @@ public class ObjectStore {
   public Iterator<? extends OzoneVolume> listVolumesByUser(String user,
       String volumePrefix, String prevVolume)
       throws IOException {
-    if(Strings.isNullOrEmpty(user)) {
+    if (Strings.isNullOrEmpty(user)) {
       user = UserGroupInformation.getCurrentUser().getUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
@@ -269,7 +407,7 @@ public class ObjectStore {
 
     @Override
     public OzoneVolume next() {
-      if(hasNext()) {
+      if (hasNext()) {
         currentValue = currentIterator.next();
         return currentValue;
       }
@@ -284,7 +422,7 @@ public class ObjectStore {
     private List<OzoneVolume> getNextListOfVolumes(String prevVolume) {
       try {
         //if user is null, we do list of all volumes.
-        if(user != null) {
+        if (user != null) {
           return proxy.listVolumes(user, volPrefix, prevVolume, listCacheSize);
         }
         return proxy.listVolumes(volPrefix, prevVolume, listCacheSize);

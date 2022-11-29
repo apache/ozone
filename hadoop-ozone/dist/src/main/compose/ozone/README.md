@@ -34,12 +34,6 @@ TL;DR:
    export OZONE_REPLICATION_FACTOR=3
    ./run.sh -d
    ```
-3. with [FileSystem Optimization (FSO)](https://ci-hadoop.apache.org/view/Hadoop%20Ozone/job/ozone-doc-master/lastSuccessfulBuild/artifact/hadoop-hdds/docs/public/feature/prefixfso.html) feature enabled
-   ```
-   export OZONE_OM_METADATA_LAYOUT=PREFIX
-   export OZONE_OM_ENABLE_FILESYSTEM_PATHS=true
-   ./run.sh -d
-   ```
 
 ### Basics
 
@@ -95,9 +89,10 @@ SCM: http://localhost:9876
 ### Monitoring
 
  * Prometheus: follows a pull based approach where metrics are published on an HTTP endpoint.  Metrics can be checked on [Prometheus' web UI](http://localhost:9090/)
- * Grafana: comes with two [dashboards](http://localhost:3000) for Ozone
+ * Grafana: comes with three [dashboards](http://localhost:3000) for Ozone
    * Ozone - Object Metrics
    * Ozone - RPC Metrics
+   * Ozone - Overall Metrics
  * Jaeger: collects distributed tracing information from Ozone, can be queried on the [Jaeger web UI](http://localhost:16686)
 
 ### Profiling

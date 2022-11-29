@@ -29,13 +29,14 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,15 +65,19 @@ public class KeyValueContainerCheck {
   private ConfigurationSource checkConfig;
 
   private String metadataPath;
+  private HddsVolume volume;
+  private KeyValueContainer container;
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID) {
+      long containerID, HddsVolume volume, KeyValueContainer container) {
     Preconditions.checkArgument(metadataPath != null);
 
     this.checkConfig = conf;
     this.containerID = containerID;
     this.onDiskContainerData = null;
     this.metadataPath = metadataPath;
+    this.volume = volume;
+    this.container = container;
   }
 
   /**
@@ -215,9 +220,8 @@ public class KeyValueContainerCheck {
     Preconditions.checkState(onDiskContainerData != null,
         "invoke loadContainerData prior to calling this function");
 
-    File metaDir = new File(metadataPath);
     File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(metaDir, containerID);
+        .getContainerDBFile(onDiskContainerData);
 
     if (!dbFile.exists() || !dbFile.canRead()) {
       String dbFileErrorMsg = "Unable to access DB File [" + dbFile.toString()
@@ -228,42 +232,103 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData.setDbFile(dbFile);
 
-    ChunkLayOutVersion layout = onDiskContainerData.getLayOutVersion();
+    try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
+            onDiskContainerData.getContainerID(),
+            onDiskContainerData.getUnprefixedKeyFilter())) {
 
-    try(ReferenceCountedDB db =
-            BlockUtils.getDB(onDiskContainerData, checkConfig);
-        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
-
-      while(kvIter.hasNext()) {
+      while (kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
-        for(ContainerProtos.ChunkInfo chunk : block.getChunks()) {
-          File chunkFile = layout.getChunkFile(onDiskContainerData,
-              block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
 
-          if (!chunkFile.exists()) {
-            // concurrent mutation in Block DB? lookup the block again.
-            String localBlockID =
-                    Long.toString(block.getBlockID().getLocalID());
-            BlockData bdata = db.getStore()
-                    .getBlockDataTable()
-                    .get(localBlockID);
-            if (bdata != null) {
-              throw new IOException("Missing chunk file "
-                  + chunkFile.getAbsolutePath());
+        // If holding read lock for the entire duration, including wait() calls
+        // in DataTransferThrottler, would effectively make other threads
+        // throttled.
+        // Here try optimistically and retry with the container lock to
+        // make sure reading the latest record. If the record is just removed,
+        // the block should be skipped to scan.
+        try {
+          scanBlock(block, throttler, canceler);
+        } catch (OzoneChecksumException ex) {
+          throw ex;
+        } catch (IOException ex) {
+          if (getBlockDataFromDBWithLock(db, block) == null) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Scanned outdated blockData {} in container {}.",
+                  block, containerID);
             }
-          } else if (chunk.getChecksumData().getType()
-              != ContainerProtos.ChecksumType.NONE) {
-            verifyChecksum(block, chunk, chunkFile, layout, throttler,
-                canceler);
+          } else {
+            throw ex;
           }
         }
       }
     }
   }
 
+  /**
+   *  Attempt to read the block data without the container lock.
+   *  The block onDisk might be in modification by other thread and not yet
+   *  flushed to DB, so the content might be outdated.
+   *
+   * @param db DB of container
+   * @param block last queried blockData
+   * @return blockData in DB
+   * @throws IOException
+   */
+  private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
+      throws IOException {
+    String blockKey =
+        onDiskContainerData.blockKey(block.getBlockID().getLocalID());
+    return db.getStore().getBlockDataTable().get(blockKey);
+  }
+
+  /**
+   *  Attempt to read the block data with the container lock.
+   *  The container lock ensure the latest DB record could be retrieved, since
+   *  other block related write operation will acquire the container write lock.
+   *
+   * @param db DB of container
+   * @param block last queried blockData
+   * @return blockData in DB
+   * @throws IOException
+   */
+  private BlockData getBlockDataFromDBWithLock(DBHandle db, BlockData block)
+      throws IOException {
+    container.readLock();
+    try {
+      return getBlockDataFromDB(db, block);
+    } finally {
+      container.readUnlock();
+    }
+  }
+
+  private void scanBlock(BlockData block, DataTransferThrottler throttler,
+      Canceler canceler) throws IOException {
+    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
+
+    for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+      File chunkFile = layout.getChunkFile(onDiskContainerData,
+          block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
+
+      if (!chunkFile.exists()) {
+        // In EC, client may write empty putBlock in padding block nodes.
+        // So, we need to make sure, chunk length > 0, before declaring
+        // the missing chunk file.
+        if (block.getChunks().size() > 0 && block
+            .getChunks().get(0).getLen() > 0) {
+          throw new IOException(
+              "Missing chunk file " + chunkFile.getAbsolutePath());
+        }
+      } else if (chunk.getChecksumData().getType()
+          != ContainerProtos.ChecksumType.NONE) {
+        verifyChecksum(block, chunk, chunkFile, layout, throttler,
+            canceler);
+      }
+    }
+  }
+
   private static void verifyChecksum(BlockData block,
       ContainerProtos.ChunkInfo chunk, File chunkFile,
-      ChunkLayOutVersion layout,
+      ContainerLayoutVersion layout,
       DataTransferThrottler throttler, Canceler canceler) throws IOException {
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
@@ -275,12 +340,12 @@ public class KeyValueContainerCheck {
     long bytesRead = 0;
     try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
         ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
-      if (layout == ChunkLayOutVersion.FILE_PER_BLOCK) {
+      if (layout == ContainerLayoutVersion.FILE_PER_BLOCK) {
         channel.position(chunk.getOffset());
       }
       for (int i = 0; i < checksumCount; i++) {
         // limit last read for FILE_PER_BLOCK, to avoid reading next chunk
-        if (layout == ChunkLayOutVersion.FILE_PER_BLOCK &&
+        if (layout == ContainerLayoutVersion.FILE_PER_BLOCK &&
             i == checksumCount - 1 &&
             chunk.getLen() % bytesPerChecksum != 0) {
           buffer.limit((int) (chunk.getLen() % bytesPerChecksum));
@@ -329,6 +394,7 @@ public class KeyValueContainerCheck {
 
     onDiskContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
+    onDiskContainerData.setVolume(volume);
   }
 
   private void handleCorruption(IOException e) {

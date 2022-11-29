@@ -32,7 +32,7 @@ import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.getRespo
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.parseInputPath;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printFSOReminder;
+import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printKVSeparator;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
@@ -106,8 +106,9 @@ public class DiskUsageSubCommand implements Callable {
     if (duResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
     } else {
-      if (!parent.isFSOEnabled()) {
-        printFSOReminder();
+      if (parent.isObjectStoreBucket(path) ||
+          !parent.bucketIsPresentInThePath(path)) {
+        printBucketReminder();
       }
 
       long totalSize = (long)(double)duResponse.get("size");

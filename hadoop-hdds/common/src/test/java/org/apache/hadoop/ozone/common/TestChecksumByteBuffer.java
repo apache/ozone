@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.util.PureJavaCrc32;
 import org.apache.hadoop.util.PureJavaCrc32C;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -96,7 +96,7 @@ public class TestChecksumByteBuffer {
     }
 
     private void checkSame() {
-      Assert.assertEquals(expected.getValue(), testee.getValue());
+      Assertions.assertEquals(expected.getValue(), testee.getValue());
     }
   }
 }

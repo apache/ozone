@@ -61,7 +61,10 @@ import java.util.Map;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.*;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.NONE;
 
 /**
  * Handle create directory request. It will add path components to the directory
@@ -153,6 +156,10 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
                 OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
                         ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
 
+        final long volumeId = omMetadataManager.getVolumeId(volumeName);
+        final long bucketId = omMetadataManager
+                .getBucketId(volumeName, bucketName);
+
         // prepare leafNode dir
         OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
                 omPathInfo.getLeafNodeName(),
@@ -160,16 +167,17 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
                 omPathInfo.getLastKnownParentId(), trxnLogIndex,
                 OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-                Optional.of(dirInfo), Optional.of(missingParentInfos),
-                trxnLogIndex);
+                volumeId, bucketId, trxnLogIndex,
+                Optional.of(missingParentInfos), Optional.of(dirInfo));
 
         // total number of keys created.
         numKeysCreated = missingParentInfos.size() + 1;
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
-            new OMDirectoryCreateResponseWithFSO(omResponse.build(), dirInfo,
-                missingParentInfos, result);
+            new OMDirectoryCreateResponseWithFSO(omResponse.build(),
+                volumeId, bucketId, dirInfo, missingParentInfos, result,
+                getBucketLayout());
       } else {
         result = Result.DIRECTORY_ALREADY_EXISTS;
         omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);

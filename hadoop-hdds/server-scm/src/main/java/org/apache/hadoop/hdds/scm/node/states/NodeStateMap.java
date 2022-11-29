@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.node.states;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -87,6 +86,31 @@ public class NodeStateMap {
       nodeMap.put(id, new DatanodeInfo(datanodeDetails, nodeStatus,
           layoutInfo));
       nodeToContainer.put(id, new HashSet<>());
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Update a node in NodeStateMap.
+   *
+   * @param datanodeDetails DatanodeDetails
+   * @param nodeStatus initial NodeStatus
+   * @param layoutInfo initial LayoutVersionProto
+   *
+   */
+  public void updateNode(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
+                         LayoutVersionProto layoutInfo)
+
+          throws NodeNotFoundException {
+    lock.writeLock().lock();
+    try {
+      UUID id = datanodeDetails.getUuid();
+      if (!nodeMap.containsKey(id)) {
+        throw new NodeNotFoundException("Node UUID: " + id);
+      }
+      nodeMap.put(id, new DatanodeInfo(datanodeDetails, nodeStatus,
+              layoutInfo));
     } finally {
       lock.writeLock().unlock();
     }
@@ -330,7 +354,7 @@ public class NodeStateMap {
   }
 
   public void setContainers(UUID uuid, Set<ContainerID> containers)
-      throws NodeNotFoundException{
+      throws NodeNotFoundException {
     lock.writeLock().lock();
     try {
       checkIfNodeExist(uuid);
@@ -345,8 +369,7 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       checkIfNodeExist(uuid);
-      return Collections
-          .unmodifiableSet(new HashSet<>(nodeToContainer.get(uuid)));
+      return new HashSet<>(nodeToContainer.get(uuid));
     } finally {
       lock.readLock().unlock();
     }

@@ -30,10 +30,9 @@ public class VolumeUsage implements SpaceUsageSource {
 
   private final CachingSpaceUsageSource source;
   private boolean shutdownComplete;
-  private final long reservedInBytes;
+  private long reservedInBytes;
 
-  VolumeUsage(SpaceUsageCheckParams checkParams, long reservedInBytes) {
-    this.reservedInBytes = reservedInBytes;
+  VolumeUsage(SpaceUsageCheckParams checkParams) {
     source = new CachingSpaceUsageSource(checkParams);
     start(); // TODO should start only on demand
   }
@@ -59,6 +58,14 @@ public class VolumeUsage implements SpaceUsageSource {
   @Override
   public long getUsedSpace() {
     return source.getUsedSpace();
+  }
+
+  public void incrementUsedSpace(long usedSpace) {
+    source.incrementUsedSpace(usedSpace);
+  }
+
+  public void decrementUsedSpace(long reclaimedSpace) {
+    source.decrementUsedSpace(reclaimedSpace);
   }
 
   /**
@@ -87,7 +94,11 @@ public class VolumeUsage implements SpaceUsageSource {
     }
   }
 
-  public void refreshNow(){
+  public void refreshNow() {
     source.refreshNow();
+  }
+
+  public void setReserved(long reserved) {
+    this.reservedInBytes = reserved;
   }
 }

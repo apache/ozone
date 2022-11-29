@@ -17,12 +17,11 @@
  */
 package org.apache.hadoop.ozone.insight;
 
+import org.junit.Assert;
+import org.junit.Test;
+
 import java.util.HashMap;
 import java.util.Map;
-
-import org.junit.Assert;
-import static org.junit.Assert.*;
-import org.junit.Test;
 
 /**
  * Test common insight point utility methods.

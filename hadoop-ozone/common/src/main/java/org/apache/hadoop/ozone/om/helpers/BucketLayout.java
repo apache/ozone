@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -65,6 +66,23 @@ public enum BucketLayout {
     return this.equals(FILE_SYSTEM_OPTIMIZED);
   }
 
+  public boolean isLegacy() {
+    return this.equals(LEGACY);
+  }
+
+  public boolean isObjectStore(boolean enableFileSystemPaths) {
+    if (this.equals(OBJECT_STORE)) {
+      return true;
+    } else {
+      // If bucket layout is Legacy and FileSystemPaths
+      // are disabled, then the bucket operates as OBS.
+      if (this.equals(LEGACY) && !enableFileSystemPaths) {
+        return true;
+      }
+      return false;
+    }
+  }
+
   public boolean shouldNormalizePaths(boolean enableFileSystemPaths) {
     switch (this) {
     case OBJECT_STORE:
@@ -83,5 +101,21 @@ public enum BucketLayout {
     // unit test cases.
     // Added safer `isBlank` check for unit test cases.
     return StringUtils.isBlank(value) ? LEGACY : BucketLayout.valueOf(value);
+  }
+
+  /**
+   * Helper method for upgrade scenarios. Throws an exception if a bucket layout
+   * is not supported on an older client.
+   *
+   * @throws OMException if bucket layout is not supported on older clients.
+   */
+  public void validateSupportedOperation() throws OMException {
+    // Older clients do not support any bucket layout other than LEGACY.
+    if (!isLegacy()) {
+      throw new OMException("Client is attempting to modify a bucket which" +
+          " uses non-LEGACY bucket layout features. Please upgrade the client" +
+          " to a compatible version before performing this operation.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
   }
 }

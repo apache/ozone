@@ -22,18 +22,19 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -42,7 +43,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -55,15 +55,15 @@ public class TestSCMBlockProtocolServer {
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private static final int NODE_COUNT = 10;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     config = new OzoneConfiguration();
     File dir = GenericTestUtils.getRandomizedTestDir();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(MockSCMHAManager.getInstance(true));
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
-    scm = TestUtils.getScm(config, configurator);
+    scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
     // add nodes to scm node manager
@@ -77,7 +77,7 @@ public class TestSCMBlockProtocolServer {
         Mockito.mock(ProtocolMessageMetrics.class));
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     if (scm != null) {
       scm.stop();
@@ -99,7 +99,7 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assert.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
 
     // illegal client 1
     client += "X";
@@ -107,14 +107,14 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assert.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assert.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
@@ -125,8 +125,8 @@ public class TestSCMBlockProtocolServer {
             .setClient(client)
             .build();
     ScmBlockLocationProtocolProtos.SortDatanodesResponseProto resp =
-        service.sortDatanodes(request, CURRENT_VERSION);
-    Assert.assertTrue(resp.getNodeList().size() == NODE_COUNT);
+        service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
+    Assertions.assertTrue(resp.getNodeList().size() == NODE_COUNT);
     System.out.println("client = " + client);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
@@ -141,9 +141,9 @@ public class TestSCMBlockProtocolServer {
         .addAllNodeNetworkName(nodes)
         .setClient(client)
         .build();
-    resp = service.sortDatanodes(request, CURRENT_VERSION);
+    resp = service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
     System.out.println("client = " + client);
-    Assert.assertTrue(resp.getNodeList().size() == 0);
+    Assertions.assertTrue(resp.getNodeList().size() == 0);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
   }

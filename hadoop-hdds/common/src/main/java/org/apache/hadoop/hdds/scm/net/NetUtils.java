@@ -105,13 +105,13 @@ public final class NetUtils {
       }
       // excludedScope is child of ancestor
       List<String> duplicateList = mutableExcludedScopes.stream()
-          .filter(scope -> scope.startsWith(ancestor.getNetworkFullPath()))
+          .filter(ancestor::isAncestor)
           .collect(Collectors.toList());
       mutableExcludedScopes.removeAll(duplicateList);
 
       // ancestor is covered by excludedScope
       mutableExcludedScopes.stream().forEach(scope -> {
-        if (ancestor.getNetworkFullPath().startsWith(scope)) {
+        if (ancestor.isDescendant(scope)) {
           // remove exclude node if it's covered by excludedScope
           iterator.remove();
         }
@@ -148,5 +148,23 @@ public final class NetUtils {
       }
     }
     return ancestorList;
+  }
+
+  /**
+   * Ensure {@link NetConstants#PATH_SEPARATOR_STR} is added to the suffix of
+   * the path.
+   * @param path path to add suffix
+   * @return the normalised path
+   * If <i>path</i>is empty, then {@link NetConstants#PATH_SEPARATOR_STR} is
+   * returned
+   */
+  public static String addSuffix(String path) {
+    if (path == null) {
+      return null;
+    }
+    if (!path.endsWith(NetConstants.PATH_SEPARATOR_STR)) {
+      return path + NetConstants.PATH_SEPARATOR_STR;
+    }
+    return path;
   }
 }

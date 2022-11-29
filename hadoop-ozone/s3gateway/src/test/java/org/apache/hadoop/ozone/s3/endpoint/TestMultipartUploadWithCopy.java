@@ -32,8 +32,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -89,8 +91,9 @@ public class TestMultipartUploadWithCopy {
 
     byte[] keyContent = EXISTING_KEY_CONTENT.getBytes(UTF_8);
     try (OutputStream stream = bucket
-        .createKey(EXISTING_KEY, keyContent.length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>())) {
+        .createKey(EXISTING_KEY, keyContent.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.THREE), new HashMap<>())) {
       stream.write(keyContent);
     }
 
@@ -120,6 +123,7 @@ public class TestMultipartUploadWithCopy {
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
+    REST.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   @Test

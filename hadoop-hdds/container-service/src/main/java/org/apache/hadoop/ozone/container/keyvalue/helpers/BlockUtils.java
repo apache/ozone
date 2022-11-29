@@ -18,15 +18,20 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
+import java.io.File;
 import java.io.IOException;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
+import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -34,8 +39,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.EXPORT_CONTAINER_METADATA_FAILED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IMPORT_CONTAINER_METADATA_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
@@ -52,28 +60,29 @@ public final class BlockUtils {
   }
 
   /**
-   * Obtain a DB handler for a given container. This handler is not cached and
-   * the caller must close it after using it.
+   * Obtain a DB handler for a given container or the underlying volume.
+   * This handler is not cached and the caller must close it after using it.
    * If another thread attempts to open the same container when it is already
    * opened by this thread, the other thread will get a RocksDB exception.
-   * @param containerID The containerID
    * @param containerDBPath The absolute path to the container database folder
    * @param schemaVersion The Container Schema version
    * @param conf Configuration
+   * @param readOnly open DB in read-only mode or not
    * @return Handler to the given container.
    * @throws IOException
    */
-  public static DatanodeStore getUncachedDatanodeStore(long containerID,
+  public static DatanodeStore getUncachedDatanodeStore(
       String containerDBPath, String schemaVersion,
       ConfigurationSource conf, boolean readOnly) throws IOException {
 
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-      store = new DatanodeStoreSchemaOneImpl(conf,
-          containerID, containerDBPath, readOnly);
+      store = new DatanodeStoreSchemaOneImpl(conf, containerDBPath, readOnly);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-      store = new DatanodeStoreSchemaTwoImpl(conf,
-          containerID, containerDBPath, readOnly);
+      store = new DatanodeStoreSchemaTwoImpl(conf, containerDBPath, readOnly);
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      store = new DatanodeStoreSchemaThreeImpl(conf, containerDBPath,
+          readOnly);
     } else {
       throw new IllegalArgumentException(
           "Unrecognized database schema version: " + schemaVersion);
@@ -94,7 +103,7 @@ public final class BlockUtils {
   public static DatanodeStore getUncachedDatanodeStore(
       KeyValueContainerData containerData, ConfigurationSource conf,
       boolean readOnly) throws IOException {
-    return getUncachedDatanodeStore(containerData.getContainerID(),
+    return getUncachedDatanodeStore(
         containerData.getDbFile().getAbsolutePath(),
         containerData.getSchemaVersion(), conf, readOnly);
   }
@@ -110,17 +119,24 @@ public final class BlockUtils {
    * @return DB handle.
    * @throws StorageContainerException
    */
-  public static ReferenceCountedDB getDB(KeyValueContainerData containerData,
-                                    ConfigurationSource conf) throws
-      StorageContainerException {
+  public static DBHandle getDB(KeyValueContainerData containerData,
+      ConfigurationSource conf) throws StorageContainerException {
     Preconditions.checkNotNull(containerData);
-    ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
     Preconditions.checkNotNull(containerData.getDbFile());
+
+    String containerDBPath = containerData.getDbFile().getAbsolutePath();
     try {
-      return cache.getDB(containerData.getContainerID(), containerData
-          .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
-              containerData.getSchemaVersion(), conf);
+      if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
+        Preconditions.checkNotNull(cache);
+        return cache.getDB(containerDBPath, conf);
+      } else {
+        ContainerCache cache = ContainerCache.getInstance(conf);
+        Preconditions.checkNotNull(cache);
+        return cache.getDB(containerData.getContainerID(), containerData
+                .getContainerDBType(), containerDBPath,
+            containerData.getSchemaVersion(), conf);
+      }
     } catch (IOException ex) {
       onFailure(containerData.getVolume());
       String message = String.format("Error opening DB. Container:%s " +
@@ -138,6 +154,10 @@ public final class BlockUtils {
   public static void removeDB(KeyValueContainerData container,
       ConfigurationSource conf) {
     Preconditions.checkNotNull(container);
+    Preconditions.checkNotNull(container.getDbFile());
+    Preconditions.checkState(!container.getSchemaVersion()
+        .equals(OzoneConsts.SCHEMA_V3));
+
     ContainerCache cache = ContainerCache.getInstance(conf);
     Preconditions.checkNotNull(cache);
     cache.removeDB(container.getDbFile().getAbsolutePath());
@@ -146,24 +166,33 @@ public final class BlockUtils {
   /**
    * Shutdown all DB Handles.
    *
-   * @param cache - Cache for DB Handles.
+   * @param config
    */
-  public static void shutdownCache(ContainerCache cache)  {
-    cache.shutdownCache();
+  public static void shutdownCache(ConfigurationSource config) {
+    ContainerCache.getInstance(config).shutdownCache();
+    DatanodeStoreCache.getInstance().shutdownCache();
   }
 
   /**
    * Add a DB handler into cache.
    *
-   * @param db - DB handler.
+   * @param store - low-level DatanodeStore for DB.
    * @param containerDBPath - DB path of the container.
    * @param conf configuration.
+   * @param schemaVersion schemaVersion.
    */
-  public static void addDB(ReferenceCountedDB db, String containerDBPath,
-      ConfigurationSource conf) {
-    ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
-    cache.addDB(containerDBPath, db);
+  public static void addDB(DatanodeStore store, String containerDBPath,
+      ConfigurationSource conf, String schemaVersion) {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
+      Preconditions.checkNotNull(cache);
+      cache.addDB(containerDBPath, new RawDB(store, containerDBPath));
+    } else {
+      ContainerCache cache = ContainerCache.getInstance(conf);
+      Preconditions.checkNotNull(cache);
+      cache.addDB(containerDBPath,
+          new ReferenceCountedDB(store, containerDBPath));
+    }
   }
 
   /**
@@ -205,6 +234,104 @@ public final class BlockUtils {
           "Unable to find the block with bcsID " + bcsId + " .Container "
               + container.getContainerData().getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
+    }
+  }
+
+  /**
+   * Remove container KV metadata from per-disk db store.
+   * @param containerData
+   * @param conf
+   * @throws IOException
+   */
+  public static void removeContainerFromDB(KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      ((DatanodeStoreSchemaThreeImpl) db.getStore()).removeKVContainerData(
+          containerData.getContainerID());
+    }
+  }
+
+  /**
+   * Dump container KV metadata to external files.
+   * @param containerData
+   * @param conf
+   * @throws StorageContainerException
+   */
+  public static void dumpKVContainerDataToFiles(
+      KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          db.getStore();
+      long containerID = containerData.getContainerID();
+      File metaDir = new File(containerData.getMetadataPath());
+      File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
+      // cleanup old files first
+      deleteAllDumpFiles(dumpDir);
+
+      try {
+        if (!dumpDir.mkdirs() && !dumpDir.exists()) {
+          throw new IOException("Failed to create dir "
+              + dumpDir.getAbsolutePath() + " for container " + containerID +
+              " to dump metadata to files");
+        }
+        store.dumpKVContainerData(containerID, dumpDir);
+      } catch (IOException e) {
+        // cleanup partially dumped files
+        deleteAllDumpFiles(dumpDir);
+        throw new StorageContainerException("Failed to dump metadata" +
+            " for container " + containerID, e,
+            EXPORT_CONTAINER_METADATA_FAILED);
+      }
+    }
+  }
+
+  /**
+   * Load container KV metadata from external files.
+   * @param containerData
+   * @param conf
+   * @throws StorageContainerException
+   */
+  public static void loadKVContainerDataFromFiles(
+      KeyValueContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    try (DBHandle db = getDB(containerData, conf)) {
+      Preconditions.checkState(db.getStore()
+          instanceof DatanodeStoreSchemaThreeImpl);
+
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          db.getStore();
+      long containerID = containerData.getContainerID();
+      File metaDir = new File(containerData.getMetadataPath());
+      File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
+      try {
+        store.loadKVContainerData(dumpDir);
+      } catch (IOException e) {
+        // Don't delete unloaded or partially loaded files on failure,
+        // but delete all partially loaded metadata.
+        store.removeKVContainerData(containerID);
+        throw new StorageContainerException("Failed to load metadata " +
+            "from files for container " + containerID, e,
+            IMPORT_CONTAINER_METADATA_FAILED);
+      } finally {
+        // cleanup already loaded files all together
+        deleteAllDumpFiles(dumpDir);
+      }
+    }
+  }
+
+  public static void deleteAllDumpFiles(File dumpDir) throws IOException {
+    try {
+      FileUtils.deleteDirectory(dumpDir);
+    } catch (IOException e) {
+      throw new IOException("Failed to delete dump files under "
+          + dumpDir.getAbsolutePath(), e);
     }
   }
 }

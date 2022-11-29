@@ -237,14 +237,19 @@ public class ContainerEndpoint {
    * {@link org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata}
    * for all missing containers.
    *
+   * @param limit The limit of missing containers to return.
    * @return {@link Response}
    */
   @GET
   @Path("/missing")
-  public Response getMissingContainers() {
+  @Deprecated
+  public Response getMissingContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit
+  ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
     containerHealthSchemaManager.getUnhealthyContainers(
-        UnHealthyContainerStates.MISSING, 0, Integer.MAX_VALUE)
+        UnHealthyContainerStates.MISSING, 0, limit)
         .forEach(container -> {
           long containerID = container.getContainerId();
           try {

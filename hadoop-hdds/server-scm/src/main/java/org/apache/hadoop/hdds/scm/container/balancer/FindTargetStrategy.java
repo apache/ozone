@@ -20,11 +20,12 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
+import javax.annotation.Nonnull;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
-import java.util.function.BiFunction;
 
 /**
  * This interface can be used to implement strategies to find a target for a
@@ -39,33 +40,33 @@ public interface FindTargetStrategy {
    * enter a potential target.
    *
    * @param source Datanode to find a target for
-   * @param potentialTargets Collection of potential target datanodes
    * @param candidateContainers Set of candidate containers satisfying
    *                            selection criteria
    *                            {@link ContainerBalancerSelectionCriteria}
-   * @param canSizeEnterTarget A functional interface whose apply
    * (DatanodeDetails, Long) method returns true if the size specified in the
    * second argument can enter the specified DatanodeDetails node
    * @return {@link ContainerMoveSelection} containing the target node and
    * selected container
    */
   ContainerMoveSelection findTargetForContainerMove(
-      DatanodeDetails source, Collection<DatanodeDetails> potentialTargets,
-      Set<ContainerID> candidateContainers,
-      BiFunction<DatanodeDetails, Long, Boolean> canSizeEnterTarget);
+      DatanodeDetails source, Set<ContainerID> candidateContainers);
 
   /**
-   * Checks whether moving the specified container from the specified source
-   * to target datanode will satisfy the placement policy.
-   *
-   * @param containerID Container to be moved from source to target
-   * @param replicas Set of replicas of the given container
-   * @param source Source datanode for container move
-   * @param target Target datanode for container move
-   * @return true if placement policy is satisfied
+   * increase the Entering size of a candidate target data node.
    */
-  boolean containerMoveSatisfiesPlacementPolicy(ContainerID containerID,
-                                                Set<ContainerReplica> replicas,
-                                                DatanodeDetails source,
-                                                DatanodeDetails target);
+  void increaseSizeEntering(DatanodeDetails target, long size);
+
+  /**
+   * reInitialize FindTargetStrategy.
+   */
+  void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
+                    ContainerBalancerConfiguration config, Double upperLimit);
+
+  /**
+   * Resets the collection of target {@link DatanodeUsageInfo} that can be
+   * selected for balancing.
+   * @param targets collection of target {@link DatanodeDetails}
+   *               that containers can be moved to
+   */
+  void resetPotentialTargets(@Nonnull Collection<DatanodeDetails> targets);
 }

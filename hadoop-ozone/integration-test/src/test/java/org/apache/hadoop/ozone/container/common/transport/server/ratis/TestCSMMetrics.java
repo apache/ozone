@@ -35,7 +35,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
       .ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
       .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.*;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -56,11 +57,13 @@ import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 
 import java.util.Map;
 import java.util.function.BiConsumer;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.Assert;
 
@@ -74,6 +77,11 @@ public class TestCSMMetrics {
   @FunctionalInterface
   interface CheckedBiFunction<LEFT, RIGHT, OUT, THROWABLE extends Throwable> {
     OUT apply(LEFT left, RIGHT right) throws THROWABLE;
+  }
+
+  @BeforeClass
+  public static void setup() {
+    ExitUtils.disableSystemExit();
   }
 
   @Test
@@ -134,7 +142,7 @@ public class TestCSMMetrics {
           getTestContainerID());
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
-              pipeline, blockID, 1024, null);
+              pipeline, blockID, 1024);
       ContainerCommandResponseProto response =
           client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
@@ -186,7 +194,7 @@ public class TestCSMMetrics {
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         null, null);
   }
 

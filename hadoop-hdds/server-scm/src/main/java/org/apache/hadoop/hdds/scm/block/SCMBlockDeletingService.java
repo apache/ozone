@@ -229,7 +229,7 @@ public class SCMBlockDeletingService extends BackgroundService
 
   @Override
   public void stop() {
-    throw new RuntimeException("Not supported operation.");
+    shutdown();
   }
 
   @VisibleForTesting

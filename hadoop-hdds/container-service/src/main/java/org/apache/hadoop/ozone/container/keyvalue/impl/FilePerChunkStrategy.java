@@ -55,7 +55,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 
 /**
@@ -82,7 +82,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
   private static void checkLayoutVersion(Container container) {
     Preconditions.checkArgument(
-        container.getContainerData().getLayOutVersion() == FILE_PER_CHUNK);
+        container.getContainerData().getLayoutVersion() == FILE_PER_CHUNK);
   }
 
   /**

@@ -55,7 +55,8 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
@@ -89,7 +90,6 @@ public class TestMultiBlockWritesWithDnFailures {
     conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
@@ -176,9 +176,9 @@ public class TestMultiBlockWritesWithDnFailures {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     Assert.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
@@ -228,9 +228,9 @@ public class TestMultiBlockWritesWithDnFailures {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setReplicationConfig(
-            new RatisReplicationConfig(HddsProtos.ReplicationFactor.THREE))
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     Assert.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -237,11 +238,13 @@ public class TestOMUpgradeFinalizer {
   }
 
   private void setupVersionManagerMockToFinalize(
-      Iterable<OMLayoutFeature> lfs
+      Iterable<? extends LayoutFeature> lfs
   ) {
     when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_REQUIRED);
     when(versionManager.needsFinalization()).thenReturn(true);
-    when(versionManager.unfinalizedFeatures()).thenReturn(lfs);
+    List<LayoutFeature> lfIter = new ArrayList<>();
+    lfs.forEach(lfIter::add);
+    when(versionManager.unfinalizedFeatures()).thenReturn(lfIter);
   }
 
   private OMLayoutFeature mockFeature(String name, int version) {
@@ -258,7 +261,7 @@ public class TestOMUpgradeFinalizer {
   private Iterable<OMLayoutFeature> mockFeatures(
       int startFromLV, String... names
   ) {
-    int i=startFromLV;
+    int i = startFromLV;
     List<OMLayoutFeature> ret = new ArrayList<>();
     for (String name : names) {
       ret.add(mockFeature(name, i));

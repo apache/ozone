@@ -51,6 +51,14 @@ export const routes: IRoute[] = [
     component: DiskUsage
   },
   {
+    path: '/Buckets',
+    component: DiskUsage,
+  },
+  {
+    path: '/Containers',
+    component: MissingContainers,
+  },
+  {
     path: '/:NotFound',
     component: NotFound
   }

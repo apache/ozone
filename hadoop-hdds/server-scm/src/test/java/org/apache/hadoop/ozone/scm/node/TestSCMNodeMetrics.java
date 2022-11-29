@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
@@ -48,11 +48,11 @@ import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -64,7 +64,7 @@ public class TestSCMNodeMetrics {
 
   private static DatanodeDetails registeredDatanode;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
 
     OzoneConfiguration source = new OzoneConfiguration();
@@ -92,7 +92,7 @@ public class TestSCMNodeMetrics {
 
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() throws IOException {
     nodeManager.close();
   }
@@ -114,8 +114,8 @@ public class TestSCMNodeMetrics {
         .build();
     nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
 
-    assertEquals("NumHBProcessed", hbProcessed + 1,
-        getCounter("NumHBProcessed"));
+    assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
+        "NumHBProcessed");
   }
 
   /**
@@ -134,8 +134,8 @@ public class TestSCMNodeMetrics {
     nodeManager.processHeartbeat(MockDatanodeDetails
         .randomDatanodeDetails(), layoutInfo);
 
-    assertEquals("NumHBProcessingFailed", hbProcessedFailed + 1,
-        getCounter("NumHBProcessingFailed"));
+    assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
+        "NumHBProcessingFailed");
   }
 
   /**
@@ -149,15 +149,15 @@ public class TestSCMNodeMetrics {
     long nrProcessed = getCounter("NumNodeReportProcessed");
 
     StorageReportProto storageReport =
-        TestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp", 100,
-            10, 90,
-            null);
+        HddsTestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp",
+            100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
-    Assert.assertEquals("NumNodeReportProcessed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessed"));
+    Assertions.assertEquals(nrProcessed + 1,
+        getCounter("NumNodeReportProcessed"),
+        "NumNodeReportProcessed");
   }
 
   /**
@@ -170,15 +170,15 @@ public class TestSCMNodeMetrics {
     DatanodeDetails randomDatanode =
         MockDatanodeDetails.randomDatanodeDetails();
 
-    StorageReportProto storageReport = TestUtils.createStorageReport(
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         randomDatanode.getUuid(), "/tmp", 100, 10, 90, null);
 
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(randomDatanode, nodeReport);
-    assertEquals("NumNodeReportProcessingFailed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessingFailed"));
+    assertEquals(nrProcessed + 1, getCounter("NumNodeReportProcessingFailed"),
+        "NumNodeReportProcessingFailed");
   }
 
   /**
@@ -188,7 +188,7 @@ public class TestSCMNodeMetrics {
   @Test
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
-    StorageReportProto storageReport = TestUtils.createStorageReport(
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         registeredDatanode.getUuid(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();

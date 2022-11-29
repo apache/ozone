@@ -26,6 +26,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 /**
  * Utility class to write random keys from a limited buffer.
  */
+@SuppressWarnings("java:S2245") // no need for secure random
 public class ContentGenerator {
 
   /**

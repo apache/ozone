@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CRLStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
@@ -32,6 +31,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandQueueReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
@@ -50,6 +50,24 @@ public final class SCMEvents {
       new TypedEvent<>(NodeReportFromDatanode.class, "Node_Report");
 
   /**
+   * Queued Command counts are sent out by Datanodes. This report is received by
+   * SCMDatanodeHeartbeatDispatcher and the COMMAND_QUEUE_REPORT Event is
+   * generated.
+   */
+  public static final TypedEvent<CommandQueueReportFromDatanode>
+      COMMAND_QUEUE_REPORT = new TypedEvent<>(
+          CommandQueueReportFromDatanode.class, "Command_Queue_Report");
+
+  /**
+   * After node manager processes a COMMAND_QUEUE_REPORT it fires
+   * this event to allow any other processes which depend upon the counts to
+   * be notified they have been updated.
+   */
+  public static final TypedEvent<DatanodeDetails>
+      DATANODE_COMMAND_COUNT_UPDATED = new TypedEvent<>(
+          DatanodeDetails.class, "Datanode_Command_Queue_Updated");
+
+  /**
    * Event generated on DataNode registration.
    */
   public static final TypedEvent<NodeRegistrationContainerReport>
@@ -58,7 +76,7 @@ public final class SCMEvents {
       "Node_Registration_Container_Report");
 
   /**
-   * ContainerReports are send out by Datanodes. This report is received by
+   * ContainerReports are sent out by Datanodes. This report is received by
    * SCMDatanodeHeartbeatDispatcher and Container_Report Event is generated.
    */
   public static final TypedEvent<ContainerReportFromDatanode> CONTAINER_REPORT =
@@ -148,6 +166,13 @@ public final class SCMEvents {
       new TypedEvent<>(DatanodeDetails.class, "New_Node");
 
   /**
+   * This event will be triggered whenever a datanode is registered with
+   * SCM with a different Ip or host name.
+   */
+  public static final TypedEvent<DatanodeDetails> NODE_ADDRESS_UPDATE =
+          new TypedEvent<>(DatanodeDetails.class, "Node_Address_Update");
+
+  /**
    * This event will be triggered whenever a datanode is moved from healthy to
    * stale state.
    */
@@ -192,9 +217,6 @@ public final class SCMEvents {
       DELETE_BLOCK_STATUS =
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
-
-  public static final TypedEvent<SafeModeStatus> SAFE_MODE_STATUS =
-      new TypedEvent<>(SafeModeStatus.class, "Safe mode status");
 
   /**
    * A CRL status report will be sent by datanodes. This report is received

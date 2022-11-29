@@ -31,9 +31,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,7 +54,7 @@ public class TestXceiverClientGrpc {
   private List<DatanodeDetails> dnsInOrder;
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-  @Before
+  @BeforeEach
   public void setup() {
     dns = new ArrayList<>();
     dns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -61,14 +62,14 @@ public class TestXceiverClientGrpc {
     dns.add(MockDatanodeDetails.randomDatanodeDetails());
 
     dnsInOrder = new ArrayList<>();
-    for (int i=2; i>=0; i--) {
+    for (int i = 2; i >= 0; i--) {
       dnsInOrder.add(dns.get(i));
     }
 
     pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(
-            new RatisReplicationConfig(ReplicationFactor.THREE))
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(dns)
         .build();
@@ -77,19 +78,20 @@ public class TestXceiverClientGrpc {
 
   @Test
   public void testCorrectDnsReturnedFromPipeline() throws IOException {
-    Assert.assertEquals(dnsInOrder.get(0), pipeline.getClosestNode());
-    Assert.assertEquals(dns.get(0), pipeline.getFirstNode());
-    Assert.assertNotEquals(dns.get(0), dnsInOrder.get(0));
+    Assertions.assertEquals(dnsInOrder.get(0), pipeline.getClosestNode());
+    Assertions.assertEquals(dns.get(0), pipeline.getFirstNode());
+    Assertions.assertNotEquals(dns.get(0), dnsInOrder.get(0));
   }
 
-  @Test(timeout=5000)
+  @Test
+  @Timeout(5)
   public void testRandomFirstNodeIsCommandTarget() throws IOException {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     // Using a new Xceiver Client, call it repeatedly until all DNs in the
     // pipeline have been the target of the command, indicating it is shuffling
     // the DNs on each call with a new client. This test will timeout if this
     // is not happening.
-    while(allDNs.size() > 0) {
+    while (allDNs.size() > 0) {
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
@@ -112,7 +114,7 @@ public class TestXceiverClientGrpc {
     // With a new Client, make 100 calls and ensure the first sortedDN is used
     // each time. The logic should always use the sorted node, so we can check
     // only a single DN is ever seen after 100 calls.
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
@@ -124,14 +126,14 @@ public class TestXceiverClientGrpc {
       };
       invokeXceiverClientGetBlock(client);
     }
-    Assert.assertEquals(1, seenDNs.size());
+    Assertions.assertEquals(1, seenDNs.size());
   }
 
   @Test
   public void testConnectionReusedAfterGetBlock() throws IOException {
     // With a new Client, make 100 calls. On each call, ensure that only one
     // DN is seen, indicating the same DN connection is reused.
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
       final Set<DatanodeDetails> seenDNs = new HashSet<>();
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
@@ -146,7 +148,7 @@ public class TestXceiverClientGrpc {
       invokeXceiverClientGetBlock(client);
       invokeXceiverClientReadChunk(client);
       invokeXceiverClientReadSmallFile(client);
-      Assert.assertEquals(1, seenDNs.size());
+      Assertions.assertEquals(1, seenDNs.size());
     }
   }
 

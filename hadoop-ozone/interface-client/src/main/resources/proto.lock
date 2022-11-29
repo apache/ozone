@@ -84,6 +84,14 @@
                 "integer": 38
               },
               {
+                "name": "RenameKeys",
+                "integer": 39
+              },
+              {
+                "name": "DeleteOpenKeys",
+                "integer": 40
+              },
+              {
                 "name": "InitiateMultiPartUpload",
                 "integer": 45
               },
@@ -114,6 +122,26 @@
               {
                 "name": "DBUpdates",
                 "integer": 53
+              },
+              {
+                "name": "FinalizeUpgrade",
+                "integer": 54
+              },
+              {
+                "name": "FinalizeUpgradeProgress",
+                "integer": 55
+              },
+              {
+                "name": "Prepare",
+                "integer": 56
+              },
+              {
+                "name": "PrepareStatus",
+                "integer": 57
+              },
+              {
+                "name": "CancelPrepare",
+                "integer": 58
               },
               {
                 "name": "GetDelegationToken",
@@ -178,6 +206,14 @@
               {
                 "name": "RecoverTrash",
                 "integer": 92
+              },
+              {
+                "name": "RevokeS3Secret",
+                "integer": 93
+              },
+              {
+                "name": "PurgePaths",
+                "integer": 94
               }
             ]
           },
@@ -419,6 +455,54 @@
               {
                 "name": "PARTIAL_DELETE",
                 "integer": 62
+              },
+              {
+                "name": "DETECTED_LOOP_IN_BUCKET_LINKS",
+                "integer": 63
+              },
+              {
+                "name": "NOT_SUPPORTED_OPERATION",
+                "integer": 64
+              },
+              {
+                "name": "PARTIAL_RENAME",
+                "integer": 65
+              },
+              {
+                "name": "QUOTA_EXCEEDED",
+                "integer": 66
+              },
+              {
+                "name": "QUOTA_ERROR",
+                "integer": 67
+              },
+              {
+                "name": "DIRECTORY_NOT_EMPTY",
+                "integer": 68
+              },
+              {
+                "name": "PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED",
+                "integer": 69
+              },
+              {
+                "name": "REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED",
+                "integer": 70
+              },
+              {
+                "name": "UPDATE_LAYOUT_VERSION_FAILED",
+                "integer": 71
+              },
+              {
+                "name": "LAYOUT_FEATURE_FINALIZATION_FAILED",
+                "integer": 72
+              },
+              {
+                "name": "PREPARE_FAILED",
+                "integer": 73
+              },
+              {
+                "name": "NOT_SUPPORTED_OPERATION_WHEN_PREPARED",
+                "integer": 74
               }
             ]
           },
@@ -457,6 +541,23 @@
               {
                 "name": "RAM_DISK",
                 "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "BucketLayoutProto",
+            "enum_fields": [
+              {
+                "name": "LEGACY",
+                "integer": 1
+              },
+              {
+                "name": "FILE_SYSTEM_OPTIMIZED",
+                "integer": 2
+              },
+              {
+                "name": "OBJECT_STORE",
+                "integer": 3
               }
             ]
           },
@@ -571,6 +672,23 @@
             ]
           },
           {
+            "name": "PrepareStatusResponse.PrepareStatus",
+            "enum_fields": [
+              {
+                "name": "NOT_PREPARED",
+                "integer": 1
+              },
+              {
+                "name": "PREPARE_GATE_ENABLED",
+                "integer": 2
+              },
+              {
+                "name": "PREPARE_COMPLETED",
+                "integer": 3
+              }
+            ]
+          },
+          {
             "name": "ServicePort.Type",
             "enum_fields": [
               {
@@ -615,6 +733,16 @@
                 "id": 4,
                 "name": "userInfo",
                 "type": "UserInfo"
+              },
+              {
+                "id": 5,
+                "name": "version",
+                "type": "uint32"
+              },
+              {
+                "id": 6,
+                "name": "layoutVersion",
+                "type": "LayoutVersion"
               },
               {
                 "id": 11,
@@ -712,6 +840,16 @@
                 "type": "DeleteKeysRequest"
               },
               {
+                "id": 39,
+                "name": "renameKeysRequest",
+                "type": "RenameKeysRequest"
+              },
+              {
+                "id": 40,
+                "name": "deleteOpenKeysRequest",
+                "type": "DeleteOpenKeysRequest"
+              },
+              {
                 "id": 45,
                 "name": "initiateMultiPartUploadRequest",
                 "type": "MultipartInfoInitiateRequest"
@@ -750,6 +888,31 @@
                 "id": 53,
                 "name": "dbUpdatesRequest",
                 "type": "DBUpdatesRequest"
+              },
+              {
+                "id": 54,
+                "name": "finalizeUpgradeRequest",
+                "type": "FinalizeUpgradeRequest"
+              },
+              {
+                "id": 55,
+                "name": "finalizeUpgradeProgressRequest",
+                "type": "FinalizeUpgradeProgressRequest"
+              },
+              {
+                "id": 56,
+                "name": "prepareRequest",
+                "type": "PrepareRequest"
+              },
+              {
+                "id": 57,
+                "name": "prepareStatusRequest",
+                "type": "PrepareStatusRequest"
+              },
+              {
+                "id": 58,
+                "name": "cancelPrepareRequest",
+                "type": "CancelPrepareRequest"
               },
               {
                 "id": 61,
@@ -845,6 +1008,16 @@
                 "id": 92,
                 "name": "RecoverTrashRequest",
                 "type": "RecoverTrashRequest"
+              },
+              {
+                "id": 93,
+                "name": "RevokeS3SecretRequest",
+                "type": "RevokeS3SecretRequest"
+              },
+              {
+                "id": 94,
+                "name": "purgePathsRequest",
+                "type": "PurgePathsRequest"
               }
             ]
           },
@@ -983,6 +1156,11 @@
                 "type": "DeleteKeysResponse"
               },
               {
+                "id": 39,
+                "name": "renameKeysResponse",
+                "type": "RenameKeysResponse"
+              },
+              {
                 "id": 45,
                 "name": "initiateMultiPartUploadResponse",
                 "type": "MultipartInfoInitiateResponse"
@@ -1021,6 +1199,31 @@
                 "id": 52,
                 "name": "dbUpdatesResponse",
                 "type": "DBUpdatesResponse"
+              },
+              {
+                "id": 54,
+                "name": "finalizeUpgradeResponse",
+                "type": "FinalizeUpgradeResponse"
+              },
+              {
+                "id": 55,
+                "name": "finalizeUpgradeProgressResponse",
+                "type": "FinalizeUpgradeProgressResponse"
+              },
+              {
+                "id": 56,
+                "name": "prepareResponse",
+                "type": "PrepareResponse"
+              },
+              {
+                "id": 57,
+                "name": "prepareStatusResponse",
+                "type": "PrepareStatusResponse"
+              },
+              {
+                "id": 58,
+                "name": "cancelPrepareResponse",
+                "type": "CancelPrepareResponse"
               },
               {
                 "id": 61,
@@ -1101,6 +1304,11 @@
                 "id": 92,
                 "name": "RecoverTrashResponse",
                 "type": "RecoverTrashResponse"
+              },
+              {
+                "id": 93,
+                "name": "purgePathsResponse",
+                "type": "PurgePathsResponse"
               }
             ]
           },
@@ -1234,6 +1442,22 @@
                 "id": 10,
                 "name": "modificationTime",
                 "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "quotaInNamespace",
+                "type": "int64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-2"
+                  }
+                ]
+              },
+              {
+                "id": 12,
+                "name": "usedNamespace",
+                "type": "uint64"
               }
             ]
           },
@@ -1342,6 +1566,11 @@
               {
                 "id": 4,
                 "name": "modificationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "quotaInNamespace",
                 "type": "uint64"
               }
             ]
@@ -1519,6 +1748,53 @@
                 "id": 11,
                 "name": "modificationTime",
                 "type": "uint64"
+              },
+              {
+                "id": 12,
+                "name": "sourceVolume",
+                "type": "string"
+              },
+              {
+                "id": 13,
+                "name": "sourceBucket",
+                "type": "string"
+              },
+              {
+                "id": 14,
+                "name": "usedBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 15,
+                "name": "quotaInBytes",
+                "type": "int64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-2"
+                  }
+                ]
+              },
+              {
+                "id": 16,
+                "name": "quotaInNamespace",
+                "type": "int64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-2"
+                  }
+                ]
+              },
+              {
+                "id": 17,
+                "name": "usedNamespace",
+                "type": "uint64"
+              },
+              {
+                "id": 18,
+                "name": "bucketLayout",
+                "type": "BucketLayoutProto"
               }
             ]
           },
@@ -1655,6 +1931,16 @@
                 "name": "metadata",
                 "type": "hadoop.hdds.KeyValue",
                 "is_repeated": true
+              },
+              {
+                "id": 8,
+                "name": "quotaInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 9,
+                "name": "quotaInNamespace",
+                "type": "uint64"
               }
             ]
           },
@@ -1780,6 +2066,11 @@
                 "id": 2,
                 "name": "acl",
                 "type": "OzoneAclInfo"
+              },
+              {
+                "id": 3,
+                "name": "modificationTime",
+                "type": "uint64"
               }
             ]
           },
@@ -1805,6 +2096,11 @@
                 "id": 2,
                 "name": "acl",
                 "type": "OzoneAclInfo"
+              },
+              {
+                "id": 3,
+                "name": "modificationTime",
+                "type": "uint64"
               }
             ]
           },
@@ -1831,6 +2127,11 @@
                 "name": "acl",
                 "type": "OzoneAclInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "modificationTime",
+                "type": "uint64"
               }
             ]
           },
@@ -1889,6 +2190,11 @@
                 "id": 1,
                 "name": "bucketArgs",
                 "type": "BucketArgs"
+              },
+              {
+                "id": 2,
+                "name": "modificationTime",
+                "type": "uint64"
               }
             ]
           },
@@ -2029,6 +2335,21 @@
                 "id": 15,
                 "name": "fileEncryptionInfo",
                 "type": "FileEncryptionInfoProto"
+              },
+              {
+                "id": 16,
+                "name": "latestVersionLocation",
+                "type": "bool"
+              },
+              {
+                "id": 17,
+                "name": "recursive",
+                "type": "bool"
+              },
+              {
+                "id": 18,
+                "name": "headOp",
+                "type": "bool"
               }
             ]
           },
@@ -2064,6 +2385,17 @@
                 "id": 7,
                 "name": "pipeline",
                 "type": "hadoop.hdds.Pipeline"
+              },
+              {
+                "id": 9,
+                "name": "partNumber",
+                "type": "int32",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-1"
+                  }
+                ]
               }
             ]
           },
@@ -2085,6 +2417,17 @@
                 "id": 3,
                 "name": "fileEncryptionInfo",
                 "type": "FileEncryptionInfoProto"
+              },
+              {
+                "id": 4,
+                "name": "isMultipartKey",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
               }
             ]
           },
@@ -2167,6 +2510,58 @@
               {
                 "id": 15,
                 "name": "updateID",
+                "type": "uint64"
+              },
+              {
+                "id": 16,
+                "name": "parentID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "DirectoryInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "creationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "modificationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "acls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "updateID",
+                "type": "uint64"
+              },
+              {
+                "id": 8,
+                "name": "parentID",
                 "type": "uint64"
               }
             ]
@@ -2402,6 +2797,68 @@
             ]
           },
           {
+            "name": "RenameKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "renameKeysArgs",
+                "type": "RenameKeysArgs"
+              }
+            ]
+          },
+          {
+            "name": "RenameKeysArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "renameKeysMap",
+                "type": "RenameKeysMap",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RenameKeysMap",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fromKeyName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "toKeyName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "RenameKeysResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "unRenamedKeys",
+                "type": "RenameKeysMap",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "bool"
+              }
+            ]
+          },
+          {
             "name": "RenameKeyRequest",
             "fields": [
               {
@@ -2529,6 +2986,79 @@
           },
           {
             "name": "PurgeKeysResponse"
+          },
+          {
+            "name": "PurgePathsRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedDirs",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "deletedSubFiles",
+                "type": "KeyInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "markDeletedSubDirs",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PurgePathsResponse"
+          },
+          {
+            "name": "DeleteOpenKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "openKeysPerBucket",
+                "type": "OpenKeyBucket",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "OpenKeyBucket",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keys",
+                "type": "OpenKey",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "OpenKey",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "clientID",
+                "type": "uint64"
+              }
+            ]
           },
           {
             "name": "OMTokenProto",
@@ -2755,6 +3285,12 @@
                 "id": 3,
                 "name": "caCertificate",
                 "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "caCerts",
+                "type": "string",
+                "is_repeated": true
               }
             ]
           },
@@ -2773,6 +3309,134 @@
                 "is_repeated": true
               }
             ]
+          },
+          {
+            "name": "FinalizeUpgradeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "upgradeClientId",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "FinalizeUpgradeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "hadoop.hdds.UpgradeFinalizationStatus"
+              }
+            ]
+          },
+          {
+            "name": "FinalizeUpgradeProgressRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "upgradeClientId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "takeover",
+                "type": "bool"
+              },
+              {
+                "id": 3,
+                "name": "readonly",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "FinalizeUpgradeProgressResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "hadoop.hdds.UpgradeFinalizationStatus"
+              }
+            ]
+          },
+          {
+            "name": "PrepareRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "args",
+                "type": "PrepareRequestArgs"
+              }
+            ]
+          },
+          {
+            "name": "PrepareRequestArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "txnApplyWaitTimeoutSeconds",
+                "type": "uint64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "300"
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "name": "txnApplyCheckIntervalSeconds",
+                "type": "uint64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "5"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "PrepareResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "txnID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "PrepareStatusRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "txnID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "PrepareStatusResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "PrepareStatus"
+              },
+              {
+                "id": 2,
+                "name": "currentTxnIndex",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CancelPrepareRequest"
+          },
+          {
+            "name": "CancelPrepareResponse"
           },
           {
             "name": "ServicePort",
@@ -2902,6 +3566,11 @@
               {
                 "id": 7,
                 "name": "updateID",
+                "type": "uint64"
+              },
+              {
+                "id": 8,
+                "name": "parentID",
                 "type": "uint64"
               }
             ]
@@ -3253,6 +3922,26 @@
             ]
           },
           {
+            "name": "LayoutVersion",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "RevokeS3SecretRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "kerberosID",
+                "type": "string"
+              }
+            ]
+          },
+          {
             "name": "UpdateGetS3SecretRequest",
             "fields": [
               {
@@ -3299,6 +3988,113 @@
           {
             "name": "java_outer_classname",
             "value": "OzoneManagerProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "OmInterServiceProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "ErrorCode",
+            "enum_fields": [
+              {
+                "name": "RATIS_NOT_ENABLED",
+                "integer": 1
+              },
+              {
+                "name": "LEADER_UNDETERMINED",
+                "integer": 2
+              },
+              {
+                "name": "LEADER_NOT_READY",
+                "integer": 3
+              },
+              {
+                "name": "RATIS_BOOTSTRAP_ERROR",
+                "integer": 4
+              },
+              {
+                "name": "UNDEFINED_ERROR",
+                "integer": 5
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "BootstrapOMRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "hostAddress",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "ratisPort",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "BootstrapOMResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool"
+              },
+              {
+                "id": 2,
+                "name": "errorCode",
+                "type": "ErrorCode"
+              },
+              {
+                "id": 3,
+                "name": "errorMsg",
+                "type": "string"
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "OzoneManagerInterService",
+            "rpcs": [
+              {
+                "name": "bootstrap",
+                "in_type": "BootstrapOMRequest",
+                "out_type": "BootstrapOMResponse"
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.ozone"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ozone.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "OzoneManagerInterServiceProtocolProtos"
           },
           {
             "name": "java_generic_services",

@@ -146,6 +146,9 @@ enum Result {
   BLOCK_TOKEN_VERIFICATION_FAILED = 41;
   ERROR_IN_DB_SYNC = 42;
   CHUNK_FILE_INCONSISTENCY = 43;
+  DELETE_ON_NON_EMPTY_CONTAINER = 44;
+  EXPORT_CONTAINER_METADATA_FAILED = 45;
+  IMPORT_CONTAINER_METADATA_FAILED = 46;
 }
 
 /**
@@ -155,6 +158,8 @@ message DatanodeBlockID {
   required int64 containerID = 1;
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
+  optional int32 replicaIndex = 4;
+
 }
 
 message KeyValue {
@@ -186,12 +191,12 @@ message ContainerCommandRequestProto {
 
   optional   PutBlockRequestProto putBlock = 12;
   optional   GetBlockRequestProto getBlock = 13;
-  optional   DeleteBlockRequestProto deleteBlock = 14;
+  optional   DeleteBlockRequestProto deleteBlock = 14 [deprecated = true];
   optional   ListBlockRequestProto listBlock = 15;
 
   optional   ReadChunkRequestProto readChunk = 16;
   optional   WriteChunkRequestProto writeChunk = 17;
-  optional   DeleteChunkRequestProto deleteChunk = 18;
+  optional   DeleteChunkRequestProto deleteChunk = 18 [deprecated = true];
   optional   ListChunkRequestProto listChunk = 19;
 
   optional   PutSmallFileRequestProto putSmallFile = 20;
@@ -241,6 +246,7 @@ message ContainerDataProto {
     UNHEALTHY = 5;
     INVALID = 6;
     DELETED = 7;
+    RECOVERING = 8;
   }
   required int64 containerID = 1;
   repeated KeyValue metadata = 2;
@@ -266,6 +272,8 @@ enum ContainerType {
 message  CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
+  optional int32 replicaIndex = 4;
+  optional ContainerDataProto.State state = 5;
 }
 
 message  CreateContainerResponseProto {
@@ -370,6 +378,7 @@ message ChunkInfo {
   required uint64 len = 3;
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
+  optional bytes stripeChecksum = 6;
 }
 
 message ChunkInfoList {

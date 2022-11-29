@@ -26,7 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import java.util.stream.LongStream;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyChar;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for the Progressbar class for Freon.

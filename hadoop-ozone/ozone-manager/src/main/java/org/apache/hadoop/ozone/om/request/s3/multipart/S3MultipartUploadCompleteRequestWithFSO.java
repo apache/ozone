@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -36,11 +37,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 /**
  * Handle Multipart upload complete request.
@@ -58,13 +59,14 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
-      String volumeName, String bucketName, String keyName,
+      OmBucketInfo omBucketInfo, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
 
     Path keyPath = Paths.get(keyName);
     OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
         OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
-            volumeName, bucketName, keyName, keyPath);
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(),
+            keyName, keyPath);
     // Check for directory exists with same name, if it exists throw error.
     if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
       throw new OMException("Can not Complete MPU for file: " + keyName +
@@ -89,7 +91,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
-      String ozoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex) {
+      String ozoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
+      throws IOException {
 
     // Add key entry to file table.
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, ozoneKey, omKeyInfo,
@@ -117,7 +120,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
       fileName = filePath.toString();
     }
 
-    return omMetadataManager.getOzonePathKey(parentId, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentId, fileName);
   }
 
   @Override
@@ -134,7 +141,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
       fileName = filePath.toString();
     }
 
-    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentId, fileName, uploadID);
   }
 
   @Override
@@ -143,29 +155,24 @@ public class S3MultipartUploadCompleteRequestWithFSO
       IOException exception) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(
-        createErrorOMResponse(omResponse, exception));
+        createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
 
   @Override
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> unUsedParts) {
+      List<OmKeyInfo> unUsedParts, OmBucketInfo omBucketInfo,
+      RepeatedOmKeyInfo oldKeyVersionsToDelete, long volumeId) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
+        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete, volumeId);
   }
 
-  private long getParentId(OMMetadataManager omMetadataManager,
-      String volumeName, String bucketName, String keyName) throws IOException {
-
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    return OMFileRequest
-        .getParentID(bucketId, pathComponents, keyName, omMetadataManager);
+  @Override
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
 

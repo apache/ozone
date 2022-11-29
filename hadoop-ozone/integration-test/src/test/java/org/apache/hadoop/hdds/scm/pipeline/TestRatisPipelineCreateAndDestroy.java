@@ -29,10 +29,10 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +47,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests for RatisPipelineUtils.
  */
-@Ignore
 public class TestRatisPipelineCreateAndDestroy {
 
   private MiniOzoneCluster cluster;
@@ -61,7 +60,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes/3)
+            .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
             .setHbInterval(2000)
             .setHbProcessorInterval(1000)
             .build();
@@ -70,12 +69,12 @@ public class TestRatisPipelineCreateAndDestroy {
     pipelineManager = scm.getPipelineManager();
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     cluster.shutdown();
   }
 
-  @Test(timeout = 180000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
@@ -83,11 +82,11 @@ public class TestRatisPipelineCreateAndDestroy {
     // make sure two pipelines are created
     waitForPipelines(2);
     Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.closePipeline(pipeline, false);
@@ -96,7 +95,7 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  @Test(timeout = 180000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
@@ -105,11 +104,11 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
-        new RatisReplicationConfig(
+        RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
     List<Pipeline> pipelines = pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.closePipeline(pipeline, false);
@@ -119,7 +118,7 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  @Test(timeout = 180000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
   public void testPipelineCreationOnNodeRestart() throws Exception {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         5, TimeUnit.SECONDS);
@@ -129,22 +128,27 @@ public class TestRatisPipelineCreateAndDestroy {
     List<HddsDatanodeService> dns = new ArrayList<>(cluster.getHddsDatanodes());
 
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(new RatisReplicationConfig(
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
     for (HddsDatanodeService dn : dns) {
       cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
     }
 
+    GenericTestUtils.waitFor(() ->
+                    cluster.getStorageContainerManager().getScmNodeManager()
+                            .getNodeCount(NodeStatus.inServiceHealthy()) == 0,
+                    100, 10 * 1000);
+
     // try creating another pipeline now
     try {
-      pipelineManager.createPipeline(new RatisReplicationConfig(
+      pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
           ReplicationFactor.THREE));
       Assert.fail("pipeline creation should fail after shutting down pipeline");
     } catch (IOException ioe) {
       // As now all datanodes are shutdown, they move to stale state, there
       // will be no sufficient datanodes to create the pipeline.
       Assert.assertTrue(ioe instanceof SCMException);
-      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES,
           ((SCMException) ioe).getResult());
     }
 
@@ -173,7 +177,7 @@ public class TestRatisPipelineCreateAndDestroy {
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(new RatisReplicationConfig(
+        .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 60000);
   }

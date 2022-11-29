@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -41,9 +43,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import org.junit.AfterClass;
 import org.junit.Assert;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -78,7 +82,6 @@ public class TestOzoneManagerRestart {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     cluster =  MiniOzoneCluster.newBuilder(conf)
@@ -171,7 +174,11 @@ public class TestOzoneManagerRestart {
   public void testRestartOMWithKeyOperation() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    String key = "key" + RandomStringUtils.randomNumeric(5);
+    String key1 = "key1" + RandomStringUtils.randomNumeric(5);
+    String key2 = "key2" + RandomStringUtils.randomNumeric(5);
+
+    String newKey1 = "key1new" + RandomStringUtils.randomNumeric(5);
+    String newKey2 = "key2new" + RandomStringUtils.randomNumeric(5);
 
     OzoneClient client = cluster.getClient();
 
@@ -188,12 +195,29 @@ public class TestOzoneManagerRestart {
     Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
 
     String data = "random data";
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
+    OzoneOutputStream ozoneOutputStream1 = ozoneBucket.createKey(key1,
         data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
         new HashMap<>());
 
-    ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
-    ozoneOutputStream.close();
+    ozoneOutputStream1.write(data.getBytes(UTF_8), 0, data.length());
+    ozoneOutputStream1.close();
+
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(key1, newKey1);
+    keyMap.put(key2, newKey2);
+
+    try {
+      ozoneBucket.renameKeys(keyMap);
+    } catch (OMException ex) {
+      Assert.assertEquals(PARTIAL_RENAME, ex.getResult());
+    }
+
+    // Get original Key1, it should not exist
+    try {
+      ozoneBucket.getKey(key1);
+    } catch (OMException ex) {
+      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+    }
 
     cluster.restartOzoneManager();
     cluster.restartStorageContainerManager(true);
@@ -202,10 +226,17 @@ public class TestOzoneManagerRestart {
     // As we allow override of keys, not testing re-create key. We shall see
     // after restart key exists or not.
 
-    // Get key.
-    OzoneKey ozoneKey = ozoneBucket.getKey(key);
-    Assert.assertTrue(ozoneKey.getName().equals(key));
+    // Get newKey1.
+    OzoneKey ozoneKey = ozoneBucket.getKey(newKey1);
+    Assert.assertTrue(ozoneKey.getName().equals(newKey1));
     Assert.assertTrue(ozoneKey.getReplicationType().equals(
         ReplicationType.RATIS));
+
+    // Get newKey2, it should not exist
+    try {
+      ozoneBucket.getKey(newKey2);
+    } catch (OMException ex) {
+      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+    }
   }
 }

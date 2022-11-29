@@ -19,10 +19,12 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -78,14 +80,22 @@ public class IncrementalContainerReportHandler extends
     synchronized (dd) {
       for (ContainerReplicaProto replicaProto :
           report.getReport().getReportList()) {
+        ContainerID id = ContainerID.valueOf(replicaProto.getContainerID());
+        ContainerInfo container = null;
         try {
-          final ContainerID id = ContainerID.valueOf(
-              replicaProto.getContainerID());
-          if (!replicaProto.getState().equals(
-              ContainerReplicaProto.State.DELETED)) {
-            nodeManager.addContainer(dd, id);
+          try {
+            container = getContainerManager().getContainer(id);
+            // Ensure we reuse the same ContainerID instance in containerInfo
+            id = container.containerID();
+          } finally {
+            if (!replicaProto.getState().equals(
+                ContainerReplicaProto.State.DELETED)) {
+              nodeManager.addContainer(dd, id);
+            }
           }
-          processContainerReplica(dd, replicaProto, publisher);
+          if (ContainerReportValidator.validate(container, dd, replicaProto)) {
+            processContainerReplica(dd, container, replicaProto, publisher);
+          }
         } catch (ContainerNotFoundException e) {
           success = false;
           LOG.warn("Container {} not found!", replicaProto.getContainerID());
@@ -97,7 +107,8 @@ public class IncrementalContainerReportHandler extends
           success = false;
           LOG.warn("Container {} replica not found!",
               replicaProto.getContainerID());
-        } catch (IOException | InvalidStateTransitionException e) {
+        } catch (IOException | InvalidStateTransitionException |
+                 TimeoutException e) {
           success = false;
           LOG.error("Exception while processing ICR for container {}",
               replicaProto.getContainerID(), e);

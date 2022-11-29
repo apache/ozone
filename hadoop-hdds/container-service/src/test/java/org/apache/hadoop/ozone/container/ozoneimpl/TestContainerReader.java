@@ -22,29 +22,34 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -52,6 +57,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -59,6 +66,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Test ContainerReader class which loads containers from disks.
  */
+@RunWith(Parameterized.class)
 public class TestContainerReader {
 
   @Rule
@@ -76,27 +84,44 @@ public class TestContainerReader {
   private int blockCount = 10;
   private long blockLen = 1024;
 
+  private final ContainerLayoutVersion layout;
+  private String schemaVersion;
+
+  public TestContainerReader(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ContainerTestVersionInfo.versionParameters();
+  }
+
   @Before
   public void setup() throws Exception {
 
     File volumeDir = tempDir.newFolder();
     volumeSet = Mockito.mock(MutableVolumeSet.class);
-    containerSet = new ContainerSet();
-    conf = new OzoneConfiguration();
+    containerSet = new ContainerSet(1000);
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
         .toString()).clusterID(clusterId).build();
+    StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf,
+        null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
-    for (int i=0; i<2; i++) {
+    for (int i = 0; i < 2; i++) {
       KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_BLOCK,
+          layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           datanodeId.toString());
 
@@ -114,28 +139,33 @@ public class TestContainerReader {
         blkNames = addBlocks(keyValueContainer, false);
         markBlocksForDelete(keyValueContainer, false, blkNames, i);
       }
-      // Close the RocksDB instance for this container and remove from the cache
-      // so it does not affect the ContainerReader, which avoids using the cache
-      // at startup for performance reasons.
-      BlockUtils.removeDB(keyValueContainerData, conf);
     }
+    // Close the RocksDB instance for this container and remove from the cache
+    // so it does not affect the ContainerReader, which avoids using the cache
+    // at startup for performance reasons.
+    ContainerCache.getInstance(conf).shutdownCache();
   }
 
+  @After
+  public void cleanup() {
+    BlockUtils.shutdownCache(conf);
+  }
 
   private void markBlocksForDelete(KeyValueContainer keyValueContainer,
       boolean setMetaData, List<Long> blockNames, int count) throws Exception {
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
-        .getContainerData(), conf)) {
+    KeyValueContainerData cData = keyValueContainer.getContainerData();
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
       for (int i = 0; i < count; i++) {
         Table<String, BlockData> blockDataTable =
                 metadataStore.getStore().getBlockDataTable();
 
-        String blk = Long.toString(blockNames.get(i));
+        Long localID = blockNames.get(i);
+        String blk = cData.blockKey(localID);
         BlockData blkInfo = blockDataTable.get(blk);
 
         blockDataTable.delete(blk);
-        blockDataTable.put(OzoneConsts.DELETING_KEY_PREFIX + blk, blkInfo);
+        blockDataTable.put(cData.deletingBlockKey(localID), blkInfo);
       }
 
       if (setMetaData) {
@@ -143,7 +173,7 @@ public class TestContainerReader {
         // and bytes used metadata values, so those do not change.
         Table<String, Long> metadataTable =
                 metadataStore.getStore().getMetadataTable();
-        metadataTable.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, (long)count);
+        metadataTable.put(cData.pendingDeleteBlockCountKey(), (long)count);
       }
     }
 
@@ -152,10 +182,9 @@ public class TestContainerReader {
   private List<Long> addBlocks(KeyValueContainer keyValueContainer,
       boolean setMetaData) throws Exception {
     long containerId = keyValueContainer.getContainerData().getContainerID();
-
+    KeyValueContainerData cData = keyValueContainer.getContainerData();
     List<Long> blkNames = new ArrayList<>();
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
-        .getContainerData(), conf)) {
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
       for (int i = 0; i < blockCount; i++) {
         // Creating BlockData
@@ -172,14 +201,14 @@ public class TestContainerReader {
         blockData.setChunks(chunkList);
         blkNames.add(localBlockID);
         metadataStore.getStore().getBlockDataTable()
-                .put(Long.toString(localBlockID), blockData);
+                .put(cData.blockKey(localBlockID), blockData);
       }
 
       if (setMetaData) {
         metadataStore.getStore().getMetadataTable()
-                .put(OzoneConsts.BLOCK_COUNT, (long)blockCount);
+                .put(cData.blockCountKey(), (long)blockCount);
         metadataStore.getStore().getMetadataTable()
-                .put(OzoneConsts.CONTAINER_BYTES_USED, blockCount * blockLen);
+                .put(cData.bytesUsedKey(), blockCount * blockLen);
       }
     }
 
@@ -188,16 +217,29 @@ public class TestContainerReader {
 
   @Test
   public void testContainerReader() throws Exception {
+    KeyValueContainerData recoveringContainerData = new KeyValueContainerData(
+        10, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), datanodeId.toString());
+    //create a container with recovering state
+    recoveringContainerData.setState(RECOVERING);
+
+    KeyValueContainer recoveringKeyValueContainer =
+        new KeyValueContainer(recoveringContainerData,
+            conf);
+    recoveringKeyValueContainer.create(
+        volumeSet, volumeChoosingPolicy, clusterId);
+
     ContainerReader containerReader = new ContainerReader(volumeSet,
-        hddsVolume, containerSet, conf);
+        hddsVolume, containerSet, conf, true);
 
     Thread thread = new Thread(containerReader);
     thread.start();
     thread.join();
 
+    //recovering container should be deleted, so the count should be 2
     Assert.assertEquals(2, containerSet.containerCount());
 
-    for (int i=0; i < 2; i++) {
+    for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);
 
       KeyValueContainerData keyValueContainerData = (KeyValueContainerData)
@@ -205,7 +247,7 @@ public class TestContainerReader {
 
       // Verify block related metadata.
       Assert.assertEquals(blockCount,
-          keyValueContainerData.getKeyCount());
+          keyValueContainerData.getBlockCount());
 
       Assert.assertEquals(blockCount * blockLen,
           keyValueContainerData.getBytesUsed());
@@ -219,7 +261,7 @@ public class TestContainerReader {
   public void testContainerReaderWithLoadException() throws Exception {
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
-    ContainerSet containerSet1 = new ContainerSet();
+    ContainerSet containerSet1 = new ContainerSet(1000);
     File volumeDir1 = tempDir.newFolder();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
 
@@ -228,6 +270,8 @@ public class TestContainerReader {
     hddsVolume1 = new HddsVolume.Builder(volumeDir1
         .getAbsolutePath()).conf(conf).datanodeUuid(datanode
         .toString()).clusterID(clusterId).build();
+    StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
+        null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume1);
@@ -235,13 +279,12 @@ public class TestContainerReader {
     int containerCount = 3;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_BLOCK,
+          layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           datanodeId.toString());
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData, conf);
       keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId);
-      BlockUtils.removeDB(keyValueContainerData, conf);
 
       if (i == 0) {
         // rename first container directory name
@@ -252,9 +295,10 @@ public class TestContainerReader {
         Assert.assertTrue(containerPath.renameTo(new File(renamePath)));
       }
     }
+    ContainerCache.getInstance(conf).shutdownCache();
 
     ContainerReader containerReader = new ContainerReader(volumeSet1,
-        hddsVolume1, containerSet1, conf);
+        hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
@@ -268,6 +312,8 @@ public class TestContainerReader {
       volumeDirs[i] = tempDir.newFolder();
       datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(",");
     }
+
+    BlockUtils.shutdownCache(conf);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         datanodeDirs.toString());
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
@@ -275,8 +321,9 @@ public class TestContainerReader {
     MutableVolumeSet volumeSets =
         new MutableVolumeSet(datanodeId.toString(), clusterId, conf, null,
             StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSets, clusterId, clusterId, conf);
     ContainerCache cache = ContainerCache.getInstance(conf);
-    cache.clear();
+    cache.shutdownCache();
 
     RoundRobinVolumeChoosingPolicy policy =
         new RoundRobinVolumeChoosingPolicy();
@@ -285,7 +332,7 @@ public class TestContainerReader {
     blockCount = containerCount;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData keyValueContainerData =
-          new KeyValueContainerData(i, ChunkLayOutVersion.FILE_PER_BLOCK,
+          new KeyValueContainerData(i, layout,
               (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
               datanodeId.toString());
 
@@ -302,18 +349,18 @@ public class TestContainerReader {
         blkNames = addBlocks(keyValueContainer, false);
         markBlocksForDelete(keyValueContainer, false, blkNames, i);
       }
-      // Close the RocksDB instance for this container and remove from the cache
-      // so it does not affect the ContainerReader, which avoids using the cache
-      // at startup for performance reasons.
-      BlockUtils.removeDB(keyValueContainerData, conf);
     }
+    // Close the RocksDB instance for this container and remove from the cache
+    // so it does not affect the ContainerReader, which avoids using the cache
+    // at startup for performance reasons.
+    cache.shutdownCache();
 
     List<StorageVolume> volumes = volumeSets.getVolumesList();
     ContainerReader[] containerReaders = new ContainerReader[volumeNum];
     Thread[] threads = new Thread[volumeNum];
     for (int i = 0; i < volumeNum; i++) {
       containerReaders[i] = new ContainerReader(volumeSets,
-          (HddsVolume) volumes.get(i), containerSet, conf);
+          (HddsVolume) volumes.get(i), containerSet, conf, true);
       threads[i] = new Thread(containerReaders[i]);
     }
     long startTime = System.currentTimeMillis();

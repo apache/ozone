@@ -118,9 +118,9 @@ public class HttpFSServer {
     final String accessModeString
         = conf.get("httpfs.access.mode", "read-write")
         .toLowerCase();
-    if(accessModeString.compareTo("write-only") == 0) {
+    if (accessModeString.compareTo("write-only") == 0) {
       accessMode = AccessMode.WRITEONLY;
-    } else if(accessModeString.compareTo("read-only") == 0) {
+    } else if (accessModeString.compareTo("read-only") == 0) {
       accessMode = AccessMode.READONLY;
     } else {
       accessMode = AccessMode.READWRITE;
@@ -261,7 +261,7 @@ public class HttpFSServer {
       throws IOException, FileSystemAccessException,
       UnsupportedOperationException {
     // Restrict access to only GETFILESTATUS and LISTSTATUS in write-only mode
-    if((op.value() != HttpFSConstants.Operation.GETFILESTATUS) &&
+    if ((op.value() != HttpFSConstants.Operation.GETFILESTATUS) &&
             (op.value() != HttpFSConstants.Operation.LISTSTATUS) &&
             accessMode == AccessMode.WRITEONLY) {
       return Response.status(Response.Status.FORBIDDEN).build();
@@ -684,7 +684,7 @@ public class HttpFSServer {
                          @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Do not allow DELETE commands in read-only mode
-    if(accessMode == AccessMode.READONLY) {
+    if (accessMode == AccessMode.READONLY) {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
@@ -790,7 +790,7 @@ public class HttpFSServer {
                        @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Do not allow POST commands in read-only mode
-    if(accessMode == AccessMode.READONLY) {
+    if (accessMode == AccessMode.READONLY) {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
@@ -972,7 +972,7 @@ public class HttpFSServer {
                        @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Do not allow PUT commands in read-only mode
-    if(accessMode == AccessMode.READONLY) {
+    if (accessMode == AccessMode.READONLY) {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();

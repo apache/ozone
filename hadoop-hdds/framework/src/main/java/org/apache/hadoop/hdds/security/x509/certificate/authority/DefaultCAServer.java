@@ -60,6 +60,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -228,7 +229,7 @@ public class DefaultCAServer implements CertificateServer {
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
-    if(xcertHolder.isCompletedExceptionally()) {
+    if (xcertHolder.isCompletedExceptionally()) {
       // This means that approver told us there are things which it disagrees
       // with in this Certificate Request. Since the first set of sanity
       // checks failed, we just return the future object right here.
@@ -257,7 +258,8 @@ public class DefaultCAServer implements CertificateServer {
       default:
         return null; // cannot happen, keeping checkstyle happy.
       }
-    } catch (CertificateException | IOException | OperatorCreationException e) {
+    } catch (CertificateException | IOException | OperatorCreationException |
+             TimeoutException e) {
       LOG.error("Unable to issue a certificate.", e);
       xcertHolder.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
@@ -268,7 +270,7 @@ public class DefaultCAServer implements CertificateServer {
   private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
       LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
-      OperatorCreationException, CertificateException {
+      OperatorCreationException, CertificateException, TimeoutException {
 
     lock.lock();
     X509CertificateHolder xcert;
@@ -313,7 +315,7 @@ public class DefaultCAServer implements CertificateServer {
           store.revokeCertificates(certificates,
               getCACertificate(), reason, revocationTime, crlApprover)
       );
-    } catch (IOException ex) {
+    } catch (IOException | TimeoutException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
       revoked.completeExceptionally(new SCMSecurityException(ex));
     }
@@ -324,7 +326,7 @@ public class DefaultCAServer implements CertificateServer {
   public List<X509Certificate> listCertificate(NodeType role,
       long startSerialId, int count, boolean isRevoked) throws IOException {
     return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
-        isRevoked? CertificateStore.CertType.REVOKED_CERTS :
+        isRevoked ? CertificateStore.CertType.REVOKED_CERTS :
             CertificateStore.CertType.VALID_CERTS);
   }
 
@@ -534,10 +536,10 @@ public class DefaultCAServer implements CertificateServer {
   private void generateRootCertificate(SecurityConfig securityConfig,
       KeyPair key) throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-    LocalDate endDate =
-        temp.plus(securityConfig.getMaxCertificateDuration()).toLocalDate();
+    LocalDateTime beginDate =
+        LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
+    LocalDateTime endDate =
+        beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
         .setSubject(this.subject)
         .setScmID(this.scmID)
@@ -554,7 +556,7 @@ public class DefaultCAServer implements CertificateServer {
       OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
           ip -> {
             builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
+            if (validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             }
           });

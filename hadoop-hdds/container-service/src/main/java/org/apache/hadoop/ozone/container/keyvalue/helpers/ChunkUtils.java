@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -125,7 +126,9 @@ public final class ChunkUtils {
     try {
       bytesWritten = writer.applyAsLong(data);
     } catch (UncheckedIOException e) {
-      onFailure(volume);
+      if (!(e.getCause() instanceof InterruptedIOException)) {
+        onFailure(volume);
+      }
       throw wrapInStorageContainerException(e.getCause());
     }
 
@@ -146,20 +149,25 @@ public final class ChunkUtils {
   private static long writeDataToFile(File file, ChunkBuffer data,
       long offset, boolean sync) {
     final Path path = file.toPath();
-    return processFileExclusively(path, () -> {
-      FileChannel channel = null;
-      try {
-        channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
+    try {
+      return processFileExclusively(path, () -> {
+        FileChannel channel = null;
+        try {
+          channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
 
-        try (FileLock ignored = channel.lock()) {
-          return writeDataToChannel(channel, data, offset);
+          try (FileLock ignored = channel.lock()) {
+            return writeDataToChannel(channel, data, offset);
+          }
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        } finally {
+          closeFile(channel, sync);
         }
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      } finally {
-        closeFile(channel, sync);
-      }
-    });
+      });
+    } catch (InterruptedException e) {
+      throw new UncheckedIOException(new InterruptedIOException(
+          "Interrupted while waiting to write file " + path));
+    }
   }
 
   private static long writeDataToChannel(FileChannel channel, ChunkBuffer data,
@@ -203,6 +211,8 @@ public final class ChunkUtils {
     } catch (UncheckedIOException e) {
       onFailure(volume);
       throw wrapInStorageContainerException(e.getCause());
+    } catch (InterruptedException e) {
+      throw wrapInStorageContainerException(e);
     }
 
     // Increment volumeIO stats here.
@@ -242,6 +252,10 @@ public final class ChunkUtils {
       }
       return true;
     }
+
+    // TODO: when overwriting a chunk, we should ensure that the new chunk
+    //  size is same as the old chunk size
+
     return false;
   }
 
@@ -287,10 +301,18 @@ public final class ChunkUtils {
   }
 
   @VisibleForTesting
-  static <T> T processFileExclusively(Path path, Supplier<T> op) {
+  static <T> T processFileExclusively(Path path, Supplier<T> op)
+      throws InterruptedException {
+    long period = 1;
     for (;;) {
       if (LOCKS.add(path)) {
         break;
+      } else {
+        Thread.sleep(period);
+        // exponentially backoff until the sleep time is over 1 second.
+        if (period < 1000) {
+          period *= 2;
+        }
       }
     }
 
@@ -353,7 +375,7 @@ public final class ChunkUtils {
   }
 
   public static StorageContainerException wrapInStorageContainerException(
-      IOException e) {
+      Exception e) {
     ContainerProtos.Result result = translate(e);
     return new StorageContainerException(e, result);
   }
@@ -379,14 +401,22 @@ public final class ChunkUtils {
    * Checks if the block file length is equal to the chunk offset.
    *
    */
-  public static void validateChunkSize(File chunkFile, ChunkInfo chunkInfo)
+  public static void validateChunkSize(FileChannel fileChannel,
+      ChunkInfo chunkInfo, String fileName)
       throws StorageContainerException {
     long offset = chunkInfo.getOffset();
-    long len = chunkFile.length();
-    if (chunkFile.length() != offset) {
-      throw new StorageContainerException(
-          "Chunk file offset " + offset + " does not match blockFile length " +
-          len, CHUNK_FILE_INCONSISTENCY);
+    long fileLen;
+    try {
+      fileLen = fileChannel.size();
+    } catch (IOException e) {
+      throw new StorageContainerException("IO error encountered while " +
+          "getting the file size for " + fileName + " at offset " + offset,
+          CHUNK_FILE_INCONSISTENCY);
+    }
+    if (fileLen != offset) {
+      throw new StorageContainerException("Chunk offset " + offset +
+          " does not match length " + fileLen + " of blockFile " + fileName,
+          CHUNK_FILE_INCONSISTENCY);
     }
   }
 }

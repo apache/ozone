@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -67,8 +68,9 @@ public class OMKeyRemoveAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   private OzoneObj obj;
 
   public OMKeyRemoveAclRequestWithFSO(
-      OzoneManagerProtocolProtos.OMRequest omRequest) {
-    super(omRequest);
+      OzoneManagerProtocolProtos.OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
     OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
         getOmRequest().getRemoveAclRequest();
     obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
@@ -151,11 +153,13 @@ public class OMKeyRemoveAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   @Override
   OMClientResponse onSuccess(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
-      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDir) {
+      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDir,
+      long volumeId, long bucketId) {
     omResponse.setSuccess(operationResult);
     omResponse.setRemoveAclResponse(
         OzoneManagerProtocolProtos.RemoveAclResponse.newBuilder()
             .setResponse(operationResult));
-    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir);
+    return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir,
+        getBucketLayout(), volumeId, bucketId);
   }
 }

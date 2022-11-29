@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+    .ContainerDataProto.State.RECOVERING;
 
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
@@ -73,17 +75,18 @@ public class ContainerReader implements Runnable {
   private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
+  private final boolean shouldDeleteRecovering;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
-      ConfigurationSource conf
-  ) {
+      ConfigurationSource conf, boolean shouldDeleteRecovering) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
+    this.shouldDeleteRecovering = shouldDeleteRecovering;
   }
 
   @Override
@@ -190,9 +193,9 @@ public class ContainerReader implements Runnable {
   }
 
   /**
-   * verify ContainerData loaded from disk and fix-up stale members.
-   * Specifically blockCommitSequenceId, delete related metadata
-   * and bytesUsed
+   * Verify ContainerData loaded from disk and fix-up stale members.
+   * Specifically the in memory values of blockCommitSequenceId, delete related
+   * metadata, bytesUsed and block count.
    * @param containerData
    * @throws IOException
    */
@@ -207,6 +210,14 @@ public class ContainerReader implements Runnable {
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
             config);
+        if (kvContainer.getContainerState() == RECOVERING) {
+          if (shouldDeleteRecovering) {
+            kvContainer.delete();
+            LOG.info("Delete recovering container {}.",
+                kvContainer.getContainerData().getContainerID());
+          }
+          return;
+        }
         containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +

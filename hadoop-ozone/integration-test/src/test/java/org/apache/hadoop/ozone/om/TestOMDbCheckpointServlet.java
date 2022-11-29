@@ -33,6 +33,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -47,7 +49,6 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeDBCheckpointToStream;
@@ -167,7 +168,6 @@ public class TestOMDbCheckpointServlet {
   public void testDoGet() throws Exception {
     conf.setBoolean(OZONE_ACL_ENABLED, false);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
 
     setupCluster();
 
@@ -178,6 +178,7 @@ public class TestOMDbCheckpointServlet {
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
         om.getOmAdminUsernames(),
+        om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
     doNothing().when(responseMock).setContentType("application/x-tgz");
@@ -213,7 +214,8 @@ public class TestOMDbCheckpointServlet {
     setupCluster();
 
     final OzoneManager om = cluster.getOzoneManager();
-    Collection<String> allowedUsers = om.getOmAdminUsernames();
+    Collection<String> allowedUsers =
+            new LinkedHashSet<>(om.getOmAdminUsernames());
     allowedUsers.add("recon");
 
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
@@ -221,6 +223,7 @@ public class TestOMDbCheckpointServlet {
         om.getMetrics().getDBCheckpointMetrics(),
         om.getAclsEnabled(),
         allowedUsers,
+        Collections.emptySet(),
         om.isSpnegoEnabled());
 
     omDbCheckpointServletMock.init();

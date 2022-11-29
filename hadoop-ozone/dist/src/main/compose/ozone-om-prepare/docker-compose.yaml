@@ -21,7 +21,7 @@ x-common-config:
   &common-config
   env_file:
     - docker-config
-  image: ${OZONE_IMAGE}
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
 
 x-replication:
   &replication

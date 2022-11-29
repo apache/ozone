@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.TimeoutException;
 
 /**
  * DeletedBlockLogStateManager interface to
@@ -33,18 +34,23 @@ import java.util.ArrayList;
 public interface DeletedBlockLogStateManager {
   @Replicate
   void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   @Replicate
   void removeTransactionsFromDB(ArrayList<Long> txIDs)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   @Replicate
   void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
-      throws IOException;
+      throws IOException, TimeoutException;
+
+  @Replicate
+  int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+      throws IOException, TimeoutException;
 
   TableIterator<Long,
-      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator();
+      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator()
+      throws IOException;
 
   void onFlush();
 

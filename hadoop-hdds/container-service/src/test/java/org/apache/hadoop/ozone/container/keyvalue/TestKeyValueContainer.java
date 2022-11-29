@@ -28,11 +28,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -41,11 +43,11 @@ import org.apache.hadoop.ozone.container.common.volume
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -56,9 +58,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
-import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.RocksDBException;
 
 import java.io.File;
 
@@ -66,6 +66,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -74,6 +76,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.ratis.util.Preconditions.assertTrue;
@@ -101,20 +104,23 @@ public class TestKeyValueContainer {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
+  private String schemaVersion;
 
   // Use one configuration object across parameterized runs of tests.
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
-  public TestKeyValueContainer(ChunkLayOutVersion layout) {
-    this.layout = layout;
+  public TestKeyValueContainer(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, CONF);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before
@@ -123,6 +129,7 @@ public class TestKeyValueContainer {
     HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
         .getAbsolutePath()).conf(CONF).datanodeUuid(datanodeId
         .toString()).build();
+    StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, CONF, null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -154,6 +161,55 @@ public class TestKeyValueContainer {
         "DB does not exist");
   }
 
+  /**
+   * Tests repair of containers affected by the bug reported in HDDS-6235.
+   */
+  @Test
+  public void testMissingChunksDirCreated() throws Exception {
+    // Create an empty container and delete its chunks directory.
+    createContainer();
+    closeContainer();
+    // Sets the checksum.
+    populate(0);
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+    File chunksDir = new File(data.getChunksPath());
+    Assert.assertTrue(chunksDir.delete());
+
+    // When the container is loaded, the missing chunks directory should
+    // be created.
+    KeyValueContainerUtil.parseKVContainerData(data, CONF);
+    Assert.assertTrue(chunksDir.exists());
+  }
+
+  @Test
+  public void testEmptyContainerImportExport() throws Exception {
+    createContainer();
+    closeContainer();
+
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+
+    // Check state of original container.
+    checkContainerFilesPresent(data, 0);
+
+    //destination path
+    File exportTar = folder.newFile("exported.tar.gz");
+    TarContainerPacker packer = new TarContainerPacker();
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+      keyValueContainer.exportContainerData(fos, packer);
+    }
+
+    keyValueContainer.delete();
+
+    // import container.
+    try (FileInputStream fis = new FileInputStream(exportTar)) {
+      keyValueContainer.importContainerData(fis, packer);
+    }
+
+    // Make sure empty chunks dir was unpacked.
+    checkContainerFilesPresent(data, 0);
+  }
+
   @Test
   public void testContainerImportExport() throws Exception {
     long containerId = keyValueContainer.getContainerData().getContainerID();
@@ -179,16 +235,16 @@ public class TestKeyValueContainer {
     //create a new one
     KeyValueContainerData containerData =
         new KeyValueContainerData(containerId,
-            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getLayoutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
     HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    container.populatePathFields(scmId, containerVolume);
     try (FileInputStream fis = new FileInputStream(folderToExport)) {
       container.importContainerData(fis, packer);
     }
@@ -199,9 +255,9 @@ public class TestKeyValueContainer {
     assertEquals(keyValueContainerData.getState(),
         containerData.getState());
     assertEquals(numberOfKeysToWrite,
-        containerData.getKeyCount());
-    assertEquals(keyValueContainerData.getLayOutVersion(),
-        containerData.getLayOutVersion());
+        containerData.getBlockCount());
+    assertEquals(keyValueContainerData.getLayoutVersion(),
+        containerData.getLayoutVersion());
     assertEquals(keyValueContainerData.getMaxSize(),
         containerData.getMaxSize());
     assertEquals(keyValueContainerData.getBytesUsed(),
@@ -221,15 +277,15 @@ public class TestKeyValueContainer {
     //Import failure should cleanup the container directory
     containerData =
         new KeyValueContainerData(containerId + 1,
-            keyValueContainerData.getLayOutVersion(),
+            keyValueContainerData.getLayoutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
     container = new KeyValueContainer(containerData, CONF);
 
     containerVolume = volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    container.populatePathFields(scmId, containerVolume);
     try {
       FileInputStream fis = new FileInputStream(folderToExport);
       fis.close();
@@ -244,6 +300,18 @@ public class TestKeyValueContainer {
     }
   }
 
+  private void checkContainerFilesPresent(KeyValueContainerData data,
+      long expectedNumFilesInChunksDir) throws IOException {
+    File chunksDir = new File(data.getChunksPath());
+    Assert.assertTrue(Files.isDirectory(chunksDir.toPath()));
+    try (Stream<Path> stream = Files.list(chunksDir.toPath())) {
+      Assert.assertEquals(expectedNumFilesInChunksDir, stream.count());
+    }
+    Assert.assertTrue(data.getDbFile().exists());
+    Assert.assertTrue(KeyValueContainer.getContainerFile(data.getMetadataPath(),
+        data.getContainerID()).exists());
+  }
+
   /**
    * Create the container on disk.
    */
@@ -256,19 +324,20 @@ public class TestKeyValueContainer {
    * Add some keys to the container.
    */
   private void populate(long numberOfKeysToWrite) throws IOException {
-    try (ReferenceCountedDB metadataStore =
-        BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
+    KeyValueContainerData cData = keyValueContainer.getContainerData();
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, CONF)) {
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
 
       for (long i = 0; i < numberOfKeysToWrite; i++) {
-        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
+        blockDataTable.put(cData.blockKey(i),
+            new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
       metadataStore.getStore().getMetadataTable()
-              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
+              .put(cData.blockCountKey(), numberOfKeysToWrite);
     }
 
     Map<String, String> metadata = new HashMap<>();
@@ -361,8 +430,13 @@ public class TestKeyValueContainer {
 
     assertFalse("Container File still exists",
         keyValueContainer.getContainerFile().exists());
-    assertFalse("Container DB file still exists",
-        keyValueContainer.getContainerDBFile().exists());
+
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      assertTrue(keyValueContainer.getContainerDBFile().exists());
+    } else {
+      assertFalse("Container DB file still exists",
+          keyValueContainer.getContainerDBFile().exists());
+    }
   }
 
   @Test
@@ -439,21 +513,19 @@ public class TestKeyValueContainer {
   }
 
   @Test
-  public void testContainerRocksDB()
-      throws StorageContainerException, RocksDBException {
+  public void testContainerRocksDB() throws IOException {
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    try(ReferenceCountedDB db =
-        BlockUtils.getDB(keyValueContainerData, CONF)) {
+    try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
       long defaultCacheSize = 64 * OzoneConsts.MB;
       long cacheSize = Long.parseLong(store
           .getProperty("rocksdb.block-cache-capacity"));
       Assert.assertEquals(defaultCacheSize, cacheSize);
-      for (ColumnFamilyHandle handle : store.getColumnFamilyHandles()) {
+      for (ColumnFamily handle : store.getColumnFamilies()) {
         cacheSize = Long.parseLong(
             store.getProperty(handle, "rocksdb.block-cache-capacity"));
         Assert.assertEquals(defaultCacheSize, cacheSize);
@@ -494,13 +566,14 @@ public class TestKeyValueContainer {
         ssdProfile.getColumnFamilyOptions(conf));
   }
 
+
   @Test
   public void testDBProfileAffectsDBOptions() throws Exception {
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile1;
-    try (ReferenceCountedDB db1 =
+    try (DBHandle db1 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
       Assert.assertTrue(store1 instanceof AbstractDatanodeStore);
@@ -509,6 +582,7 @@ public class TestKeyValueContainer {
 
     // Create Container 2 with different DBProfile in otherConf
     OzoneConfiguration otherConf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, otherConf);
     // Use a dedicated profile for test
     otherConf.setEnum(HDDS_DB_PROFILE, DBProfile.SSD);
 
@@ -520,15 +594,49 @@ public class TestKeyValueContainer {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile2;
-    try (ReferenceCountedDB db2 =
+    try (DBHandle db2 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), otherConf)) {
       DatanodeStore store2 = db2.getStore();
       Assert.assertTrue(store2 instanceof AbstractDatanodeStore);
       outProfile2 = ((AbstractDatanodeStore) store2).getDbProfile();
     }
 
-    // DBOtions should be different
-    Assert.assertNotEquals(outProfile1.getDBOptions().compactionReadaheadSize(),
-        outProfile2.getDBOptions().compactionReadaheadSize());
+    // DBOtions should be different, except SCHEMA-V3
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      Assert.assertEquals(
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
+    } else {
+      Assert.assertNotEquals(
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
+    }
+  }
+
+  @Test
+  public void testKeyValueDataProtoBufMsg() throws Exception {
+    createContainer();
+    populate(10);
+    closeContainer();
+    ContainerProtos.ContainerDataProto proto =
+        keyValueContainerData.getProtoBufMessage();
+
+    assertEquals(keyValueContainerData.getContainerID(),
+        proto.getContainerID());
+    assertEquals(keyValueContainerData.getContainerType(),
+        proto.getContainerType());
+    assertEquals(keyValueContainerData.getContainerPath(),
+        proto.getContainerPath());
+    assertEquals(keyValueContainerData.getBlockCount(),
+        proto.getBlockCount());
+    assertEquals(keyValueContainerData.getBytesUsed(),
+        proto.getBytesUsed());
+    assertEquals(keyValueContainerData.getState(),
+        proto.getState());
+
+    for (ContainerProtos.KeyValue kv : proto.getMetadataList()) {
+      assertEquals(keyValueContainerData.getMetadata().get(kv.getKey()),
+          kv.getValue());
+    }
   }
 }

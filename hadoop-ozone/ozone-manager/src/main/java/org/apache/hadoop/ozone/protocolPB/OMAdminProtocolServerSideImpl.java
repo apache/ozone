@@ -18,11 +18,16 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
@@ -61,6 +66,45 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
         .setSuccess(true)
         .addAllNodesInMemory(omNodesInMemory)
         .addAllNodesInNewConf(omNodesInNewConf)
+        .build();
+  }
+
+  @Override
+  public DecommissionOMResponse decommission(RpcController controller,
+      DecommissionOMRequest request) throws ServiceException {
+    if (request == null) {
+      return null;
+    }
+    if (!ozoneManager.isRatisEnabled()) {
+      return DecommissionOMResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg("OM node cannot be decommissioned as Ratis is " +
+              "not enabled.")
+          .build();
+    }
+
+    OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+    OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+
+    OMNodeDetails decommNode = ozoneManager.getPeerNode(request.getNodeId());
+    if (decommNode == null) {
+      return DecommissionOMResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg("OM node not present in the OM peer list.")
+          .build();
+    }
+
+    try {
+      omRatisServer.removeOMFromRatisRing(decommNode);
+    } catch (IOException ex) {
+      return DecommissionOMResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage())
+          .build();
+    }
+
+    return DecommissionOMResponse.newBuilder()
+        .setSuccess(true)
         .build();
   }
 }

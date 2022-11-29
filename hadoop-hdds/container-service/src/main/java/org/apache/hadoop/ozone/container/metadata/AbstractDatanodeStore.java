@@ -18,19 +18,27 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.db.*;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
-import org.rocksdb.Statistics;
+import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,10 +69,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
-  private DBStore store;
+  private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
-  private final long containerID;
-  private final ColumnFamilyOptions cfOptions;
+  private final ManagedColumnFamilyOptions cfOptions;
 
   private static DatanodeDBProfile dbProfile;
   private final boolean openReadOnly;
@@ -75,7 +82,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
+  protected AbstractDatanodeStore(ConfigurationSource config,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
 
@@ -88,7 +95,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     cfOptions = dbProfile.getColumnFamilyOptions(config);
 
     this.dbDef = dbDef;
-    this.containerID = containerID;
     this.openReadOnly = openReadOnly;
     start(config);
   }
@@ -97,25 +103,54 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      DBOptions options = dbProfile.getDBOptions();
+      ManagedDBOptions options = dbProfile.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 
+      if (this.dbDef instanceof DatanodeSchemaOneDBDefinition ||
+          this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
+        long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
+        options.setMaxTotalWalSize(maxWalSize);
+      }
+
       String rocksDbStat = config.getTrimmed(
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
+          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
+          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
       if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        Statistics statistics = new Statistics();
+        ManagedStatistics statistics = new ManagedStatistics();
         statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
         options.setStatistics(statistics);
       }
 
-      this.store = DBStoreBuilder.newBuilder(config, dbDef)
-              .setDBOptions(options)
-              .setDefaultCFOptions(cfOptions)
-              .setOpenReadOnly(openReadOnly)
-              .build();
+      if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
+        DatanodeConfiguration dc =
+            config.getObject(DatanodeConfiguration.class);
+        // Config user log files
+        InfoLogLevel level = InfoLogLevel.valueOf(
+            dc.getRocksdbLogLevel() + "_LEVEL");
+        options.setInfoLogLevel(level);
+        options.setMaxLogFileSize(dc.getRocksdbMaxFileSize());
+        options.setKeepLogFileNum(dc.getRocksdbMaxFileNum());
+        options.setDeleteObsoleteFilesPeriodMicros(
+            dc.getRocksdbDeleteObsoleteFilesPeriod());
+
+        // For V3, all Rocksdb dir has the same "container.db" name. So use
+        // parentDirName(storage UUID)-dbDirName as db metrics name
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .setDBJmxBeanNameName(dbDef.getDBLocation(config).getName() + "-" +
+                dbDef.getName())
+            .build();
+      } else {
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .build();
+      }
 
       // Use the DatanodeTable wrapper to disable the table iterator on
       // existing Table implementations retrieved from the DBDefinition.
@@ -141,7 +176,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void stop() throws Exception {
+  public synchronized void stop() throws Exception {
     if (store != null) {
       store.close();
       store = null;
@@ -174,15 +209,31 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator() {
+  public BlockIterator<BlockData> getBlockIterator(long containerID)
+      throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator());
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator(KeyPrefixFilter filter) {
+  public BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public synchronized boolean isClosed() {
+    if (this.store == null) {
+      return true;
+    }
+    return this.store.isClosed();
+  }
+
+  @Override
+  public void close() throws IOException {
+    this.store.close();
+    this.cfOptions.close();
   }
 
   @Override
@@ -205,6 +256,14 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     return dbProfile;
   }
 
+  protected AbstractDatanodeDBDefinition getDbDef() {
+    return this.dbDef;
+  }
+
+  protected Table<String, BlockData> getBlockDataTableWithIterator() {
+    return this.blockDataTableWithIterator;
+  }
+
   private static void checkTableStatus(Table<?, ?> table, String name)
           throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
@@ -224,7 +283,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
    */
   @InterfaceAudience.Public
-  private static class KeyValueBlockIterator implements
+  public static class KeyValueBlockIterator implements
           BlockIterator<BlockData>, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(
@@ -276,7 +335,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         nextBlock = null;
         return currentBlock;
       }
-      if(hasNext()) {
+      if (hasNext()) {
         return nextBlock();
       }
       throw new NoSuchElementException("Block Iterator reached end for " +

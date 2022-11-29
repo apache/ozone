@@ -18,14 +18,14 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,6 +36,9 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
@@ -49,18 +52,25 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.slf4j.Logger;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.*;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Test class for {@link DefaultCertificateClient}.
@@ -81,7 +91,7 @@ public class TestDefaultCertificateClient {
   private KeyCodec omKeyCodec;
   private KeyCodec dnKeyCodec;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
     config.setStrings(OZONE_SCM_NAMES, "localhost");
@@ -116,7 +126,7 @@ public class TestDefaultCertificateClient {
     dnCertClient = new DNCertificateClient(dnSecurityConfig, certSerialId);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     omCertClient = null;
     dnCertClient = null;
@@ -186,7 +196,7 @@ public class TestDefaultCertificateClient {
         x509Certificate.getSerialNumber().toString());
     assertNotNull(cert);
     assertTrue(cert.getEncoded().length > 0);
-    assertEquals(cert, x509Certificate);
+    assertEquals(x509Certificate, cert);
 
     // TODO: test verifyCertificate once implemented.
   }
@@ -230,7 +240,7 @@ public class TestDefaultCertificateClient {
             omSecurityConfig.getProvider());
     rsaSignature.initVerify(omCertClient.getPublicKey());
     rsaSignature.update(data);
-    Assert.assertTrue(rsaSignature.verify(hash));
+    assertTrue(rsaSignature.verify(hash));
   }
 
   /**
@@ -385,16 +395,14 @@ public class TestDefaultCertificateClient {
 
 
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
-    assertTrue(dnClientLog.getOutput().contains("Keypair validation " +
-        "failed"));
+    assertEquals(FAILURE, dnCertClient.init());
+    assertTrue(dnClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
     // Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
-    assertTrue(omClientLog.getOutput().contains("Keypair validation " +
-        "failed"));
+    assertEquals(FAILURE, omCertClient.init());
+    assertTrue(omClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
@@ -418,14 +426,13 @@ public class TestDefaultCertificateClient {
     dnCertCodec.writeCertificate(new X509CertificateHolder(
         x509Certificate.getEncoded()));
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
-    assertTrue(dnClientLog.getOutput().contains("Keypair validation " +
-        "failed"));
+    assertEquals(FAILURE, dnCertClient.init());
+    assertTrue(dnClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
     // Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
+    assertEquals(FAILURE, omCertClient.init());
     assertTrue(omClientLog.getOutput().contains("Keypair validation failed"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
@@ -433,7 +440,7 @@ public class TestDefaultCertificateClient {
     // Case 3. Expect failure when certificate is generated from different
     // private key and certificate validation fails.
 
-    // Re write the correct public key.
+    // Re-write the correct public key.
     FileUtils.deleteQuietly(Paths.get(
         omSecurityConfig.getKeyLocation(OM_COMPONENT).toString(),
         omSecurityConfig.getPublicKeyFileName()).toFile());
@@ -445,16 +452,16 @@ public class TestDefaultCertificateClient {
     dnKeyCodec.writePublicKey(keyPair.getPublic());
 
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
-    assertTrue(dnClientLog.getOutput().contains("Stored certificate is " +
-        "generated with different"));
+    assertEquals(FAILURE, dnCertClient.init());
+    assertTrue(dnClientLog.getOutput()
+        .contains("Stored certificate is generated with different"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
     //Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
-    assertTrue(omClientLog.getOutput().contains("Stored certificate is " +
-        "generated with different"));
+    assertEquals(FAILURE, omCertClient.init());
+    assertTrue(omClientLog.getOutput()
+        .contains("Stored certificate is generated with different"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
 
@@ -468,14 +475,55 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getPublicKeyFileName()).toFile());
 
     // Check for DN.
-    assertEquals(dnCertClient.init(), FAILURE);
+    assertEquals(FAILURE, dnCertClient.init());
     assertTrue(dnClientLog.getOutput().contains("Can't recover public key"));
 
     // Check for OM.
-    assertEquals(omCertClient.init(), FAILURE);
+    assertEquals(FAILURE, omCertClient.init());
     assertTrue(omClientLog.getOutput().contains("Can't recover public key"));
     dnClientLog.clearOutput();
     omClientLog.clearOutput();
   }
 
+  @Test
+  public void testCertificateExpirationHandlingInInit() throws Exception {
+    String certId = "1L";
+    String compName = "TEST";
+
+    Logger mockLogger = mock(Logger.class);
+
+    SecurityConfig config = mock(SecurityConfig.class);
+    Path nonexistent = Paths.get("nonexistent");
+    when(config.getCertificateLocation(anyString())).thenReturn(nonexistent);
+    when(config.getKeyLocation(anyString())).thenReturn(nonexistent);
+    when(config.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
+
+    Calendar cal = Calendar.getInstance();
+    cal.add(Calendar.DAY_OF_YEAR, 2);
+    Date expiration = cal.getTime();
+    X509Certificate mockCert = mock(X509Certificate.class);
+    when(mockCert.getNotAfter()).thenReturn(expiration);
+
+    DefaultCertificateClient client =
+        new DefaultCertificateClient(config, mockLogger, certId, compName) {
+          @Override
+          public PrivateKey getPrivateKey() {
+            return mock(PrivateKey.class);
+          }
+
+          @Override
+          public PublicKey getPublicKey() {
+            return mock(PublicKey.class);
+          }
+
+          @Override
+          public X509Certificate getCertificate() {
+            return mockCert;
+          }
+        };
+
+    InitResponse resp = client.init();
+    verify(mockLogger, atLeastOnce()).info(anyString());
+    assertEquals(resp, REINIT);
+  }
 }

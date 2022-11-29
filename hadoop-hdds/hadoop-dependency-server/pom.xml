@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-hadoop-dependency-server</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.3.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Hadoop server dependencies
   </description>
   <name>Apache Ozone HDDS Hadoop Server dependencies</name>
@@ -52,6 +52,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>zookeeper</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.codehaus.jackson</groupId>
           <artifactId>jackson-mapper-asl</artifactId>
         </exclusion>
@@ -70,6 +74,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-json</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -91,6 +107,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>org.fusesource.leveldbjni</groupId>
           <artifactId>leveldbjni-all</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

@@ -20,7 +20,7 @@ source "${DIR}/_lib.sh"
 
 install_spotbugs
 
-MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx'
+MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx --no-transfer-progress'
 
 #shellcheck disable=SC2086
 mvn ${MAVEN_OPTIONS} test-compile spotbugs:spotbugs "$@"

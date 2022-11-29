@@ -28,7 +28,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -47,7 +47,7 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   private final OzoneManagerProtocolPB rpcProxy;
 
-  private final OMFailoverProxyProvider omFailoverProxyProvider;
+  private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
 
   public Hadoop27RpcTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -56,8 +56,8 @@ public class Hadoop27RpcTransport implements OmTransport {
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
 
-    this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
-        omServiceId, OzoneManagerProtocolPB.class);
+    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider(
+            conf, ugi, omServiceId, OzoneManagerProtocolPB.class);
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -78,12 +78,13 @@ public class Hadoop27RpcTransport implements OmTransport {
 
         // Failover to the OM node returned by OMResponse leaderOMNodeId if
         // current proxy is not pointing to that node.
-        omFailoverProxyProvider.performFailoverIfRequired(leaderOmId);
+        omFailoverProxyProvider.setNextOmProxy(leaderOmId);
+        omFailoverProxyProvider.performFailover(null);
       }
       return omResponse;
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
-          OMFailoverProxyProvider.getNotLeaderException(e);
+          HadoopRpcOMFailoverProxyProvider.getNotLeaderException(e);
       if (notLeaderException == null) {
         throw ProtobufHelper.getRemoteException(e);
       }
@@ -98,11 +99,12 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   /**
    * Creates a {@link RetryProxy} encapsulating the
-   * {@link OMFailoverProxyProvider}. The retry proxy fails over on network
-   * exception or if the current proxy is not the leader OM.
+   * {@link HadoopRpcOMFailoverProxyProvider}. The retry proxy fails over on
+   * network exception or if the current proxy is not the leader OM.
    */
   private OzoneManagerProtocolPB createRetryProxy(
-      OMFailoverProxyProvider failoverProxyProvider, int maxFailovers) {
+      HadoopRpcOMFailoverProxyProvider failoverProxyProvider,
+      int maxFailovers) {
 
     OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
         OzoneManagerProtocolPB.class, failoverProxyProvider,

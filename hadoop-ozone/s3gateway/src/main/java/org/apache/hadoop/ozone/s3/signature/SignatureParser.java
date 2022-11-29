@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-
 /**
  * Parser contract to extract signature information from header or query.
  */
@@ -26,5 +24,5 @@ public interface SignatureParser {
 
   String AUTHORIZATION_HEADER = "Authorization";
 
-  SignatureInfo parseSignature() throws OS3Exception;
+  SignatureInfo parseSignature() throws MalformedResourceException;
 }

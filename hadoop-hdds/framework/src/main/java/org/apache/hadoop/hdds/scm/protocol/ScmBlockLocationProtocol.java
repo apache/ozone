@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * ScmBlockLocationProtocol is used by an HDFS node to find the set of nodes
@@ -63,9 +64,9 @@ public interface ScmBlockLocationProtocol extends Closeable {
   @Deprecated
   default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationType type, ReplicationFactor factor, String owner,
-      ExcludeList excludeList) throws IOException {
+      ExcludeList excludeList) throws IOException, TimeoutException {
     return allocateBlock(size, numBlocks, ReplicationConfig
-        .fromTypeAndFactor(type, factor), owner, excludeList);
+        .fromProtoTypeAndFactor(type, factor), owner, excludeList);
   }
 
   /**

@@ -16,6 +16,7 @@
 *** Settings ***
 Documentation       Ozone FS tests
 Library             OperatingSystem
+Library             String
 Resource            ../commonlib.robot
 Resource            setup.robot
 Test Timeout        5 minutes
@@ -45,13 +46,29 @@ Copy from local
                    Execute               ozone fs -copyFromLocal NOTICE.txt ${DEEP_URL}/
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         NOTICE.txt
-    ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationFactor'
-                   Should Be Equal       ${result}         3
+    ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationConfig.replicationFactor'
+                   Should Be Equal       ${result}         THREE
 
 Put
-                   Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
+    ${result} =    Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
+                   Should Be Empty       ${result}
     ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         PUTFILE.txt
+
+
+Check disk usage after create a file which uses RATIS replication type
+                  ${vol} =      Generate Random String  8  [LOWER]
+               ${bucket} =      Generate Random String  8  [LOWER]
+                                Execute                 ozone sh volume create /${vol}
+                                Execute                 ozone sh bucket create /${vol}/${bucket} --type RATIS --replication 3 
+                                Execute                 ozone fs -put NOTICE.txt /${vol}/${bucket}/PUTFILE1.txt
+     ${expectedFileLength} =    Execute                 stat -c %s NOTICE.txt
+     ${expectedDiskUsage} =     Get Disk Usage of File with RATIS Replication    ${expectedFileLength}    3
+     ${result} =                Execute                 ozone fs -du /${vol}/${bucket}
+                                Should contain          ${result}         PUTFILE1.txt
+                                Should contain          ${result}         ${expectedFileLength}
+                                Should contain          ${result}         ${expectedDiskUsage}
+
 
 List
     ${result} =    Execute               ozone fs -ls ${DEEP_URL}/
@@ -147,3 +164,13 @@ Setup localdir1
                    Execute               ozone fs -mkdir -p ${BASE_URL}testdir1
                    Execute               ozone fs -copyFromLocal /tmp/localdir1 ${BASE_URL}testdir1/
                    Execute               ozone fs -put NOTICE.txt ${BASE_URL}testdir1/NOTICE.txt
+
+
+
+Get Disk Usage of File with RATIS Replication
+                                     [arguments]          ${fileLength}    ${replicationFactor}
+    # the formula comes from https://github.com/apache/ozone/blob/master/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/QuotaUtil.java#L42-L60
+    ${expectedDiskUsage} =           Evaluate             ${fileLength} * ${replicationFactor}
+    ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
+                                     [return]             ${expectedDiskUsage}
+

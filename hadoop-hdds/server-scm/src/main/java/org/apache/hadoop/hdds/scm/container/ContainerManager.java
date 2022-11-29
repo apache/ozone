@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -31,14 +32,10 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
- * TODO: Add extensive javadoc.
- *
- * ContainerManager class contains the mapping from a name to a pipeline
- * mapping. This is used by SCM when allocating new locations and when
- * looking up a key.
+ * ContainerManager is responsible for keeping track of all Containers and
+ * managing all containers operations like creating, deleting etc.
  */
 public interface ContainerManager extends Closeable {
-  // TODO: Rename this to ContainerManager
 
   /**
    * Reinitialize the containerManager with the updated container store.
@@ -84,6 +81,13 @@ public interface ContainerManager extends Closeable {
   List<ContainerInfo> getContainers(LifeCycleState state);
 
   /**
+   * Returns the size of containers which are in the specified state.
+   *
+   * @return size of containers.
+   */
+  int getContainerStateCount(LifeCycleState state);
+
+  /**
    * Returns true if the container exist, false otherwise.
    * @param id Container ID
    * @return true if container exist, else false
@@ -96,7 +100,8 @@ public interface ContainerManager extends Closeable {
    * @throws IOException
    */
   ContainerInfo allocateContainer(ReplicationConfig replicationConfig,
-                                  String owner) throws IOException;
+                                  String owner)
+      throws IOException, TimeoutException;
 
   /**
    * Update container state.
@@ -107,7 +112,7 @@ public interface ContainerManager extends Closeable {
    */
   void updateContainerState(ContainerID containerID,
                             LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException, InvalidStateTransitionException, TimeoutException;
 
   /**
    * Returns the latest list of replicas for given containerId.
@@ -180,13 +185,7 @@ public interface ContainerManager extends Closeable {
    * @throws IOException
    */
   void deleteContainer(ContainerID containerID)
-      throws IOException;
-
-  /**
-   * Returns the list of containersIDs.
-   * @return list of containerIDs
-   */
-  Set<ContainerID> getContainerIDs();
+      throws IOException, TimeoutException;
 
   /**
    * Returns containerStateManger.

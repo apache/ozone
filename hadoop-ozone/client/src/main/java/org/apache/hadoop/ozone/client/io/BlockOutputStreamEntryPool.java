@@ -26,6 +26,7 @@ import java.util.ListIterator;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -79,6 +80,7 @@ public class BlockOutputStreamEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private final ContainerClientMetrics clientMetrics;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -88,7 +90,8 @@ public class BlockOutputStreamEntryPool {
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory, long openID
+      XceiverClientFactory xceiverClientFactory, long openID,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -102,7 +105,7 @@ public class BlockOutputStreamEntryPool {
         .setMultipartUploadPartNumber(partNumber).build();
     this.requestID = requestId;
     this.openID = openID;
-    this.excludeList = new ExcludeList();
+    this.excludeList = createExcludeList();
 
     this.bufferPool =
         new BufferPool(config.getStreamBufferSize(),
@@ -110,15 +113,14 @@ public class BlockOutputStreamEntryPool {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
+    this.clientMetrics = clientMetrics;
   }
 
-  /**
-   * A constructor for testing purpose only.
-   *
-   * @see KeyOutputStream#KeyOutputStream()
-   */
-  @VisibleForTesting
-  BlockOutputStreamEntryPool() {
+  ExcludeList createExcludeList() {
+    return new ExcludeList();
+  }
+
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
@@ -136,6 +138,7 @@ public class BlockOutputStreamEntryPool {
     currentStreamIndex = 0;
     openID = -1;
     excludeList = new ExcludeList();
+    this.clientMetrics = clientMetrics;
   }
 
   /**
@@ -181,6 +184,7 @@ public class BlockOutputStreamEntryPool {
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
+            .setClientMetrics(clientMetrics)
             .build();
   }
 
@@ -208,7 +212,6 @@ public class BlockOutputStreamEntryPool {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     for (BlockOutputStreamEntry streamEntry : streams) {
       long length = streamEntry.getCurrentPosition();
-
       // Commit only those blocks to OzoneManager which are not empty
       if (length != 0) {
         OmKeyLocationInfo info =
@@ -217,7 +220,7 @@ public class BlockOutputStreamEntryPool {
                 .setLength(streamEntry.getCurrentPosition())
                 .setOffset(0)
                 .setToken(streamEntry.getToken())
-                .setPipeline(streamEntry.getPipelineForOMLocationReport())
+                .setPipeline(streamEntry.getPipeline())
                 .build();
         locationInfoList.add(info);
       }
@@ -242,6 +245,10 @@ public class BlockOutputStreamEntryPool {
 
   OzoneClientConfig getConfig() {
     return config;
+  }
+
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   /**
@@ -320,7 +327,8 @@ public class BlockOutputStreamEntryPool {
     if (keyArgs != null) {
       // in test, this could be null
       long length = getKeyLength();
-      Preconditions.checkArgument(offset == length);
+      Preconditions.checkArgument(offset == length,
+          "Epected offset: " + offset + " expected len: " + length);
       keyArgs.setDataSize(length);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not

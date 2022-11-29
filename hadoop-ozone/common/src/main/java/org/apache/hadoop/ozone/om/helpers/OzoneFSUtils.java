@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 public final class OzoneFSUtils {
 
-  private OzoneFSUtils() {}
+  private OzoneFSUtils() { }
 
   /**
    * Returns string representation of path after removing the leading slash.
@@ -120,6 +120,23 @@ public final class OzoneFSUtils {
   }
 
   /**
+   * Checks whether the bucket layout is valid for File System operations
+   * otherwise throws IllegalArgumentException.
+   * Allowed bucket layouts are FILE_SYSTEM_OPTIMIZED and LEGACY.
+   */
+  public static void validateBucketLayout(String bucketName,
+                                          BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new IllegalArgumentException(
+          "Bucket: " + bucketName + " has layout: " + bucketLayout +
+              ", which does not support" +
+              " file system semantics. Bucket Layout must be " +
+              BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
+              + BucketLayout.LEGACY + ".");
+    }
+  }
+
+  /**
    * The function returns leaf node name from the given absolute path. For
    * example, the given key path '/a/b/c/d/e/file1' then it returns leaf node
    * name 'file1'.
@@ -132,6 +149,52 @@ public final class OzoneFSUtils {
     // failed to converts a path key
     return keyName;
   }
+
+  /**
+   * Verifies whether the childKey is a sibling of a given
+   * parentKey.
+   *
+   * @param parentKey parent key name
+   * @param childKey  child key name
+   * @return true if childKey is a sibling of parentKey
+   */
+  public static boolean isSibling(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
+  public static boolean isAncestorPath(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.startsWith(parentParent) ||
+          childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
 
   /**
    * Verifies whether the childKey is an immediate path under the given
@@ -151,6 +214,7 @@ public final class OzoneFSUtils {
     java.nio.file.Path childPath = Paths.get(childKey);
 
     java.nio.file.Path childParent = childPath.getParent();
+
     // Following are the valid parentKey formats:
     // parentKey="" or parentKey="/" or parentKey="/a" or parentKey="a"
     // Following are the valid childKey formats:

@@ -24,4 +24,4 @@ Suite Setup         Generate prefix
 *** Test Cases ***
 
 Test ozone shell
-   Test ozone shell       ${EMPTY}            ${EMPTY}     ${prefix}-rpcbasic
+   Test ozone shell       ${EMPTY}            ${EMPTY}     ${prefix}-without-scheme

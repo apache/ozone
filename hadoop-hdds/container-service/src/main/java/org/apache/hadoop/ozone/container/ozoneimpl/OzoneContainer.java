@@ -18,17 +18,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -41,36 +32,60 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Maps;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
-
 import org.apache.hadoop.util.Timer;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 /**
  * Ozone main class sets up the network servers and initializes the container
@@ -86,6 +101,7 @@ public class OzoneContainer {
   private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
+  private final MutableVolumeSet dbVolumeSet;
   private final StorageVolumeChecker volumeChecker;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
@@ -94,6 +110,8 @@ public class OzoneContainer {
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
+  private final StaleRecoveringContainerScrubbingService
+      recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
@@ -114,10 +132,8 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(
-      DatanodeDetails datanodeDetails, ConfigurationSource
-      conf, StateContext context, CertificateClient certClient
-  )
-      throws IOException {
+      DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      StateContext context, CertificateClient certClient) throws IOException {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -129,20 +145,36 @@ public class OzoneContainer {
     metaVolumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.META_VOLUME, volumeChecker);
 
-    containerSet = new ContainerSet();
+    dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+        new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
+            context, VolumeType.DB_VOLUME, volumeChecker);
+    if (SchemaV3.isFinalizedAndEnabled(config)) {
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
+    }
+
+    long recoveringContainerTimeout = config.getTimeDuration(
+        OZONE_RECOVERING_CONTAINER_TIMEOUT,
+        OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+
+    containerSet = new ContainerSet(recoveringContainerTimeout);
     metadataScanner = null;
 
     buildContainerSet();
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
-    Consumer<ContainerReplicaProto> icrSender = containerReplicaProto -> {
-      IncrementalContainerReportProto icr = IncrementalContainerReportProto
-          .newBuilder()
-          .addReport(containerReplicaProto)
-          .build();
-      context.addIncrementalReport(icr);
-      context.getParent().triggerHeartbeat();
+    IncrementalReportSender<Container> icrSender = container -> {
+      synchronized (containerSet) {
+        ContainerReplicaProto containerReport = container.getContainerReport();
+
+        IncrementalContainerReportProto icr = IncrementalContainerReportProto
+            .newBuilder()
+            .addReport(containerReport)
+            .build();
+        context.addIncrementalReport(icr);
+        context.getParent().triggerHeartbeat();
+      }
     };
 
     for (ContainerType containerType : ContainerType.values()) {
@@ -176,16 +208,41 @@ public class OzoneContainer {
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
-    Duration svcInterval = conf.getObject(
-            DatanodeConfiguration.class).getBlockDeletionInterval();
+    Duration blockDeletingSvcInterval = conf.getObject(
+        DatanodeConfiguration.class).getBlockDeletionInterval();
 
-    long serviceTimeout = config
+    long blockDeletingServiceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
+
+    int blockDeletingServiceWorkerSize = config
+        .getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+            OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
     blockDeletingService =
-        new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
-            TimeUnit.MILLISECONDS, config);
+        new BlockDeletingService(this, blockDeletingSvcInterval.toMillis(),
+            blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
+            blockDeletingServiceWorkerSize, config);
+
+    Duration recoveringContainerScrubbingSvcInterval = conf.getObject(
+        DatanodeConfiguration.class).getRecoveringContainerScrubInterval();
+
+    long recoveringContainerScrubbingServiceTimeout = config
+        .getTimeDuration(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
+            OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
+
+    int recoveringContainerScrubbingServiceWorkerSize = config
+        .getInt(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS,
+            OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT);
+
+    recoveringContainerScrubbingService =
+        new StaleRecoveringContainerScrubbingService(
+            recoveringContainerScrubbingSvcInterval.toMillis(),
+            TimeUnit.MILLISECONDS,
+            recoveringContainerScrubbingServiceWorkerSize,
+            recoveringContainerScrubbingServiceTimeout,
+            containerSet);
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
       List<X509Certificate> x509Certificates =
@@ -214,12 +271,16 @@ public class OzoneContainer {
     ArrayList<Thread> volumeThreads = new ArrayList<>();
     long startTime = System.currentTimeMillis();
 
+    // Load container inspectors that may be triggered at startup based on
+    // system properties set. These can inspect and possibly repair
+    // containers as we iterate them here.
+    ContainerInspectorUtil.load();
     //TODO: diskchecker should be run before this, to see how disks are.
     // And also handle disk failure tolerance need to be added
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
       Thread thread = new Thread(new ContainerReader(volumeSet,
-          (HddsVolume) volume, containerSet, config));
+          (HddsVolume) volume, containerSet, config, true));
       thread.start();
       volumeThreads.add(thread);
     }
@@ -233,6 +294,10 @@ public class OzoneContainer {
       Thread.currentThread().interrupt();
     }
 
+    // After all containers have been processed, turn off container
+    // inspectors so they are not hit during normal datanode execution.
+    ContainerInspectorUtil.unload();
+
     LOG.info("Build ContainerSet costs {}s",
         (System.currentTimeMillis() - startTime) / 1000);
   }
@@ -241,26 +306,47 @@ public class OzoneContainer {
    * Start background daemon thread for performing container integrity checks.
    */
   private void startContainerScrub() {
-    ContainerScrubberConfiguration c = config.getObject(
-        ContainerScrubberConfiguration.class);
-    boolean enabled = c.isEnabled();
-
-    if (!enabled) {
-      LOG.info("Background container scanner has been disabled.");
-    } else {
-      if (this.metadataScanner == null) {
-        this.metadataScanner = new ContainerMetadataScanner(c, controller);
-      }
-      this.metadataScanner.start();
-
-      dataScanners = new ArrayList<>();
-      for (StorageVolume v : volumeSet.getVolumesList()) {
-        ContainerDataScanner s = new ContainerDataScanner(c, controller,
-            (HddsVolume) v);
-        s.start();
-        dataScanners.add(s);
-      }
+    ContainerScannerConfiguration c = config.getObject(
+        ContainerScannerConfiguration.class);
+    if (!c.isEnabled()) {
+      LOG.info("Scheduled background container scanners and " +
+          "the on-demand container scanner have been disabled.");
+      return;
     }
+    initOnDemandContainerScanner(c);
+    initMetadataScanner(c);
+    initContainerScanner(c);
+  }
+
+  private void initContainerScanner(ContainerScannerConfiguration c) {
+    if (c.getBandwidthPerVolume() == 0L) {
+      LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+          "so background container data scanner will not start.");
+      return;
+    }
+    dataScanners = new ArrayList<>();
+    for (StorageVolume v : volumeSet.getVolumesList()) {
+      ContainerDataScanner s = new ContainerDataScanner(c, controller,
+          (HddsVolume) v);
+      s.start();
+      dataScanners.add(s);
+    }
+  }
+
+  private void initMetadataScanner(ContainerScannerConfiguration c) {
+    if (this.metadataScanner == null) {
+      this.metadataScanner = new ContainerMetadataScanner(c, controller);
+    }
+    this.metadataScanner.start();
+  }
+
+  private void initOnDemandContainerScanner(ContainerScannerConfiguration c) {
+    if (c.getOnDemandBandwidthPerVolume() == 0L) {
+      LOG.warn(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+          "so the on-demand container data scanner will not start.");
+      return;
+    }
+    OnDemandContainerScanner.init(c, controller);
   }
 
   /**
@@ -272,9 +358,14 @@ public class OzoneContainer {
     }
     metadataScanner.shutdown();
     metadataScanner = null;
+
+    if (dataScanners == null) {
+      return;
+    }
     for (ContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
+    OnDemandContainerScanner.shutdown();
   }
 
   /**
@@ -312,6 +403,7 @@ public class OzoneContainer {
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
+    recoveringContainerScrubbingService.start();
 
     // mark OzoneContainer as INITIALIZED.
     initializingStatus.set(InitializingStatus.INITIALIZED);
@@ -332,7 +424,11 @@ public class OzoneContainer {
     volumeChecker.shutdownAndWait(0, TimeUnit.SECONDS);
     volumeSet.shutdown();
     metaVolumeSet.shutdown();
+    if (dbVolumeSet != null) {
+      dbVolumeSet.shutdown();
+    }
     blockDeletingService.shutdown();
+    recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
   }
 
@@ -390,6 +486,14 @@ public class OzoneContainer {
       nrb.addMetadataStorageReport(
           metaReports[i].getMetadataProtoBufMessage());
     }
+
+    if (dbVolumeSet != null) {
+      StorageLocationReport[] dbReports = dbVolumeSet.getStorageReport();
+      for (int i = 0; i < dbReports.length; i++) {
+        nrb.addDbStorageReport(dbReports[i].getProtoBufMessage());
+      }
+    }
+
     return nrb.build();
   }
 
@@ -406,9 +510,12 @@ public class OzoneContainer {
     return metaVolumeSet;
   }
 
+  public MutableVolumeSet getDbVolumeSet() {
+    return dbVolumeSet;
+  }
+
   @VisibleForTesting
   StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
     return new StorageVolumeChecker(conf, new Timer());
   }
-
 }

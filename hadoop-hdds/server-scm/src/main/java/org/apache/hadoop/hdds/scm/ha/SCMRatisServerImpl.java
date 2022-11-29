@@ -33,10 +33,10 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
@@ -59,7 +59,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
-import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMServerTlsParameters;
 
 /**
  * TODO.
@@ -76,6 +75,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final AtomicLong callId = new AtomicLong();
   private final RaftServer.Division division;
   private final GrpcTlsConfig grpcTlsConfig;
+  private boolean isStopped;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -97,7 +97,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
     grpcTlsConfig = createSCMRatisTLSConfig(new SecurityConfig(conf),
         scm.getScmCertificateClient());
-    Parameters parameters = createSCMServerTlsParameters(grpcTlsConfig);
+    final Parameters parameters = RatisHelper.setServerTlsConf(grpcTlsConfig);
 
     this.server = newRaftServer(scm.getScmId(), conf)
         .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
@@ -108,6 +108,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         (SCMStateMachine) server.getDivision(groupId).getStateMachine();
 
     this.division = server.getDivision(groupId);
+    this.isStopped = false;
   }
 
   public static void initialize(String clusterId, String scmId,
@@ -235,11 +236,20 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public void stop() throws IOException {
     LOG.info("stopping ratis server {}", server.getPeer().getAddress());
     server.close();
+    isStopped = true;
+    getSCMStateMachine().close();
   }
+
+  @Override
+  public boolean isStopped() {
+    return isStopped;
+  }
+
 
   @Override
   public List<String> getRatisRoles() throws IOException {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
+    RaftPeer leader = getLeader();
     List<String> ratisRoles = new ArrayList<>();
     for (RaftPeer peer : peers) {
       InetAddress peerInetAddress = null;
@@ -250,15 +260,12 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
             peer.getAddress());
       }
-      boolean isLocal = false;
-      if (peerInetAddress != null) {
-        isLocal = NetUtils.isLocalAddress(peerInetAddress);
-      }
       ratisRoles.add((peer.getAddress() == null ? "" :
-              peer.getAddress().concat(isLocal ?
+          peer.getAddress().concat(peer.equals(leader) ?
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
                   ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
-                  .concat(":".concat(peer.getId().toString()))));
+                  .concat(":".concat(peer.getId().toString()))
+                  .concat(":".concat(peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }
@@ -342,4 +349,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }
 
+  private RaftPeer getLeader() {
+    if (division.getInfo().isLeader()) {
+      return division.getPeer();
+    } else {
+      ByteString leaderId = division.getInfo().getRoleInfoProto()
+          .getFollowerInfo().getLeaderInfo().getId().getId();
+      return leaderId.isEmpty() ? null :
+          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+    }
+  }
 }

@@ -8,7 +8,7 @@ Ozone is a scalable, redundant, and distributed object store for Hadoop and Clou
  * SCALABLE: Ozone is designed to scale to tens of billions of files and blocks and, in the future, even more.
  * CONSISTENT: Ozone is a strongly consistent object store. This consistency is achieved by using protocols like RAFT.
  * CLOUD-NATIVE: Ozone is designed to work well in containerized environments like YARN and Kubernetes.
- * SECURE: Ozone integrates with Kerberos infrastructure for access control and supports TDE and on-wire encryption.
+ * SECURE: Ozone integrates with Kerberos infrastructure for authentication, supports native ACLs and integrates with Ranger for access control and supports TDE and on-wire encryption.
  * HIGHLY AVAILABLE: Ozone is a fully replicated system that is designed to survive multiple failures.
 
 ## Documentation

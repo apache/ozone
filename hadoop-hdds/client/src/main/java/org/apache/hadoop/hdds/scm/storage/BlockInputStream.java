@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,9 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.fs.ByteBufferReadable;
-import org.apache.hadoop.fs.CanUnbuffer;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -50,6 +46,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,13 +56,10 @@ import org.slf4j.LoggerFactory;
  * This class encapsulates all state management for iterating
  * through the sequence of chunks through {@link ChunkInputStream}.
  */
-public class BlockInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
+public class BlockInputStream extends BlockExtendedInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockInputStream.class);
-
-  private static final int EOF = -1;
 
   private final BlockID blockID;
   private final long length;
@@ -147,18 +141,22 @@ public class BlockInputStream extends InputStream
     IOException catchEx = null;
     do {
       try {
-        // If refresh returns new pipeline, retry with it.
-        // If we get IOException due to connectivity issue,
-        // retry according to retry policy.
         chunks = getChunkInfos();
         break;
-      } catch(SCMSecurityException ex) {
+        // If we get a StorageContainerException or an IOException due to
+        // datanodes are not reachable, refresh to get the latest pipeline
+        // info and retry.
+        // Otherwise, just retry according to the retry policy.
+      } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
         refreshPipeline(ex);
         catchEx = ex;
       } catch (IOException ex) {
         LOG.debug("Retry to get chunk info fail", ex);
+        if (isConnectivityIssue(ex)) {
+          refreshPipeline(ex);
+        }
         catchEx = ex;
       }
     } while (shouldRetryRead(catchEx));
@@ -194,19 +192,19 @@ public class BlockInputStream extends InputStream
     }
   }
 
+  /**
+   * Check if this exception is because datanodes are not reachable.
+   */
+  private boolean isConnectivityIssue(IOException ex) {
+    return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
+  }
+
   private void refreshPipeline(IOException cause) throws IOException {
     LOG.info("Unable to read information for block {} from pipeline {}: {}",
         blockID, pipeline.getId(), cause.getMessage());
     if (refreshPipelineFunction != null) {
       LOG.debug("Re-fetching pipeline for block {}", blockID);
-      Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
-      if (newPipeline == null || newPipeline.sameDatanodes(pipeline)) {
-        LOG.warn("No new pipeline for block {}", blockID);
-        throw cause;
-      } else {
-        LOG.debug("New pipeline got for block {}", blockID);
-        this.pipeline = newPipeline;
-      }
+      this.pipeline = refreshPipelineFunction.apply(blockID);
     } else {
       throw cause;
     }
@@ -219,9 +217,10 @@ public class BlockInputStream extends InputStream
   protected List<ChunkInfo> getChunkInfos() throws IOException {
     // irrespective of the container state, we will always read via Standalone
     // protocol.
-    if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
+    if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE && pipeline
+        .getType() != HddsProtos.ReplicationType.EC) {
       pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(new StandaloneReplicationConfig(
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               ReplicationConfig
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
@@ -235,10 +234,17 @@ public class BlockInputStream extends InputStream
             blockID.getContainerID());
       }
 
-      DatanodeBlockID datanodeBlockID = blockID
-          .getDatanodeBlockIDProtobuf();
+      DatanodeBlockID.Builder blkIDBuilder =
+          DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
+              .setLocalID(blockID.getLocalID())
+              .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+
+      int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
+      if (replicaIndex > 0) {
+        blkIDBuilder.setReplicaIndex(replicaIndex);
+      }
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, datanodeBlockID, token);
+          .getBlock(xceiverClient, blkIDBuilder.build(), token);
 
       chunks = response.getBlockData().getChunksList();
       success = true;
@@ -269,46 +275,14 @@ public class BlockInputStream extends InputStream
         xceiverClientFactory, () -> pipeline, verifyChecksum, token);
   }
 
+  @Override
   public synchronized long getRemaining() {
     return length - getPos();
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  public synchronized int read() throws IOException {
-    byte[] buf = new byte[1];
-    if (read(buf, 0, 1) == EOF) {
-      return EOF;
-    }
-    return Byte.toUnsignedInt(buf[0]);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
-    if (len == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
-  @Override
-  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
-    int len = strategy.getTargetLength();
-    if (len == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
-  }
-
-  synchronized int readWithStrategy(ByteReaderStrategy strategy) throws
-      IOException {
+  protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
+      throws IOException {
     Preconditions.checkArgument(strategy != null);
     if (!initialized) {
       initialize();
@@ -332,7 +306,13 @@ public class BlockInputStream extends InputStream
       int numBytesRead;
       try {
         numBytesRead = strategy.readFromBlock(current, numBytesToRead);
-        retries = 0; // reset retries after successful read
+        retries = 0;
+        // If we get a StorageContainerException or an IOException due to
+        // datanodes are not reachable, refresh to get the latest pipeline
+        // info and retry.
+        // Otherwise, just retry according to the retry policy.
+      } catch (SCMSecurityException ex) {
+        throw ex;
       } catch (StorageContainerException e) {
         if (shouldRetryRead(e)) {
           handleReadError(e);
@@ -340,13 +320,13 @@ public class BlockInputStream extends InputStream
         } else {
           throw e;
         }
-      } catch(SCMSecurityException ex) {
-        throw ex;
-      } catch(IOException ex) {
-        // We got a IOException which might be due
-        // to DN down or connectivity issue.
+      } catch (IOException ex) {
         if (shouldRetryRead(ex)) {
-          current.releaseClient();
+          if (isConnectivityIssue(ex)) {
+            handleReadError(ex);
+          } else {
+            current.releaseClient();
+          }
           continue;
         } else {
           throw ex;
@@ -398,7 +378,7 @@ public class BlockInputStream extends InputStream
     }
 
     checkOpen();
-    if (pos < 0 || pos >= length) {
+    if (pos < 0 || pos > length) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception
@@ -478,10 +458,6 @@ public class BlockInputStream extends InputStream
     }
   }
 
-  public synchronized void resetPosition() {
-    this.blockPosition = 0;
-  }
-
   /**
    * Checks if the stream is open.  If not, throw an exception.
    *
@@ -493,10 +469,12 @@ public class BlockInputStream extends InputStream
     }
   }
 
+  @Override
   public BlockID getBlockID() {
     return blockID;
   }
 
+  @Override
   public long getLength() {
     return length;
   }
@@ -512,7 +490,7 @@ public class BlockInputStream extends InputStream
   }
 
   @Override
-  public void unbuffer() {
+  public synchronized void unbuffer() {
     storePosition();
     releaseClient();
 

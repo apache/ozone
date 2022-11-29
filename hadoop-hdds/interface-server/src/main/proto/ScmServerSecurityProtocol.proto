@@ -55,7 +55,7 @@ message SCMSecurityRequest {
     optional SCMGetCrlsRequestProto getCrlsRequest = 10;
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
     optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
-
+    optional SCMGetCertRequestProto getCertRequest = 13;
 }
 
 message SCMSecurityResponse {
@@ -95,6 +95,7 @@ enum Type {
     GetCrls = 9;
     GetLatestCrlId = 10;
     RevokeCertificates = 11;
+    GetCert = 12;
 }
 
 enum Status {
@@ -131,6 +132,11 @@ message SCMGetDataNodeCertRequestProto {
 */
 message SCMGetOMCertRequestProto {
     required OzoneManagerDetailsProto omDetails = 1;
+    required string CSR = 2;
+}
+
+message SCMGetCertRequestProto {
+    required NodeDetailsProto nodeDetails = 1;
     required string CSR = 2;
 }
 
