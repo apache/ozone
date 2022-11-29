@@ -40,6 +40,7 @@ import com.google.common.base.Preconditions;
 import static java.lang.Math.max;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Class wraps ozone container info.
@@ -558,7 +559,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   /**
    * Expiry information for the blocks.
    */
-  static class ExpiryInfo {
+  static class ExpiryInfo implements Comparable {
     private long expiryTime;
     private long blockId;
     
@@ -572,6 +573,11 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
     public long getBlockId() {
       return blockId;
+    }
+
+    @Override
+    public int compareTo(@NotNull Object o) {
+      return (int) (expiryTime - ((ExpiryInfo) o).expiryTime);
     }
   }
 
