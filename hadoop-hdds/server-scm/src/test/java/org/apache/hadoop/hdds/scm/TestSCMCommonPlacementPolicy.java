@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -33,7 +32,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -92,15 +90,11 @@ public class TestSCMCommonPlacementPolicy {
             .setContainerState(CLOSED)
             .setReplicaIndex(5)
             .setDatanodeDetails(list.get(5)).build());
-    ReplicationConfig replicationConfig = Mockito.mock(ReplicationConfig.class);
-    Mockito.when(replicationConfig.getNumberOfUniqueReplica()).thenReturn(5);
-    Mockito.when(replicationConfig.getRequiredNodes()).thenReturn(5);
-    Mockito.when(replicationConfig.getReplicationFactorOfUniqueReplica())
-            .thenReturn(1);
+
     Map<ContainerReplica, Integer> replicasToCopy =
             dummyPlacementPolicy.replicasToCopy(replicas.values()
                             .stream().collect(Collectors.toSet()),
-                    replicationConfig);
+            1, 5);
     Assertions.assertTrue(replicasToCopy.keySet().stream().findFirst()
             .map(replica -> Arrays.asList(replicas.get(1), replicas.get(5))
                     .contains(replica)).orElse(false));
@@ -128,13 +122,10 @@ public class TestSCMCommonPlacementPolicy {
             .setReplicaIndex(1)
             .setDatanodeDetails(list.get(7)).build();
     replicas.add(replica);
-    ReplicationConfig replicationConfig = Mockito.mock(ReplicationConfig.class);
-    Mockito.when(replicationConfig.getNumberOfUniqueReplica()).thenReturn(5);
-    Mockito.when(replicationConfig.getRequiredNodes()).thenReturn(5);
-    Mockito.when(replicationConfig.getReplicationFactorOfUniqueReplica())
-            .thenReturn(1);
+
     Set<ContainerReplica> replicasToRemove =
-            dummyPlacementPolicy.replicasToRemove(replicas, replicationConfig);
+            dummyPlacementPolicy.replicasToRemove(replicas,
+                    1, 5);
     Assertions.assertEquals(replicasToRemove.size(), 1);
     Assertions.assertEquals(replicasToRemove.stream().findFirst().get(),
             replica);

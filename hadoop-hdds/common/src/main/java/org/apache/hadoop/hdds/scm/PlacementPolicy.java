@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 import java.io.IOException;
@@ -69,8 +68,10 @@ public interface PlacementPolicy<Replica> {
   ContainerPlacementStatus validateContainerPlacement(
           List<DatanodeDetails> dns, int replicas);
   Map<Replica, Integer> replicasToCopy(Set<Replica> replicas,
-                                       ReplicationConfig replicationConfig);
+                                       int expectedCountPerUniqueReplica,
+                                       int expectedUniqueGroups);
 
   Set<Replica> replicasToRemove(Set<Replica> replicas,
-                                ReplicationConfig replicationConfig);
+                                int expectedCountPerUniqueReplica,
+                                int expectedUniqueGroups);
 }

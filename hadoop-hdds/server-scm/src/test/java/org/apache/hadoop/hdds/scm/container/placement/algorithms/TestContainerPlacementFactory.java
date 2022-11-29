@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -199,18 +198,17 @@ public class TestContainerPlacementFactory {
 
     @Override
     public Map<ContainerReplica, Integer> replicasToCopy(
-            Set<ContainerReplica> replicas,
-            ReplicationConfig replicationConfig) {
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
       return null;
     }
 
     @Override
     public Set<ContainerReplica> replicasToRemove(
-            Set<ContainerReplica> replicas,
-            ReplicationConfig replicationConfig) {
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
       return null;
     }
-
 
   }
 

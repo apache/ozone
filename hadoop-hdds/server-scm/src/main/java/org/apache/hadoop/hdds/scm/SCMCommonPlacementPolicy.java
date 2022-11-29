@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -90,26 +89,11 @@ public abstract class SCMCommonPlacementPolicy implements
    * @param conf        Configuration class.
    */
   public SCMCommonPlacementPolicy(NodeManager nodeManager,
-      ConfigurationSource conf,
-      Function<ContainerReplica, Integer> replicaIdentifierFunction) {
+      ConfigurationSource conf) {
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.shouldRemovePeers = ScmUtils.shouldRemovePeers(conf);
-    this.replicaIdentifierFunction = replicaIdentifierFunction;
   }
-
-  /**
-   * Constructor.
-   *
-   * @param nodeManager NodeManager
-   * @param conf        Configuration class.
-   */
-  public SCMCommonPlacementPolicy(NodeManager nodeManager,
-                                  ConfigurationSource conf) {
-    this(nodeManager, conf, ContainerReplica::getReplicaIndex);
-  }
-
-
 
   /**
    * Return node manager.
@@ -458,13 +442,13 @@ public abstract class SCMCommonPlacementPolicy implements
   }
   @Override
   public Set<ContainerReplica> replicasToRemove(Set<ContainerReplica> replicas,
-         ReplicationConfig replicationConfig) {
+         int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
     Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
     Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
             = new HashMap<>();
     Map<Node, Integer> placementGroupCntMap = new HashMap<>();
     for (ContainerReplica replica:replicas) {
-      Integer replicaId = replicaIdentifierFunction.apply(replica);
+      Integer replicaId = replica.getReplicaIndex();
       Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
       if (!replicaIdMap.containsKey(replicaId)) {
         replicaIdMap.put(replicaId, Sets.newHashSet());
@@ -501,8 +485,7 @@ public abstract class SCMCommonPlacementPolicy implements
               .map(Map.Entry::getKey)
               .collect(Collectors.toList()));
 
-      while (replicaIdMap.get(rid).size() >
-              replicationConfig.getReplicationFactorOfUniqueReplica()) {
+      while (replicaIdMap.get(rid).size() > expectedCountPerUniqueReplica) {
         Node rack = pq.poll();
         Set<ContainerReplica> replicaSet =
                 placementGroupReplicaIdMap.get(rack).get(rid);
@@ -526,12 +509,13 @@ public abstract class SCMCommonPlacementPolicy implements
 
   @Override
   public Map<ContainerReplica, Integer> replicasToCopy(
-         Set<ContainerReplica> replicas, ReplicationConfig replicationConfig) {
+         Set<ContainerReplica> replicas, int expectedCountPerUniqueReplicas,
+         int expectedUniqueGroups) {
     Map<Integer, ContainerReplica> replicaIdMap = new HashMap<>();
     Map<Node, Set<ContainerReplica>> placementGroupReplicaIdMap
             = new HashMap<>();
     for (ContainerReplica replica:replicas) {
-      Integer replicaId = replicaIdentifierFunction.apply(replica);
+      Integer replicaId = replica.getReplicaIndex();
       Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
       if (!replicaIdMap.containsKey(replicaId)) {
         replicaIdMap.put(replicaId, replica);
@@ -546,7 +530,7 @@ public abstract class SCMCommonPlacementPolicy implements
               });
     }
     int misreplicationCnt = Math.max(getRequiredRackCount(
-        replicationConfig.getRequiredNodes())
+        expectedUniqueGroups * expectedCountPerUniqueReplicas)
         - placementGroupReplicaIdMap.size(), 0);
     Map<Integer, Integer> copyRIDMap = new HashMap<>();
 
@@ -555,7 +539,8 @@ public abstract class SCMCommonPlacementPolicy implements
       if (misreplicationCnt > 0 && replicaSet.size() > 1) {
         Map<Integer, Long> cntMap = replicaSet.stream()
                 .limit(Math.min(replicaSet.size() - 1, misreplicationCnt))
-                .collect(Collectors.groupingBy(replicaIdentifierFunction,
+                .collect(Collectors.groupingBy(
+                        ContainerReplica::getReplicaIndex,
                         Collectors.counting()));
         for (Map.Entry<Integer, Long> ridCntEntry : cntMap.entrySet()) {
           int additionalReplica = Math.toIntExact(ridCntEntry.getValue());

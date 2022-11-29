@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -375,15 +374,15 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     @Override
     public Map<ContainerReplica, Integer> replicasToCopy(
-            Set<ContainerReplica> replicas,
-            ReplicationConfig replicationConfig) {
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
       return null;
     }
 
     @Override
     public Set<ContainerReplica> replicasToRemove(
-            Set<ContainerReplica> replicas,
-            ReplicationConfig replicationConfig) {
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+            int expectedUniqueGroups) {
       return null;
     }
 
