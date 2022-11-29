@@ -79,7 +79,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 3000);
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
@@ -231,13 +231,14 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 15);
     // 15 subDir + 3 parentDir
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
-    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
+    // handled 5 move dir or file as capacity as recursive
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 17);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 25);
 
     long elapsedRunCount = dirDeletingService.getRunCount() - preRunCount;
     assertTrue(dirDeletingService.getRunCount() > 1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
-    assertTrue(elapsedRunCount == 8 || elapsedRunCount == 9);
+    assertTrue(elapsedRunCount >= 7);
   }
 
   @Test
@@ -283,7 +284,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 0);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 4);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     assertTrue(dirDeletingService.getRunCount() > 1);
