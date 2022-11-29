@@ -12,14 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: build-branch
+name: scheduled-ci
 on:
-  pull_request:
-    types: [opened, ready_for_review, synchronize]
-  push:
-concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  schedule:
+    - cron: 30 0,12 * * *
 jobs:
   CI:
     uses: ./.github/workflows/ci.yml
