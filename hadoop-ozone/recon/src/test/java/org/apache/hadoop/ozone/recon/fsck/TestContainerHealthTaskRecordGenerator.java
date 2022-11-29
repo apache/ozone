@@ -54,8 +54,6 @@ public class TestContainerHealthTaskRecordGenerator {
   private PlacementPolicy placementPolicy;
   private ContainerInfo container;
 
-  private Long containerReportInterval = 10 * 1000L;
-
   @BeforeEach
   public void setup() {
     placementPolicy = mock(PlacementPolicy.class);
@@ -78,25 +76,25 @@ public class TestContainerHealthTaskRecordGenerator {
         new ContainerHealthStatus(container, replicas, placementPolicy);
     // Missing record should be retained
     assertTrue(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, missingRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, missingRecord()
+        ));
     // Under / Over / Mis replicated should not be retained as if a container is
     // missing then it is not in any other category.
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, underReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, underReplicatedRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, overReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, overReplicatedRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, misReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, misReplicatedRecord()
+        ));
 
     replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
     status = new ContainerHealthStatus(container, replicas, placementPolicy);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, missingRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, missingRecord()
+        ));
   }
 
   @Test
@@ -109,27 +107,27 @@ public class TestContainerHealthTaskRecordGenerator {
 
     UnhealthyContainersRecord rec = underReplicatedRecord();
     assertTrue(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, rec, containerReportInterval));
+        .retainOrUpdateRecord(status, rec));
     // The record actual count should be updated from 1 -> 2
     assertEquals(2, rec.getActualReplicaCount().intValue());
     assertEquals(1, rec.getReplicaDelta().intValue());
 
     // Missing / Over / Mis replicated should not be retained
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, missingRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, missingRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, overReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, overReplicatedRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, misReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, misReplicatedRecord()
+        ));
 
     // Container is now replicated OK - should be removed.
     replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
     status = new ContainerHealthStatus(container, replicas, placementPolicy);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, rec, containerReportInterval));
+        .retainOrUpdateRecord(status, rec));
   }
 
   @Test
@@ -142,27 +140,27 @@ public class TestContainerHealthTaskRecordGenerator {
 
     UnhealthyContainersRecord rec = overReplicatedRecord();
     assertTrue(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, rec, containerReportInterval));
+        .retainOrUpdateRecord(status, rec));
     // The record actual count should be updated from 5 -> 4
     assertEquals(4, rec.getActualReplicaCount().intValue());
     assertEquals(-1, rec.getReplicaDelta().intValue());
 
     // Missing / Over / Mis replicated should not be retained
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, missingRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, missingRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, underReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, underReplicatedRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, misReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, misReplicatedRecord()
+        ));
 
     // Container is now replicated OK - should be removed.
     replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
     status = new ContainerHealthStatus(container, replicas, placementPolicy);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, rec, containerReportInterval));
+        .retainOrUpdateRecord(status, rec));
   }
 
   @Test
@@ -178,7 +176,7 @@ public class TestContainerHealthTaskRecordGenerator {
 
     UnhealthyContainersRecord rec = misReplicatedRecord();
     assertTrue(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, rec, containerReportInterval));
+        .retainOrUpdateRecord(status, rec));
     // The record actual count should be updated from 1 -> 2
     assertEquals(2, rec.getActualReplicaCount().intValue());
     assertEquals(1, rec.getReplicaDelta().intValue());
@@ -186,14 +184,14 @@ public class TestContainerHealthTaskRecordGenerator {
 
     // Missing / Over / Mis replicated should not be retained
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, missingRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, missingRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, underReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, underReplicatedRecord()
+        ));
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, overReplicatedRecord(),
-            containerReportInterval));
+        .retainOrUpdateRecord(status, overReplicatedRecord()
+        ));
 
     // Container is now placed OK - should be removed.
     when(placementPolicy.validateContainerPlacement(
@@ -201,7 +199,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .thenReturn(new ContainerPlacementStatusDefault(3, 3, 5));
     status = new ContainerHealthStatus(container, replicas, placementPolicy);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
-        .retainOrUpdateRecord(status, rec, containerReportInterval));
+        .retainOrUpdateRecord(status, rec));
   }
 
   @Test

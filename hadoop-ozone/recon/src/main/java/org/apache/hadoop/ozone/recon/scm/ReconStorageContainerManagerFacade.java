@@ -299,8 +299,7 @@ public class ReconStorageContainerManagerFacade
         scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy,
-        reconTaskConfig,
-        conf));
+        reconTaskConfig));
   }
 
   /**
@@ -512,7 +511,6 @@ public class ReconStorageContainerManagerFacade
                     containers.contains(containerInfo);
                 if (!isContainerPresentAtRecon) {
                   try {
-                    containerInfo.setState(HddsProtos.LifeCycleState.UNKNOWN);
                     ContainerWithPipeline containerWithPipeline =
                         scmServiceProvider.getContainerWithPipeline(
                             containerID);

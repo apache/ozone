@@ -61,12 +61,6 @@ public final class ClusterStateResponse {
   private int missingContainers;
 
   /**
-   * Total count of unknown containers in the cluster.
-   */
-  @JsonProperty("unknownContainers")
-  private int unknownContainers;
-
-  /**
    * Total count of volumes in the cluster.
    */
   @JsonProperty("volumes")
@@ -103,7 +97,6 @@ public final class ClusterStateResponse {
     this.storageReport = b.storageReport;
     this.containers = b.containers;
     this.missingContainers = b.missingContainers;
-    this.unknownContainers = b.unknownContainers;
   }
 
   /**
@@ -117,7 +110,6 @@ public final class ClusterStateResponse {
     private DatanodeStorageReport storageReport;
     private int containers;
     private int missingContainers;
-    private int unknownContainers;
     private long volumes;
     private long buckets;
     private long keys;
@@ -126,7 +118,6 @@ public final class ClusterStateResponse {
       // Default values
       this.containers = 0;
       this.missingContainers = 0;
-      this.unknownContainers = 0;
       this.volumes = 0;
       this.buckets = 0;
       this.keys = 0;
@@ -162,11 +153,6 @@ public final class ClusterStateResponse {
 
     public Builder setMissingContainers(int missingContainers) {
       this.missingContainers = missingContainers;
-      return this;
-    }
-
-    public Builder setUnknownContainers(int unknownContainers) {
-      this.unknownContainers = unknownContainers;
       return this;
     }
 
@@ -218,10 +204,6 @@ public final class ClusterStateResponse {
 
   public int getMissingContainers() {
     return missingContainers;
-  }
-
-  public int getUnknownContainers() {
-    return unknownContainers;
   }
 
   public long getBuckets() {

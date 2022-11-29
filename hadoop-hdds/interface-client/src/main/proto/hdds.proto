@@ -211,7 +211,6 @@ enum LifeCycleState {
     DELETING = 5;
     DELETED = 6; // object is deleted.
     RECOVERING = 7;
-    UNKNOWN = 8;
 }
 
 enum LifeCycleEvent {
