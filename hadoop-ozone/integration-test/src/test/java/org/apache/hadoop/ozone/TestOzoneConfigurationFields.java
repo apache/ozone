@@ -134,6 +134,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
+        OMConfigKeys.OZONE_OM_S3_GPRC_METRICS_PERCENTILES_INTERVALS_KEY,
+        OMConfigKeys.OZONE_OM_S3_GPRC_METRICS_QUANTILE_ENABLED,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY
     ));
   }

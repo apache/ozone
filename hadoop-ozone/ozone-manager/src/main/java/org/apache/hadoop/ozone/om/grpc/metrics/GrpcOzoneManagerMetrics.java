@@ -108,11 +108,15 @@ public class GrpcOzoneManagerMetrics {
   @Metric("Queue time")
   private MutableRate grpcOmQueueTime;
 
+  // There should be no getter method to avoid
+  // exposing internal representation. FindBugs error raised.
   private MutableQuantiles[] grpcOmQueueTimeMillisQuantiles;
 
   @Metric("Processsing time")
   private MutableRate grpcOmProcessingTime;
 
+  // There should be no getter method to avoid
+  // exposing internal representation. FindBugs error raised.
   private MutableQuantiles[] grpcOmProcessingTimeMillisQuantiles;
 
   @Metric("Number of active clients connected")
