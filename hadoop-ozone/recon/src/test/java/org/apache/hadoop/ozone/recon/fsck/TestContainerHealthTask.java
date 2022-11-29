@@ -379,13 +379,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       return null;
     }
 
-    @Override
-    public Set<ContainerReplica> replicasToRemove(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
-      return null;
-    }
-
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
       for (DatanodeDetails dn : dns) {

@@ -102,35 +102,6 @@ public class TestSCMCommonPlacementPolicy {
             .allMatch(i -> i == 1));
   }
 
-  @Test
-  public void testReplicasToRemove() {
-    DummyPlacementPolicy dummyPlacementPolicy =
-            new DummyPlacementPolicy(nodeManager, conf);
-    List<DatanodeDetails> list =
-            nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    Set<ContainerReplica> replicas =
-            IntStream.range(1, 6).mapToObj(i ->
-                            ContainerReplica.newBuilder()
-                                    .setContainerID(new ContainerID(1))
-                                    .setContainerState(CLOSED)
-                                    .setReplicaIndex(i)
-                                    .setDatanodeDetails(list.get(i)).build())
-                    .collect(Collectors.toSet());
-    ContainerReplica replica = ContainerReplica.newBuilder()
-            .setContainerID(new ContainerID(1))
-            .setContainerState(CLOSED)
-            .setReplicaIndex(1)
-            .setDatanodeDetails(list.get(7)).build();
-    replicas.add(replica);
-
-    Set<ContainerReplica> replicasToRemove =
-            dummyPlacementPolicy.replicasToRemove(replicas,
-                    1, 5);
-    Assertions.assertEquals(replicasToRemove.size(), 1);
-    Assertions.assertEquals(replicasToRemove.stream().findFirst().get(),
-            replica);
-  }
-
   private static class DummyPlacementPolicy extends
           SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> dns;

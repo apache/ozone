@@ -202,14 +202,6 @@ public class TestContainerPlacementFactory {
             int expectedUniqueGroups) {
       return null;
     }
-
-    @Override
-    public Set<ContainerReplica> replicasToRemove(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
-      return null;
-    }
-
   }
 
   @Test

@@ -70,8 +70,4 @@ public interface PlacementPolicy<Replica> {
   Map<Replica, Integer> replicasToCopy(Set<Replica> replicas,
                                        int expectedCountPerUniqueReplica,
                                        int expectedUniqueGroups);
-
-  Set<Replica> replicasToRemove(Set<Replica> replicas,
-                                int expectedCountPerUniqueReplica,
-                                int expectedUniqueGroups);
 }
