@@ -22,6 +22,7 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.DeleteTablePrefix;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -108,8 +109,10 @@ public class TestOMKeysDeleteResponseWithFSO
   @Override
   protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
       OmBucketInfo omBucketInfo) {
+    DeleteTablePrefix prefix = new DeleteTablePrefix(360L, true);
+
     return new OMKeysDeleteResponseWithFSO(
-        omResponse, getOmKeyInfoList(), dirDeleteList, true, omBucketInfo,
+        omResponse, prefix, getOmKeyInfoList(), dirDeleteList, omBucketInfo,
         volId);
   }
 

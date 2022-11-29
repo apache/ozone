@@ -145,8 +145,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+                    parentId + 1, parentId,
+                    100L, Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
 

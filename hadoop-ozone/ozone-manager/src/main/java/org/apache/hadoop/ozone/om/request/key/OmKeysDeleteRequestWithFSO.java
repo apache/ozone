@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.DeleteTablePrefix;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -134,17 +135,18 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   @NotNull @Override
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
-      List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
-      OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId) {
+          List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+          OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
+          OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
+          boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId,
+          DeleteTablePrefix deleteTablePrefix) {
     OMClientResponse omClientResponse;
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
                 .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
-        .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
+        .build(), deleteTablePrefix, omKeyInfoList, dirList,
         omBucketInfo.copyObject(), volumeId);
     return omClientResponse;
 

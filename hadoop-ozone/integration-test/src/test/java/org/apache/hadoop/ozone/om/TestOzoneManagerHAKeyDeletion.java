@@ -67,7 +67,8 @@ public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
     GenericTestUtils.waitFor(() ->
             keyDeletingService.getDeletedKeyCount().get() == 4, 10000, 120000);
 
-    // Check delete table is empty or not on all OMs.
+    // Check delete table is empty or not on all OMs. Waiting until all keys
+    // purged by deletion service; delete table will eventually become empty.
     getCluster().getOzoneManagersList().forEach((om) -> {
       try {
         GenericTestUtils.waitFor(() -> {

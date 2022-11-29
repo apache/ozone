@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.DeleteTablePrefix;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -96,8 +97,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             openKeyBucket, deletedOpenKeys);
       }
 
+      DeleteTablePrefix prefix = new DeleteTablePrefix(
+          trxnLogIndex, ozoneManager.isRatisEnabled());
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
+          prefix, deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -111,8 +114,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
               omDoubleBufferHelper);
     }
 
-    processResults(omMetrics, numSubmittedOpenKeys, deletedOpenKeys.size(),
-        deleteOpenKeysRequest, result);
+    processResults(omMetrics, numSubmittedOpenKeys,
+        deletedOpenKeys.size(), deleteOpenKeysRequest, result);
 
     return omClientResponse;
   }

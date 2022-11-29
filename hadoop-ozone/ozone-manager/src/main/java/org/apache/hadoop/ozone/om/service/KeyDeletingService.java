@@ -307,9 +307,18 @@ public class KeyDeletingService extends BackgroundService {
       String objectKey) {
     // Parse volume and bucket name
     String[] split = objectKey.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length > 3, "Volume and/or Bucket Name " +
-        "missing from Key Name.");
-    Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
+    Pair<String, String> volumeBucketPair;
+
+    if (split.length > 3) {
+      // Old key formatting in delete table: /volume/bucket/key..
+      // TODO: This path must be removed once HDDS-5905 completed.
+      volumeBucketPair = Pair.of(split[1], split[2]);
+    } else {
+      Preconditions.assertTrue(split.length == 1,
+          "Unknown format of delete key format");
+      // For new key format in delete table, use a pair empty strings
+      volumeBucketPair = Pair.of("", "");
+    }
     if (!map.containsKey(volumeBucketPair)) {
       map.put(volumeBucketPair, new ArrayList<>());
     }
