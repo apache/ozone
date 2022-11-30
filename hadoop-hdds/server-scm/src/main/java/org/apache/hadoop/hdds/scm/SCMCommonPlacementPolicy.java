@@ -21,6 +21,8 @@ package org.apache.hadoop.hdds.scm;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -498,6 +500,77 @@ public abstract class SCMCommonPlacementPolicy implements
       }
     }
     return copyReplicaSet;
+  }
+
+  protected Node getPlacementGroup(DatanodeDetails dn) {
+    return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
+  }
+
+  @Override
+  public Set<ContainerReplica> replicasToRemove(Set<ContainerReplica> replicas,
+                                                int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
+    Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
+    Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
+            = new HashMap<>();
+    Map<Node, Integer> placementGroupCntMap = new HashMap<>();
+    for (ContainerReplica replica:replicas) {
+      Integer replicaId = replica.getReplicaIndex();
+      Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
+      if (!replicaIdMap.containsKey(replicaId)) {
+        replicaIdMap.put(replicaId, Sets.newHashSet());
+      }
+      if (!placementGroupReplicaIdMap.containsKey(placementGroup)) {
+        placementGroupReplicaIdMap.put(placementGroup, Maps.newHashMap());
+      }
+      placementGroupCntMap.compute(placementGroup,
+              (group, cnt) -> (cnt == null ? 0 : cnt) + 1);
+      replicaIdMap.get(replicaId).add(replica);
+      Map<Integer, Set<ContainerReplica>> placementGroupReplicaIDMap =
+              placementGroupReplicaIdMap.get(placementGroup);
+      placementGroupReplicaIDMap.compute(replicaId,
+              (rid, placementGroupReplicas) -> {
+                if (placementGroupReplicas == null) {
+                  placementGroupReplicas = Sets.newHashSet();
+                }
+                placementGroupReplicas.add(replica);
+                return placementGroupReplicas;
+              });
+    }
+
+    Set<ContainerReplica> replicasToRemove = new HashSet<>();
+    List<Integer> sortedRIDList = replicaIdMap.keySet().stream()
+            .sorted((o1, o2) -> Integer.compare(replicaIdMap.get(o2).size(),
+                    replicaIdMap.get(o1).size())).collect(Collectors.toList());
+    for (Integer rid : sortedRIDList) {
+      Queue<Node> pq = new PriorityQueue<>((o1, o2) ->
+              Integer.compare(placementGroupCntMap.get(o2),
+                      placementGroupCntMap.get(o1)));
+      pq.addAll(placementGroupReplicaIdMap.entrySet()
+              .stream()
+              .filter(nodeMapEntry -> nodeMapEntry.getValue().containsKey(rid))
+              .map(Map.Entry::getKey)
+              .collect(Collectors.toList()));
+
+      while (replicaIdMap.get(rid).size() > expectedCountPerUniqueReplica) {
+        Node rack = pq.poll();
+        Set<ContainerReplica> replicaSet =
+                placementGroupReplicaIdMap.get(rack).get(rid);
+        if (replicaSet.size() > 0) {
+          ContainerReplica r = replicaSet.stream().findFirst().get();
+          replicasToRemove.add(r);
+          replicaSet.remove(r);
+          replicaIdMap.get(rid).remove(r);
+          placementGroupCntMap.compute(rack,
+                  (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
+          if (replicaSet.size() == 0) {
+            placementGroupReplicaIdMap.get(rack).remove(rid);
+          } else {
+            pq.add(rack);
+          }
+        }
+      }
+    }
+    return replicasToRemove;
   }
 
   protected Node getPlacementGroup(DatanodeDetails dn) {

@@ -77,4 +77,8 @@ public interface PlacementPolicy<Replica> {
    */
   Set<Replica> replicasToCopyToFixMisreplication(
           Map<Replica, Boolean> replicas);
+
+  Set<Replica> replicasToRemove(Set<Replica> replicas,
+                                int expectedCountPerUniqueReplica,
+                                int expectedUniqueGroups);
 }

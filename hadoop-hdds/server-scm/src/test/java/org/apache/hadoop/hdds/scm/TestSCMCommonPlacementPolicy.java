@@ -35,11 +35,17 @@ import org.apache.ratis.thirdparty.com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
 import org.mockito.Mockito;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -289,6 +295,40 @@ public class TestSCMCommonPlacementPolicy {
 
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
+    private Map<DatanodeDetails, Node> rackMap;
+    private List<Node> racks;
+    private int rackCnt;
+  @Test
+  public void testReplicasToRemove() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf);
+    List<DatanodeDetails> list =
+            nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    Set<ContainerReplica> replicas =
+            IntStream.range(1, 6).mapToObj(i ->
+                            ContainerReplica.newBuilder()
+                                    .setContainerID(new ContainerID(1))
+                                    .setContainerState(CLOSED)
+                                    .setReplicaIndex(i)
+                                    .setDatanodeDetails(list.get(i)).build())
+                    .collect(Collectors.toSet());
+    ContainerReplica replica = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(7)).build();
+    replicas.add(replica);
+
+    Set<ContainerReplica> replicasToRemove =
+            dummyPlacementPolicy.replicasToRemove(replicas,
+                    1, 5);
+    Assertions.assertEquals(replicasToRemove.size(), 1);
+    Assertions.assertEquals(replicasToRemove.stream().findFirst().get(),
+            replica);
+  }
+
+  private static class DummyPlacementPolicy extends
+          SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> rackMap;
     private List<Node> racks;
     private int rackCnt;
