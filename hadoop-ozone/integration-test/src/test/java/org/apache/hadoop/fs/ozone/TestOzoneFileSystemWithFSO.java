@@ -393,6 +393,64 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     assertEquals(subdir1BeforeMTime, subdir1AfterMTime);
   }
 
+  @Test
+  public void testRenameParentBucketModificationTime() throws IOException {
+    OMMetadataManager omMgr =
+        getCluster().getOzoneManager().getMetadataManager();
+
+    // mv /file1 -> /renamedFile1, the bucket mtime should be changed
+    Path file1 = new Path("/file1");
+    Path renamedFile1 = new Path("/renamedFile1");
+    getFs().create(file1, false).close();
+    renameAndAssert(omMgr, file1, renamedFile1, true);
+
+    // mv /dir1/subFile2 -> /dir2/renamedSubFile2,
+    // the bucket mtime should not be changed
+    Path dir1 = new Path(getFs().getUri().toString(), "/dir1");
+    Path subFile2 = new Path(dir1, "subFile2");
+    Path dir2 = new Path(getFs().getUri().toString(), "/dir2");
+    Path renamedSubFile2 = new Path(dir2, "renamedSubFile2");
+    getFs().mkdirs(dir1);
+    getFs().mkdirs(dir2);
+    getFs().create(subFile2, false).close();
+    renameAndAssert(omMgr, subFile2, renamedSubFile2, false);
+
+    // mv /dir3/subFile3 -> "/renamedFile3"  the bucket mtime should be changed
+    Path dir3 = new Path(getFs().getUri().toString(), "/dir3");
+    Path subFile3 = new Path(dir3, "subFile3");
+    Path renamedFile3 = new Path("/renamedFile3");
+    getFs().mkdirs(dir3);
+    getFs().create(subFile3, false).close();
+    renameAndAssert(omMgr, subFile3, renamedFile3, true);
+
+    // mv /file4 -> "/dir4/renamedFile4"  the bucket mtime should be changed
+    Path file4 = new Path("/file4");
+    Path dir4 = new Path(getFs().getUri().toString(), "/dir4");
+    Path renamedSubFile4 = new Path(dir4, "subFile3");
+    getFs().mkdirs(dir4);
+    getFs().create(file4, false).close();
+    renameAndAssert(omMgr, file4, renamedSubFile4, true);
+  }
+
+  private void renameAndAssert(OMMetadataManager omMgr,
+      Path from, Path to, boolean exceptChangeMtime) throws IOException {
+    OmBucketInfo omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    long bucketBeforeMTime = omBucketInfo.getModificationTime();
+    long fileBeforeMTime = getFs().getFileStatus(from).getModificationTime();
+    getFs().rename(from, to);
+    omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    long bucketAfterMTime = omBucketInfo.getModificationTime();
+    long fileAfterMTime = getFs().getFileStatus(to).getModificationTime();
+    if (exceptChangeMtime) {
+      assertTrue(bucketBeforeMTime < bucketAfterMTime);
+    } else {
+      assertEquals(bucketBeforeMTime, bucketAfterMTime);
+    }
+    assertEquals(fileBeforeMTime, fileAfterMTime);
+  }
+
   @Override
   @Test
   @Ignore("TODO:HDDS-2939")

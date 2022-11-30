@@ -21,7 +21,9 @@ package org.apache.hadoop.ozone.om.response.key;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -38,6 +40,7 @@ import static  org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   protected OmKeyInfo fromKeyParent;
   protected OmKeyInfo toKeyParent;
+  protected OmBucketInfo bucketInfo;
   @Test
   public void testAddToDBBatch() throws Exception {
     OMResponse omResponse =
@@ -65,6 +68,8 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
           .isExist(getDBKeyName(fromKeyParent)));
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
+      Assert.assertFalse(
+          omMetadataManager.getBucketTable().iterator().hasNext());
     }
 
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -81,6 +86,11 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
           .isExist(getDBKeyName(fromKeyParent)));
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
+      Table.KeyValue<String, OmBucketInfo> keyValue =
+          omMetadataManager.getBucketTable().iterator().next();
+      Assert.assertEquals(omMetadataManager.getBucketKey(
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName())
+          , keyValue.getKey());
     }
   }
 

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -42,16 +43,19 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
   private boolean isRenameDirectory;
   private OmKeyInfo fromKeyParent;
   private OmKeyInfo toKeyParent;
+  private OmBucketInfo bucketInfo;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse,
       String fromDBKey, String toDBKey, OmKeyInfo fromKeyParent,
       OmKeyInfo toKeyParent, @Nonnull OmKeyInfo renameKeyInfo,
+      OmBucketInfo bucketInfo,
       boolean isRenameDirectory, BucketLayout bucketLayout) {
     super(omResponse, fromDBKey, toDBKey, renameKeyInfo, bucketLayout);
     this.isRenameDirectory = isRenameDirectory;
     this.fromKeyParent = fromKeyParent;
     this.toKeyParent = toKeyParent;
+    this.bucketInfo = bucketInfo;
   }
 
   /**
@@ -92,6 +96,13 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
     if (toKeyParent != null) {
       addDirToDBBatch(omMetadataManager, toKeyParent,
           volumeId, bucketId, batchOperation);
+    }
+    if (bucketInfo != null) {
+      String dbBucketKey =
+          omMetadataManager.getBucketKey(bucketInfo.getVolumeName(),
+              bucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          dbBucketKey, bucketInfo);
     }
   }
 

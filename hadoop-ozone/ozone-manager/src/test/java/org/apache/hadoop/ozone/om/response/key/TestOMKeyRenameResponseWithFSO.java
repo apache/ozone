@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
@@ -61,12 +63,12 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
   @Override
   protected OMKeyRenameResponse getOMKeyRenameResponse(OMResponse response,
       OmKeyInfo fromKeyInfo, OmKeyInfo toKeyInfo) throws IOException {
-    createParentKey();
+    createParent();
     return new OMKeyRenameResponseWithFSO(response, getDBKeyName(fromKeyInfo),
         getDBKeyName(toKeyInfo), fromKeyParent, toKeyParent, toKeyInfo,
-        false, getBucketLayout());
+        bucketInfo, false, getBucketLayout());
   }
-  protected void createParentKey() {
+  protected void createParent() {
     long bucketId = random.nextLong();
     String fromKeyParentName = UUID.randomUUID().toString();
     String toKeyParentName = UUID.randomUUID().toString();
@@ -82,6 +84,9 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
         fromKeyParent.getKeyName()));
     toKeyParent.setFileName(OzoneFSUtils.getFileName(
         toKeyParent.getKeyName()));
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    bucketInfo = TestOMResponseUtils.createBucket(volumeName, bucketName);
   }
   @Override
   public BucketLayout getBucketLayout() {
