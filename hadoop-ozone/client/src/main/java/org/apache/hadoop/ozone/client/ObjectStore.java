@@ -560,4 +560,9 @@ public class ObjectStore {
       throws IOException {
     return proxy.listSnapshot(volumeName, bucketName);
   }
+  public String snapshotDiff(String volumeName, String bucketName,
+                           String fromSnapshot, String toSnapshot)
+    throws IOException {
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot);
+  }
 }

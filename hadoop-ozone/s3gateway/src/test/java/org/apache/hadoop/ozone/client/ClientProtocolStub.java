@@ -583,4 +583,11 @@ public class ClientProtocolStub implements ClientProtocol {
       throws IOException {
     return null;
   }
+
+  public String snapshotDiff(String volumeName, String bucketName,
+                             String fromSnapshot, String toSnapshot)
+    throws IOException {
+    return null;
+  }
+
 }

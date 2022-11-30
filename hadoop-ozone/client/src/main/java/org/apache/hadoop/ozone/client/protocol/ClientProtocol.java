@@ -979,4 +979,18 @@ public interface ClientProtocol {
    */
   List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
       throws IOException;
+
+
+  /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  String snapshotDiff(String volumeName, String bucketName,
+                      String fromSnapshot, String toSnapshot)
+      throws IOException;
 }

@@ -1141,6 +1141,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
+  public String snapshotDiff(String volumeName, String bucketName,
+                              String fromSnapshot, String toSnapshot)
+      throws IOException {
+    final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setFromSnapshot(fromSnapshot)
+            .setToSnapshot(toSnapshot);
+
+    final OMRequest omRequest = createOMRequest(Type.SnapshotDiff)
+        .setSnapshotDiffRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    return omResponse.getSnapshotDiffResponse()
+        .getSnapshotDiff();
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
   public void tenantAssignAdmin(String accessId, String tenantId,
       boolean delegated) throws IOException {
 

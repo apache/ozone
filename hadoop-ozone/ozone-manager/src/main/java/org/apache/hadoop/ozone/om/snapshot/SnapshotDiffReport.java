@@ -165,4 +165,18 @@ public class SnapshotDiffReport {
   public List<DiffReportEntry> getDiffList() {
     return diffList;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder str = new StringBuilder();
+    String from = "snapshot " + fromSnapshot;
+    String to = "snapshot " + toSnapshot;
+    str.append("Difference between ").append(from).append(" and ").append(to)
+        .append(":")
+        .append(LINE_SEPARATOR);
+    for (DiffReportEntry entry : diffList) {
+      str.append(entry.toString()).append(LINE_SEPARATOR);
+    }
+    return str.toString();
+  }
 }

@@ -636,6 +636,22 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  default String snapshotDiff(String volumeName, String bucketName,
+                              String fromSnapshot, String toSnapshot)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Assign admin role to a user identified by an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantId tenant name.

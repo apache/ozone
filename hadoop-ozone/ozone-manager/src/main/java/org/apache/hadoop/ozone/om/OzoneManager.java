@@ -4263,4 +4263,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ozoneObj.getVolumeName(), ozoneObj.getBucketName(),
         ozoneObj.getKeyName());
   }
+
+  public String snapshotDiff(String volume, String bucket,
+                             String fromSnapshot, String toSnapshot)
+    throws IOException {
+    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+        fromSnapshot, toSnapshot).toString();
+  }
 }
