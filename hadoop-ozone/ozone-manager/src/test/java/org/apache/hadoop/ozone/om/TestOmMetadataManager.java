@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -54,6 +55,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_T
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -66,6 +69,17 @@ public class TestOmMetadataManager {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
+  public static <E extends Throwable> void expectOmException(
+      OMException.ResultCodes code,
+      LambdaTestUtils.VoidCallable eval)
+      throws Exception {
+    try {
+      eval.call();
+      Assert.fail("OMException is expected");
+    } catch (OMException ex) {
+      Assert.assertEquals(code, ex.getResult());
+    }
+  }
 
   @Before
   public void setup() throws Exception {
@@ -673,6 +687,35 @@ public class TestOmMetadataManager {
   public void testListSnapshot() throws Exception {
     String vol1 = "vol1";
     String bucket1 = "bucket1";
+
+    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
+    addBucketsToCache(vol1, bucket1);
+    String snapshotName = "snapshot";
+
+    for (int i = 1; i <= 10; i++) {
+      if (i % 2 == 0) {
+        OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
+            snapshotName + i, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
+            snapshotName + i, omMetadataManager);
+      }
+    }
+
+    //Test listing all snapshots.
+    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
+        bucket1);
+    Assert.assertEquals(10, snapshotInfos.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      Assert.assertTrue(snapshotInfo.getName().startsWith(snapshotName));
+    }
+
+  }
+
+  @Test
+  public void testListSnapshotWithInvalidPath() throws Exception {
+    String vol1 = "vol1";
+    String bucket1 = "bucket1";
     String nonexistentBucket = "nonexistentBucket";
 
     OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
@@ -690,25 +733,15 @@ public class TestOmMetadataManager {
     }
 
     //Test listing snapshots with no volume name.
-    Assert.assertThrows(OMException.class,
+    expectOmException(VOLUME_NOT_FOUND,
         () -> omMetadataManager.listSnapshot(null, null));
 
     //Test listing snapshots with no bucket name.
-    Assert.assertThrows(OMException.class,
+    expectOmException(BUCKET_NOT_FOUND,
         () -> omMetadataManager.listSnapshot(vol1, null));
 
     //Test listing snapshots with non-existent bucket.
-
-    Assert.assertThrows(OMException.class,
+    expectOmException(BUCKET_NOT_FOUND,
         () -> omMetadataManager.listSnapshot(vol1, nonexistentBucket));
-
-    //Test listing all snapshots.
-    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
-        bucket1);
-    Assert.assertEquals(10, snapshotInfos.size());
-    for (SnapshotInfo snapshotInfo : snapshotInfos) {
-      Assert.assertTrue(snapshotInfo.getName().startsWith(snapshotName));
-    }
-
   }
 }
