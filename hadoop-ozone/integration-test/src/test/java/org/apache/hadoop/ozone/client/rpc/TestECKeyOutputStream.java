@@ -399,19 +399,25 @@ public class TestECKeyOutputStream {
       try (OzoneOutputStream out = bucket.createKey(keyName, 1024,
           new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
               chunkSize), new HashMap<>())) {
+        ECKeyOutputStream ecOut = (ECKeyOutputStream) out.getOutputStream();
         out.write(inputData);
         // Kill a node from first pipeline
-        nodeToKill =
-            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
-                .get(0).getPipeline().getFirstNode();
+        nodeToKill = ecOut.getStreamEntries()
+            .get(0).getPipeline().getFirstNode();
         cluster.shutdownHddsDatanode(nodeToKill);
 
         out.write(inputData);
-        // Check the second blockGroup pipeline to make sure that the failed not
-        // is not selected.
-        Assert.assertFalse(
-            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
-                .get(1).getPipeline().getNodes().contains(nodeToKill));
+
+        // Wait for flushing thread to finish its work.
+        final long checkpoint = System.currentTimeMillis();
+        ecOut.insertFlushCheckpoint(checkpoint);
+        GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
+            100, 10000);
+
+        // Check the second blockGroup pipeline to make sure that the failed
+        // node is not selected.
+        Assert.assertFalse(ecOut.getStreamEntries()
+            .get(1).getPipeline().getNodes().contains(nodeToKill));
       }
 
       try (OzoneInputStream is = bucket.readKey(keyName)) {
