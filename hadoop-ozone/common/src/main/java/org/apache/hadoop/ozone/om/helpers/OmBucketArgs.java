@@ -152,7 +152,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
-   * Returns true if defaultReplicationConfig has been set to a non default value.
+   * Returns true if defaultReplicationConfig has been set
+   * to a non default value.
    */
   public boolean hasDefaultReplicationConfig() {
     return defaultReplicationConfigSet;
@@ -295,7 +296,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       OmBucketArgs omBucketArgs =
           new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
               storageType, metadata, ownerName);
-      if(defaultReplicationConfigSet) {
+      if (defaultReplicationConfigSet) {
         omBucketArgs.setDefaultReplicationConfig(defaultReplicationConfig);
       }
       if (quotaInBytesSet) {
@@ -357,8 +358,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     // OmBucketArgs ctor already has more arguments, so setting the default
     // replication config separately.
     if (bucketArgs.hasDefaultReplicationConfig()) {
-      omBucketArgs.setDefaultReplicationConfig(
-              new DefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig()));
+      omBucketArgs.setDefaultReplicationConfig(new DefaultReplicationConfig(
+              bucketArgs.getDefaultReplicationConfig()));
     }
     if (bucketArgs.hasQuotaInBytes()) {
       omBucketArgs.setQuotaInBytes(bucketArgs.getQuotaInBytes());

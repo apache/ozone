@@ -204,7 +204,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
       } else {
         // Retaining existing default replication config
-        if (dbBucketInfo.getDefaultReplicationConfig() != null ) {
+        if (dbBucketInfo.getDefaultReplicationConfig() != null) {
           bucketInfoBuilder.setDefaultReplicationConfig(
                   dbBucketInfo.getDefaultReplicationConfig());
         }

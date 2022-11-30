@@ -454,7 +454,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     /* Bucket with default replication */
     OMRequestTestUtils.addVolumeAndBucketToDB(
-            volumeName1,bucketName1,omMetadataManager);
+            volumeName1, bucketName1, omMetadataManager);
 
     String bucketKey = omMetadataManager
             .getBucketKey(volumeName1, bucketName1);
@@ -478,7 +478,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OmBucketInfo dbBucketInfoAfter =
             omMetadataManager.getBucketTable().get(bucketKey);
 
-    Assert.assertEquals(null,dbBucketInfoAfter.getDefaultReplicationConfig());
+    Assert.assertEquals(null,
+            dbBucketInfoAfter.getDefaultReplicationConfig());
     Assert.assertEquals(
             dbBucketInfoBefore.getDefaultReplicationConfig(),
             dbBucketInfoAfter.getDefaultReplicationConfig());
@@ -494,7 +495,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
                     EC, new ECReplicationConfig(3, 2)));
 
-    OMRequestTestUtils.addVolumeToDB(volumeName2,omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
     OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketInfo);
 
     bucketKey = omMetadataManager

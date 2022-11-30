@@ -91,6 +91,7 @@ public class TestOmBucketArgs {
             bucketArgs.getProtobuf());
 
     Assert.assertEquals(true, argsFromProto.hasDefaultReplicationConfig());
-    Assert.assertEquals(EC, argsFromProto.getDefaultReplicationConfig().getType());
+    Assert.assertEquals(EC,
+            argsFromProto.getDefaultReplicationConfig().getType());
   }
 }
