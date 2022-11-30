@@ -820,12 +820,22 @@ public class TestOzoneShellHA {
             .getQuotaInNamespace());
 
     // Test clrquota option.
+    args = new String[]{"volume", "clrquota", "vol4"};
+    executeWithError(ozoneShell, args, "At least one of the quota clear" +
+        " flag is required");
+    out.reset();
+    
     args = new String[]{"volume", "clrquota", "vol4", "--space-quota",
         "--namespace-quota"};
     execute(ozoneShell, args);
     assertEquals(-1, objectStore.getVolume("vol4").getQuotaInBytes());
     assertEquals(-1,
         objectStore.getVolume("vol4").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "clrquota", "vol4/buck4"};
+    executeWithError(ozoneShell, args, "At least one of the quota clear" +
+        " flag is required");
     out.reset();
 
     args = new String[]{"bucket", "clrquota", "vol4/buck4",
@@ -870,6 +880,12 @@ public class TestOzoneShellHA {
     assertEquals(100,
         objectStore.getVolume("vol4").getQuotaInNamespace());
 
+    // Test set volume quota without quota flag
+    String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4"};
+    executeWithError(ozoneShell, volumeArgs5,
+        "At least one of the quota set flag is required");
+    out.reset();
+
     // Test set bucket quota to 0.
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "0GB"};
@@ -913,6 +929,12 @@ public class TestOzoneShellHA {
         .getBucket("buck4").getQuotaInBytes());
     assertEquals(100, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInNamespace());
+
+    // Test set volume quota without quota flag
+    String[] bucketArgs6 = new String[]{"bucket", "setquota", "vol4/buck4"};
+    executeWithError(ozoneShell, bucketArgs6,
+        "At least one of the quota set flag is required");
+    out.reset();
 
     objectStore.getVolume("vol").deleteBucket("buck");
     objectStore.deleteVolume("vol");
