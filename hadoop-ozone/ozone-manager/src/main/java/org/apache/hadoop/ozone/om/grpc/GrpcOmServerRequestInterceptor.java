@@ -62,11 +62,6 @@ public class GrpcOmServerRequestInterceptor implements ServerInterceptor {
         serverCallHandler.startCall(serverCall, headers)) {
 
       @Override
-      protected ServerCall.Listener<ReqT> delegate() {
-        return super.delegate();
-      }
-
-      @Override
       public void onMessage(ReqT message) {
         // start time
         startTime = System.nanoTime();
