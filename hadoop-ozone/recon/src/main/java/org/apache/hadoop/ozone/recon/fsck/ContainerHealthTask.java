@@ -87,7 +87,7 @@ public class ContainerHealthTask extends ReconScmTask {
     try {
       lock.writeLock().lock();
       while (canRun()) {
-        wait(interval);
+        Thread.sleep(interval);
         triggerContainerHealthCheck();
       }
     } catch (Throwable t) {
