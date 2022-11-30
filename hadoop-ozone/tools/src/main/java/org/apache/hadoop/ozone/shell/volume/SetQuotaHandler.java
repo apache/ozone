@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.shell.volume;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
@@ -31,7 +30,6 @@ import picocli.CommandLine.Command;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
 
 /**
  * Executes set volume quota calls.
