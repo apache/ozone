@@ -230,27 +230,38 @@ public class TestNSSummaryEndpointWithFSO {
       + CONTAINER_SIX_REPLICA_COUNT * BLOCK_SIX_LENGTH;
 
   private static final long FILE1_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_ONE_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_ONE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE2_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_TWO_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_TWO_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE3_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_THREE_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_THREE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE4_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_FOUR_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_FOUR_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE5_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_FIVE_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_FIVE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE6_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_SIX_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_SIX_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE7_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_SEVEN_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_SEVEN_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE8_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_EIGHT_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_EIGHT_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE9_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_NINE_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_NINE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE10_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_TEN_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_TEN_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE11_SIZE_WITH_REPLICA =
-      getReplicatedSize(KEY_ELEVEN_SIZE, StandaloneReplicationConfig.getInstance(ONE));
+      getReplicatedSize(KEY_ELEVEN_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
           = FILE7_SIZE_WITH_REPLICA;
   private static final long
