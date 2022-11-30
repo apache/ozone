@@ -640,7 +640,11 @@ public final class RocksDatabase {
         boolean isKeyWithPrefixPresent =
             filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
         if (!isKeyWithPrefixPresent) {
-          db.get().deleteFile(liveFileMetaData.fileName());
+          String sstFileName = liveFileMetaData.fileName();
+          LOG.info("Deleting sst file {} corresponding to column family"
+                  + " {} from db: {}", sstFileName,
+              liveFileMetaData.columnFamilyName(), db.get().getName());
+          db.get().deleteFile(sstFileName);
         }
       }
     }
