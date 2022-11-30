@@ -126,7 +126,7 @@ const COLUMNS = [
     key: 'hostname',
     isVisible: true,
     isSearchable: true,
-    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname,undefined,{numeric:true}),
+    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname, undefined, {numeric: true}),
     defaultSortOrder: 'ascend' as const,
     fixed: 'left'
   },
