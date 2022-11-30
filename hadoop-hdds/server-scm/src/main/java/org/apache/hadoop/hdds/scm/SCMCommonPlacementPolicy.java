@@ -508,7 +508,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
   @Override
   public Set<ContainerReplica> replicasToRemove(Set<ContainerReplica> replicas,
-                                                int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
+         int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
     Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
     Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
             = new HashMap<>();
