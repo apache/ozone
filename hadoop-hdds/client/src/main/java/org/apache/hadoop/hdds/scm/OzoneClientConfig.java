@@ -143,6 +143,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int maxECStripeWriteRetries = 10;
 
+  @Config(key = "ec.stripe.queue.size",
+      defaultValue = "2",
+      description = "The max number of EC stripes can be buffered in client " +
+          " before flushing into datanodes.",
+      tags = ConfigTag.CLIENT)
+  private int ecStripeQueueSize = 2;
+
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
       description = "Time after which an excluded node is reconsidered for" +
@@ -286,6 +293,10 @@ public class OzoneClientConfig {
 
   public int getMaxECStripeWriteRetries() {
     return this.maxECStripeWriteRetries;
+  }
+
+  public int getEcStripeQueueSize() {
+    return this.ecStripeQueueSize;
   }
 
   public long getExcludeNodesExpiryTime() {
