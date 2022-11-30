@@ -601,7 +601,7 @@ public class RocksDBCheckpointDiffer {
       // Read compaction log entry
 
       // Trim the beginning
-      line = line.substring(COMPACTION_LOG_SEQNUM_LINE_PREFIX.length());
+      line = line.substring(COMPACTION_LOG_ENTRY_LINE_PREFIX.length());
       final String[] io = line.split(":");
       if (io.length != 2) {
         LOG.error("Invalid line in compaction log: {}", line);
