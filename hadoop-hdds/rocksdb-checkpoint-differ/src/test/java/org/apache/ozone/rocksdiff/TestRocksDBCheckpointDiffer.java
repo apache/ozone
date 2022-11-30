@@ -37,6 +37,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
@@ -44,6 +45,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -98,10 +102,141 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
+   * Test cases for testGetSSTDiffListWithoutDB.
+   */
+  private static Stream<Arguments> testGetSSTDiffListWithoutDBCases() {
+
+    DifferSnapshotInfo snapshotInfo1 = new DifferSnapshotInfo(
+        "/path/to/dbcp1", "ssUUID1", 3008L);
+    DifferSnapshotInfo snapshotInfo2 = new DifferSnapshotInfo(
+        "/path/to/dbcp2", "ssUUID2", 14980L);
+    DifferSnapshotInfo snapshotInfo3 = new DifferSnapshotInfo(
+        "/path/to/dbcp3", "ssUUID3", 17975L);
+    DifferSnapshotInfo snapshotInfo4 = new DifferSnapshotInfo(
+        "/path/to/dbcp4", "ssUUID4", 18000L);
+
+    Set<String> snapshotSstFiles1 = new HashSet<>(asList(
+        "000059", "000053"));
+    Set<String> snapshotSstFiles2 = new HashSet<>(asList(
+        "000088", "000059", "000053", "000095"));
+    Set<String> snapshotSstFiles3 = new HashSet<>(asList(
+        "000088", "000105", "000059", "000053", "000095"));
+    Set<String> snapshotSstFiles4 = new HashSet<>(asList(
+        "000088", "000105", "000059", "000053", "000095", "000108"));
+    Set<String> snapshotSstFiles1Alt1 = new HashSet<>(asList(
+        "000059", "000053", "000066"));
+    Set<String> snapshotSstFiles1Alt2 = new HashSet<>(asList(
+        "000059", "000053", "000052"));
+    Set<String> snapshotSstFiles2Alt2 = new HashSet<>(asList(
+        "000088", "000059", "000053", "000095", "000099"));
+    Set<String> snapshotSstFiles2Alt3 = new HashSet<>(asList(
+        "000088", "000059", "000053", "000062"));
+
+    return Stream.of(
+        Arguments.of("Test 1: Regular case. Expands expandable " +
+                "SSTs in the initial diff.",
+            snapshotInfo3,
+            snapshotInfo1,
+            snapshotSstFiles3,
+            snapshotSstFiles1,
+            new HashSet<>(asList("000059", "000053")),
+            new HashSet<>(asList(
+                "000066", "000105", "000080", "000087", "000073", "000095"))),
+        Arguments.of("Test 2: Crafted input: One source " +
+                "('to' snapshot) SST file is never compacted (newly flushed)",
+            snapshotInfo4,
+            snapshotInfo3,
+            snapshotSstFiles4,
+            snapshotSstFiles3,
+            new HashSet<>(asList(
+                "000088", "000105", "000059", "000053", "000095")),
+            new HashSet<>(asList("000108"))),
+        Arguments.of("Test 3: Crafted input: Same SST files " +
+                "found during SST expansion",
+            snapshotInfo2,
+            snapshotInfo1,
+            snapshotSstFiles2,
+            snapshotSstFiles1Alt1,
+            new HashSet<>(asList("000066", "000059", "000053")),
+            new HashSet<>(asList(
+                "000080", "000087", "000073", "000095"))),
+        Arguments.of("Test 4: Crafted input: Skipping known " +
+                "processed SST.",
+            snapshotInfo2,
+            snapshotInfo1,
+            snapshotSstFiles2Alt2,
+            snapshotSstFiles1Alt2,
+            new HashSet<>(),
+            new HashSet<>()),
+        Arguments.of("Test 5: Hit snapshot generation early exit " +
+                "condition",
+            snapshotInfo2,
+            snapshotInfo1,
+            snapshotSstFiles2Alt3,
+            snapshotSstFiles1,
+            new HashSet<>(asList("000059", "000053")),
+            new HashSet<>(asList(
+                "000066", "000080", "000087", "000073", "000062")))
+    );
+  }
+
+  /**
    * Tests core SST diff list logic. Does not involve DB.
    * Focuses on testing edge cases in internalGetSSTDiffList().
    */
-  @Test
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("testGetSSTDiffListWithoutDBCases")
+  public void testGetSSTDiffListWithoutDB(String description,
+      DifferSnapshotInfo srcSnapshot,
+      DifferSnapshotInfo destSnapshot,
+      Set<String> srcSnapshotSstFiles,
+      Set<String> destSnapshotSstFiles,
+      Set<String> expectedSameSstFiles,
+      Set<String> expectedDiffSstFiles) {
+
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+
+    String compactionLog = ""
+        + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5\n"  // Snapshot 0
+        + "C 000001,000002:000062\n"
+          // Additional "compaction" to trigger and test early exit condition
+        + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5\n"  // Snapshot 1
+        + "C 000068,000062:000069\n"  // Regular compaction
+        + "C 000071,000064,000060,000052:000071,000064,000060,000052\n"
+          // Trivial move
+        + "C 000073,000066:000074\n"
+        + "C 000082,000076,000069:000083\n"
+        + "C 000087,000080,000074:000088\n"
+        + "C 000093,000090,000083:\n"  // Deletion?
+        + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd\n"  // Snapshot 2
+        + "C 000098,000096,000085,000078,000071,000064,000060,000052:000099\n"
+        + "C 000105,000095,000088:000107\n"
+        + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea\n";  // Snapshot 3
+
+    // Construct DAG from compaction log input
+    Arrays.stream(compactionLog.split("\n")).forEach(
+        differ::processCompactionLogLine);
+
+    Set<String> actualSameSstFiles = new HashSet<>();
+    Set<String> actualDiffSstFiles = new HashSet<>();
+    differ.internalGetSSTDiffList(
+        srcSnapshot,
+        destSnapshot,
+        srcSnapshotSstFiles,
+        destSnapshotSstFiles,
+        differ.getForwardCompactionDAG(),
+        actualSameSstFiles,
+        actualDiffSstFiles);
+    // Check same and different SST files result
+    Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
+    Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+  }
+
+  /**
+   * Tests core SST diff list logic. Does not involve DB.
+   * Focuses on testing edge cases in internalGetSSTDiffList().
+   */
+//  @Test
   void testGetSSTDiffListWithoutDB() {
 
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();

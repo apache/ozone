@@ -705,9 +705,9 @@ public class RocksDBCheckpointDiffer {
    */
   void internalGetSSTDiffList(
       DifferSnapshotInfo src, DifferSnapshotInfo dest,
-      HashSet<String> srcSnapFiles, HashSet<String> destSnapFiles,
+      Set<String> srcSnapFiles, Set<String> destSnapFiles,
       MutableGraph<CompactionNode> mutableGraph,
-      HashSet<String> sameFiles, HashSet<String> differentFiles) {
+      Set<String> sameFiles, Set<String> differentFiles) {
 
     // Sanity check
     Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
