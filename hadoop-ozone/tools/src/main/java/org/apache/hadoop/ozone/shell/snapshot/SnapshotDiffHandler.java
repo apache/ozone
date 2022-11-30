@@ -59,7 +59,7 @@ public class SnapshotDiffHandler extends Handler {
     OmUtils.validateSnapshotName(fromSnapshot);
     OmUtils.validateSnapshotName(toSnapshot);
 
-    try(PrintStream stream = out()) {
+    try (PrintStream stream = out()) {
       stream.print(client.getObjectStore()
           .snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
     }

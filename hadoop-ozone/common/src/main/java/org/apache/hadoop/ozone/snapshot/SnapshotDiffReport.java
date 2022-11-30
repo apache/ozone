@@ -16,10 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.snapshot;
+
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto.DiffTypeProto;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Snapshot diff report.
@@ -51,6 +56,14 @@ public class SnapshotDiffReport {
 
     public String getLabel() {
       return label;
+    }
+
+    public DiffTypeProto toProtobuf() {
+      return DiffTypeProto.valueOf(this.name());
+    }
+
+    public static DiffType fromProtobuf(final DiffTypeProto type) {
+      return DiffType.valueOf(type.name());
     }
   }
 
@@ -125,6 +138,23 @@ public class SnapshotDiffReport {
       return toString().hashCode();
     }
 
+    public DiffReportEntryProto toProtobuf() {
+      final DiffReportEntryProto.Builder builder = DiffReportEntryProto
+          .newBuilder();
+      builder.setDiffType(type.toProtobuf()).setSourcePath(sourcePath);
+      if (targetPath != null) {
+        builder.setTargetPath(targetPath);
+      }
+      return builder.build();
+    }
+
+    public static DiffReportEntry fromProtobuf(
+        final DiffReportEntryProto entry) {
+      return of(DiffType.fromProtobuf(entry.getDiffType()),
+          entry.getSourcePath(),
+          entry.hasTargetPath() ? entry.getTargetPath() : null);
+    }
+
   }
 
 
@@ -179,4 +209,25 @@ public class SnapshotDiffReport {
     }
     return str.toString();
   }
+
+  public SnapshotDiffReportProto toProtobuf() {
+    final SnapshotDiffReportProto.Builder builder = SnapshotDiffReportProto
+        .newBuilder();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setFromSnapshot(fromSnapshot)
+        .setToSnapshot(toSnapshot);
+    builder.addAllDiffList(diffList.stream().map(DiffReportEntry::toProtobuf)
+        .collect(Collectors.toList()));
+    return builder.build();
+  }
+
+  public static SnapshotDiffReport fromProtobuf(
+      final SnapshotDiffReportProto report) {
+    return new SnapshotDiffReport(report.getVolumeName(),
+        report.getBucketName(), report.getFromSnapshot(),
+        report.getToSnapshot(), report.getDiffListList().stream()
+        .map(DiffReportEntry::fromProtobuf).collect(Collectors.toList()));
+  }
+
 }

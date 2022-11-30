@@ -23,8 +23,9 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport.DiffType;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffReportEntry;
 
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;

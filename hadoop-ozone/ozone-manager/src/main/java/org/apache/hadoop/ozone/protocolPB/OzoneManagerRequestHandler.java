@@ -286,9 +286,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setListSnapshotResponse(listSnapshotResponse);
         break;
       case SnapshotDiff:
-        SnapshotDiffResponse snapshotDiff = snapshotDiff(
+        SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
             request.getSnapshotDiffRequest());
-        responseBuilder.setSnapshotDiffResponse(snapshotDiff);
+        responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1207,11 +1207,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private SnapshotDiffResponse snapshotDiff(
       SnapshotDiffRequest snapshotDiffRequest) throws IOException {
-    return SnapshotDiffResponse.newBuilder().setSnapshotDiff(
+    return SnapshotDiffResponse.newBuilder().setSnapshotDiffReport(
         impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
             snapshotDiffRequest.getBucketName(),
             snapshotDiffRequest.getFromSnapshot(),
-            snapshotDiffRequest.getToSnapshot())).build();
+            snapshotDiffRequest.getToSnapshot()).toProtobuf()).build();
   }
 
 

@@ -1707,7 +1707,27 @@ message ListSnapshotResponse {
 
 
 message SnapshotDiffResponse {
-  required string snapshotDiff = 1;
+  required SnapshotDiffReportProto snapshotDiffReport = 1;
+}
+
+message SnapshotDiffReportProto {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required string fromSnapshot = 3;
+  required string toSnapshot = 4;
+  repeated DiffReportEntryProto diffList = 5;
+}
+
+message DiffReportEntryProto {
+  enum DiffTypeProto {
+    CREATE = 1;
+    MODIFY = 2;
+    DELETE= 3;
+    RENAME = 4;
+  }
+  required DiffTypeProto diffType = 1;
+  required string sourcePath = 2;
+  optional string targetPath = 3;
 }
 
 message DeleteTenantResponse {
