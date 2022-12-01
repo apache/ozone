@@ -176,7 +176,7 @@ public class RocksDBCheckpointDiffer {
     }
 
     this.compactionLogDir =
-        Paths.get(parentDir.toString(), compactionLogDirName).toString();
+        Paths.get(parentDir.getPath(), compactionLogDirName).toString();
     File clDir = new File(compactionLogDir);
     if (!clDir.exists() && !clDir.mkdir()) {
       LOG.error("Error creating compaction log dir.");

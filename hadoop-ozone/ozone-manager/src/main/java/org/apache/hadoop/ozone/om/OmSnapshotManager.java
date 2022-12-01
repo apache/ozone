@@ -321,12 +321,22 @@ public final class OmSnapshotManager {
     return data;
   }
 
-  // Get the filename without the introductory metadata directory
+  /**
+   * Get the filename without the introductory metadata directory
+   *
+   * @param truncateLength Length to remove.
+   * @param file File to remove prefix from.
+   * @return Truncated string.
+   */
   static String truncateFileName(int truncateLength, Path file) {
     return file.toString().substring(truncateLength);
   }
 
-  // Create hard links listed in OM_HARDLINK_FILE
+  /**
+   * Create hard links listed in OM_HARDLINK_FILE
+   *
+   * @param dbPath Path to db to have links created.
+   */
   static void createHardLinks(Path dbPath) throws IOException {
     File hardLinkFile = new File(dbPath.toString(),
         OM_HARDLINK_FILE);

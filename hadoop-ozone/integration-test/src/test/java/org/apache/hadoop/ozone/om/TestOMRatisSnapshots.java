@@ -572,10 +572,12 @@ public class TestOMRatisSnapshots {
     // Allow the snapshot to be written to the info table.
     GenericTestUtils.waitFor(() -> {
       try {
-        SnapshotInfo snapshotInfo =
-            leaderOM.getMetadataManager().getSnapshotInfoTable()
-                .getSkipCache(
-                    SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+        String tableKey = SnapshotInfo.getTableKey(volumeName,
+            bucketName,
+            "snap1");
+        SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
+            .getSnapshotInfoTable()
+            .getSkipCache(tableKey);
         return snapshotInfo != null;
       } catch (Exception e) {
         return false;

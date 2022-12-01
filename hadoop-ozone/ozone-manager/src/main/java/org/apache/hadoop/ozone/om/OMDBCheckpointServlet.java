@@ -234,8 +234,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
-  private void writeFilesToArchive(HashMap<Object, Path> copyFiles,
-                         HashMap<Path, Path> hardLinkFiles,
+  private void writeFilesToArchive(Map<Object, Path> copyFiles,
+                         Map<Path, Path> hardLinkFiles,
                          ArchiveOutputStream archiveOutputStream)
       throws IOException {
 

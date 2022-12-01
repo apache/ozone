@@ -3383,6 +3383,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     DBCheckpoint omDBCheckpoint = getDBCheckpointFromLeader(leaderId);
+    if (omDBCheckpoint == null) {
+      return null;
+    }
     LOG.info("Downloaded checkpoint from Leader {} to the location {}",
         leaderId, omDBCheckpoint.getCheckpointLocation());
 
@@ -3615,6 +3618,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           dbSnapshotsBackup.toPath());
     }
 
+    moveCheckpointFiles(oldDB, checkpointPath, dbDir, dbBackup, dbSnapshotsDir,
+        dbSnapshotsBackup);
+    return dbBackupDir;
+  }
+
+  private void moveCheckpointFiles(File oldDB, Path checkpointPath, File dbDir,
+                         File dbBackup, File dbSnapshotsDir,
+                         File dbSnapshotsBackup) throws IOException {
     // Move the new DB checkpoint into the om metadata dir
     Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
     try {
@@ -3644,7 +3655,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       throw e;
     }
-    return dbBackupDir;
   }
 
   // Move the new snapshot directory into place and create hard links.

@@ -302,7 +302,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   /**
-   * metadata constructor for checkpoints.
+   * Metadata constructor for checkpoints.
    *
    * @param conf - Ozone conf.
    * @param dir - Checkpoint parent directory.

@@ -489,15 +489,21 @@ public class TestOMDbCheckpointServlet {
     return fileSet;
   }
 
-  // Tests to see that fabricated link lines in hardlink file are
-  // properly formatted "dir1/fabricatedFile dir2/fabricatedFile".
-  //
-  // The "fabricated" files/links are ones I've created by hand to
-  // fully test the code, (as opposed to the "natural" files/links
-  // created by the create snapshot process).
+  /**
+   * Confirm fabricated link lines in hardlink file are properly
+   * formatted: "dir1/fabricatedFile dir2/fabricatedFile".
+   *
+   * The "fabricated" files/links are ones I've created by hand to
+   * fully test the code, (as opposed to the "natural" files/links
+   * created by the create snapshot process).
+   *
+   * @param directories Possible directories for the links to exist in.
+   * @param lines Text lines defining the link paths.
+   * @param testDirName Name of test directory.
+   */
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkFabricatedLines(Set<String> directories, List<String> lines,
-                              String testDirName) {
+                                    String testDirName) {
     // find the real file
     String realDir = null;
     for (String dir: directories) {
