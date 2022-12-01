@@ -54,14 +54,10 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
    * deletes these keys to move them to deletedKeys table.
    */
   @Before
-  public void cleanup() {
-    try {
-      String bucketKey = omMetadataManager.getBucketKey(volumeName,
-          bucketName);
-      omMetadataManager.getBucketTable().delete(bucketKey);
-    } catch (Exception e) {
-      // do nothing
-    }
+  public void cleanup() throws Exception {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName,
+        bucketName);
+    omMetadataManager.getBucketTable().delete(bucketKey);
   }
   
   private List<OmKeyInfo> createAndDeleteKeys(Integer trxnIndex, String bucket)
