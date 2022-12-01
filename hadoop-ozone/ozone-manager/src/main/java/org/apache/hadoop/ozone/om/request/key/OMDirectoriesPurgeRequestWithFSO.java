@@ -75,12 +75,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
-              volumeName, bucketName);
+          updateBucketInfo(volBucketInfoMap, omMetadataManager, path,
+              volumeName, bucketName, volBucketPair);
+          OmBucketInfo omBucketInfo = volBucketInfoMap.get(volBucketPair);
           // bucketInfo can be null in case of delete volume or bucket
+          // or key does not belong to bucket as bucket is recreated
           if (null != omBucketInfo) {
             omBucketInfo.incrUsedNamespace(-1L);
-            volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
 
@@ -95,13 +96,14 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
-              volumeName, bucketName);
+          updateBucketInfo(volBucketInfoMap, omMetadataManager,
+              path, volumeName, bucketName, volBucketPair);
+          OmBucketInfo omBucketInfo = volBucketInfoMap.get(volBucketPair);
           // bucketInfo can be null in case of delete volume or bucket
+          // or key does not belong to bucket as bucket is recreated
           if (null != omBucketInfo) {
             omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
             omBucketInfo.incrUsedNamespace(-1L);
-            volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
       }
@@ -116,7 +118,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               e.getValue()));
       for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
           volBucketInfoMap.entrySet()) {
-        entry.setValue(entry.getValue().copyObject());
+        if (null != entry.getValue()) {
+          entry.setValue(entry.getValue().copyObject());
+        }
       }
     }
 
@@ -129,5 +133,24 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         omDoubleBufferHelper);
 
     return omClientResponse;
+  }
+
+  private void updateBucketInfo(
+      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
+      OMMetadataManager omMetadataManager,
+      OzoneManagerProtocolProtos.PurgePathRequest path, String volumeName,
+      String bucketName, Pair<String, String> volBucketPair) {
+    if (!volBucketInfoMap.containsKey(volBucketPair)) {
+      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+          volumeName, bucketName);
+      // null is added to avoid again lookup, in case of bucket not found
+      // or bucket is not matching as recreated
+      if (null == omBucketInfo 
+          || omBucketInfo.getObjectID() != path.getBucketId()) {
+        volBucketInfoMap.put(volBucketPair, null);
+      } else {
+        volBucketInfoMap.put(volBucketPair, omBucketInfo);
+      }
+    }
   }
 }

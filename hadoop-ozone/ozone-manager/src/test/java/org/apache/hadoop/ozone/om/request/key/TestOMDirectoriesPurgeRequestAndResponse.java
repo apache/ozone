@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -52,6 +53,17 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
    * Creates volume, bucket and key entries and adds to OM DB and then
    * deletes these keys to move them to deletedKeys table.
    */
+  @Before
+  public void cleanup() {
+    try {
+      String bucketKey = omMetadataManager.getBucketKey(volumeName,
+          bucketName);
+      omMetadataManager.getBucketTable().delete(bucketKey);
+    } catch (Exception e) {
+      // do nothing
+    }
+  }
+  
   private List<OmKeyInfo> createAndDeleteKeys(Integer trxnIndex, String bucket)
       throws Exception {
     if (bucket == null) {
@@ -108,7 +120,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
    * @return OMRequest
    */
   private OMRequest createPurgeKeysRequest(String purgeDeletedDir,
-      List<OmKeyInfo> keyList) throws IOException {
+      List<OmKeyInfo> keyList, OmBucketInfo bucketInfo) throws IOException {
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList
         = new ArrayList<>();
     List<OmKeyInfo> subFiles = new ArrayList<>();
@@ -117,7 +129,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     }
     List<OmKeyInfo> subDirs = new ArrayList<>();
     Long volumeId = 1L;
-    Long bucketId = 1L;
+    Long bucketId = bucketInfo.getObjectID();
     OzoneManagerProtocolProtos.PurgePathRequest request = wrapPurgeRequest(
         volumeId, bucketId, purgeDeletedDir, subFiles, subDirs);
     purgePathRequestList.add(request);
@@ -190,15 +202,15 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     }
 
     // Create PurgeKeysRequest to purge the deleted keys
-    OMRequest omRequest = createPurgeKeysRequest(null, deletedKeyInfos);
-
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
+    OMRequest omRequest = createPurgeKeysRequest(
+        null, deletedKeyInfos, omBucketInfo);
     OMRequest preExecutedRequest = preExecute(omRequest);
     OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
         new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
 
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-        bucketKey);
     Assert.assertEquals(1000L * deletedKeyNames.size(),
         omBucketInfo.getUsedBytes());
     OMDirectoriesPurgeResponseWithFSO omClientResponse
@@ -212,6 +224,75 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
     try (BatchOperation batchOperation =
         omMetadataManager.getStore().initBatchOperation()) {
+
+      omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+
+      // Do manual commit and see whether addToBatch is successful or not.
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+
+    // The keys should exist in the DeletedKeys table after dir delete
+    for (String deletedKey : deletedKeyNames) {
+      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
+          deletedKey));
+    }
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheQuotaBucketRecreated()
+      throws Exception {
+    // Create and Delete keys. The keys should be moved to DeletedKeys table
+    List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
+    // The keys should be present in the DeletedKeys table before purging
+    List<String> deletedKeyNames = new ArrayList<>();
+    for (OmKeyInfo deletedKey : deletedKeyInfos) {
+      String keyName = omMetadataManager.getOzoneKey(deletedKey.getVolumeName(),
+          deletedKey.getBucketName(), deletedKey.getKeyName());
+      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
+          keyName));
+      deletedKeyNames.add(keyName);
+    }
+
+
+    // Create PurgeKeysRequest to purge the deleted keys
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
+    OMRequest omRequest = createPurgeKeysRequest(
+        null, deletedKeyInfos, omBucketInfo);
+    OMRequest preExecutedRequest = preExecute(omRequest);
+    OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
+        new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
+
+    // recreate bucket
+    omMetadataManager.getBucketTable().delete(bucketKey);
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
+    omBucketInfo.incrUsedBytes(1000);
+    omBucketInfo.incrUsedNamespace(100L);
+    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+    omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+
+    // prevalidate bucket
+    omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    Assert.assertEquals(1000L, omBucketInfo.getUsedBytes());
+    
+    // perform delete
+    OMDirectoriesPurgeResponseWithFSO omClientResponse
+        = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
+        .validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    
+    // validate bucket info, no change expected
+    omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
+    Assert.assertEquals(1000L, omBucketInfo.getUsedBytes());
+
+    try (BatchOperation batchOperation =
+             omMetadataManager.getStore().initBatchOperation()) {
 
       omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
 
