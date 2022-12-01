@@ -322,7 +322,7 @@ public final class OmSnapshotManager {
   }
 
   /**
-   * Get the filename without the introductory metadata directory
+   * Get the filename without the introductory metadata directory.
    *
    * @param truncateLength Length to remove.
    * @param file File to remove prefix from.
@@ -333,7 +333,7 @@ public final class OmSnapshotManager {
   }
 
   /**
-   * Create hard links listed in OM_HARDLINK_FILE
+   * Create hard links listed in OM_HARDLINK_FILE.
    *
    * @param dbPath Path to db to have links created.
    */

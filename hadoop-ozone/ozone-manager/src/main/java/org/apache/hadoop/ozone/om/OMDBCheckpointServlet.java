@@ -130,11 +130,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         includeSnapshotData(request));
 
     try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP, destination);
+        .createCompressorOutputStream(
+            CompressorStreamFactory.GZIP, destination);
          TarArchiveOutputStream archiveOutputStream = 
              new TarArchiveOutputStream(gzippedOut)
     ) {
-      archiveOutputStream.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+      archiveOutputStream
+          .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
     } catch (CompressorException e) {
       throw new IOException(
@@ -208,6 +210,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
+  @NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE
   private void processDir(Path dir, Map<Object, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
                           Set<Path> snapshotPaths)
