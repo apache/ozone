@@ -24,9 +24,11 @@ import java.io.Writer;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.commons.configuration2.SubsetConfiguration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.DecayRpcSchedulerUtil;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
 import org.apache.hadoop.metrics2.MetricsRecord;
@@ -61,11 +63,17 @@ public class PrometheusMetricsSink implements MetricsSink {
       if (metrics.type() == MetricType.COUNTER
           || metrics.type() == MetricType.GAUGE) {
 
+        String metricName = DecayRpcSchedulerUtil
+            .splitMetricNameIfNeeded(metricsRecord.name(), metrics.name());
+        // If there is no username this should be null
+        String username = DecayRpcSchedulerUtil
+            .checkMetricNameForUsername(metricsRecord.name(), metrics.name());
+
         String key = prometheusName(
-            metricsRecord.name(), metrics.name());
+            metricsRecord.name(), metricName);
 
         String prometheusMetricKeyAsString =
-            getPrometheusMetricKeyAsString(metricsRecord, key);
+            getPrometheusMetricKeyAsString(metricsRecord, key, username);
 
         String metricKey = "# TYPE "
             + key
@@ -80,14 +88,20 @@ public class PrometheusMetricsSink implements MetricsSink {
   }
 
   private String getPrometheusMetricKeyAsString(MetricsRecord metricsRecord,
-      String key) {
+      String key, String username) {
     StringBuilder prometheusMetricKey = new StringBuilder();
     prometheusMetricKey.append(key)
         .append("{");
     String sep = "";
 
+    // tagListWithUsernameIfNeeded() checks if username is null.
+    // If it's not then it returns a list with the existing
+    // metric tags and a username tag.
+    List<MetricsTag> metricTagList = DecayRpcSchedulerUtil
+        .tagListWithUsernameIfNeeded(metricsRecord, username);
+
     //add tags
-    for (MetricsTag tag : metricsRecord.tags()) {
+    for (MetricsTag tag : metricTagList) {
       String tagName = tag.name().toLowerCase();
 
       //ignore specific tag which includes sub-hierarchy
