@@ -207,8 +207,8 @@ licenses. This section summarizes those components and their licenses.
 See licenses/ for text of these licenses.
 
 
-Apache Software Foundation License 2.0
---------------------------------------
+Apache License 2.0
+------------------
 
 hadoop-hdds/framework/src/main/resources/webapps/static/nvd3-1.8.5.min.js.map
 hadoop-hdds/framework/src/main/resources/webapps/static/nvd3-1.8.5.min.css.map
