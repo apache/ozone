@@ -163,8 +163,10 @@ public class TestOMSnapshotCreateRequest {
   @Test
   public void testPreExecuteNameLength() throws Exception {
     // check snapshot name length
-    String name63 = "snap75795657617173401188448010125899089001363595171500499231286";
-    String name64 = "snap156808943643007724443266605711479126926050896107709081166294";
+    String name63 =
+            "snap75795657617173401188448010125899089001363595171500499231286";
+    String name64 =
+            "snap156808943643007724443266605711479126926050896107709081166294";
 
     // name length = 63
     when(ozoneManager.isOwner(any(), any())).thenReturn(true);
