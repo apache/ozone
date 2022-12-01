@@ -31,7 +31,6 @@ import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -139,7 +138,7 @@ public class TestOzoneDelegationTokenSecretManager {
     X509Certificate cert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
 
-    return new OMCertificateClient(securityConfig) {
+    return new OMCertificateClient(conf) {
       @Override
       public X509Certificate getCertificate() {
         return cert;

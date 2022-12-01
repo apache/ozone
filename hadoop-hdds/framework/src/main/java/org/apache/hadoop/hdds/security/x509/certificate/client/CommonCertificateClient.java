@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.slf4j.Logger;
+
+import java.io.IOException;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
@@ -35,9 +37,9 @@ public class CommonCertificateClient extends DefaultCertificateClient {
 
   private final Logger log;
 
-  public CommonCertificateClient(SecurityConfig securityConfig, Logger log,
+  public CommonCertificateClient(OzoneConfiguration ozoneConfig, Logger log,
       String certSerialId, String component) {
-    super(securityConfig, log, certSerialId, component);
+    super(ozoneConfig, log, certSerialId, component);
     this.log = log;
   }
 
@@ -49,7 +51,7 @@ public class CommonCertificateClient extends DefaultCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
+      throws IOException {
     return super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);

@@ -24,14 +24,18 @@ import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
@@ -100,6 +104,39 @@ public interface CertificateClient extends Closeable {
   boolean verifyCertificate(X509Certificate certificate);
 
   /**
+   * How much time is left for a certificate to enter the expiry grace period.
+   * @param certSerialId
+   *
+   * @return Duration, time before certificate enters the grace period defined
+   *         by "hdds.x509.renew.grace.duration"
+   */
+  Duration timeBeforeExpiryGracePeriod(String certSerialId)
+      throws CertificateException;
+
+  /**
+   * Load all certificates from configured location.
+   * */
+  void loadAllCertificates();
+
+  /**
+   * Set the serial ID of default certificate for the specified component.
+   * @param certSerialId - certificate ID.
+   * */
+  void setCertificateId(String certSerialId);
+
+  /**
+   * Renew keys and certificate. Save the keys are certificate to disk in new
+   * directories, swap the current key directory and certs directory with the
+   * new directories.
+   * @param force, check certificate expiry time again if force is false.
+   * @return String, new certificate ID
+   * */
+  default String renewAndStoreKeyAndCertificate(boolean force)
+      throws CertificateException {
+    return null;
+  }
+
+  /**
    * Creates digital signature over the data stream using the components private
    * key.
    *
@@ -141,7 +178,35 @@ public interface CertificateClient extends Closeable {
    *
    * @return CertificateSignRequest.Builder
    */
-  CertificateSignRequest.Builder getCSRBuilder() throws CertificateException;
+   CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+       throws IOException;
+
+  /**
+   * Returns a CSR builder that can be used to create a Certificate sigining
+   * request.
+   *
+   * @return CertificateSignRequest.Builder
+   */
+  CertificateSignRequest.Builder getCSRBuilder()
+      throws IOException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException;
 
   /**
    * Get the certificate of well-known entity from SCM.
@@ -334,4 +399,6 @@ public interface CertificateClient extends Closeable {
    * Return the store factory for key manager and trust manager for client.
    */
   KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+
+  default void reloadKeyAndCertificate(String newCertId) {}
 }

@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Paths;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
@@ -46,18 +47,18 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       Paths.get(OzoneConsts.SCM_CA_CERT_STORAGE_DIR,
           OzoneConsts.SCM_SUB_CA_PATH).toString();
 
-  public SCMCertificateClient(SecurityConfig securityConfig,
+  public SCMCertificateClient(OzoneConfiguration ozoneConfig,
       String certSerialId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
+    super(ozoneConfig, LOG, certSerialId, COMPONENT_NAME);
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME);
+  public SCMCertificateClient(OzoneConfiguration ozoneConfig) {
+    super(ozoneConfig, LOG, null, COMPONENT_NAME);
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig,
+  public SCMCertificateClient(OzoneConfiguration ozoneConfig,
       String certSerialId, String component) {
-    super(securityConfig, LOG, certSerialId, component);
+    super(ozoneConfig, LOG, certSerialId, component);
   }
 
   @Override
@@ -127,7 +128,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
+      throws IOException {
     return super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true)

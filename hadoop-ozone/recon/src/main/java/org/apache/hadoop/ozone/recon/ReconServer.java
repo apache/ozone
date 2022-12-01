@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -172,8 +171,7 @@ public class ReconServer extends GenericCli {
   private void initializeCertificateClient(OzoneConfiguration conf)
       throws IOException {
     LOG.info("Initializing secure Recon.");
-    certClient = new ReconCertificateClient(
-        new SecurityConfig(configuration),
+    certClient = new ReconCertificateClient(configuration,
         reconStorage.getReconCertSerialId());
 
     CertificateClient.InitResponse response = certClient.init();
@@ -181,7 +179,7 @@ public class ReconServer extends GenericCli {
       LOG.info("Re-initialize certificate client.");
       reconStorage.unsetReconCertSerialId();
       reconStorage.persistCurrentState();
-      certClient = new ReconCertificateClient(new SecurityConfig(configuration),
+      certClient = new ReconCertificateClient(configuration,
           reconStorage.getReconCertSerialId());
       response = certClient.init();
     }

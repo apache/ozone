@@ -414,8 +414,7 @@ public class TestDefaultCAServer {
     rootCA.init(new SecurityConfig(conf), SELF_SIGNED_CA);
 
 
-    SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf));
+    SCMCertificateClient scmCertificateClient = new SCMCertificateClient(conf);
 
     CertificateClient.InitResponse response = scmCertificateClient.init();
     assertEquals(CertificateClient.InitResponse.GETCERT, response);

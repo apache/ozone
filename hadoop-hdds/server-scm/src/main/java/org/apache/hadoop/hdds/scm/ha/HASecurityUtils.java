@@ -90,8 +90,7 @@ public final class HASecurityUtils {
       throws IOException {
     LOG.info("Initializing secure StorageContainerManager.");
 
-    CertificateClient certClient =
-        new SCMCertificateClient(new SecurityConfig(conf));
+    CertificateClient certClient = new SCMCertificateClient(conf);
     InitResponse response = certClient.init();
     LOG.info("Init response: {}", response);
     switch (response) {

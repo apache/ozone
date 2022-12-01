@@ -21,16 +21,19 @@ import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.security.KeyPair;
-import java.security.cert.CertificateException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -38,17 +41,15 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -72,14 +73,11 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -98,6 +96,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       HddsDatanodeService.class);
 
   private OzoneConfiguration conf;
+  private SecurityConfig secConf;
   private DatanodeDetails datanodeDetails;
   private DatanodeStateMachine datanodeStateMachine;
   private List<ServicePlugin> plugins;
@@ -114,6 +113,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
+  private ScheduledExecutorService executorService;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -187,6 +187,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public void setConfiguration(OzoneConfiguration configuration) {
     this.conf = configuration;
+    this.secConf = new SecurityConfig(conf);
   }
 
   /**
@@ -237,7 +238,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         component = "dn-" + datanodeDetails.getUuidString();
 
-        dnCertClient = new DNCertificateClient(new SecurityConfig(conf),
+        secConf = new SecurityConfig(conf);
+        dnCertClient = new DNCertificateClient(conf, datanodeDetails,
             datanodeDetails.getCertSerialId());
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
@@ -273,7 +275,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       dnCRLStore = new DatanodeCRLStoreImpl(conf);
 
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        initializeCertificateClient(conf);
+        dnCertClient = initializeCertificateClient(dnCertClient);
+        startCertificateMonitor();
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
           dnCertClient, this::terminateDatanode, dnCRLStore);
@@ -333,15 +336,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * Initializes secure Datanode.
    * */
   @VisibleForTesting
-  public void initializeCertificateClient(OzoneConfiguration config)
-      throws IOException {
+  public CertificateClient initializeCertificateClient(
+      CertificateClient certClient) throws IOException {
     LOG.info("Initializing secure Datanode.");
 
-    CertificateClient.InitResponse response = dnCertClient.init();
+    CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       LOG.info("Re-initialize certificate client.");
-      dnCertClient = new DNCertificateClient(new SecurityConfig(conf));
-      response = dnCertClient.init();
+      certClient = new DNCertificateClient(conf, datanodeDetails, null);
+      response = certClient.init();
     }
     LOG.info("Init response: {}", response);
     switch (response) {
@@ -349,7 +352,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       LOG.info("Initialization successful, case:{}.", response);
       break;
     case GETCERT:
-      getSCMSignedCert(config);
+      CertificateSignRequest.Builder csrBuilder = certClient.getCSRBuilder();
+      String dnCertSerialId =
+          certClient.signAndStoreCertificate(csrBuilder.build());
+      // persist cert ID to VERSION file
+      datanodeDetails.setCertSerialId(dnCertSerialId);
+      persistDatanodeDetails(datanodeDetails);
+      // reload certificates
+      certClient.setCertificateId(dnCertSerialId);
+      certClient.loadAllCertificates();
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
@@ -365,51 +376,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           response);
       throw new RuntimeException("DN security initialization failed.");
     }
-  }
 
-  /**
-   * Get SCM signed certificate and store it using certificate client.
-   * @param config
-   * */
-  private void getSCMSignedCert(OzoneConfiguration config) {
-    try {
-      PKCS10CertificationRequest csr = getCSR(config);
-      // TODO: For SCM CA we should fetch certificate from multiple SCMs.
-      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
-      SCMGetCertResponseProto response = secureScmClient.
-          getDataNodeCertificateChain(
-              datanodeDetails.getProtoBufMessage(),
-              getEncodedString(csr));
-      // Persist certificates.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedCert = response.getX509Certificate();
-        dnCertClient.storeCertificate(pemEncodedCert, true);
-        dnCertClient.storeCertificate(response.getX509CACertificate(), true,
-            true);
-
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          dnCertClient.storeRootCACertificate(
-              response.getX509RootCACertificate(), true);
-        }
-        String dnCertSerialId = getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString();
-        datanodeDetails.setCertSerialId(dnCertSerialId);
-        persistDatanodeDetails(datanodeDetails);
-        // Rebuild dnCertClient with the new CSR result so that the default
-        // certSerialId and the x509Certificate can be updated.
-        dnCertClient = new DNCertificateClient(
-            new SecurityConfig(config), dnCertSerialId);
-
-      } else {
-        throw new RuntimeException("Unable to retrieve datanode certificate " +
-            "chain");
-      }
-    } catch (IOException | CertificateException e) {
-      LOG.error("Error while storing SCM signed certificate.", e);
-      throw new RuntimeException(e);
-    }
+    return certClient;
   }
 
   private void registerMXBean() {
@@ -425,30 +393,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       MBeans.unregister(this.dnInfoBeanName);
       this.dnInfoBeanName = null;
     }
-  }
-
-  /**
-   * Creates CSR for DN.
-   * @param config
-   * */
-  @VisibleForTesting
-  public PKCS10CertificationRequest getCSR(ConfigurationSource config)
-      throws IOException {
-    CertificateSignRequest.Builder builder = dnCertClient.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(dnCertClient.getPublicKey(),
-        dnCertClient.getPrivateKey());
-
-    String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
-
-    builder.setCA(false)
-        .setKey(keyPair)
-        .setConfiguration(config)
-        .setSubject(subject);
-
-    LOG.info("Creating csr for DN-> subject:{}", subject);
-    return builder.build();
   }
 
   /**
@@ -584,11 +528,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       unregisterMXBean();
       // stop dn crl store
       try {
-        dnCRLStore.stop();
+        if (dnCRLStore != null) {
+          dnCRLStore.stop();
+        }
       } catch (Exception ex) {
         LOG.error("Datanode CRL store stop failed", ex);
       }
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
+
+      if (executorService != null) {
+        executorService.shutdown();
+      }
     }
   }
 
@@ -630,5 +580,77 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public void printError(Throwable error) {
     LOG.error("Exception in HddsDatanodeService.", error);
+  }
+
+  @VisibleForTesting
+  public void startCertificateMonitor() throws CertificateException {
+    // Schedule task to refresh certificate before it expires
+    Duration gracePeriod = new SecurityConfig(conf).getRenewalGracePeriod();
+    String certId = dnCertClient.getCertificate().getSerialNumber().toString();
+    long timeBeforeGracePeriod =
+        dnCertClient.timeBeforeExpiryGracePeriod(certId).toMillis();
+    // At least three chances to renew the certificate before it expires
+    long interval =
+        Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));
+
+    if (executorService == null) {
+      executorService = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
+              .setDaemon(true).build());
+    }
+    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
+        timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
+    LOG.info("CertificateLifetimeMonitor is started with first delay {} ms and"
+        + " interval {} ms.", timeBeforeGracePeriod, interval);
+  }
+
+  /**
+   * Certificate lifetime monitor task.
+   */
+  public class CertificateLifetimeMonitor implements Runnable {
+    @Override
+    public void run() {
+      String certId =
+          dnCertClient.getCertificate().getSerialNumber().toString();
+      Duration timeLeft = Duration.ZERO;
+      try {
+        timeLeft = dnCertClient.timeBeforeExpiryGracePeriod(certId);
+      } catch (CertificateException e) {
+        LOG.error("Failed to get cert {}. Keep on using existing certificates.",
+            certId, e);
+        return;
+      }
+
+      if (timeLeft.isZero()) {
+        String newCertId;
+        try {
+          LOG.info("Current certificate {} has entered the expiry grace " +
+              "period {}. Start to renew and store new key and certs.", certId,
+              timeLeft, secConf.getRenewalGracePeriod());
+          newCertId = dnCertClient.renewAndStoreKeyAndCertificate(false);
+        } catch (CertificateException e) {
+          LOG.error("Failed to renew and store key and cert." +
+              " Keep using existing certificates.", e);
+          if (e.errorCode() == CertificateException.ErrorCode.ROLLBACK_ERROR) {
+            terminateDatanode();
+          }
+          return;
+        }
+
+        // save new certificate Id to VERSION file
+        datanodeDetails.setCertSerialId(newCertId);
+        try {
+          persistDatanodeDetails(datanodeDetails);
+        } catch (IOException ex) {
+          // New cert ID cannot be persisted into VERSION file.
+          LOG.error("Failed to persist new cert ID {} to VERSION file." +
+              "Terminating datanode...", newCertId, ex);
+          terminateDatanode();
+        }
+
+        // reset and reload all certs
+        dnCertClient.reloadKeyAndCertificate(newCertId);
+      }
+    }
   }
 }

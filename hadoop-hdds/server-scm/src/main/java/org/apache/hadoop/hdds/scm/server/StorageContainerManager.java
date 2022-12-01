@@ -529,7 +529,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
         scmStorageConfig.checkPrimarySCMIdInitialized()) {
       scmCertificateClient = new SCMCertificateClient(
-          securityConfig, scmStorageConfig.getScmCertSerialId());
+          configuration, scmStorageConfig.getScmCertSerialId());
     }
   }
 
@@ -920,7 +920,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         LOG.error("Get CA Certificate failed", ex);
         throw ex;
       }
-      scmCertificateClient = new SCMCertificateClient(securityConfig,
+      scmCertificateClient = new SCMCertificateClient(conf,
           certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
     }
     String certId = scmCertificateClient.getCertificate().getSerialNumber()

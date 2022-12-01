@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,9 +30,9 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   public static final String COMPONENT_NAME = "recon";
 
-  public ReconCertificateClient(SecurityConfig securityConfig,
+  public ReconCertificateClient(OzoneConfiguration ozoneConfig,
       String certSerialId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
+    super(ozoneConfig, LOG, certSerialId, COMPONENT_NAME);
   }
 
   @Override
