@@ -422,6 +422,13 @@ public class TestOMDbCheckpointServlet {
     snapshotDirName2 =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
 
+    // Create dummy snapshot to make sure it is not included.
+    Path fabricatedSnapshot  = Paths.get(
+        new File(snapshotDirName).getParent(),
+        "fabricatedSnapshot");
+    fabricatedSnapshot.toFile().mkdirs();
+    Paths.get(fabricatedSnapshot.toString(), "fabricatedFile")
+        .toFile().createNewFile();
 
     // Create fabricated links to snapshot dirs
     // to confirm that links are recognized even if
@@ -481,7 +488,7 @@ public class TestOMDbCheckpointServlet {
         if (file.toFile().isDirectory()) {
           getFiles(file, truncateLength, fileSet);
         }
-        if (!file.getFileName().toString().equals("fabricatedFile")) {
+        if (!file.getFileName().toString().startsWith("fabricated")) {
           fileSet.add(truncateFileName(truncateLength, file));
         }
       }

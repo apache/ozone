@@ -49,12 +49,15 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.createHardLinkList;
@@ -148,25 +151,31 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
-    processDir(dir, copyFiles, hardLinkFiles);
+    processDir(dir, copyFiles, hardLinkFiles, new HashSet<>());
 
     if (!includeSnapshotData) {
       return;
     }
 
     // Get the snapshot files.
-    waitForSnapshotDirs(checkpoint);
+    Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
-    processDir(snapshotDir, copyFiles, hardLinkFiles);
+    processDir(snapshotDir, copyFiles, hardLinkFiles, snapshotPaths);
   }
 
-  // The snapshotInfo table may contain a snapshot that
-  // doesn't yet exist on the fs, so wait a few seconds for it.
-  private void waitForSnapshotDirs(DBCheckpoint checkpoint)
+  /**
+   * The snapshotInfo table may contain a snapshot that
+   * doesn't yet exist on the fs, so wait a few seconds for it.
+   * @param checkpoint Checkpoint containing snapshot entries expected.
+   * @return Set of expected snapshot dirs.
+   */
+  private Set<Path> waitForSnapshotDirs(DBCheckpoint checkpoint)
       throws IOException, InterruptedException {
 
     OzoneConfiguration conf = getConf();
+
+    Set<Path> snapshotPaths = new HashSet<>();
 
     // get snapshotInfo entries
     OmMetadataManagerImpl checkpointMetadataManager =
@@ -181,8 +190,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
         waitForDirToExist(path);
+        snapshotPaths.add(path);
       }
     }
+    return snapshotPaths;
   }
 
   private void waitForDirToExist(Path dir)
@@ -198,12 +209,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   private void processDir(Path dir, Map<Object, Path> copyFiles,
-                          Map<Path, Path> hardLinkFiles)
+                          Map<Path, Path> hardLinkFiles,
+                          Set<Path> snapshotPaths)
       throws IOException {
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
         if (file.toFile().isDirectory()) {
-          processDir(file, copyFiles, hardLinkFiles);
+          // Skip any unexpected snapshot files.
+          if (file.getParent().toString().endsWith(OM_SNAPSHOT_CHECKPOINT_DIR)
+              && !snapshotPaths.contains(file)) {
+            continue;
+          }
+          processDir(file, copyFiles, hardLinkFiles, snapshotPaths);
         } else {
           processFile(file, copyFiles, hardLinkFiles);
         }
