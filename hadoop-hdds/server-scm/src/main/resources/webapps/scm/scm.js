@@ -30,6 +30,10 @@
                 .then(function (result) {
                     ctrl.nodemanagermetrics = result.data.beans[0];
                 });
+            $http.get("jmx?qry=Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo")
+            .then(function (result) {
+                ctrl.pieplinesrmetrics = result.data.beans[0];
+            });
 
             const nodeOpStateSortOrder = {
                 "IN_SERVICE": "a",
