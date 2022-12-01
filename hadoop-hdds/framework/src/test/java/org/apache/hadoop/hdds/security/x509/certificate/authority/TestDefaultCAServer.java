@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -29,9 +30,11 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.ozone.test.LambdaTestUtils;
-
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -50,12 +53,14 @@ import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -65,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.INTERMEDIARY_CA;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.SELF_SIGNED_CA;
+import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -340,6 +346,27 @@ public class TestDefaultCAServer {
   }
 
   @Test
+  public void testExternalRootCA(@TempDir Path tempDir) throws Exception {
+    String externalCaCert = "CaCert.pem";
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf));
+    KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
+    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+    keyPEMWriter.writeKey(tempDir, keyPair, true);
+    X509CertificateHolder certificateHolder = generateExternalCert(securityConfig);
+
+    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    certificateCodec.writeCertificate(tempDir, externalCaCert,
+        CertificateCodec.getPEMEncodedString(certificateHolder), true);
+    
+    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_PATH, tempDir.toString());
+  }
+
+  @Test
   public void testIntermediaryCA() throws Exception {
 
     conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
@@ -412,6 +439,47 @@ public class TestDefaultCAServer {
       fail("testIntermediaryCA failed during init");
     }
 
+  }
+
+  private X509CertificateHolder generateExternalCert(SecurityConfig securityConfig) throws Exception {
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    String subject = "testRootCert";
+    HDDSKeyGenerator keyGen =
+        new HDDSKeyGenerator(securityConfig.getConfiguration());
+    KeyPair keyPair = keyGen.generateKey();
+
+    SelfSignedCertificate.Builder builder =
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(notBefore)
+            .setEndDate(notAfter)
+            .setClusterID(clusterID)
+            .setScmID(scmID)
+            .setSubject(subject)
+            .setKey(keyPair)
+            .setConfiguration(conf)
+            .makeCA();
+
+    try {
+      DomainValidator validator = DomainValidator.getInstance();
+      // Add all valid ips.
+      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
+          ip -> {
+            builder.addIpAddress(ip.getHostAddress());
+            if (validator.isValid(ip.getCanonicalHostName())) {
+              builder.addDnsName(ip.getCanonicalHostName());
+            }
+          });
+    } catch (IOException e) {
+      throw new org.apache.hadoop.hdds.security.x509
+          .exceptions.CertificateException(
+          "Error while adding ip to CA self signed certificate", e,
+          CSR_ERROR);
+    }
+
+    return builder.build();
   }
 
 }
