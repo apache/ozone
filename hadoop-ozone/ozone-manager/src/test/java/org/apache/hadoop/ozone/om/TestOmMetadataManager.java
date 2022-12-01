@@ -720,7 +720,8 @@ public class TestOmMetadataManager {
   @ParameterizedTest
   @NullSource
   @ValueSource(strings = { "nonexistentBucket"})
-  public void testListSnapshotWithInvalidPath(String invalidBucket) throws Exception {
+  public void testListSnapshotWithInvalidPath(String invalidBucket)
+      throws Exception {
     String vol1 = "vol1";
     String bucket1 = "bucket1";
 
