@@ -210,7 +210,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  @NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE
+  @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
   private void processDir(Path dir, Map<Object, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
                           Set<Path> snapshotPaths)
