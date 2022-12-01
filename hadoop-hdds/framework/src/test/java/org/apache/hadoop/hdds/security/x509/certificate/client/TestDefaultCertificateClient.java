@@ -99,8 +99,6 @@ public class TestDefaultCertificateClient {
     config = new OzoneConfiguration();
     config.setStrings(OZONE_SCM_NAMES, "localhost");
     config.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
-    final String omPath = GenericTestUtils
-        .getTempPath(UUID.randomUUID().toString());
     final String dnPath = GenericTestUtils
         .getTempPath(UUID.randomUUID().toString());
 

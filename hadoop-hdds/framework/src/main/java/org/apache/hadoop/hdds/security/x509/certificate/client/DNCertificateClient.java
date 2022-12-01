@@ -109,16 +109,17 @@ public class DNCertificateClient extends DefaultCertificateClient {
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
       Path certPath) throws CertificateException {
     try {
+      SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
       synchronized (this) {
         if (secureScmClient == null) {
           // TODO: For SCM CA we should fetch certificate from multiple SCMs.
           secureScmClient =
               HddsServerUtil.getScmSecurityClientWithMaxRetry(getConfig());
         }
+        response = secureScmClient.getDataNodeCertificateChain(
+            dn.getProtoBufMessage(), getEncodedString(csr));
       }
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
-          secureScmClient.getDataNodeCertificateChain(dn.getProtoBufMessage(),
-              getEncodedString(csr));
+
       // Persist certificates.
       if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();

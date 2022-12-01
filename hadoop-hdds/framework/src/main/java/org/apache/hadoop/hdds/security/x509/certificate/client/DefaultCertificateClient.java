@@ -1116,8 +1116,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (isRenewing.compareAndSet(false, true)) {
       try {
         if (!force) {
-          Preconditions.checkArgument(
-              timeBeforeExpiryGracePeriod(certSerialId).isZero());
+          synchronized (this) {
+            Preconditions.checkArgument(
+                timeBeforeExpiryGracePeriod(certSerialId).isZero());
+          }
         }
         String newKeyPath = securityConfig.getKeyLocation(component)
             .toString() + HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;

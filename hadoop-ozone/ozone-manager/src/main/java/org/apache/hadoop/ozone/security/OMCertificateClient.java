@@ -23,7 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -147,17 +147,17 @@ public class OMCertificateClient extends CommonCertificateClient {
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
       Path certPath) throws CertificateException {
     try {
+      SCMGetCertResponseProto response;
       synchronized (this) {
         if (secureScmClient == null) {
           secureScmClient =
               HddsServerUtil.getScmSecurityClientWithFixedDuration(getConfig());
         }
+        response = secureScmClient.getOMCertChain(omInfo,
+            getEncodedString(request));
       }
 
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
-          secureScmClient.getOMCertChain(omInfo, getEncodedString(request));
       String pemEncodedCert = response.getX509Certificate();
-
       CertificateCodec certCodec = new CertificateCodec(
           getSecurityConfig(), certPath);
 
