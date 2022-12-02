@@ -41,6 +41,7 @@ import org.mockito.Mockito;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -156,6 +157,10 @@ public class TestOMDirectoryCreateRequest {
         .get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName))
         != null);
 
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    Assert.assertEquals(OzoneFSUtils.getFileCount(keyName),
+        bucketInfo.getUsedNamespace());
   }
 
   @Test

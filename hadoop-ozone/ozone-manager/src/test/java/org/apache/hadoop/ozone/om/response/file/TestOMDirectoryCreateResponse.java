@@ -20,14 +20,17 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
+import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -41,6 +44,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tests OMDirectoryCreateResponse.
@@ -79,6 +83,13 @@ public class TestOMDirectoryCreateResponse {
         bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
 
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));
+    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+        volumeName, bucketName);
+    omBucketInfo = omBucketInfo.toBuilder()
+        .setUsedNamespace(usedNamespace).build();
+
     OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
         OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
@@ -87,7 +98,7 @@ public class TestOMDirectoryCreateResponse {
 
     OMDirectoryCreateResponse omDirectoryCreateResponse =
         new OMDirectoryCreateResponse(omResponse, omKeyInfo,
-            new ArrayList<>(), Result.SUCCESS, getBucketLayout());
+            new ArrayList<>(), Result.SUCCESS, getBucketLayout(), omBucketInfo);
 
     omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -96,6 +107,12 @@ public class TestOMDirectoryCreateResponse {
 
     Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
+
+    Table.KeyValue<String, OmBucketInfo> keyValue =
+        omMetadataManager.getBucketTable().iterator().next();
+    Assert.assertEquals(omMetadataManager.getBucketKey(volumeName,
+        bucketName), keyValue.getKey());
+    Assert.assertEquals(usedNamespace, keyValue.getValue().getUsedNamespace());
   }
 
   public BucketLayout getBucketLayout() {
