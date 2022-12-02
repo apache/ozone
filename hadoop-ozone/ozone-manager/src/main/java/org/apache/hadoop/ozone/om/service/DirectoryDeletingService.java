@@ -163,7 +163,8 @@ public class DirectoryDeletingService extends BackgroundService {
             remainNum = remainNum - request.getDeletedSubFilesCount();
             remainNum = remainNum - request.getMarkDeletedSubDirsCount();
             // Count up the purgeDeletedDir, subDirs and subFiles
-            if (request.getDeletedDir() != null) {
+            if (request.getDeletedDir() != null
+                && !request.getDeletedDir().isEmpty()) {
               dirNum++;
             }
             subDirNum += request.getMarkDeletedSubDirsCount();
@@ -185,7 +186,8 @@ public class DirectoryDeletingService extends BackgroundService {
               remainNum = remainNum - request.getDeletedSubFilesCount();
               remainNum = remainNum - request.getMarkDeletedSubDirsCount();
               // Count up the purgeDeletedDir, subDirs and subFiles
-              if (request.getDeletedDir() != null) {
+              if (request.getDeletedDir() != null
+                  && !request.getDeletedDir().isEmpty()) {
                 subdirDelNum++;
               }
               subDirNum += request.getMarkDeletedSubDirsCount();
