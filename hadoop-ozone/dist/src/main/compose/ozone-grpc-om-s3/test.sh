@@ -22,14 +22,13 @@ export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
 export OZONE_REPLICATION_FACTOR=3
-export GRPC_ENABLED=true
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env 5
 
-execute_robot_test scm s3/grpc-om-s3-metrics.robot
+execute_robot_test scm -v GRPC_ENABLED:true s3/grpc-om-s3-metrics.robot
 
 stop_docker_env
 
