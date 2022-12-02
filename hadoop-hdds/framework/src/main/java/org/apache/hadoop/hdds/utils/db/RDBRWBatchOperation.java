@@ -18,24 +18,27 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-
 import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.rocksdb.ColumnFamilyHandle;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
 
 /**
- * Batch operation implementation for rocks db.
+ * Read Write Batch operation implementation for rocks db.
  */
-public class RDBBatchOperation implements BatchOperation {
+public class RDBRWBatchOperation implements RWBatchOperation {
 
-  private final ManagedWriteBatch writeBatch;
+  private final ManagedReadWriteBatch writeBatch;
 
-  public RDBBatchOperation() {
-    writeBatch = new ManagedWriteBatch();
+  public RDBRWBatchOperation() {
+    writeBatch = new ManagedReadWriteBatch();
   }
 
-  public RDBBatchOperation(ManagedWriteBatch writeBatch) {
+  public RDBRWBatchOperation(ManagedReadWriteBatch writeBatch) {
     this.writeBatch = writeBatch;
   }
 
@@ -64,5 +67,11 @@ public class RDBBatchOperation implements BatchOperation {
   public void put(ColumnFamily family, byte[] key, byte[] value)
       throws IOException {
     family.batchPut(writeBatch, key, value);
+  }
+
+  @Override
+  public ManagedRocksIterator newIteratorWithBase(
+      ColumnFamilyHandle handle, ManagedRocksIterator newIterator) {
+    return managed(writeBatch.newIteratorWithBase(handle, newIterator.get()));
   }
 }

@@ -291,6 +291,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
+      RWBatchOperation writeBatch) throws IOException {
+    TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
+        rawTable.iterator(writeBatch);
+    return new TypedTableIterator(iterator, keyType, valueType);
+  }
+
+  @Override
   public String getName() throws IOException {
     return rawTable.getName();
   }

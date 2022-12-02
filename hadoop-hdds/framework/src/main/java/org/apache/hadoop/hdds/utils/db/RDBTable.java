@@ -73,11 +73,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void putWithBatch(BatchOperation batch, byte[] key, byte[] value)
       throws IOException {
-    if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).put(family, key, value);
-    } else {
-      throw new IllegalArgumentException("batch should be RDBBatchOperation");
-    }
+    batch.put(family, key, value);
   }
 
 
@@ -148,12 +144,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void deleteWithBatch(BatchOperation batch, byte[] key)
       throws IOException {
-    if (batch instanceof RDBBatchOperation) {
-      ((RDBBatchOperation) batch).delete(family, key);
-    } else {
-      throw new IllegalArgumentException("batch should be RDBBatchOperation");
-    }
-
+    batch.delete(family, key);
   }
 
   @Override
@@ -167,6 +158,13 @@ class RDBTable implements Table<byte[], byte[]> {
       throws IOException {
     return new RDBStoreIterator(db.newIterator(family, false), this,
         prefix);
+  }
+
+  @Override
+  public TableIterator<byte[], ByteArrayKeyValue> iterator(
+      RWBatchOperation writeBatch) throws IOException {
+    return new RDBStoreIterator(db.newIterator(family, writeBatch, false),
+        this);
   }
 
   @Override

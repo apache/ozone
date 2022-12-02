@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -81,6 +82,14 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
       KEY prefix) {
+    throw new UnsupportedOperationException("Iterating tables directly is not" +
+        " supported for datanode containers due to differing schema " +
+        "version.");
+  }
+
+  @Override
+  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
+      RWBatchOperation writeBatch) {
     throw new UnsupportedOperationException("Iterating tables directly is not" +
         " supported for datanode containers due to differing schema " +
         "version.");

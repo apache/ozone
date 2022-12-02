@@ -166,6 +166,16 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       throws IOException;
 
   /**
+   * Returns the iterator for this metadata store.
+   *
+   * @param writeBatch Read write batch
+   * @return MetaStoreIterator
+   * @throws IOException on failure.
+   */
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
+      RWBatchOperation writeBatch) throws IOException;
+
+  /**
    * Returns the Name of this Table.
    * @return - Table Name.
    * @throws IOException on failure.

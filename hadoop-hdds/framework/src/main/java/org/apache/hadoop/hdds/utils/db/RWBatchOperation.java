@@ -18,25 +18,14 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.rocksdb.ColumnFamilyHandle;
 
 /**
- * Class represents a batch operation, collects multiple db operation.
+ * Class represents a read write batch operation,
+ * collects multiple db operation.
  */
-public interface BatchOperation extends AutoCloseable {
-
-  @Override
-  void close();
-
-  void commit(RocksDatabase db) throws IOException;
-
-  void commit(RocksDatabase db, ManagedWriteOptions writeOptions)
-      throws IOException;
-
-  void delete(RocksDatabase.ColumnFamily family, byte[] key)
-      throws IOException;
-
-  void put(RocksDatabase.ColumnFamily family, byte[] key, byte[] value)
-      throws IOException;
+public interface RWBatchOperation extends BatchOperation {
+  ManagedRocksIterator newIteratorWithBase(
+      ColumnFamilyHandle handle, ManagedRocksIterator newIterator);
 }

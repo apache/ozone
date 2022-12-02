@@ -16,27 +16,22 @@
  * limitations under the License.
  *
  */
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.utils.db.managed;
 
-import java.io.IOException;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.rocksdb.WriteBatchWithIndex;
 
 /**
- * Class represents a batch operation, collects multiple db operation.
+ * Managed WriteBatchWithIndex.
  */
-public interface BatchOperation extends AutoCloseable {
+public class ManagedReadWriteBatch extends WriteBatchWithIndex {
+
+  public ManagedReadWriteBatch() {
+    super();
+  }
 
   @Override
-  void close();
-
-  void commit(RocksDatabase db) throws IOException;
-
-  void commit(RocksDatabase db, ManagedWriteOptions writeOptions)
-      throws IOException;
-
-  void delete(RocksDatabase.ColumnFamily family, byte[] key)
-      throws IOException;
-
-  void put(RocksDatabase.ColumnFamily family, byte[] key, byte[] value)
-      throws IOException;
+  protected void finalize() throws Throwable {
+    ManagedRocksObjectUtils.assertClosed(this);
+    super.finalize();
+  }
 }

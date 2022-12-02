@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
@@ -39,7 +39,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
-  private BatchOperation currentBatchOperation;
+  private RWBatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
 
@@ -49,7 +49,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     init();
   }
 
-  private BatchOperation getCurrentBatchOperation() {
+  @Override
+  public RWBatchOperation getCurrentBatchOperation() {
     return currentBatchOperation;
   }
 
@@ -102,7 +103,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     currentBatchOperation.close();
     this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
     // reset batch operation
-    currentBatchOperation = metadataStore.getStore().initBatchOperation();
+    currentBatchOperation = metadataStore.getStore().initRWBatchOperation();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -116,7 +117,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     metadataStore = scm.getScmMetadataStore();
 
     // initialize a batch operation during construction time
-    currentBatchOperation = this.metadataStore.getStore().initBatchOperation();
+    currentBatchOperation = this.metadataStore.getStore()
+        .initRWBatchOperation();
     latestTrxInfo = this.metadataStore.getTransactionInfoTable()
         .get(TRANSACTION_INFO_KEY);
     if (latestTrxInfo == null) {

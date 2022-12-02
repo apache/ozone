@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
@@ -41,4 +42,6 @@ public interface SCMHADBTransactionBuffer
   void flush() throws IOException;
 
   void init() throws IOException;
+
+  RWBatchOperation getCurrentBatchOperation();
 }

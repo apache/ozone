@@ -35,6 +35,15 @@ public interface BatchOperationHandler {
   BatchOperation initBatchOperation();
 
   /**
+   * Initialize an atomic batch operation which can hold multiple PUT/DELETE
+   * operations and committed later in one step. Also provide read from batch
+   *
+   * @return BatchOperation holder which can be used to add or commit batch
+   * operations.
+   */
+  RWBatchOperation initRWBatchOperation();
+
+  /**
    * Commit the batch operations.
    *
    * @param operation which contains all the required batch operation.

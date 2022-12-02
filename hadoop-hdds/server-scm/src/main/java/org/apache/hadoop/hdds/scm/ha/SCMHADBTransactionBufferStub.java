@@ -17,9 +17,9 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBRWBatchOperation;
+import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
@@ -31,7 +31,7 @@ import java.io.IOException;
  */
 public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
-  private BatchOperation currentBatchOperation;
+  private RWBatchOperation currentBatchOperation;
 
   public SCMHADBTransactionBufferStub() {
   }
@@ -40,12 +40,12 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
     this.dbStore = store;
   }
 
-  private BatchOperation getCurrentBatchOperation() {
+  public RWBatchOperation getCurrentBatchOperation() {
     if (currentBatchOperation == null) {
       if (dbStore != null) {
-        currentBatchOperation = dbStore.initBatchOperation();
+        currentBatchOperation = dbStore.initRWBatchOperation();
       } else {
-        currentBatchOperation = new RDBBatchOperation();
+        currentBatchOperation = new RDBRWBatchOperation();
       }
     }
     return currentBatchOperation;

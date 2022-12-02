@@ -188,9 +188,14 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public RWBatchOperation initRWBatchOperation() {
+    return new RDBRWBatchOperation();
+  }
+
+  @Override
   public void commitBatchOperation(BatchOperation operation)
       throws IOException {
-    ((RDBBatchOperation) operation).commit(db);
+    operation.commit(db);
   }
 
 

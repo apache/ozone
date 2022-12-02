@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -290,6 +291,32 @@ public final class RocksDatabase {
 
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
+      assertClosed();
+      try {
+        counter.incrementAndGet();
+        writeBatch.put(getHandle(), key, value);
+      } catch (RocksDBException e) {
+        throw toIOException(this, "batchPut key " + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+
+    public void batchDelete(ManagedReadWriteBatch writeBatch, byte[] key)
+        throws IOException {
+      assertClosed();
+      try {
+        counter.incrementAndGet();
+        writeBatch.delete(getHandle(), key);
+      } catch (RocksDBException e) {
+        throw toIOException(this, "batchDelete key " + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+
+    public void batchPut(ManagedReadWriteBatch writeBatch, byte[] key,
+                         byte[] value) throws IOException {
       assertClosed();
       try {
         counter.incrementAndGet();
@@ -636,6 +663,20 @@ public final class RocksDatabase {
     }
   }
 
+  public ManagedRocksIterator newIterator(
+      ColumnFamily family, RWBatchOperation batch,
+      boolean fillCache) throws IOException {
+    assertClose();
+    try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
+      counter.incrementAndGet();
+      readOptions.setFillCache(fillCache);
+      return batch.newIteratorWithBase(family.getHandle(),
+          managed(db.get().newIterator(family.getHandle(), readOptions)));
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   public void batchWrite(ManagedWriteBatch writeBatch,
                          ManagedWriteOptions options)
       throws IOException {
@@ -651,7 +692,26 @@ public final class RocksDatabase {
     }
   }
 
+  public void batchWrite(ManagedReadWriteBatch writeBatch,
+                         ManagedWriteOptions options)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().write(options, writeBatch);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "batchWrite", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   public void batchWrite(ManagedWriteBatch writeBatch) throws IOException {
+    batchWrite(writeBatch, writeOptions);
+  }
+
+  public void batchWrite(ManagedReadWriteBatch writeBatch) throws IOException {
     batchWrite(writeBatch, writeOptions);
   }
 
