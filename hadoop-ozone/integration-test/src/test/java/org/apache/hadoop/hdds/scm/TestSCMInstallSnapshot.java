@@ -112,9 +112,12 @@ public class TestSCMInstallSnapshot {
     provider.setPeerNodesMap(peerMap);
     DBCheckpoint checkpoint =
         provider.getSCMDBSnapshot(scmNodeDetails.getNodeId());
+    String snapshotDir =
+        conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
     final File[] files = FileUtil.listFiles(provider.getScmSnapshotDir());
     Assert.assertTrue(files[0].getName().startsWith(
         OzoneConsts.SCM_DB_NAME + "-" + scmNodeDetails.getNodeId()));
+    Assert.assertTrue(files[0].getAbsolutePath().startsWith(snapshotDir));
     return checkpoint;
   }
 

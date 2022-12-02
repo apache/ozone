@@ -146,7 +146,7 @@ public final class SCMHAUtils {
 
   public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir =
-            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
 
     // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
     if (Strings.isNullOrEmpty(snapshotDir)) {
