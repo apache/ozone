@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
-import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -78,8 +78,8 @@ public class TestOmMetadataManager {
   private File folder;
 
   public static <E extends Throwable> void expectOmException(
-      OMException.ResultCodes code,
-      LambdaTestUtils.VoidCallable eval)
+      ResultCodes code,
+      VoidCallable eval)
       throws Exception {
     try {
       eval.call();

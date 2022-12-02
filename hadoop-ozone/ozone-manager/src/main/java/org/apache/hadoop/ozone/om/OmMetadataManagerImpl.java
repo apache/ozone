@@ -1169,19 +1169,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
       throws IOException {
     if (Strings.isNullOrEmpty(volumeName)) {
-      throw new OMException("Volume name is required.",
-          ResultCodes.VOLUME_NOT_FOUND);
+      throw new OMException("Volume name is required.", VOLUME_NOT_FOUND);
     }
 
     if (Strings.isNullOrEmpty(bucketName)) {
-      throw new OMException("Bucket name is required.",
-          ResultCodes.BUCKET_NOT_FOUND);
+      throw new OMException("Bucket name is required.", BUCKET_NOT_FOUND);
     }
 
     String bucketNameBytes = getBucketKey(volumeName, bucketName);
     if (getBucketTable().get(bucketNameBytes) == null) {
       throw new OMException("Bucket " + bucketName + " not found.",
-          ResultCodes.BUCKET_NOT_FOUND);
+          BUCKET_NOT_FOUND);
     }
 
     String prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
