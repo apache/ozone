@@ -68,6 +68,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
@@ -105,6 +109,8 @@ public class SecurityConfig {
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
+  private final long keystoreReloadInterval;
+  private final long truststoreReloadInterval;
 
   /**
    * Constructs a SecurityConfig.
@@ -190,6 +196,15 @@ public class SecurityConfig {
         }
       }
     }
+
+    this.keystoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.truststoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -420,5 +435,13 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
+  }
+
+  public long getSslKeystoreReloadInterval() {
+    return keystoreReloadInterval;
+  }
+
+  public long getSslTruststoreReloadInterval() {
+    return truststoreReloadInterval;
   }
 }

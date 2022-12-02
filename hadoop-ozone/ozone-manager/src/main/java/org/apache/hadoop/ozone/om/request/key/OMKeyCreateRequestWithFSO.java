@@ -204,6 +204,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
       int clientVersion = getOmRequest().getVersion();
+      omBucketInfo.incrUsedNamespace(numKeysCreated);
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
               .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
                   keyArgs.getLatestVersionLocation()))
