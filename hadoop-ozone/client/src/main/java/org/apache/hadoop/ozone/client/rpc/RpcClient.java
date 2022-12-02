@@ -617,7 +617,10 @@ public class RpcClient implements ClientProtocol {
       String volumeName, String bucketName, BucketArgs bucketArgs)
       throws IOException {
     verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
+    // there're other types of volume/bucket/key operation using the original verifyBucketName method,
+    // in order not to change all those methods for now, I created a separate method  verifyBucketNameAllowNonS3Compliant,
+    // which accepts a boolean parameter to read client side's configuration of property: ozone.client.s3.naming.compliant.
+    verifyBucketNameAllowNonS3Compliant(bucketName, bucketArgs.getIsS3NamingCompliant());
     Preconditions.checkNotNull(bucketArgs);
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
@@ -712,6 +715,16 @@ public class RpcClient implements ClientProtocol {
           OMException.ResultCodes.INVALID_BUCKET_NAME);
     }
   }
+
+  private static void verifyBucketNameAllowNonS3Compliant(String bucketName, boolean isS3NamingCompliant) throws OMException {
+    try {
+      HddsClientUtils.verifyResourceNameAllowNonS3Compliant(bucketName, isS3NamingCompliant);
+    } catch (IllegalArgumentException e) {
+      throw new OMException(e.getMessage(),
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
+  }
+
 
   private static void verifyCountsQuota(long quota) throws OMException {
     if (quota < OzoneConsts.QUOTA_RESET || quota == 0) {

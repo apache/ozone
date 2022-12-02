@@ -66,6 +66,8 @@ public final class BucketArgs {
 
   private String owner;
 
+  private boolean isS3NamingCompliant;
+
   /**
    * Bucket Layout.
    */
@@ -91,7 +93,7 @@ public final class BucketArgs {
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
       long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout,
-      String owner, DefaultReplicationConfig defaultReplicationConfig) {
+      String owner, DefaultReplicationConfig defaultReplicationConfig, boolean isS3NamingCompliant) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -104,6 +106,7 @@ public final class BucketArgs {
     this.bucketLayout = bucketLayout;
     this.owner = owner;
     this.defaultReplicationConfig = defaultReplicationConfig;
+    this.isS3NamingCompliant = isS3NamingCompliant;
   }
 
   /**
@@ -153,6 +156,10 @@ public final class BucketArgs {
    */
   public DefaultReplicationConfig getDefaultReplicationConfig() {
     return this.defaultReplicationConfig;
+  }
+
+  public boolean getIsS3NamingCompliant() {
+    return isS3NamingCompliant;
   }
 
   /**
@@ -218,6 +225,7 @@ public final class BucketArgs {
     private BucketLayout bucketLayout;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private boolean isS3NamingCompliant;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -286,6 +294,11 @@ public final class BucketArgs {
       return this;
     }
 
+    public BucketArgs.Builder setIsS3NamingCompliant(boolean isS3NamingCompliant) {
+      isS3NamingCompliant = isS3NamingCompliant;
+      return this;
+    }
+
     /**
      * Constructs the BucketArgs.
      * @return instance of BucketArgs.
@@ -293,7 +306,7 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketLayout, owner, defaultReplicationConfig);
+          quotaInNamespace, bucketLayout, owner, defaultReplicationConfig, isS3NamingCompliant);
     }
   }
 }

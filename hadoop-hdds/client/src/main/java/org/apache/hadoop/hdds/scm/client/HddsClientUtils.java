@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -127,17 +129,23 @@ public final class HddsClientUtils {
     }
   }
 
-  private static boolean isSupportedCharacter(char c) {
-    return (c == '.' || c == '-' ||
+  private static boolean isSupportedCharacter(char c, boolean isS3NamingCompliant) {
+    if (isS3NamingCompliant) {
+      return (c == '.' || c == '-' ||
         Character.isLowerCase(c) || Character.isDigit(c));
+    } else {
+      // allow to follow other volume/bucket naming convention,
+      return (c == '.' || c == '-' || c == '_' ||
+        Character.isLowerCase(c) || Character.isDigit(c));
+    }
   }
 
-  private static void doCharacterChecks(char currChar, char prev) {
+  private static void doCharacterChecks(char currChar, char prev, boolean isS3NamingCompliant) {
     if (Character.isUpperCase(currChar)) {
       throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
     }
-    if (!isSupportedCharacter(currChar)) {
+    if (!isSupportedCharacter(currChar, isS3NamingCompliant)) {
       throw new IllegalArgumentException("Bucket or Volume name has an " +
           "unsupported character : " + currChar);
     }
@@ -174,7 +182,9 @@ public final class HddsClientUtils {
       if (currChar != '.') {
         isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
       }
-      doCharacterChecks(currChar, prev);
+      // verifyResourceName is used by other types of volume/bucket/key operation except createBucketRequest,
+      // for those non-createBucketRequest operation, set the default value for isS3NamingCompliant to true for now.
+      doCharacterChecks(currChar, prev, true);
       prev = currChar;
     }
 
@@ -183,6 +193,30 @@ public final class HddsClientUtils {
           "Bucket or Volume name cannot be an IPv4 address or all numeric");
     }
   }
+
+
+  public static void verifyResourceNameAllowNonS3Compliant(String resName, boolean isS3NamingCompliant) {
+
+    doNameChecks(resName);
+
+    boolean isIPv4 = true;
+    char prev = (char) 0;
+
+    for (int index = 0; index < resName.length(); index++) {
+      char currChar = resName.charAt(index);
+      if (currChar != '.') {
+        isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
+      }
+      doCharacterChecks(currChar, prev, isS3NamingCompliant);
+      prev = currChar;
+    }
+
+    if (isIPv4) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name cannot be an IPv4 address or all numeric");
+    }
+  }
+
 
   /**
    * verifies that bucket / volume name is a valid DNS name.

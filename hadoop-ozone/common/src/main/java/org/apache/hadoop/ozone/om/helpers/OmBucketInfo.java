@@ -102,6 +102,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private BucketLayout bucketLayout;
 
+  private boolean isS3NamingCompliant;
+
   private String owner;
 
   /**
@@ -145,7 +147,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       long quotaInNamespace,
       BucketLayout bucketLayout,
       String owner,
-      DefaultReplicationConfig defaultReplicationConfig) {
+      DefaultReplicationConfig defaultReplicationConfig,
+      boolean isS3NamingCompliant) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -166,6 +169,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.bucketLayout = bucketLayout;
     this.owner = owner;
     this.defaultReplicationConfig = defaultReplicationConfig;
+    this.isS3NamingCompliant = isS3NamingCompliant;
   }
 
   /**
@@ -183,6 +187,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   public String getBucketName() {
     return bucketName;
   }
+
+  public boolean getIsS3NamingCompliant(){
+    return isS3NamingCompliant;
+  }
+
 
   /**
    * Returns the ACL's associated with this bucket.
@@ -330,6 +339,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.owner = ownerName;
   }
 
+  public void setIsS3NamingCompliant(boolean isS3NamingCompliant) {
+    this.isS3NamingCompliant = isS3NamingCompliant;
+  }
+
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -411,7 +424,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setQuotaInNamespace(quotaInNamespace)
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
-        .setDefaultReplicationConfig(defaultReplicationConfig);
+        .setDefaultReplicationConfig(defaultReplicationConfig)
+        .setIsS3NamingCompliant(isS3NamingCompliant);
   }
 
   public void setDefaultReplicationConfig(ReplicationConfig replicationConfig) {
@@ -451,6 +465,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private BucketLayout bucketLayout;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private boolean isS3NamingCompliant;
 
     public Builder() {
       //Default values
@@ -461,6 +476,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       this.quotaInBytes = OzoneConsts.QUOTA_RESET;
       this.quotaInNamespace = OzoneConsts.QUOTA_RESET;
       this.bucketLayout = BucketLayout.DEFAULT;
+      this.isS3NamingCompliant = false;
     }
 
     public Builder setVolumeName(String volume) {
@@ -470,6 +486,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
     public Builder setBucketName(String bucket) {
       this.bucketName = bucket;
+      return this;
+    }
+
+    public Builder setIsS3NamingCompliant(boolean isS3NamingCompliant) {
+      this.isS3NamingCompliant = isS3NamingCompliant;
       return this;
     }
 
@@ -599,7 +620,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
           storageType, creationTime, modificationTime, objectID, updateID,
           metadata, bekInfo, sourceVolume, sourceBucket, usedBytes,
           usedNamespace, quotaInBytes, quotaInNamespace, bucketLayout, owner,
-          defaultReplicationConfig);
+          defaultReplicationConfig, isS3NamingCompliant);
     }
   }
 
@@ -621,7 +642,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUsedNamespace(usedNamespace)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .setQuotaInBytes(quotaInBytes)
-        .setQuotaInNamespace(quotaInNamespace);
+        .setQuotaInNamespace(quotaInNamespace)
+        .setIsS3NamingCompliant(isS3NamingCompliant);
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -672,7 +694,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setModificationTime(bucketInfo.getModificationTime())
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
-        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace())
+        .setIsS3NamingCompliant(bucketInfo.getIsS3NamingCompliant());
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
     } else if (bucketInfo.getBucketLayout() != null) {
@@ -785,6 +808,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", bucketLayout=" + bucketLayout +
         ", owner=" + owner +
         ", defaultReplicationConfig=" + defaultReplicationConfig +
+        ", isS3NamingCompliant=" + isS3NamingCompliant +
         '}';
   }
 }

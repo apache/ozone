@@ -404,6 +404,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isNativeAuthorizerEnabled;
 
+  private boolean isS3NamingCompliant = true;
+
   private ExitManager exitManager;
 
   private OzoneManagerPrepareState prepareState;
@@ -504,6 +506,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
     this.useRatisForReplication = conf.getBoolean(
         DFS_CONTAINER_RATIS_ENABLED_KEY, DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+    this.isS3NamingCompliant = conf.getBoolean(
+        OZONE_OM_METADATA_S3_NAMING_COMPLIANT, true);
+  
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or
     //  replicated (for HA).
@@ -824,6 +829,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isS3MultiTenancyEnabled() {
     return isS3MultiTenancyEnabled;
+  }
+
+  public boolean isS3NamingCompliant() {
+    return isS3NamingCompliant;
   }
 
   /**

@@ -631,6 +631,7 @@ message BucketInfo {
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
+    optional bool isS3NamingCompliant = 21;
 }
 
 enum StorageTypeProto {

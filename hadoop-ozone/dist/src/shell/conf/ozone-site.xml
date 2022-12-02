@@ -21,4 +21,18 @@
 
 <configuration>
 
+  <property>
+    <name>ozone.cli.s3.naming.compliant</name>
+    <value>false</value>
+    <tag>OZONE</tag>
+    <description>Ozone CLI follows Volume/Bucket naming convention compliant with s3 rules</description>
+  </property>
+
+  <property>
+    <name>ozone.om.s3.naming.compliant</name>
+    <value>false</value>
+    <tag>OZONE</tag>
+    <description>Ozone Manager follows Volume/Bucket naming convention compliant with s3 rules</description>
+  </property>
+
 </configuration>

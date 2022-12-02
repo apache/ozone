@@ -543,6 +543,17 @@ public final class OmUtils {
     }
   }
 
+  public static void verifyBucketNameAllowNonS3Compliant(String bucketName, boolean isS3NamingCompliant)
+      throws OMException {
+    try {
+      HddsClientUtils.verifyResourceNameAllowNonS3Compliant(bucketName, isS3NamingCompliant);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid bucket name: " + bucketName,
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
+  }
+
+
   /**
    * Return OM Client Rpc Time out.
    */
