@@ -54,6 +54,7 @@ public class GrpcOzoneManagerServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOzoneManagerServer.class);
 
+  private static final int CLIENT_TIMEOUT_SECS = 60;
   private final GrpcOzoneManagerMetrics omS3gGrpcMetrics;
   private Server server;
   private int port;
@@ -96,6 +97,7 @@ public class GrpcOzoneManagerServer {
                    CertificateClient caClient) {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(maxSize)
+        .maxConnectionIdle(CLIENT_TIMEOUT_SECS, TimeUnit.SECONDS)
         .addService(ServerInterceptors.intercept(
             new OzoneManagerServiceGrpc(omTranslator,
                 delegationTokenMgr,
