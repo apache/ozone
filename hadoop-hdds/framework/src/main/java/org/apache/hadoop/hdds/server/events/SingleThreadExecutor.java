@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import org.apache.hadoop.hdds.metrics.MetricsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,8 +65,8 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
    */
   public SingleThreadExecutor(String name) {
     this.name = name;
-    DefaultMetricsSystem.instance()
-        .register(EVENT_QUEUE + name, "Event Executor metrics ", this);
+    MetricsUtil.registerDynamic(this, EVENT_QUEUE + name,
+        "Event Executor metrics ", "EventQueue");
 
     executor = Executors.newSingleThreadExecutor(
         runnable -> {
