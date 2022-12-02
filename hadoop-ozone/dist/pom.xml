@@ -340,6 +340,7 @@
                   <appendAssemblyId>false</appendAssemblyId>
                   <attach>false</attach>
                   <finalName>ozone-${project.version}-src</finalName>
+                  <tarLongFileMode>posix</tarLongFileMode>
                   <outputDirectory>target</outputDirectory>
                   <basedir>${project.basedir}/../..</basedir>
                   <!-- Not using descriptorRef and hadoop-assembly dependency -->
