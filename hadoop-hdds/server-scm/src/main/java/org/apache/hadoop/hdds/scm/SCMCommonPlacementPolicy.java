@@ -63,8 +63,6 @@ public abstract class SCMCommonPlacementPolicy implements
   private final ConfigurationSource conf;
   private final boolean shouldRemovePeers;
 
-  private Function<ContainerReplica, Integer> replicaIdentifierFunction;
-
   /**
    * Return for replication factor 1 containers where the placement policy
    * is always met, or not met (zero replicas available) rather than creating a
@@ -435,6 +433,11 @@ public abstract class SCMCommonPlacementPolicy implements
     return false;
   }
 
+  /**
+   * Given a set of replicas of a container, return a set of replicas to copy
+   * to another node to fix misreplication.
+   * @param replicas
+   */
   @Override
   public Set<ContainerReplica> replicasToCopyToFixMisreplication(
          Set<ContainerReplica> replicas) {
