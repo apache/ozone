@@ -102,8 +102,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .count();
   }
 
-  public static boolean isNonClosedRatisThreePipeline(Pipeline p) {
-    return p.getReplicationConfig()
+  private static boolean isNonClosedRatisThreePipeline(Pipeline p) {
+    return p != null && p.getReplicationConfig()
         .equals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         && !p.isClosed();
   }
@@ -364,7 +364,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
     return results;
   }
-
 
   /**
    * Find a node from the healthy list and return it after removing it from the

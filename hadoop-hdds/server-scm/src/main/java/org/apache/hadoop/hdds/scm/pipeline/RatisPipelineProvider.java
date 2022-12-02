@@ -63,8 +63,7 @@ public class RatisPipelineProvider
 
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
-  //private final PipelinePlacementPolicy placementPolicy;
-  private PlacementPolicy placementPolicy = null;
+  private final PlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
   private final LeaderChoosePolicy leaderChoosePolicy;
@@ -82,13 +81,15 @@ public class RatisPipelineProvider
     this.conf = conf;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    PlacementPolicy policy = null;
     try {
-      this.placementPolicy = PipelinePlacementPolicyFactory
+      policy = PipelinePlacementPolicyFactory
           .getPolicy(conf, nodeManager, stateManager,
               nodeManager.getClusterNetworkTopologyMap(), true, null);
     } catch (Exception e) {
-      this.placementPolicy = null;
-      LOG.info("Cannot create pipeline policy for pipeline, {}", e);
+      LOG.info("Cannot create pipeline policy for pipeline");
+    } finally {
+      this.placementPolicy = policy;
     }
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
@@ -174,12 +175,14 @@ public class RatisPipelineProvider
           containerSizeBytes);
       break;
     case THREE:
-      List<DatanodeDetails> excludeDueToEngagement =
-          filterPipelineEngagement();
-      if (excludeDueToEngagement.size() > 0 && excludedNodes.size() == 0) {
-        excludedNodes = excludeDueToEngagement;
+      List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
+      if (excludeDueToEngagement.size() > 0) {
+        if (excludedNodes.size() == 0) {
+          excludedNodes = excludeDueToEngagement;
+        } else {
+          excludedNodes.addAll(excludeDueToEngagement);
+        }
       }
-      excludedNodes.addAll(filterPipelineEngagement());
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
           containerSizeBytes);
