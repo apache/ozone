@@ -67,6 +67,7 @@ public class TestLDBCli {
   private DBScanner dbScanner;
   private DBStore dbStore = null;
   private List<String> keyNames;
+  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -123,10 +124,11 @@ public class TestLDBCli {
 
     final ByteArrayOutputStream outputStreamCaptor =
         new ByteArrayOutputStream();
-    System.setOut(new PrintStream(outputStreamCaptor));
+    System.setOut(new PrintStream(outputStreamCaptor, false, DEFAULT_ENCODING));
     DBScanner.setShowCount(true);
     dbScanner.call();
-    Assert.assertEquals("5", outputStreamCaptor.toString().trim());
+    Assert.assertEquals("5",
+        outputStreamCaptor.toString(DEFAULT_ENCODING).trim());
     System.setOut(System.out);
     DBScanner.setShowCount(false);
 
