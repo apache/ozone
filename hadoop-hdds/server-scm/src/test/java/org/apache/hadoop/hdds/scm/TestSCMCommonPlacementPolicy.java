@@ -36,7 +36,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -78,17 +83,17 @@ public class TestSCMCommonPlacementPolicy {
             replicasToCopy.size());
     Map<Node, Long> rackCopyMap =
             replicasToCopy.stream().collect(Collectors.groupingBy(
-            replica -> placementPolicy
-                    .getPlacementGroup(replica.getDatanodeDetails()),
+                    replica -> placementPolicy
+                            .getPlacementGroup(replica.getDatanodeDetails()),
             Collectors.counting()));
     Set<Node> racks = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .map(placementPolicy::getPlacementGroup)
             .collect(Collectors.toSet());
-    for(Node rack: racks) {
+    for (Node rack: racks) {
       Assertions.assertEquals(
               expectedNumberOfCopyOperationFromRack.getOrDefault(rack, 0),
-              rackCopyMap.getOrDefault(rack, 0l).intValue());
+              rackCopyMap.getOrDefault(rack, 0L).intValue());
     }
   }
 
@@ -123,7 +128,7 @@ public class TestSCMCommonPlacementPolicy {
     replicaDns =
             Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
-    //Creating Replicas without replica Index
+    //Creating Replicas without replica Index for ratis case
     replicas = HddsTestUtils.getReplicas(new ContainerID(1),
             CLOSED, 0, replicaDns);
     testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 3,
