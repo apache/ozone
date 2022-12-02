@@ -27,11 +27,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -52,7 +50,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -481,20 +478,26 @@ public final class KeyValueContainerUtil {
         // directory are probably leftovers of a failed delete and
         // the RocksDB entries must have already been removed.
         // In any case we can proceed with deleting the directory's contents.
-        if (VersionedDatanodeFeatures.isFinalized(
-            HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-          // Get container file.
-          // Due to a failed cleanup of the tmp directory, the container
-          // parent directory might not be in its normal structure.
-          File containerFile = getContainerFile(file);
+        // --------------------------------------------
+        // Get container file and check Schema version. If Schema is V3
+        // then remove the container from RocksDB.
+        File containerFile = ContainerUtils.getContainerFile(file);
 
-          // If file exists
-          if (containerFile != null) {
-            ContainerData containerData = ContainerDataYaml
-                .readContainerFile(containerFile);
-            KeyValueContainerData keyValueContainerData =
-                (KeyValueContainerData) containerData;
+        // If file exists
+        if (containerFile != null) {
+          ContainerData containerData = ContainerDataYaml
+              .readContainerFile(containerFile);
+          KeyValueContainerData keyValueContainerData =
+              (KeyValueContainerData) containerData;
 
+          if (keyValueContainerData.getSchemaVersion()
+              .equals(OzoneConsts.SCHEMA_V3)) {
+            // Container file doesn't include the volume
+            // so we need to set it here in order to get the db file.
+            keyValueContainerData.setVolume(hddsVolume);
+            File dbFile = KeyValueContainerLocationUtil
+                .getContainerDBFile(keyValueContainerData);
+            keyValueContainerData.setDbFile(dbFile);
             // Remove container from Rocks DB
             BlockUtils.removeContainerFromDB(keyValueContainerData,
                 hddsVolume.getConf());
@@ -512,41 +515,6 @@ public final class KeyValueContainerUtil {
               "{}", hddsVolume.getDeleteServiceDirPath().toString(), ex);
         }
       }
-    }
-
-    /**
-     * Search recursively for the container file under a
-     * directory. Return null if the file is not found.
-     * @param file
-     * @return container file or null if it doesn't exist
-     * @throws IOException
-     */
-    public static File getContainerFile(File file) throws IOException {
-      try {
-        if (file.isDirectory()) {
-          for (File subFile : file.listFiles()) {
-            if (subFile.isDirectory()) {
-              File containerFile = getContainerFile(subFile);
-              if (containerFile != null) {
-                return containerFile;
-              }
-            } else {
-              if (FilenameUtils.getExtension(subFile.getName())
-                  .equals("container")) {
-                return subFile;
-              }
-            }
-          }
-        } else {
-          if (FilenameUtils.getExtension(file.getName())
-              .equals("container")) {
-            return file;
-          }
-        }
-      } catch (NullPointerException ex) {
-        LOG.error("File object is null.", ex);
-      }
-      return null;
     }
 
     /**

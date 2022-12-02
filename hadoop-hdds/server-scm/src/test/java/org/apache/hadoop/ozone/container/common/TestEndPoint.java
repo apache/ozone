@@ -17,14 +17,15 @@
 package org.apache.hadoop.ozone.container.common;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -47,6 +48,11 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -56,12 +62,14 @@ import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointT
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
-import org.apache.hadoop.thirdparty.com.google.common.io.Files;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
@@ -186,22 +194,10 @@ public class TestEndPoint {
         hddsVolume.createWorkingDir(clusterId, null);
         hddsVolume.createDeleteServiceDir();
 
-        // Write to tmp/container_delete_service dir under volume
-        File testFile = new File(hddsVolume
-            .getDeleteServiceDirPath().toString() + "/testFile.txt");
-        Files.touch(testFile);
-        Assert.assertTrue(testFile.exists());
-
-        ListIterator<File> tmpDirIter = KeyValueContainerUtil
-            .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
-        boolean testFileExistsUnderTmp = false;
-
-        while (tmpDirIter.hasNext()) {
-          if (tmpDirIter.next().equals(testFile)) {
-            testFileExistsUnderTmp = true;
-          }
-        }
-        Assert.assertTrue(testFileExistsUnderTmp);
+        // Create a container and move it under the tmp delete dir.
+        KeyValueContainer container =
+            setUpTestContainer(hddsVolume, clusterId, conf);
+        assertTrue(container.getContainerFile().exists());
       }
 
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
@@ -218,6 +214,37 @@ public class TestEndPoint {
             .getDeleteLeftovers(hddsVolume).hasNext());
       }
     }
+  }
+
+  private KeyValueContainer setUpTestContainer(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf) throws IOException {
+    ContainerSet containerSet = new ContainerSet(1000);
+    VolumeChoosingPolicy volumeChoosingPolicy =
+        new RoundRobinVolumeChoosingPolicy();
+    long containerId = HddsUtils.getTime();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+
+    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
+        containerId, layout,
+        ContainerTestHelper.CONTAINER_MAX_SIZE,
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    keyValueContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V3);
+
+    KeyValueContainer container =
+        new KeyValueContainer(keyValueContainerData, conf);
+    container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
+
+    containerSet.addContainer(container);
+
+    // For testing, we are moving the container
+    // under the tmp directory, in order to delete
+    // it during versionTask.call()
+    KeyValueContainerUtil.ContainerDeleteDirectory
+        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
+
+    return container;
   }
 
   @Test
