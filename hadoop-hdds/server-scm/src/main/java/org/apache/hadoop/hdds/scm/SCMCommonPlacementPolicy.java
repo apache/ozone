@@ -436,30 +436,27 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   @Override
-  public Set<ContainerReplica> replicasToCopy(
-         Set<ContainerReplica> replicas, int expectedCountPerUniqueReplicas,
-         int expectedUniqueGroups) {
-    Map<Node, Set<ContainerReplica>> placementGroupReplicaIdMap
+  public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+         Set<ContainerReplica> replicas) {
+    Map<Node, List<ContainerReplica>> placementGroupReplicaIdMap
             = replicas.stream().collect(Collectors.groupingBy(replica ->
-            this.getPlacementGroup(replica.getDatanodeDetails()),
-            Collectors.toSet()));
+            this.getPlacementGroup(replica.getDatanodeDetails())));
 
-    int totalNumberOfReplicas =
-            expectedUniqueGroups * expectedCountPerUniqueReplicas;
+    int totalNumberOfReplicas = replicas.size();
     int requiredNumberOfPlacementGroups = getRequiredRackCount(
-            expectedUniqueGroups * expectedCountPerUniqueReplicas);
+            totalNumberOfReplicas);
     int replicasPerPlacementGroup =
             totalNumberOfReplicas / requiredNumberOfPlacementGroups;
     int misreplicationCnt = Math.max(requiredNumberOfPlacementGroups
         - placementGroupReplicaIdMap.size(), 0);
     Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
 
-    for (Set<ContainerReplica> replicaSet: placementGroupReplicaIdMap
+    for (List<ContainerReplica> replicaList: placementGroupReplicaIdMap
             .values()) {
-      if (misreplicationCnt > copyReplicaSet.size() && replicaSet.size() >
+      if (misreplicationCnt > copyReplicaSet.size() && replicaList.size() >
               replicasPerPlacementGroup) {
-        copyReplicaSet.addAll(replicaSet.stream()
-                .limit(Math.min(replicaSet.size() - 1, misreplicationCnt))
+        copyReplicaSet.addAll(replicaList.stream()
+                .limit(Math.min(replicaList.size() - 1, misreplicationCnt))
                 .collect(Collectors.toSet()));
       }
     }
@@ -469,6 +466,4 @@ public abstract class SCMCommonPlacementPolicy implements
   protected Node getPlacementGroup(DatanodeDetails dn) {
     return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
   }
-
-
 }

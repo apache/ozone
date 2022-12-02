@@ -66,7 +66,11 @@ public interface PlacementPolicy<Replica> {
    */
   ContainerPlacementStatus validateContainerPlacement(
           List<DatanodeDetails> dns, int replicas);
-  Set<Replica> replicasToCopy(Set<Replica> replicas,
-                                       int expectedCountPerUniqueReplica,
-                                       int expectedUniqueGroups);
+
+  /**
+   * Given a set of replicas of a container, return a set of replicas to copy
+   * to another node to fix misreplication.
+   * @param replicas
+   */
+  Set<Replica> replicasToCopyToFixMisreplication(Set<Replica> replicas);
 }

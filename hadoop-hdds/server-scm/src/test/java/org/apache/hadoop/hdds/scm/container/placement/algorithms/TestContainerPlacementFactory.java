@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -196,10 +197,9 @@ public class TestContainerPlacementFactory {
     }
 
     @Override
-    public Set<ContainerReplica> replicasToCopy(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
-      return null;
+    public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+            Set<ContainerReplica> replicas) {
+      return Collections.emptySet();
     }
   }
 

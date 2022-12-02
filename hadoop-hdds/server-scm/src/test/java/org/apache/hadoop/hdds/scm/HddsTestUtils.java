@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -744,14 +745,14 @@ public final class HddsTestUtils {
     return builder.build();
   }
 
-  public static Set<ContainerReplica> getReplicasWithReplicaIndex(
+  public static List<ContainerReplica> getReplicasWithReplicaIndex(
           final ContainerID containerId,
           final ContainerReplicaProto.State state,
           final long usedBytes,
           final long keyCount,
           final long sequenceId,
-          final DatanodeDetails... datanodeDetails) {
-    Set<ContainerReplica> replicas = new HashSet<>();
+          final Iterable<DatanodeDetails> datanodeDetails) {
+    List<ContainerReplica> replicas = new ArrayList<>();
     int replicaIndex = 1;
     for (DatanodeDetails datanode : datanodeDetails) {
       replicas.add(getReplicaBuilder(containerId, state,
@@ -760,6 +761,17 @@ public final class HddsTestUtils {
       replicaIndex += 1;
     }
     return replicas;
+  }
+
+  public static Set<ContainerReplica> getReplicasWithReplicaIndex(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long usedBytes,
+          final long keyCount,
+          final long sequenceId,
+          final DatanodeDetails... datanodeDetails) {
+    return Sets.newHashSet(getReplicasWithReplicaIndex(containerId, state,
+            usedBytes, keyCount, sequenceId, Arrays.asList(datanodeDetails)));
   }
 
 

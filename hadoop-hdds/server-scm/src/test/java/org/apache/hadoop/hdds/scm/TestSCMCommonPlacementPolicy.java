@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 
@@ -62,7 +63,7 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void testGetResultSet() throws SCMException {
     DummyPlacementPolicy dummyPlacementPolicy =
-        new DummyPlacementPolicy(nodeManager, conf);
+        new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     List<DatanodeDetails> result = dummyPlacementPolicy.getResultSet(3, list);
@@ -71,47 +72,44 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToCopy() {
+  public void testReplicasToFixMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
-            new DummyPlacementPolicy(nodeManager, conf);
+            new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list =
             nodeManager.getNodes(NodeStatus.inServiceHealthy());
-    List<ContainerReplica> replicas =
-            IntStream.range(1, 5).mapToObj(i ->
-                    ContainerReplica.newBuilder()
-                            .setContainerID(new ContainerID(1))
-                            .setContainerState(CLOSED)
-                            .setReplicaIndex(i)
-            .setDatanodeDetails(list.get(i - 1)).build())
-                    .collect(Collectors.toList());
-    replicas.add(ContainerReplica.newBuilder()
-            .setContainerID(new ContainerID(1))
-            .setContainerState(CLOSED)
-            .setReplicaIndex(5)
-            .setDatanodeDetails(list.get(5)).build());
+    List<DatanodeDetails> replicaDns =
+            Stream.of(0, 1, 2, 3, 4, 5)
+                    .map(list::get).collect(Collectors.toList());
 
-    Set<ContainerReplica> replicasToCopy =
-            dummyPlacementPolicy.replicasToCopy(Sets.newHashSet(replicas),
-            1, 5);
+
+    List<ContainerReplica> replicas =
+            HddsTestUtils.getReplicasWithReplicaIndex(new ContainerID(1),
+                    CLOSED, 0, 0, 0, replicaDns);
+
+    Set<ContainerReplica> replicasToCopy = dummyPlacementPolicy
+            .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
     Assertions.assertTrue(replicasToCopy.stream().findFirst()
             .map(replica -> Arrays.asList(replicas.get(0), replicas.get(4))
                     .contains(replica)).orElse(false));
     Assertions.assertEquals(1, replicasToCopy.size());
   }
 
-  private static class DummyPlacementPolicy extends
-          SCMCommonPlacementPolicy {
+  private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> dns;
+    private int rackCnt;
 
     DummyPlacementPolicy(
         NodeManager nodeManager,
-        ConfigurationSource conf) {
+        ConfigurationSource conf,
+        int rackCnt) {
       super(nodeManager, conf);
       dns = new HashMap<>();
       List<DatanodeDetails> datanodeDetails =
               nodeManager.getNodes(NodeStatus.inServiceHealthy());
+      this.rackCnt = Math.min(rackCnt, datanodeDetails.size());
       for (int idx = 0; idx < datanodeDetails.size(); idx++) {
-        dns.put(datanodeDetails.get(idx), datanodeDetails.get(idx % 5));
+        dns.put(datanodeDetails.get(idx), datanodeDetails.get(idx %
+                this.rackCnt));
       }
     }
 
@@ -127,7 +125,7 @@ public class TestSCMCommonPlacementPolicy {
 
     @Override
     protected int getRequiredRackCount(int numReplicas) {
-      return 5;
+      return Math.min(numReplicas, rackCnt);
     }
   }
 }

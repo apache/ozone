@@ -372,10 +372,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     }
 
     @Override
-    public Set<ContainerReplica> replicasToCopy(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
-      return null;
+    public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+            Set<ContainerReplica> replicas) {
+      return Collections.emptySet();
     }
 
 
