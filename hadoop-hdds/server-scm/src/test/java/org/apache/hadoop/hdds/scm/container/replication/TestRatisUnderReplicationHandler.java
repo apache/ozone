@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -96,11 +97,8 @@ public class TestRatisUnderReplicationHandler {
         ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
-    testProcessing(replicas, pendingOps, healthResult, 2, 1);
+    testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
+        1);
   }
 
   /**
@@ -109,12 +107,8 @@ public class TestRatisUnderReplicationHandler {
    */
   @Test
   public void testUnderReplicatedAndUnrecoverable() throws IOException {
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
     testProcessing(Collections.emptySet(), Collections.emptyList(),
-        healthResult, 2, 0);
+        getUnderReplicatedHealthResult(), 2, 0);
   }
 
   /**
@@ -130,11 +124,8 @@ public class TestRatisUnderReplicationHandler {
         ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
-    testProcessing(replicas, pendingOps, healthResult, 2, 0);
+    testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
+        0);
   }
 
   /**
@@ -148,11 +139,8 @@ public class TestRatisUnderReplicationHandler {
         .createReplicas(Pair.of(DECOMMISSIONING, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
 
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
-    testProcessing(replicas, Collections.emptyList(), healthResult, 2, 1);
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
   }
 
   /**
@@ -167,11 +155,8 @@ public class TestRatisUnderReplicationHandler {
         .createReplicas(Pair.of(ENTERING_MAINTENANCE, 0),
             Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
 
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
-    testProcessing(replicas, Collections.emptyList(), healthResult, 3, 1);
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 3, 1);
   }
 
   /**
@@ -185,11 +170,8 @@ public class TestRatisUnderReplicationHandler {
         .createReplicas(Pair.of(ENTERING_MAINTENANCE, 0),
             Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
 
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
-    testProcessing(replicas, Collections.emptyList(), healthResult, 2, 0);
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 0);
   }
 
   /**
@@ -206,13 +188,9 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
 
-    ContainerHealthResult.UnderReplicatedHealthResult healthResult =
-        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
-
     Assert.assertThrows(IOException.class,
         () -> handler.processAndCreateCommands(replicas,
-            Collections.emptyList(), healthResult, 2));
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
   }
 
   /**
@@ -239,5 +217,12 @@ public class TestRatisUnderReplicationHandler {
         handler.processAndCreateCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
     Assert.assertEquals(expectNumCommands, commands.size());
+  }
+
+  private UnderReplicatedHealthResult getUnderReplicatedHealthResult() {
+    UnderReplicatedHealthResult healthResult =
+        Mockito.mock(UnderReplicatedHealthResult.class);
+    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
+    return healthResult;
   }
 }
