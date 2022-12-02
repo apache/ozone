@@ -45,9 +45,11 @@ import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
@@ -82,6 +84,7 @@ public class TestLDBCli {
     if (dbStore != null) {
       dbStore.close();
     }
+    System.setOut(System.out);
     // Restore the static fields in DBScanner
     DBScanner.setContainerId(-1);
     DBScanner.setDnDBSchemaVersion("V2");
@@ -117,6 +120,16 @@ public class TestLDBCli {
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
     Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
     Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
+
+    final ByteArrayOutputStream outputStreamCaptor =
+        new ByteArrayOutputStream();
+    System.setOut(new PrintStream(outputStreamCaptor));
+    DBScanner.setShowCount(true);
+    dbScanner.call();
+    Assert.assertEquals("5", outputStreamCaptor.toString().trim());
+    System.setOut(System.out);
+    DBScanner.setShowCount(false);
+
 
     DBScanner.setLimit(1);
     Assert.assertEquals(1, getKeyNames(dbScanner).size());

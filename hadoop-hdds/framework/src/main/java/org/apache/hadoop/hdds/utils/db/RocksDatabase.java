@@ -68,7 +68,7 @@ import static org.rocksdb.RocksDB.listColumnFamilies;
 public final class RocksDatabase {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
-  static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+  public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
