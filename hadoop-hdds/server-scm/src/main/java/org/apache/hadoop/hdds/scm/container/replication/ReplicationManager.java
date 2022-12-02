@@ -158,6 +158,7 @@ public class ReplicationManager implements SCMService {
   private ReplicationQueue replicationQueue;
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
+  private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final int maintenanceRedundancy;
   private final int ratisMaintenanceMinReplicas;
   private Thread underReplicatedProcessorThread;
@@ -220,6 +221,8 @@ public class ReplicationManager implements SCMService {
         ecContainerPlacement, conf, nodeManager, this);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
+    ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
+        ratisContainerPlacement, conf, nodeManager);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -513,8 +516,12 @@ public class ReplicationManager implements SCMService {
         containerID);
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
-    return ecUnderReplicationHandler.processAndCreateCommands(replicas,
-        pendingOps, result, maintenanceRedundancy);
+    if (result.getContainerInfo().getReplicationType() == EC) {
+      return ecUnderReplicationHandler.processAndCreateCommands(replicas,
+          pendingOps, result, maintenanceRedundancy);
+    }
+    return ratisUnderReplicationHandler.processAndCreateCommands(replicas,
+        pendingOps, result, ratisMaintenanceMinReplicas);
   }
 
   public Map<DatanodeDetails, SCMCommand<?>> processOverReplicatedContainer(
