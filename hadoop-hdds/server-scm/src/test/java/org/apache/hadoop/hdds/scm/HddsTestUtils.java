@@ -692,11 +692,20 @@ public final class HddsTestUtils {
   }
 
   public static Set<ContainerReplica> getReplicas(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long sequenceId,
+          final DatanodeDetails... datanodeDetails) {
+    return Sets.newHashSet(getReplicas(containerId, state, sequenceId,
+            Arrays.asList(datanodeDetails)));
+  }
+
+  public static List<ContainerReplica> getReplicas(
       final ContainerID containerId,
       final ContainerReplicaProto.State state,
       final long sequenceId,
-      final DatanodeDetails... datanodeDetails) {
-    Set<ContainerReplica> replicas = new HashSet<>();
+      final Iterable<DatanodeDetails> datanodeDetails) {
+    List<ContainerReplica> replicas = new ArrayList<>();
     for (DatanodeDetails datanode : datanodeDetails) {
       replicas.add(getReplicas(containerId, state,
           sequenceId, datanode.getUuid(), datanode));

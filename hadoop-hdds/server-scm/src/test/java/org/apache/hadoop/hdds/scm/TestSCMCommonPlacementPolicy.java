@@ -30,16 +30,13 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ratis.thirdparty.com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -70,14 +67,77 @@ public class TestSCMCommonPlacementPolicy {
     Assertions.assertNotEquals(1, resultSet.size());
   }
 
+  private void testReplicasToFixMisreplication(
+          List<ContainerReplica> replicas,
+          DummyPlacementPolicy placementPolicy,
+          int expectedNumberOfReplicasToCopy,
+          Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
+    Set<ContainerReplica> replicasToCopy = placementPolicy
+            .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
+    Assertions.assertEquals(expectedNumberOfReplicasToCopy,
+            replicasToCopy.size());
+    Map<Node, Long> rackCopyMap =
+            replicasToCopy.stream().collect(Collectors.groupingBy(
+            replica -> placementPolicy
+                    .getPlacementGroup(replica.getDatanodeDetails()),
+            Collectors.counting()));
+    Set<Node> racks = replicas.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .map(placementPolicy::getPlacementGroup)
+            .collect(Collectors.toSet());
+    for(Node rack: racks) {
+      Assertions.assertEquals(
+              expectedNumberOfCopyOperationFromRack.getOrDefault(rack, 0),
+              rackCopyMap.getOrDefault(rack, 0l).intValue());
+    }
+  }
+
   @Test
   public void testReplicasToFixMisreplication() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 5);
+    List<Node> racks = dummyPlacementPolicy.racks;
+    List<DatanodeDetails> list =
+            nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> replicaDns =
+            Stream.of(0, 1, 2, 3, 5)
+                    .map(list::get).collect(Collectors.toList());
+    List<ContainerReplica> replicas =
+            HddsTestUtils.getReplicasWithReplicaIndex(new ContainerID(1),
+                    CLOSED, 0, 0, 0, replicaDns);
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 1,
+            ImmutableMap.of(racks.get(0), 1));
+    //Changing Rack of Dn 1 to move to rack 0
+    dummyPlacementPolicy.rackMap.put(list.get(1),
+            dummyPlacementPolicy.getPlacementGroup(list.get(0)));
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 2,
+            ImmutableMap.of(racks.get(0), 2));
+    //Changing Rack of Dn 2 to move to rack 0
+    dummyPlacementPolicy.rackMap.put(list.get(2),
+            dummyPlacementPolicy.getPlacementGroup(list.get(0)));
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 3,
+            ImmutableMap.of(racks.get(0), 3));
+    //Changing Rack of Dn 4 to move to rack 3
+    dummyPlacementPolicy.rackMap.put(list.get(4),
+            dummyPlacementPolicy.getPlacementGroup(list.get(3)));
+    replicaDns =
+            Stream.of(0, 1, 2, 3, 4)
+                    .map(list::get).collect(Collectors.toList());
+    //Creating Replicas without replica Index
+    replicas = HddsTestUtils.getReplicas(new ContainerID(1),
+            CLOSED, 0, replicaDns);
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 3,
+            ImmutableMap.of(racks.get(0), 2, racks.get(3), 1));
+  }
+
+  @Test
+  public void testReplicasWithoutMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list =
             nodeManager.getNodes(NodeStatus.inServiceHealthy());
     List<DatanodeDetails> replicaDns =
-            Stream.of(0, 1, 2, 3, 4, 5)
+            Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
 
 
@@ -87,14 +147,14 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToCopy = dummyPlacementPolicy
             .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
-    Assertions.assertTrue(replicasToCopy.stream().findFirst()
-            .map(replica -> Arrays.asList(replicas.get(0), replicas.get(4))
-                    .contains(replica)).orElse(false));
-    Assertions.assertEquals(1, replicasToCopy.size());
+    Assertions.assertEquals(0, replicasToCopy.size());
   }
 
+
+
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
-    private Map<DatanodeDetails, Node> dns;
+    private Map<DatanodeDetails, Node> rackMap;
+    private List<Node> racks;
     private int rackCnt;
 
     DummyPlacementPolicy(
@@ -102,13 +162,16 @@ public class TestSCMCommonPlacementPolicy {
         ConfigurationSource conf,
         int rackCnt) {
       super(nodeManager, conf);
-      dns = new HashMap<>();
+      rackMap = new HashMap<>();
       List<DatanodeDetails> datanodeDetails =
               nodeManager.getNodes(NodeStatus.inServiceHealthy());
       this.rackCnt = Math.min(rackCnt, datanodeDetails.size());
+      this.racks = new ArrayList<>(this.rackCnt);
+      for (int r = 0; r < this.rackCnt; r++) {
+        racks.add(Mockito.mock(Node.class));
+      }
       for (int idx = 0; idx < datanodeDetails.size(); idx++) {
-        dns.put(datanodeDetails.get(idx), datanodeDetails.get(idx %
-                this.rackCnt));
+        rackMap.put(datanodeDetails.get(idx), racks.get(idx % this.rackCnt));
       }
     }
 
@@ -119,7 +182,7 @@ public class TestSCMCommonPlacementPolicy {
 
     @Override
     public Node getPlacementGroup(DatanodeDetails dn) {
-      return dns.get(dn);
+      return rackMap.get(dn);
     }
 
     @Override
