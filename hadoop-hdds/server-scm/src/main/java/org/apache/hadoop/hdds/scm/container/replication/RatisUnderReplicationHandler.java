@@ -225,11 +225,6 @@ public class RatisUnderReplicationHandler
             currentContainerSize);
     return placementPolicy.chooseDatanodes(excludeList, null,
         replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
-
-    // TODO Now that under replication handling is separate from mis
-    //  replication handling, do we need to validate placement policy with
-    //  existing replicas + pending additions + targets like Legacy RM? What if
-    //  the validation fails?
   }
 
   private Map<DatanodeDetails, SCMCommand<?>> createReplicationCommands(
