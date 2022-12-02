@@ -165,6 +165,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
             == OzoneManagerProtocolProtos.Status.OK);
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    Assert.assertEquals(OzoneFSUtils.getFileCount(keyName),
+        bucketInfo.getUsedNamespace());
   }
 
   @Test
