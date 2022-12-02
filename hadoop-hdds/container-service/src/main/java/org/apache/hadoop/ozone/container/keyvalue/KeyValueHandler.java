@@ -1259,6 +1259,8 @@ public class KeyValueHandler extends Handler {
         } else {
           LOG.error("Failed to move container under " +
               hddsVolume.getDeleteServiceDirPath());
+          throw new StorageContainerException("Moving container failed",
+              IO_EXCEPTION);
         }
       }
       long containerId = container.getContainerData().getContainerID();

@@ -170,8 +170,8 @@ public class TestHddsDatanodeService {
     volumeSet.shutdown();
   }
 
-  private KeyValueContainer setUpTestContainer(HddsVolume volume,
-                                   String schemaVersion) throws IOException {
+  private KeyValueContainer setUpTestContainer(
+      HddsVolume volume, String schemaVersion) throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
