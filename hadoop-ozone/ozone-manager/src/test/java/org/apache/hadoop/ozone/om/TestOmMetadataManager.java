@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -38,8 +39,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.time.Duration;
@@ -52,6 +53,7 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
@@ -63,6 +65,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -718,33 +721,27 @@ public class TestOmMetadataManager {
   }
 
   @ParameterizedTest
-  @NullSource
-  @ValueSource(strings = { "nonexistentBucket"})
-  public void testListSnapshotWithInvalidPath(String invalidBucket)
+  @MethodSource("listSnapshotWithInvalidPathCases")
+  public void testListSnapshotWithInvalidPath(String volume,
+                                              String bucket,
+                                              ResultCodes expectedResultCode)
       throws Exception {
     String vol1 = "vol1";
     String bucket1 = "bucket1";
 
     OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
     addBucketsToCache(vol1, bucket1);
-    String snapshotName = "snapshot";
 
-    for (int i = 1; i <= 10; i++) {
-      if (i % 2 == 0) {
-        OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
-            snapshotName + i, omMetadataManager);
-      } else {
-        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
-            snapshotName + i, omMetadataManager);
-      }
-    }
+    expectOmException(expectedResultCode,
+        () -> omMetadataManager.listSnapshot(volume, bucket));
 
-    //Test listing snapshots with no volume name.
-    expectOmException(VOLUME_NOT_FOUND,
-        () -> omMetadataManager.listSnapshot(null, null));
+  }
 
-    //Test listing snapshots with invalid bucket.
-    expectOmException(BUCKET_NOT_FOUND,
-        () -> omMetadataManager.listSnapshot(vol1, invalidBucket));
+  private static Stream<Arguments> listSnapshotWithInvalidPathCases() {
+    return Stream.of(
+        arguments(null, null, VOLUME_NOT_FOUND),
+        arguments("vol1", null, BUCKET_NOT_FOUND),
+        arguments("vol1", "nonexistentBucket", BUCKET_NOT_FOUND)
+    );
   }
 }
