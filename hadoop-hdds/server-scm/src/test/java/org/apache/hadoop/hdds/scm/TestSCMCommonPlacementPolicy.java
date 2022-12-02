@@ -128,7 +128,25 @@ public class TestSCMCommonPlacementPolicy {
     replicaDns =
             Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
-    //Creating Replicas without replica Index for ratis case
+    //Creating Replicas without replica Index
+    replicas = HddsTestUtils.getReplicas(new ContainerID(1),
+            CLOSED, 0, replicaDns);
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 3,
+            ImmutableMap.of(racks.get(0), 2, racks.get(3), 1));
+    //Creating Replicas without replica Index for replicas < number of racks
+    replicaDns =
+            Stream.of(0, 1, 3, 4)
+                    .map(list::get).collect(Collectors.toList());
+    replicas = HddsTestUtils.getReplicas(new ContainerID(1),
+            CLOSED, 0, replicaDns);
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 2,
+            ImmutableMap.of(racks.get(0), 1, racks.get(3), 1));
+
+    //Creating Replicas without replica Index for replicas > number of racks
+    replicaDns =
+            Stream.of(0, 1, 2, 3, 4, 6)
+                    .map(list::get).collect(Collectors.toList());
+
     replicas = HddsTestUtils.getReplicas(new ContainerID(1),
             CLOSED, 0, replicaDns);
     testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 3,
