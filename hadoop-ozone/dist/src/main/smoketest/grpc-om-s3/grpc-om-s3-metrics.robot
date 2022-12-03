@@ -19,7 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
-Resource            commonawslib.robot
+Resource            ../s3/commonawslib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
 
@@ -32,7 +32,7 @@ ${GRPC_OM_METRICS_NAME}     GrpcOzoneManagerMetrics
 *** Keywords ***
 Verify endpoint is up
     [arguments]         ${url}
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
     Should contain      ${result}       200 OK
 

@@ -28,7 +28,7 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env 5
 
-execute_robot_test s3g -v GRPC_ENABLED:true s3/grpc-om-s3-metrics.robot
+execute_robot_test s3g -v GRPC_ENABLED:true grpc-om-s3/grpc-om-s3-metrics.robot
 
 stop_docker_env
 
