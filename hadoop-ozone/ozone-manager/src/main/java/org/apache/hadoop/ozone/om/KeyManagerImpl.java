@@ -1300,7 +1300,8 @@ public class KeyManagerImpl implements KeyManager {
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
     Table.KeyValue<String, OmKeyInfo> keyValue =
-            metadataManager.getKeyTable(layout).iterator().seek(fileKeyBytes);
+            metadataManager.getKeyTable(layout).iterator()
+                .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
 
     if (keyValue != null) {
       Path fullPath = Paths.get(keyValue.getValue().getKeyName());
