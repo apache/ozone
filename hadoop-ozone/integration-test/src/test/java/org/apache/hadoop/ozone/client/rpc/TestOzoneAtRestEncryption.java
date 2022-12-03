@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
+import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -497,7 +497,9 @@ public class TestOzoneAtRestEncryption {
 
     // Create an input stream to read the data
     OzoneInputStream inputStream = bucket.readKey(keyName);
-    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
+
+    Assert.assertTrue(inputStream.getInputStream()
+        instanceof MultipartInputStream);
 
     // Test complete read
     byte[] completeRead = new byte[keySize];

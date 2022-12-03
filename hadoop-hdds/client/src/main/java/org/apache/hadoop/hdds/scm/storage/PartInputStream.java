@@ -17,21 +17,20 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.fs.CanUnbuffer;
+import org.apache.hadoop.fs.Seekable;
+
+import java.io.IOException;
+
 
 /**
- * Abstract class used as an interface for input streams related to Ozone
- * blocks.
+ * A stream that can be a part of a {@link MultipartInputStream}.
  */
-public abstract class BlockExtendedInputStream extends ExtendedInputStream
-    implements PartInputStream {
+public interface PartInputStream
+    extends CanUnbuffer, Seekable {
+  long getLength();
 
-  public abstract BlockID getBlockID();
+  long getRemaining() throws IOException;
 
-  @Override
-  public abstract long getRemaining();
-
-  @Override
-  public abstract long getLength();
-
+  void close() throws IOException;
 }

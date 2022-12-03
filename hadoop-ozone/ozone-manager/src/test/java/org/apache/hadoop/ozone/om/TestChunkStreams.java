@@ -25,6 +25,8 @@ import org.junit.rules.ExpectedException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
@@ -39,51 +41,52 @@ public class TestChunkStreams {
 
   @Test
   public void testReadGroupInputStream() throws Exception {
-    try (KeyInputStream groupInputStream = new KeyInputStream()) {
+    String dataString = RandomStringUtils.randomAscii(500);
+    byte[] buf = dataString.getBytes(UTF_8);
+    List<BlockInputStream> streams = new ArrayList<>();
+    int offset = 0;
+    for (int i = 0; i < 5; i++) {
+      int tempOffset = offset;
+      BlockInputStream in =
+          new BlockInputStream(null, 100, null, null, true, null) {
+            private long pos = 0;
+            private ByteArrayInputStream in =
+                new ByteArrayInputStream(buf, tempOffset, 100);
 
-      String dataString = RandomStringUtils.randomAscii(500);
-      byte[] buf = dataString.getBytes(UTF_8);
-      int offset = 0;
-      for (int i = 0; i < 5; i++) {
-        int tempOffset = offset;
-        BlockInputStream in =
-            new BlockInputStream(null, 100, null, null, true, null) {
-              private long pos = 0;
-              private ByteArrayInputStream in =
-                  new ByteArrayInputStream(buf, tempOffset, 100);
+            @Override
+            public synchronized void seek(long pos) throws IOException {
+              throw new UnsupportedOperationException();
+            }
 
-              @Override
-              public synchronized void seek(long pos) throws IOException {
-                throw new UnsupportedOperationException();
-              }
+            @Override
+            public synchronized long getPos() {
+              return pos;
+            }
 
-              @Override
-              public synchronized long getPos() {
-                return pos;
-              }
+            @Override
+            public boolean seekToNewSource(long targetPos)
+                throws IOException {
+              throw new UnsupportedOperationException();
+            }
 
-              @Override
-              public boolean seekToNewSource(long targetPos)
-                  throws IOException {
-                throw new UnsupportedOperationException();
-              }
+            @Override
+            public synchronized int read() throws IOException {
+              return in.read();
+            }
 
-              @Override
-              public synchronized int read() throws IOException {
-                return in.read();
-              }
-
-              @Override
-              public synchronized  int read(byte[] b, int off, int len)
-                  throws IOException {
-                int readLen = in.read(b, off, len);
-                pos += readLen;
-                return readLen;
-              }
-            };
-        offset += 100;
-        groupInputStream.addStream(in);
-      }
+            @Override
+            public synchronized int read(byte[] b, int off, int len)
+                throws IOException {
+              int readLen = in.read(b, off, len);
+              pos += readLen;
+              return readLen;
+            }
+          };
+      offset += 100;
+      streams.add(in);
+    }
+    try (KeyInputStream groupInputStream =
+             new KeyInputStream("key", streams)) {
 
       byte[] resBuf = new byte[500];
       int len = groupInputStream.read(resBuf, 0, 500);
@@ -95,52 +98,52 @@ public class TestChunkStreams {
 
   @Test
   public void testErrorReadGroupInputStream() throws Exception {
-    try (KeyInputStream groupInputStream = new KeyInputStream()) {
+    String dataString = RandomStringUtils.randomAscii(500);
+    byte[] buf = dataString.getBytes(UTF_8);
+    List<BlockInputStream> streams = new ArrayList<>();
+    int offset = 0;
+    for (int i = 0; i < 5; i++) {
+      int tempOffset = offset;
+      BlockInputStream in =
+          new BlockInputStream(null, 100, null, null, true, null) {
+            private long pos = 0;
+            private ByteArrayInputStream in =
+                new ByteArrayInputStream(buf, tempOffset, 100);
 
-      String dataString = RandomStringUtils.randomAscii(500);
-      byte[] buf = dataString.getBytes(UTF_8);
-      int offset = 0;
-      for (int i = 0; i < 5; i++) {
-        int tempOffset = offset;
-        BlockInputStream in =
-            new BlockInputStream(null, 100, null, null, true, null) {
-              private long pos = 0;
-              private ByteArrayInputStream in =
-                  new ByteArrayInputStream(buf, tempOffset, 100);
+            @Override
+            public synchronized void seek(long pos) throws IOException {
+              throw new UnsupportedOperationException();
+            }
 
-              @Override
-              public synchronized void seek(long pos) throws IOException {
-                throw new UnsupportedOperationException();
-              }
+            @Override
+            public synchronized long getPos() {
+              return pos;
+            }
 
-              @Override
-              public synchronized long getPos() {
-                return pos;
-              }
+            @Override
+            public synchronized boolean seekToNewSource(long targetPos)
+                throws IOException {
+              throw new UnsupportedOperationException();
+            }
 
-              @Override
-              public synchronized boolean seekToNewSource(long targetPos)
-                  throws IOException {
-                throw new UnsupportedOperationException();
-              }
+            @Override
+            public synchronized int read() throws IOException {
+              return in.read();
+            }
 
-              @Override
-              public synchronized int read() throws IOException {
-                return in.read();
-              }
-
-              @Override
-              public synchronized int read(byte[] b, int off, int len)
-                  throws IOException {
-                int readLen = in.read(b, off, len);
-                pos += readLen;
-                return readLen;
-              }
-            };
-        offset += 100;
-        groupInputStream.addStream(in);
-      }
-
+            @Override
+            public synchronized int read(byte[] b, int off, int len)
+                throws IOException {
+              int readLen = in.read(b, off, len);
+              pos += readLen;
+              return readLen;
+            }
+          };
+      offset += 100;
+      streams.add(in);
+    }
+    try (KeyInputStream groupInputStream =
+             new KeyInputStream("key", streams)) {
       byte[] resBuf = new byte[600];
       // read 300 bytes first
       int len = groupInputStream.read(resBuf, 0, 340);

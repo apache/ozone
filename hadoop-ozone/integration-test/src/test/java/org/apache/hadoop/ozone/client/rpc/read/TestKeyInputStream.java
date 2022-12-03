@@ -161,7 +161,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
         dataLength, BLOCK_SIZE);
     List<BlockExtendedInputStream> blockStreams =
-        keyInputStream.getBlockStreams();
+        keyInputStream.getPartStreams();
     Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
 
     int readBlockLength = 0;
