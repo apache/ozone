@@ -19,8 +19,6 @@ CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_ozone.om.transport.class=org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory
-OZONE-SITE.XML_ozone.om.s3.grpc.metrics.percentiles.intervals=60,300,900
-OZONE-SITE.XML_ozone.om.s3.grpc.metrics.quantile.enabled=true
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874

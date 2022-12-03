@@ -20,9 +20,7 @@ between OzoneManager and S3Gateway Clients.
 ### Differences with `compose/ozone`
 
 * in `docker-config`
-  * for enabling grpc
+  * for enabling grpc server on om side
     * `OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true`
+  * for enabling grpc transport on client side
     * `OZONE-SITE.XML_ozone.om.transport.class=org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory`
-  * for enabling grpc metrics quantile and percentile intervals
-    * `OZONE-SITE.XML_ozone.om.s3.grpc.metrics.percentiles.intervals=60,300,900`
-    * `OZONE-SITE.XML_ozone.om.s3.grpc.metrics.quantile.enabled=true`

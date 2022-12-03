@@ -21,7 +21,7 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup v4 headers
+Suite Setup         Setup s3 tests
 
 *** Variables ***
 ${GRPC_ENABLED}             false
@@ -80,33 +80,21 @@ Check that metrics are registered
     ${result} =         Execute                             curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | grep ${GRPC_OM_METRICS_NAME}
                         Should contain      ${result}       ${GRPC_OM_METRICS_NAME}
 
-Check no bytes sent
-    SentBytes are equal to zero
-
-Check no bytes received
-    ReceivedBytes are equal to zero
-
-Check no active connections
-    NumActiveClientConnections are equal to zero
-
-Create new bucket
-    ${bucket} =         Create bucket
-
-Check bytes sent are higher than zero
+Check bytes sent
     IF      '${GRPC_ENABLED}' == 'true'
         SentBytes are higher than zero
     ELSE
         SentBytes are equal to zero
     END
 
-Check bytes received are higher than zero
+Check bytes received
     IF      '${GRPC_ENABLED}' == 'true'
         ReceivedBytes are higher than zero
     ELSE
         ReceivedBytes are equal to zero
     END
 
-Check active connections are higher than zero
+Check active connections
     IF      '${GRPC_ENABLED}' == 'true'
         NumActiveClientConnections are higher than zero
     ELSE
