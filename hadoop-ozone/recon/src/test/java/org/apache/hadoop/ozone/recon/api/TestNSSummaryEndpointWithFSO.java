@@ -218,16 +218,6 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
-  private static final long LOCATION_INFO_GROUP_ONE_SIZE
-          = CONTAINER_ONE_REPLICA_COUNT * BLOCK_ONE_LENGTH
-          + CONTAINER_TWO_REPLICA_COUNT * BLOCK_TWO_LENGTH
-          + CONTAINER_THREE_REPLICA_COUNT * BLOCK_THREE_LENGTH;
-
-
-  private static final long LOCATION_INFO_GROUP_TWO_SIZE
-      = CONTAINER_FOUR_REPLICA_COUNT * BLOCK_FOUR_LENGTH
-      + CONTAINER_FIVE_REPLICA_COUNT * BLOCK_FIVE_LENGTH
-      + CONTAINER_SIX_REPLICA_COUNT * BLOCK_SIX_LENGTH;
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ONE_SIZE,
