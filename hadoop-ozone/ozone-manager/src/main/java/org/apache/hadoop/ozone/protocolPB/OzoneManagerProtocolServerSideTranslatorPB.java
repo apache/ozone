@@ -19,11 +19,9 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateSnapshot;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -44,7 +42,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -160,10 +157,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     boolean s3Auth = false;
 
     try {
-      if (request.getCmdType() == CreateSnapshot) {
-        request = updateCreateSnapshotRequest(request);
-      }
-
       if (request.hasS3Authentication()) {
         OzoneManager.setS3Auth(request.getS3Authentication());
         try {
@@ -219,21 +212,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private OMResponse submitRequestToRatis(OMRequest request)
       throws ServiceException {
     return omRatisServer.submitRequest(request);
-  }
-
-  /**
-   * Adds snapshotId to a create snapshot request to make sure that all
-   * the OM nodes have the same snapshotId.
-   */
-  private OMRequest updateCreateSnapshotRequest(OMRequest request) {
-    OzoneManagerProtocolProtos.CreateSnapshotRequest newRequest =
-        OzoneManagerProtocolProtos.CreateSnapshotRequest
-            .newBuilder(request.getCreateSnapshotRequest())
-            .setSnapshotId(UUID.randomUUID().toString())
-            .build();
-    return OMRequest.newBuilder(request)
-        .setCreateSnapshotRequest(newRequest)
-        .build();
   }
 
   private OMResponse submitReadRequestToOM(OMRequest request)
