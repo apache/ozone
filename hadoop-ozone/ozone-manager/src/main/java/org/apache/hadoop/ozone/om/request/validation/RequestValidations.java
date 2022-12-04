@@ -116,7 +116,7 @@ public class RequestValidations {
 
   /**
    * Clones client request with updated parameters needed at server side.
-   *
+   * <p>
    * e.g. For CreateSnapshot request, it clones the client request and adds
    * snapshotId to a create snapshot request to make sure that all the OM
    * nodes (leader and followers) have the same snapshotId.
@@ -131,7 +131,7 @@ public class RequestValidations {
           .setCreateSnapshotRequest(requestWithSnapshotId)
           .build();
     } else {
-     return clientRequest.toBuilder().build();
+      return clientRequest.toBuilder().build();
     }
   }
 }

@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
-import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
