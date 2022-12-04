@@ -359,7 +359,6 @@ MIT
 =====================
 
    com.kstruct:gethostname4j
-   net.sf.jopt-simple:jopt-simple
    org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
@@ -429,14 +428,13 @@ BSD 3-Clause
 =====================
 
 d3-3.5.17.min.js
-d3-3.5.17.min.js
-glyphicons-*
 
 MIT License
 =====================
 
 bootstrap-3.4.1
 css/bootstrap-*
+fonts/glyphicons-*
 bootstrap.min.js
 angular-route-1.8.0.min.js
 angular-nvd3-1.0.9.min.js
