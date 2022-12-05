@@ -32,7 +32,7 @@
                 });
             $http.get("jmx?qry=Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo")
             .then(function (result) {
-                ctrl.pieplinesrmetrics = result.data.beans[0];
+                ctrl.pipelinemetrics = result.data.beans[0];
             });
 
             const nodeOpStateSortOrder = {
