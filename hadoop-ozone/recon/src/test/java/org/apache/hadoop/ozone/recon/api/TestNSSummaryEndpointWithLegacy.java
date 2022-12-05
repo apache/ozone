@@ -478,7 +478,7 @@ public class TestNSSummaryEndpointWithLegacy {
     Assert.assertEquals(StorageType.DISK,
         ((BucketObjectDBInfo)
             bucketOneObj.getObjectDBInfo()).getStorageType());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    Assert.assertEquals(BucketLayout.LEGACY,
         ((BucketObjectDBInfo)
             bucketOneObj.getObjectDBInfo()).getBucketLayout());
     Assert.assertEquals("bucket1",
@@ -500,7 +500,7 @@ public class TestNSSummaryEndpointWithLegacy {
     Assert.assertEquals(StorageType.DISK,
         ((BucketObjectDBInfo)
             bucketTwoObj.getObjectDBInfo()).getStorageType());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    Assert.assertEquals(BucketLayout.LEGACY,
         ((BucketObjectDBInfo)
             bucketTwoObj.getObjectDBInfo()).getBucketLayout());
     Assert.assertEquals("bucket2",
