@@ -107,10 +107,14 @@ public class TestReconTasks {
     final ContainerInfo container3 = reconContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
-    scmContainerManager.updateContainerState(container1.containerID(), HddsProtos.LifeCycleEvent.FINALIZE);
-    scmContainerManager.updateContainerState(container2.containerID(), HddsProtos.LifeCycleEvent.FINALIZE);
-    scmContainerManager.updateContainerState(container1.containerID(), HddsProtos.LifeCycleEvent.CLOSE);
-    scmContainerManager.updateContainerState(container2.containerID(), HddsProtos.LifeCycleEvent.CLOSE);
+    scmContainerManager.updateContainerState(container1.containerID(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scmContainerManager.updateContainerState(container2.containerID(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scmContainerManager.updateContainerState(container1.containerID(),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    scmContainerManager.updateContainerState(container2.containerID(),
+        HddsProtos.LifeCycleEvent.CLOSE);
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconContainerManager
         .getContainers().size();
