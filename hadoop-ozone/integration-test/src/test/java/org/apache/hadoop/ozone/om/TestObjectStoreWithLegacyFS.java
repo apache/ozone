@@ -137,9 +137,37 @@ public class TestObjectStoreWithLegacyFS {
 
     ozoneBucket.renameKey(keyName, "dir1/NewKey-1");
 
+    // RenameKey changes keyTable cache, so we need to
+    // wait for the transaction to be flushed to db
+    GenericTestUtils.waitFor(
+        () -> !isKeyExist(keyTable, volumeName, bucketName, keyName),
+        500, 60000);
+    // When the old key is removed, new key should exist
+    Assert.assertTrue(
+        isKeyExist(keyTable, volumeName, bucketName, "dir1/NewKey-1"));
+
     GenericTestUtils
         .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, "dir1/NewKey-1"), 500,
             60000);
+  }
+
+  private boolean isKeyExist(Table<String, OmKeyInfo> keyTable, String volume,
+      String bucket, String key) {
+    String dbKey = cluster.getOzoneManager().getMetadataManager()
+        .getOzoneKey(volume, bucket, key);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = keyTable.iterator()) {
+      iterator.seek(dbKey);
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        if (kv.getKey().equals(dbKey)) {
+          return true;
+        }
+      }
+    } catch (IOException ex) {
+      LOG.error("Error while iterating key table", ex);
+    }
+    return false;
   }
 
   private boolean assertKeyCount(
