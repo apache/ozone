@@ -237,7 +237,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     long elapsedRunCount = dirDeletingService.getRunCount() - preRunCount;
     assertTrue(dirDeletingService.getRunCount() > 1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
-    assertTrue(elapsedRunCount == 8 || elapsedRunCount == 9);
+    assertTrue(elapsedRunCount >= 7);
   }
 
   @Test
@@ -283,7 +283,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 0);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 4);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     assertTrue(dirDeletingService.getRunCount() > 1);
