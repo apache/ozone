@@ -216,7 +216,6 @@ public final class HddsClientUtils {
     }
   }
 
-
   /**
    * verifies that bucket / volume name is a valid DNS name.
    *
