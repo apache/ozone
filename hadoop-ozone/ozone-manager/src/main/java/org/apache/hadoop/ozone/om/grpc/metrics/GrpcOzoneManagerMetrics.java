@@ -120,7 +120,7 @@ public class GrpcOzoneManagerMetrics {
   private MutableQuantiles[] grpcOmProcessingTimeMillisQuantiles;
 
   @Metric("Number of active clients connected")
-  private MutableGaugeInt numActiveClientConnections;
+  private MutableGaugeInt numOpenClientConnections;
 
   public void setSentBytes(long byteCount) {
     sentBytes.set(byteCount);
@@ -152,8 +152,8 @@ public class GrpcOzoneManagerMetrics {
     }
   }
 
-  public void setNumActiveClientConnections(int activeClients) {
-    numActiveClientConnections.set(activeClients);
+  public void setNumOpenClientConnections(int activeClients) {
+    numOpenClientConnections.set(activeClients);
   }
 
   public MutableGaugeLong getSentBytes() {
@@ -173,7 +173,7 @@ public class GrpcOzoneManagerMetrics {
   }
 
   public MutableGaugeInt getNumActiveClientConnections() {
-    return numActiveClientConnections;
+    return numOpenClientConnections;
   }
 
   public GrpcOzoneManagerServer getGrpcOmServer() {

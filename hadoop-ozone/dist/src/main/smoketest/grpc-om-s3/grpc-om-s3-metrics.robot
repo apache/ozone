@@ -44,8 +44,8 @@ Get ReceivedBytes
     ${receivedBytes} =          Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_OM_METRICS_NAME}/,/}/p' | grep 'ReceivedBytes' | grep -Eo '[0-9]{1,}'
     [return]                    ${receivedBytes}
 
-Get NumActiveClientConnections
-    ${activeConnections} =      Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_OM_METRICS_NAME}/,/}/p' | grep 'NumActiveClientConnections' | grep -Eo '[0-9]{1,}'
+Get NumOpenClientConnections
+    ${activeConnections} =      Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_OM_METRICS_NAME}/,/}/p' | grep 'NumOpenClientConnections' | grep -Eo '[0-9]{1,}'
     [return]                    ${activeConnections}
 
 SentBytes are equal to zero
@@ -56,8 +56,8 @@ ReceivedBytes are equal to zero
     ${receivedBytes} =              Get ReceivedBytes
                                     Should be true      ${receivedBytes} == 0
 
-NumActiveClientConnections are equal to zero
-    ${activeConnections} =          Get NumActiveClientConnections
+NumOpenClientConnections are equal to zero
+    ${activeConnections} =          Get NumOpenClientConnections
                                     Should be true      ${activeConnections} == 0
 
 SentBytes are higher than zero
@@ -68,8 +68,8 @@ ReceivedBytes are higher than zero
     ${receivedBytes} =                  Get ReceivedBytes
                                         Should be true      ${receivedBytes} > 0
 
-NumActiveClientConnections are higher than zero
-    ${activeConnections} =              Get NumActiveClientConnections
+NumOpenClientConnections are higher than zero
+    ${activeConnections} =              Get NumOpenClientConnections
                                         Should be true      ${activeConnections} > 0
 
 *** Test Cases ***
@@ -96,7 +96,7 @@ Check bytes received
 
 Check active connections
     IF      '${GRPC_ENABLED}' == 'true'
-        NumActiveClientConnections are higher than zero
+        NumOpenClientConnections are higher than zero
     ELSE
-        NumActiveClientConnections are equal to zero
+        NumOpenClientConnections are equal to zero
     END

@@ -39,14 +39,14 @@ public class GrpcOmServerTransportFilter extends ServerTransportFilter {
   @Override
   public Attributes transportReady(Attributes transportAttrs) {
     activeClientCount++;
-    grpcMetrics.setNumActiveClientConnections(activeClientCount);
+    grpcMetrics.setNumOpenClientConnections(activeClientCount);
     return super.transportReady(transportAttrs);
   }
 
   @Override
   public void transportTerminated(Attributes transportAttrs) {
     activeClientCount--;
-    grpcMetrics.setNumActiveClientConnections(activeClientCount);
+    grpcMetrics.setNumOpenClientConnections(activeClientCount);
     super.transportTerminated(transportAttrs);
   }
 }
