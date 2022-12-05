@@ -29,9 +29,15 @@ public class CompactionNode {
   private final long totalNumberOfKeys;
   private long cumulativeKeysReverseTraversal;
 
+  /**
+   * CompactionNode constructor.
+   * @param file SST file (filename without extension)
+   * @param ssId snapshotId field. Added here for improved debuggability only
+   * @param numKeys Number of keys in the SST
+   * @param seqNum Snapshot generation (sequence number)
+   */
   CompactionNode(String file, String ssId, long numKeys, long seqNum) {
     fileName = file;
-    // snapshotId field added here only for improved debuggability
     snapshotId = ssId;
     totalNumberOfKeys = numKeys;
     snapshotGeneration = seqNum;

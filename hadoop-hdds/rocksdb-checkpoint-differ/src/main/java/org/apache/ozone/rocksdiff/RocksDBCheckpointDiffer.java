@@ -706,6 +706,12 @@ public class RocksDBCheckpointDiffer {
 
   /**
    * Core getSSTDiffList logic.
+   * <p>
+   * For each SST in the src snapshot, traverse the DAG to find its final
+   * successors.  If any of those successors match an SST in the dest
+   * snapshot, add it to the sameFiles map (as it doesn't need further
+   * diffing).  Otherwise, add it to the differentFiles map, as it will
+   * need further diffing.
    */
   void internalGetSSTDiffList(
       DifferSnapshotInfo src, DifferSnapshotInfo dest,
@@ -859,12 +865,12 @@ public class RocksDBCheckpointDiffer {
    * Populate the compaction DAG with input and output SST files lists.
    * @param inputFiles List of compaction input files.
    * @param outputFiles List of compaction output files.
-   * @param snapshotID Snapshot ID for debugging purpose. In fact, this can be
+   * @param snapshotId Snapshot ID for debugging purpose. In fact, this can be
    *                   arbitrary String as long as it helps debugging.
    * @param seqNum DB transaction sequence number.
    */
   private void populateCompactionDAG(List<String> inputFiles,
-      List<String> outputFiles, String snapshotID, long seqNum) {
+      List<String> outputFiles, String snapshotId, long seqNum) {
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Input files: {} -> Output files: {}", inputFiles, outputFiles);
@@ -872,11 +878,11 @@ public class RocksDBCheckpointDiffer {
 
     for (String outfile : outputFiles) {
       final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
-          outfile, file -> addNodeToDAG(file, snapshotID, seqNum));
+          outfile, file -> addNodeToDAG(file, snapshotId, seqNum));
 
       for (String infile : inputFiles) {
         final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
-            infile, file -> addNodeToDAG(file, snapshotID, seqNum));
+            infile, file -> addNodeToDAG(file, snapshotId, seqNum));
         // Draw the edges
         if (!outfileNode.getFileName().equals(infileNode.getFileName())) {
           forwardCompactionDAG.putEdge(outfileNode, infileNode);
