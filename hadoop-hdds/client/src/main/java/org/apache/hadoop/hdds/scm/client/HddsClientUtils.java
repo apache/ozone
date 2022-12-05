@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -135,6 +133,7 @@ public final class HddsClientUtils {
         Character.isLowerCase(c) || Character.isDigit(c));
     } else {
       // allow to follow other volume/bucket naming convention,
+      // for example, here allows 'underscore', which is a valid character in POSIX-compliant system, like HDFS.
       return (c == '.' || c == '-' || c == '_' ||
         Character.isLowerCase(c) || Character.isDigit(c));
     }
