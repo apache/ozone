@@ -104,7 +104,7 @@ public class TestReconTasks {
     final ContainerInfo container2 = scmContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
-    final ContainerInfo container3 = reconContainerManager.allocateContainer(
+    reconContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
     scmContainerManager.updateContainerState(container1.containerID(),
