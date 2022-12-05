@@ -178,7 +178,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     ) :
       <div>
           <span>{containers.toString()}   </span>
-        <Tooltip placement='bottom' title={openContainers > 0 ? `Open Containers` : ``}>
+        <Tooltip placement='bottom' title='Number of open containers'>
           <span>({openContainers})</span>
         </Tooltip>
       </div>
