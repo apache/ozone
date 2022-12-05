@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.Objects;
@@ -52,11 +53,13 @@ public class ContainerBlockID {
         .append(" locID: ").append(localID);
   }
 
+  @JsonIgnore
   public HddsProtos.ContainerBlockID getProtobuf() {
     return HddsProtos.ContainerBlockID.newBuilder().
         setContainerID(containerID).setLocalID(localID).build();
   }
 
+  @JsonIgnore
   public static ContainerBlockID getFromProtobuf(
       HddsProtos.ContainerBlockID containerBlockID) {
     return new ContainerBlockID(containerBlockID.getContainerID(),

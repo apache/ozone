@@ -276,4 +276,18 @@ public class FSOBucketHandler extends BucketHandler {
         parentObjectId, fileName);
     return getOmMetadataManager().getFileTable().getSkipCache(ozoneKey);
   }
+
+  @Override
+  public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
+    long parentObjectId = getDirObjectId(names, names.length - 1);
+    String dirKey = getOmMetadataManager().getOzonePathKey(
+        getVolumeObjectId(names),
+        getBucketObjectId(names),
+        parentObjectId,
+        names[names.length - 1]);
+    OmDirectoryInfo dirInfo = getOmMetadataManager()
+        .getDirectoryTable().getSkipCache(dirKey);
+    return dirInfo;
+  }
+
 }

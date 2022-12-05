@@ -80,7 +80,8 @@ public class NSSummaryEndpoint {
     NamespaceSummaryResponse namespaceSummaryResponse;
     if (!isInitializationComplete()) {
       namespaceSummaryResponse =
-          new NamespaceSummaryResponse(EntityType.UNKNOWN);
+          NamespaceSummaryResponse.newBuilder().
+              setEntityType(EntityType.UNKNOWN).build();
       namespaceSummaryResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(namespaceSummaryResponse).build();
     }

@@ -18,62 +18,67 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * HTTP Response wrapped for a 'summary' request.
  */
 public class NamespaceSummaryResponse {
+  /** Path for metadata summary. */
+  @JsonProperty("path")
+  private String path;
+
   /** The namespace the request path is on. */
   @JsonProperty("type")
   private EntityType entityType;
 
-  /** Total number of volumes under root, -1 for other types. */
-  @JsonProperty("numVolume")
-  private int numVolume;
+  /** Count stats which tells the number of volumes/buckets/dir/files etc. */
+  @JsonProperty("countStats")
+  private CountStats countStats;
 
-  /** Total number of buckets for root/volume, -1 for other types. */
-  @JsonProperty("numBucket")
-  private int numBucket;
-
-  /** Total number of directories for all types except key, -1 for key. */
-  @JsonProperty("numDir")
-  private int numTotalDir;
-
-  /** Total number of keys. */
-  @JsonProperty("numKey")
-  private long numTotalKey;
+  @JsonProperty("objectInfo")
+  private ObjectDBInfo objectDBInfo;
 
   /** Path Status. */
   @JsonProperty("status")
   private ResponseStatus status;
 
-  public NamespaceSummaryResponse(EntityType entityType) {
-    this.entityType = entityType;
-    this.numVolume = -1;
-    this.numBucket = -1;
-    this.numTotalDir = -1;
-    this.numTotalKey = 0;
-    this.status = ResponseStatus.OK;
+  /**
+   * Returns new builder class that builds a NamespaceSummaryResponse.
+   *
+   * @return Builder
+   */
+  public static NamespaceSummaryResponse.Builder newBuilder() {
+    return new NamespaceSummaryResponse.Builder();
+  }
+
+  public NamespaceSummaryResponse(Builder b) {
+    this.path = b.path;
+    this.entityType = b.entityType;
+    this.countStats = b.countStats;
+    this.objectDBInfo = b.objectDBInfo;
+    this.status = b.status;
+  }
+
+  public String getPath() {
+    return path;
+  }
+
+  public void setPath(String path) {
+    this.path = path;
+  }
+
+  public CountStats getCountStats() {
+    return countStats;
+  }
+
+  public void setCountStats(CountStats countStats) {
+    this.countStats = countStats;
   }
 
   public EntityType getEntityType() {
     return this.entityType;
-  }
-
-  public int getNumVolume() {
-    return this.numVolume;
-  }
-
-  public int getNumBucket() {
-    return this.numBucket;
-  }
-
-  public int getNumTotalDir() {
-    return this.numTotalDir;
-  }
-
-  public long getNumTotalKey() {
-    return this.numTotalKey;
   }
 
   public ResponseStatus getStatus() {
@@ -84,23 +89,72 @@ public class NamespaceSummaryResponse {
     this.entityType = entityType;
   }
 
-  public void setNumVolume(int numVolume) {
-    this.numVolume = numVolume;
-  }
-
-  public void setNumBucket(int numBucket) {
-    this.numBucket = numBucket;
-  }
-
-  public void setNumTotalDir(int numTotalDir) {
-    this.numTotalDir = numTotalDir;
-  }
-
-  public void setNumTotalKey(long numTotalKey) {
-    this.numTotalKey = numTotalKey;
-  }
-
   public void setStatus(ResponseStatus status) {
     this.status = status;
   }
+
+  public ObjectDBInfo getObjectDBInfo() {
+    return objectDBInfo;
+  }
+
+  public void setObjectDBInfo(ObjectDBInfo objectDBInfo) {
+    this.objectDBInfo = objectDBInfo;
+  }
+
+  /**
+   * Builder for NamespaceSummaryResponse.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class Builder {
+    private String path;
+    private EntityType entityType;
+    private CountStats countStats;
+    private ObjectDBInfo objectDBInfo;
+    private ResponseStatus status;
+
+
+    public Builder() {
+      // Default values
+      this.path = StringUtils.EMPTY;
+      this.entityType = EntityType.ROOT;
+    }
+
+    public NamespaceSummaryResponse.Builder setPath(String path) {
+      this.path = path;
+      return this;
+    }
+
+    public NamespaceSummaryResponse.Builder setEntityType(
+        EntityType entityType) {
+      this.entityType = entityType;
+      return this;
+    }
+
+    public NamespaceSummaryResponse.Builder setCountStats(
+        CountStats countStats) {
+      this.countStats = countStats;
+      return this;
+    }
+
+    public NamespaceSummaryResponse.Builder setObjectDBInfo(
+        ObjectDBInfo objectDBInfo) {
+      this.objectDBInfo = objectDBInfo;
+      return this;
+    }
+
+    public NamespaceSummaryResponse.Builder setStatus(
+        ResponseStatus status) {
+      this.status = status;
+      return this;
+    }
+
+    public NamespaceSummaryResponse build() {
+      Preconditions.checkNotNull(this.path);
+      Preconditions.checkNotNull(this.entityType);
+      Preconditions.checkNotNull(this.status);
+
+      return new NamespaceSummaryResponse(this);
+    }
+  }
+
 }

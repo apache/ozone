@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -321,5 +322,12 @@ public class LegacyBucketHandler extends BucketHandler {
     Table keyTable =
         getOmMetadataManager().getKeyTable(getBucketLayout());
     return keyTable;
+  }
+
+  @Override
+  public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
+    return OmDirectoryInfo.newBuilder()
+        .setName(names[2])
+        .build();
   }
 }
