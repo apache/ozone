@@ -51,6 +51,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRe
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import com.google.common.base.Preconditions;
@@ -109,6 +111,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String component;
   private List<String> pemEncodedCACerts = null;
   private final Lock lock;
+  private KeyStoresFactory serverKeyStoresFactory;
+  // for mutual authentication client
+  private KeyStoresFactory clientKeyStoresFactory;
 
   DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
       String certSerialId, String component) {
@@ -1059,5 +1064,38 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   public void setLocalCrlId(long crlId) {
     this.localCrlId = crlId;
+  }
+
+  @Override
+  public synchronized KeyStoresFactory getServerKeyStoresFactory()
+      throws CertificateException {
+    if (serverKeyStoresFactory == null) {
+      serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
+          securityConfig, this, true);
+    }
+    return serverKeyStoresFactory;
+  }
+
+  @Override
+  public KeyStoresFactory getClientKeyStoresFactory(boolean mutualAuth)
+      throws CertificateException {
+    Preconditions.checkArgument(mutualAuth,
+        "Only support mutual authentication client now.");
+    if (clientKeyStoresFactory == null) {
+      clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
+          securityConfig, this, true);
+    }
+    return clientKeyStoresFactory;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (serverKeyStoresFactory != null) {
+      serverKeyStoresFactory.destroy();
+    }
+
+    if (clientKeyStoresFactory != null) {
+      clientKeyStoresFactory.destroy();
+    }
   }
 }

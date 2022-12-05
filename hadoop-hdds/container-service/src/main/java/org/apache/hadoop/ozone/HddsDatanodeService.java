@@ -604,6 +604,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
       }
     }
+
+    if (dnCertClient != null) {
+      try {
+        dnCertClient.close();
+      } catch (IOException e) {
+        LOG.warn("Certificate client could not be closed", e);
+      }
+    }
   }
 
   @VisibleForTesting

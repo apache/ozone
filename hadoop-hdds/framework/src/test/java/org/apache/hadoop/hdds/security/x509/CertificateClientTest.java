@@ -231,4 +231,8 @@ public class CertificateClientTest implements CertificateClient {
     x509Certificate = newCert;
     isKeyRenewed = true;
   }
+
+  @Override
+  public void close() throws IOException {
+  }
 }

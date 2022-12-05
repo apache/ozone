@@ -47,16 +47,15 @@ import org.slf4j.LoggerFactory;
  */
 public class SimpleContainerDownloader implements ContainerDownloader {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
   private final Path workingDirectory;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
 
-  public SimpleContainerDownloader(
-      ConfigurationSource conf, CertificateClient certClient) {
-
+  public SimpleContainerDownloader(ConfigurationSource conf,
+      CertificateClient certClient) {
     String workDirString =
         conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
 
