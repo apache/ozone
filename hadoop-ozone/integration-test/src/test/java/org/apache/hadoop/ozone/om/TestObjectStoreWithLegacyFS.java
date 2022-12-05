@@ -127,13 +127,9 @@ public class TestObjectStoreWithLegacyFS {
         cluster.getOzoneManager().getMetadataManager()
             .getKeyTable(BucketLayout.OBJECT_STORE);
 
-    String seekKey = "dir";
-    String dbKey = cluster.getOzoneManager().getMetadataManager()
-        .getOzoneKey(volumeName, bucketName, seekKey);
-
-    GenericTestUtils
-        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, keyName), 500,
-            60000);
+    GenericTestUtils.waitFor(
+        () -> isKeyExist(keyTable, volumeName, bucketName, keyName),
+        500, 60000);
 
     ozoneBucket.renameKey(keyName, "dir1/NewKey-1");
 
@@ -145,10 +141,6 @@ public class TestObjectStoreWithLegacyFS {
     // When the old key is removed, new key should exist
     Assert.assertTrue(
         isKeyExist(keyTable, volumeName, bucketName, "dir1/NewKey-1"));
-
-    GenericTestUtils
-        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, "dir1/NewKey-1"), 500,
-            60000);
   }
 
   private boolean isKeyExist(Table<String, OmKeyInfo> keyTable, String volume,
@@ -168,33 +160,6 @@ public class TestObjectStoreWithLegacyFS {
       LOG.error("Error while iterating key table", ex);
     }
     return false;
-  }
-
-  private boolean assertKeyCount(
-      Table<String, OmKeyInfo> keyTable,
-      String dbKey, int expectedCnt, String keyName) {
-    int countKeys = 0;
-    try {
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          itr = keyTable.iterator();
-      itr.seek(dbKey);
-      while (itr.hasNext()) {
-
-        Table.KeyValue<String, OmKeyInfo> keyValue = itr.next();
-        if (!keyValue.getKey().startsWith(dbKey)) {
-          break;
-        }
-        countKeys++;
-        Assert.assertTrue(keyValue.getKey().endsWith(keyName));
-      }
-    } catch (IOException ex) {
-      LOG.info("Test failed with: " + ex.getMessage(), ex);
-      Assert.fail("Test failed with: " + ex.getMessage());
-    }
-    if (countKeys != expectedCnt) {
-      LOG.info("Couldn't find KeyName:{} in KeyTable, retrying...", keyName);
-    }
-    return countKeys == expectedCnt;
   }
 
   @Test
