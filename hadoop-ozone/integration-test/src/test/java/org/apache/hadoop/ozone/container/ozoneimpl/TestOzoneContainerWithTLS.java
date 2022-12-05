@@ -220,7 +220,7 @@ public class TestOzoneContainerWithTLS {
 
       // Create containers
       long containerId = ContainerTestHelper.getTestContainerID();
-      int count = 10;
+      int count = 5;
       List<Long> containerIdList = new ArrayList<>();
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
           Collections.singletonList(caClient.getCACertificate()));
