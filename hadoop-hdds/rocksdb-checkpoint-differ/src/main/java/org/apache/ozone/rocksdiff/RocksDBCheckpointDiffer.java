@@ -959,10 +959,11 @@ public class RocksDBCheckpointDiffer {
    * deleted.
    */
   public void pruneSnapshotFileNodesFromDag(DifferSnapshotInfo snapshotInfo) {
-    Set<String> snapshotSstFiles = readRocksDBLiveFiles(snapshotInfo.dbPath);
+    Set<String> snapshotSstFiles =
+        readRocksDBLiveFiles(snapshotInfo.getDbPath());
     if (snapshotSstFiles.isEmpty()) {
       LOG.info("Snapshot '{}' doesn't have any sst file to remove.",
-          snapshotInfo.dbPath);
+          snapshotInfo.getDbPath());
       return;
     }
 
@@ -1017,7 +1018,7 @@ public class RocksDBCheckpointDiffer {
 
       nextLevel.forEach(node -> {
         removeNodes.add(node);
-        removedFiles.add(node.fileName);
+        removedFiles.add(node.getFileName());
       });
 
       currentLevel = nextLevel;
@@ -1063,8 +1064,8 @@ public class RocksDBCheckpointDiffer {
 
         forwardCompactionDAG.removeNode(current);
         backwardCompactionDAG.removeNode(current);
-        compactionNodeMap.remove(current.fileName, current);
-        removedFiles.add(current.fileName);
+        compactionNodeMap.remove(current.getFileName(), current);
+        removedFiles.add(current.getFileName());
       }
 
       currentLevel = nextLevel;
