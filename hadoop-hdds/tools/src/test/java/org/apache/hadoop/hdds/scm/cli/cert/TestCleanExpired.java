@@ -50,7 +50,6 @@ public class TestCleanExpired {
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-
   @Mock
   private DBStore dbStore;
   @Mock
@@ -65,7 +64,6 @@ public class TestCleanExpired {
   private X509Certificate nonExpiredCert;
   @Mock
   private X509Certificate expiredCert;
-
 
   @BeforeEach
   public void setup() throws IOException {

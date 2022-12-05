@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import picocli.CommandLine;
 
-import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
@@ -43,20 +42,16 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
     name = "clean",
-    description = "Clean expired certificates from the SCM metadata",
+    description = "Clean expired certificates from the SCM metadata. " +
+        "This command is only supported when the SCM is shutdown.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class CleanExpired implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
-      description = "Database metadata directory")
-  private String dbDirectory;
-
-  @CommandLine.Option(names = {"--name"},
-      required = true,
-      description = "Database file name")
-  private String dbName;
+      description = "Database file path")
+  private String dbFile;
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -68,17 +63,19 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
 
     OzoneConfiguration configuration = parent.createOzoneConfiguration();
 
-    if (!Files.exists(Paths.get(dbDirectory))) {
-      System.out.println("DB path not exist:" + dbDirectory);
+    if (!Files.exists(Paths.get(dbFile))) {
+      System.out.println("DB path does not exist: " + dbFile);
       return null;
     }
 
-    try (DBStore dbStore = HAUtils.loadDB(
-        configuration, new File(dbDirectory), dbName, new SCMDBDefinition())) {
+    try {
+      DBStore dbStore = HAUtils.loadDB(
+          configuration, Paths.get(dbFile).getParent().toFile(),
+          Paths.get(dbFile).getFileName().toString(), new SCMDBDefinition());
       removeExpiredCertificates(dbStore);
     } catch (IOException e) {
-      System.out.println("Error trying to open" + dbName +
-          " at: " + dbDirectory);
+      System.out.println("Error trying to open file: " + dbFile +
+          " failed with exception: " + e);
     }
     return null;
   }
@@ -100,7 +97,8 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
         }
       }
     } catch (IOException e) {
-      System.out.println("Error when trying to open certificate table from db");
+      System.out.println("Error when trying to open " +
+          "certificate table from db: " + e);
     }
   }
 
