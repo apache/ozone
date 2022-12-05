@@ -275,6 +275,15 @@ public class TestRocksDBCheckpointDiffer {
 
     diffAllSnapshots(differ);
 
+    // Confirm correct links created
+    try (Stream<Path> sstPathStream = Files.list(sstDir.toPath())) {
+      List<String> expectedLinks = sstPathStream.map(Path::getFileName)
+              .map(Object::toString).sorted().collect(Collectors.toList());
+      Assertions.assertEquals(expectedLinks, asList(
+              "000015.sst", "000017.sst", "000019.sst", "000021.sst",
+              "000022.sst", "000024.sst", "000026.sst"));
+    }
+
     if (LOG.isDebugEnabled()) {
       differ.dumpCompactionNodeTable();
     }
