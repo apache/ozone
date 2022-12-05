@@ -70,12 +70,9 @@ public class TestOmBucketArgs {
             .setVolumeName("volume")
             .build();
 
-    Assert.assertEquals(false, bucketArgs.hasDefaultReplicationConfig());
-
     OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
             bucketArgs.getProtobuf());
 
-    Assert.assertEquals(false, argsFromProto.hasDefaultReplicationConfig());
     Assert.assertEquals(null, argsFromProto.getDefaultReplicationConfig());
 
     bucketArgs = OmBucketArgs.newBuilder()
@@ -85,12 +82,9 @@ public class TestOmBucketArgs {
                     EC, new ECReplicationConfig(3, 2)))
             .build();
 
-    Assert.assertEquals(true, bucketArgs.hasDefaultReplicationConfig());
-
     argsFromProto = OmBucketArgs.getFromProtobuf(
             bucketArgs.getProtobuf());
 
-    Assert.assertEquals(true, argsFromProto.hasDefaultReplicationConfig());
     Assert.assertEquals(EC,
             argsFromProto.getDefaultReplicationConfig().getType());
   }
