@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
-import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -63,6 +62,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -77,17 +77,6 @@ public class TestOmMetadataManager {
   @TempDir
   private File folder;
 
-  public static <E extends Throwable> void expectOmException(
-      ResultCodes code,
-      VoidCallable eval)
-      throws Exception {
-    try {
-      eval.call();
-      fail("OMException is expected");
-    } catch (OMException ex) {
-      assertEquals(code, ex.getResult());
-    }
-  }
 
   @BeforeEach
   public void setup() throws Exception {
@@ -732,9 +721,9 @@ public class TestOmMetadataManager {
     OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
     addBucketsToCache(vol1, bucket1);
 
-    expectOmException(expectedResultCode,
+    OMException oe = assertThrows(OMException.class,
         () -> omMetadataManager.listSnapshot(volume, bucket));
-
+    assertEquals(expectedResultCode, oe.getResult());
   }
 
   private static Stream<Arguments> listSnapshotWithInvalidPathCases() {
