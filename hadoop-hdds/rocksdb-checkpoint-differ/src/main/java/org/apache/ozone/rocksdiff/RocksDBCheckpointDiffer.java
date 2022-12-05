@@ -971,8 +971,10 @@ public class RocksDBCheckpointDiffer {
       startNodes.add(infileNode);
     }
 
-    Set<String> prunedSstFilesFromPruningDownstreamDag = pruneDownstreamDag(startNodes);
-    Set<String> prunedSstFilesFromPruningUpstreamDag = pruneUpstreamDag(startNodes);
+    Set<String> prunedSstFilesFromPruningDownstreamDag =
+        pruneDownstreamDag(startNodes);
+    Set<String> prunedSstFilesFromPruningUpstreamDag =
+        pruneUpstreamDag(startNodes);
 
     Set<String> allSstFilesPruned = new HashSet<>();
     allSstFilesPruned.addAll(prunedSstFilesFromPruningDownstreamDag);

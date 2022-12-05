@@ -191,7 +191,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {1, 2, 3, 4, 5})
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5})
   void testRemoveSnapshotFileFromDag(int snapshotIndex) throws Exception {
     String clDirStr = "compaction-log";
     String metadataDirStr = ".";
