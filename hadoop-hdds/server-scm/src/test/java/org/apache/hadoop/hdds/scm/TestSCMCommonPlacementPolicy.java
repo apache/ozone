@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -102,8 +103,7 @@ public class TestSCMCommonPlacementPolicy {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<Node> racks = dummyPlacementPolicy.racks;
-    List<DatanodeDetails> list =
-            nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
     List<DatanodeDetails> replicaDns =
             Stream.of(0, 1, 2, 3, 5)
                     .map(list::get).collect(Collectors.toList());
@@ -149,8 +149,25 @@ public class TestSCMCommonPlacementPolicy {
 
     replicas = HddsTestUtils.getReplicas(new ContainerID(1),
             CLOSED, 0, replicaDns);
-    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 3,
-            ImmutableMap.of(racks.get(0), 2, racks.get(3), 1));
+
+    int idx = 0;
+    Map<Node, Integer> expectedRackCnt = Maps.newHashMap();
+    expectedRackCnt.put(racks.get(0), 1);
+    expectedRackCnt.put(racks.get(3), 0);
+    expectedRackCnt.compute(expectedRackCnt.keySet().stream().findFirst().get(),
+            (node, integer) -> integer + 1);
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 2,
+            expectedRackCnt);
+    dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 2);
+    racks = dummyPlacementPolicy.racks;
+    replicaDns = Stream.of(0, 2, 4, 6, 8)
+            .map(list::get).collect(Collectors.toList());
+    replicas = HddsTestUtils.getReplicas(new ContainerID(1),
+            CLOSED, 0, replicaDns);
+    testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 2,
+            ImmutableMap.of(racks.get(0), 2));
+
   }
 
   @Test
@@ -186,8 +203,7 @@ public class TestSCMCommonPlacementPolicy {
         int rackCnt) {
       super(nodeManager, conf);
       rackMap = new HashMap<>();
-      List<DatanodeDetails> datanodeDetails =
-              nodeManager.getNodes(NodeStatus.inServiceHealthy());
+      List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       this.rackCnt = Math.min(rackCnt, datanodeDetails.size());
       this.racks = new ArrayList<>(this.rackCnt);
       for (int r = 0; r < this.rackCnt; r++) {

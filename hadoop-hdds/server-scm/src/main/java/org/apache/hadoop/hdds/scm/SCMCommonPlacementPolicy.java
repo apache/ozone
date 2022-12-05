@@ -41,6 +41,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -352,6 +355,21 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   /**
+   * Default implementation to return the max number of replicas per rack.
+   * For simple policies that are not rack aware
+   * we return numReplicas, from this default implementation.
+   *
+   * @param numReplicas - The desired replica counts
+   * @return The max number of replicas per rack
+   */
+  protected int getMaxReplicasPerRack(int numReplicas) {
+    return numReplicas / getRequiredRackCount(numReplicas)
+            + Math.min(numReplicas % getRequiredRackCount(numReplicas), 1);
+  }
+
+
+
+  /**
    * This default implementation handles rack aware policies and non rack
    * aware policies. If a future placement policy needs to check more than racks
    * to validate the policy (eg node groups, HDFS like upgrade domain) this
@@ -369,6 +387,7 @@ public abstract class SCMCommonPlacementPolicy implements
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     int requiredRacks = getRequiredRackCount(replicas);
+    int maxReplicasPerRack = getMaxReplicasPerRack(replicas);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -383,16 +402,17 @@ public abstract class SCMCommonPlacementPolicy implements
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
     numRacks = topology.getNumOfNodes(maxLevel - 1);
-    final long currentRackCount = dns.stream()
-        .map(this::getPlacementGroup)
-        .distinct()
-        .count();
+    Map<Node, Long> currentRackCount = dns.stream()
+            .collect(Collectors.groupingBy(this::getPlacementGroup,
+                    Collectors.counting()));
 
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
     return new ContainerPlacementStatusDefault(
-        (int)currentRackCount, requiredRacks, numRacks);
+        currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
+            currentRackCount.values().stream().map(Long::intValue)
+                    .collect(Collectors.toList()));
   }
 
   /**
@@ -446,21 +466,46 @@ public abstract class SCMCommonPlacementPolicy implements
             this.getPlacementGroup(replica.getDatanodeDetails())));
 
     int totalNumberOfReplicas = replicas.size();
-    int requiredNumberOfPlacementGroups = getRequiredRackCount(
-            totalNumberOfReplicas);
+    int requiredNumberOfPlacementGroups =
+            getRequiredRackCount(totalNumberOfReplicas);
+    int additionalNumberOfRacksRequired = Math.max(
+            requiredNumberOfPlacementGroups - placementGroupReplicaIdMap.size(),
+            0);
     int replicasPerPlacementGroup =
-            totalNumberOfReplicas / requiredNumberOfPlacementGroups;
-    int misreplicationCnt = Math.max(requiredNumberOfPlacementGroups
-        - placementGroupReplicaIdMap.size(), 0);
+            getMaxReplicasPerRack(totalNumberOfReplicas);
     Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
 
     for (List<ContainerReplica> replicaList: placementGroupReplicaIdMap
             .values()) {
-      if (misreplicationCnt > copyReplicaSet.size() && replicaList.size() >
-              replicasPerPlacementGroup) {
-        copyReplicaSet.addAll(replicaList.stream()
-                .limit(Math.min(replicaList.size() - 1, misreplicationCnt))
-                .collect(Collectors.toSet()));
+      if (replicaList.size() > replicasPerPlacementGroup) {
+        List<ContainerReplica> replicasToBeCopied = replicaList.stream()
+                .limit(replicaList.size() - replicasPerPlacementGroup)
+                .collect(Collectors.toList());
+        copyReplicaSet.addAll(replicasToBeCopied);
+        replicaList.removeAll(replicasToBeCopied);
+      }
+    }
+    if (additionalNumberOfRacksRequired > copyReplicaSet.size()) {
+      additionalNumberOfRacksRequired -= copyReplicaSet.size();
+      Queue<List<ContainerReplica>> placementGroupReplicas =
+              new PriorityQueue<>((o1, o2) ->
+                      Integer.compare(o2.size(), o1.size()));
+      placementGroupReplicas.addAll(placementGroupReplicaIdMap.values());
+      while (placementGroupReplicas.size() > 0
+              && additionalNumberOfRacksRequired > 0) {
+        List<ContainerReplica> replicaList = placementGroupReplicas.poll();
+        int numberOfReplicasToBeCopied = Math.max(1,
+                Math.min(replicaList.size()
+                        - Optional.ofNullable(placementGroupReplicas.peek())
+                          .map(List::size).orElse(0),
+                        additionalNumberOfRacksRequired));
+        List<ContainerReplica> replicasToBeCopied = replicaList.stream()
+                .limit(numberOfReplicasToBeCopied)
+                .collect(Collectors.toList());
+        copyReplicaSet.addAll(replicasToBeCopied);
+        replicaList.removeAll(replicasToBeCopied);
+        placementGroupReplicas.add(replicaList);
+        additionalNumberOfRacksRequired -= replicasToBeCopied.size();
       }
     }
     return copyReplicaSet;
