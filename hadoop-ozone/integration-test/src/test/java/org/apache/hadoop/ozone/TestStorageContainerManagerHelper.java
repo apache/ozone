@@ -32,8 +32,9 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -137,7 +138,8 @@ public class TestStorageContainerManagerHelper {
                   cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
-        allBlocks.add(Long.valueOf(entry.getKey()));
+        allBlocks.add(Long.valueOf(DatanodeSchemaThreeDBDefinition
+            .getKeyWithoutPrefix(entry.getKey())));
       }
     }
     return allBlocks;
@@ -149,13 +151,14 @@ public class TestStorageContainerManagerHelper {
       KeyValueContainerData cData = getContainerMetadata(entry.getKey());
       try (DBHandle db = BlockUtils.getDB(cData, conf)) {
         DatanodeStore ds = db.getStore();
-        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-            (DatanodeStoreSchemaTwoImpl) ds;
-        List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
-            txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
-            .getRangeKVs(null, Integer.MAX_VALUE, null);
+        DatanodeStoreSchemaThreeImpl dnStoreImpl =
+            (DatanodeStoreSchemaThreeImpl) ds;
+        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+            txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
+            .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                cData.containerPrefix());
         List<Long> conID = new ArrayList<>();
-        for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
+        for (Table.KeyValue<String, DeletedBlocksTransaction> txn :
             txnsInTxnTable) {
           conID.addAll(txn.getValue().getLocalIDList());
         }

@@ -32,6 +32,8 @@ public class ReplicationQueue {
       underRepQueue;
   private final Queue<ContainerHealthResult.OverReplicatedHealthResult>
       overRepQueue;
+  private final Queue<ContainerHealthResult.MisReplicatedHealthResult>
+      misRepQueue;
 
   public ReplicationQueue() {
     underRepQueue = new PriorityQueue<>(
@@ -40,6 +42,7 @@ public class ReplicationQueue {
         .thenComparing(ContainerHealthResult
             .UnderReplicatedHealthResult::getRequeueCount));
     overRepQueue = new LinkedList<>();
+    misRepQueue = new LinkedList<>();
   }
 
   public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult
@@ -52,6 +55,11 @@ public class ReplicationQueue {
     overRepQueue.add(overReplicatedHealthResult);
   }
 
+  public void enqueue(ContainerHealthResult.MisReplicatedHealthResult
+      misReplicatedHealthResult) {
+    misRepQueue.add(misReplicatedHealthResult);
+  }
+
   public ContainerHealthResult.UnderReplicatedHealthResult
       dequeueUnderReplicatedContainer() {
     return underRepQueue.poll();
@@ -62,12 +70,21 @@ public class ReplicationQueue {
     return overRepQueue.poll();
   }
 
+  public ContainerHealthResult.MisReplicatedHealthResult
+      dequeueMisReplicatedContainer() {
+    return misRepQueue.poll();
+  }
+
   public int underReplicatedQueueSize() {
     return underRepQueue.size();
   }
 
   public int overReplicatedQueueSize() {
     return overRepQueue.size();
+  }
+
+  public int misReplicatedQueueSize() {
+    return misRepQueue.size();
   }
 
 }

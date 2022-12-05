@@ -20,20 +20,16 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 /**
  * This handler deletes a container if it's closed and empty (0 key count)
@@ -44,12 +40,9 @@ public class EmptyContainerHandler extends AbstractCheck {
       LoggerFactory.getLogger(EmptyContainerHandler.class);
 
   private final ReplicationManager replicationManager;
-  private final ContainerManager containerManager;
 
-  public EmptyContainerHandler(ReplicationManager replicationManager,
-      ContainerManager containerManager) {
+  public EmptyContainerHandler(ReplicationManager replicationManager) {
     this.replicationManager = replicationManager;
-    this.containerManager = containerManager;
   }
 
   /**
@@ -72,14 +65,8 @@ public class EmptyContainerHandler extends AbstractCheck {
       deleteContainerReplicas(containerInfo, replicas);
 
       // Update the container's state
-      try {
-        containerManager.updateContainerState(containerInfo.containerID(),
-            HddsProtos.LifeCycleEvent.DELETE);
-      } catch (IOException | InvalidStateTransitionException |
-          TimeoutException e) {
-        LOG.error("Failed to delete empty container {}",
-            request.getContainerInfo(), e);
-      }
+      replicationManager.updateContainerState(
+          containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
       return true;
     }
 

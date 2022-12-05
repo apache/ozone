@@ -219,6 +219,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
+          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
         throw new FileNotFoundException(
             ex.getResult().name() + ": " + ex.getMessage());
@@ -523,6 +524,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         .getRequiredNodes();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
             .makeQualified(defaultUri, workingDir),
         status.isDirectory(),

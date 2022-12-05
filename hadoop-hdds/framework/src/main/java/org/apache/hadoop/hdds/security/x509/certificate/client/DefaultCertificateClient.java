@@ -38,6 +38,7 @@ import java.security.SignatureException;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -63,8 +65,10 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.validator.routines.DomainValidator;
+
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.BOOTSTRAP_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CERTIFICATE_ERROR;
@@ -74,7 +78,6 @@ import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateExcepti
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
-import org.apache.ratis.util.FileUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 
@@ -636,7 +639,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 6. PUBLICKEY_PRIVATEKEY  indicates private and public key were read
    *                          successfully from configured location but
    *                          Certificate.
-   * 7. All                   Keypair as well as certificate is present.
+   * 7. ALL                   Keypair as well as certificate is present.
+   * 8. EXPIRED_CERT          The certificate is present, but either it has
+   *                          already expired, or is about to be expired within
+   *                          the grace period provided in the configuration.
    *
    * */
   protected enum InitCase {
@@ -647,7 +653,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PRIVATE_KEY,
     PRIVATEKEY_CERT,
     PUBLICKEY_PRIVATEKEY,
-    ALL
+    ALL,
+    EXPIRED_CERT
   }
 
   /**
@@ -657,6 +664,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. Generates and stores a keypair.
    * 3. Try to recover public key if private key and certificate is present
    *    but public key is missing.
+   * 4. Checks if the certificate is about to be expired or have already been
+   *    expired, and if yes removes the key material and the certificate and
+   *    asks for re-initialization in the result.
    *
    * Truth table:
    *  +--------------+-----------------+--------------+----------------+
@@ -688,6 +698,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. When keypair (public/private key) is available but certificate is
    *    missing.
    *
+   * Returns REINIT in following case:
+   *    If it would return SUCCESS, but the certificate expiration date is
+   *    within the configured grace period or if the certificate is already
+   *    expired.
+   *    The grace period is configured by the hdds.x509.renew.grace.duration
+   *    configuration property.
+   *
    */
   @Override
   public synchronized InitResponse init() throws CertificateException {
@@ -695,7 +712,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PrivateKey pvtKey = getPrivateKey();
     PublicKey pubKey = getPublicKey();
     X509Certificate certificate = getCertificate();
-
     if (pvtKey != null) {
       initCase = initCase | 1 << 2;
     }
@@ -705,8 +721,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (certificate != null) {
       initCase = initCase | 1;
     }
+
+    boolean successCase =
+        initCase == InitCase.ALL.ordinal() ||
+            initCase == InitCase.PRIVATEKEY_CERT.ordinal();
+    boolean shouldRenew =
+        certificate != null &&
+            Instant.now().plus(securityConfig.getRenewalGracePeriod())
+                .isAfter(certificate.getNotAfter().toInstant());
+
+    if (successCase && shouldRenew) {
+      initCase = InitCase.EXPIRED_CERT.ordinal();
+    }
+
     getLogger().info("Certificate client init case: {}", initCase);
-    Preconditions.checkArgument(initCase < 8, "Not a " +
+    Preconditions.checkArgument(initCase < InitCase.values().length, "Not a " +
         "valid case.");
     InitCase init = InitCase.values()[initCase];
     return handleCase(init);
@@ -766,11 +795,30 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       } else {
         return FAILURE;
       }
+    case EXPIRED_CERT:
+      getLogger().info("Component certificate is about to expire. Initiating" +
+          "renewal.");
+      removeMaterial();
+      return REINIT;
     default:
       getLogger().error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));
 
       return FAILURE;
+    }
+  }
+
+  protected void removeMaterial() throws CertificateException {
+    try {
+      FileUtils.deleteDirectory(
+          securityConfig.getKeyLocation(component).toFile());
+      getLogger().info("Certificate renewal: key material is removed.");
+      FileUtils.deleteDirectory(
+          securityConfig.getCertificateLocation(component).toFile());
+      getLogger().info("Certificate renewal: certificates are removed.");
+    } catch (IOException e) {
+      throw new CertificateException("Certificate renewal failed: remove key" +
+          " material failed.", e);
     }
   }
 
@@ -988,7 +1036,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             certName = ROOT_CA_CERT_PREFIX + certName;
           }
 
-          FileUtils.deleteFileQuietly(basePath.resolve(certName).toFile());
+          FileUtils.deleteQuietly(basePath.resolve(certName).toFile());
           // remove in memory
           certificateMap.remove(certId);
 

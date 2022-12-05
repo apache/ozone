@@ -77,6 +77,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>0.8.5</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
 </project>

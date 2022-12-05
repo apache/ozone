@@ -88,10 +88,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ExecutorService executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
+  private final OzoneContainer ozoneContainer;
 
-  public DeleteBlocksCommandHandler(ContainerSet cset,
+  public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
-    this.containerSet = cset;
+    this.ozoneContainer = container;
+    this.containerSet = container.getContainerSet();
     this.conf = conf;
     this.executor = Executors.newFixedThreadPool(
         threadPoolSize, new ThreadFactoryBuilder()
@@ -117,7 +119,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
       LOG.warn("Command is discarded because of the command queue is full");
-      return;
     }
   }
 
@@ -424,9 +425,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                   blkLong, containerId);
             }
           } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Block {} not found or already under deletion in"
-                  + " container {}, skip deleting it.", blkLong, containerId);
+            // try clean up the possibly onDisk but unreferenced blocks/chunks
+            try {
+              Container<?> container = containerSet.getContainer(containerId);
+              ozoneContainer.getDispatcher().getHandler(container
+                  .getContainerType()).deleteUnreferenced(container, blkLong);
+            } catch (IOException e) {
+              LOG.error("Failed to delete files for unreferenced block {} of " +
+                      "container {}", blkLong, containerId, e);
             }
           }
         }

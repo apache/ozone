@@ -76,9 +76,12 @@ public abstract class AbstractTestChunkManager {
     OzoneConfiguration config = new OzoneConfiguration();
     getStrategy().updateConfig(config);
     UUID datanodeId = UUID.randomUUID();
+    UUID clusterId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(confDir
         .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
-        .toString()).build();
+        .toString()).clusterID(clusterId.toString()).build();
+    hddsVolume.format(clusterId.toString());
+    hddsVolume.createWorkingDir(clusterId.toString(), null);
 
     VolumeSet volumeSet = mock(MutableVolumeSet.class);
 

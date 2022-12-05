@@ -22,6 +22,7 @@ import io.prometheus.client.Collector;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.dropwizard.DropwizardExports;
 import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
+import java.util.function.BooleanSupplier;
 import org.apache.ratis.metrics.MetricRegistries;
 import org.apache.ratis.metrics.MetricsReporting;
 import org.apache.ratis.metrics.RatisMetricRegistry;
@@ -43,14 +44,15 @@ public class RatisDropwizardExports extends DropwizardExports {
   }
 
   public static void registerRatisMetricReporters(
-      Map<String, RatisDropwizardExports> ratisMetricsMap) {
+      Map<String, RatisDropwizardExports> ratisMetricsMap,
+      BooleanSupplier checkStopped) {
     //All the Ratis metrics (registered from now) will be published via JMX and
     //via the prometheus exporter (used by the /prom servlet
     MetricRegistries.global()
         .addReporterRegistration(MetricsReporting.jmxReporter(),
             MetricsReporting.stopJmxReporter());
     MetricRegistries.global().addReporterRegistration(
-        r1 -> registerDropwizard(r1, ratisMetricsMap),
+        r1 -> registerDropwizard(r1, ratisMetricsMap, checkStopped),
         r2 -> deregisterDropwizard(r2, ratisMetricsMap));
   }
 
@@ -69,12 +71,19 @@ public class RatisDropwizardExports extends DropwizardExports {
   }
 
   private static void registerDropwizard(RatisMetricRegistry registry,
-      Map<String, RatisDropwizardExports> ratisMetricsMap) {
+      Map<String, RatisDropwizardExports> ratisMetricsMap,
+      BooleanSupplier checkStopped) {
+    if (checkStopped.getAsBoolean()) {
+      return;
+    }
+    
     RatisDropwizardExports rde = new RatisDropwizardExports(
         registry.getDropWizardMetricRegistry());
-    CollectorRegistry.defaultRegistry.register(rde);
     String name = registry.getMetricRegistryInfo().getName();
-    ratisMetricsMap.putIfAbsent(name, rde);
+    if (null == ratisMetricsMap.putIfAbsent(name, rde)) {
+      // new rde is added for the name, so need register
+      CollectorRegistry.defaultRegistry.register(rde);
+    }
   }
 
   private static void deregisterDropwizard(RatisMetricRegistry registry,

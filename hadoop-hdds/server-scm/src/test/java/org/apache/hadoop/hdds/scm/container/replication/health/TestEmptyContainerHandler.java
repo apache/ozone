@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
@@ -50,7 +49,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
  */
 public class TestEmptyContainerHandler {
   private ReplicationManager replicationManager;
-  private ContainerManager containerManager;
   private EmptyContainerHandler emptyContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
@@ -62,10 +60,8 @@ public class TestEmptyContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    containerManager = Mockito.mock(ContainerManager.class);
-
     emptyContainerHandler =
-        new EmptyContainerHandler(replicationManager, containerManager);
+        new EmptyContainerHandler(replicationManager);
   }
 
   /**
@@ -74,7 +70,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testEmptyAndClosedECContainerReturnsTrue()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 0L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -96,7 +92,7 @@ public class TestEmptyContainerHandler {
 
   @Test
   public void testEmptyAndClosedRatisContainerReturnsTrue()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 0L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -122,7 +118,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testEmptyAndNonClosedECContainerReturnsFalse()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 0L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -150,7 +146,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testNonEmptyRatisContainerReturnsFalse()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     long keyCount = 5L;
     long bytesUsed = 123L;
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -177,7 +173,7 @@ public class TestEmptyContainerHandler {
    */
   @Test
   public void testEmptyECContainerWithNonEmptyReplicaReturnsFalse()
-      throws InvalidStateTransitionException, IOException, TimeoutException {
+      throws IOException {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ecReplicationConfig, 1, CLOSED, 0L, 0L);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
@@ -215,7 +211,7 @@ public class TestEmptyContainerHandler {
    */
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times, long numEmptyExpected)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException {
     Assertions.assertEquals(assertion, emptyContainerHandler.handle(request));
     Mockito.verify(replicationManager, Mockito.times(times))
         .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
@@ -224,7 +220,7 @@ public class TestEmptyContainerHandler {
         ReplicationManagerReport.HealthState.EMPTY));
 
     if (times > 0) {
-      Mockito.verify(containerManager, Mockito.times(1))
+      Mockito.verify(replicationManager, Mockito.times(1))
           .updateContainerState(Mockito.any(ContainerID.class),
               Mockito.any(HddsProtos.LifeCycleEvent.class));
     }

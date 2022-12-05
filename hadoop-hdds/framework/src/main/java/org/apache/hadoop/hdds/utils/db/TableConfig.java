@@ -108,6 +108,8 @@ public class TableConfig implements AutoCloseable {
 
   @Override
   public void close() {
-    columnFamilyOptions.close();
+    if (!columnFamilyOptions.isReused()) {
+      columnFamilyOptions.close();
+    }
   }
 }

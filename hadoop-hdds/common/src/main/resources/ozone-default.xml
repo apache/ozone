@@ -1547,17 +1547,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.scm.watcher.timeout</name>
-    <value>10m</value>
-    <tag>OZONE, SCM, MANAGEMENT</tag>
-    <description>
-      Timeout for the watchers of the HDDS SCM CommandWatchers. After this
-      duration the Copy/Delete container commands will be sent again to the
-      datanode unless the datanode confirms the completion.
-    </description>
-  </property>
-
-  <property>
     <name>hdds.db.profile</name>
     <value>DISK</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -2078,6 +2067,14 @@
       PnDTnHnMn.nS</description>
   </property>
   <property>
+    <name>hdds.x509.renew.grace.duration</name>
+    <value>P28D</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Duration of the grace period within which a certificate should be
+      * renewed before the current one expires. Default is 28 days.
+    </description>
+  </property>
+  <property>
     <name>hdds.x509.dir.name</name>
     <value>certs</value>
     <tag>OZONE, HDDS, SECURITY</tag>
@@ -2274,6 +2271,16 @@
       Iterate batch size of delete when use BasicOzoneFileSystem.
     </description>
   </property>
+
+  <property>
+    <name>fs.trash.classname</name>
+    <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+    <tag>OZONE, OZONEFS, CLIENT</tag>
+    <description>
+      Trash Policy to be used.
+    </description>
+  </property>
+
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
@@ -2381,6 +2388,24 @@
     <description>
       Comma separated list of users and groups allowed to access
       client scm container protocol.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.ssl.keystore.reload.interval</name>
+    <value>60s</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the keystore
+      certificates file has changed and needs reloading. Default is 60s. Unit could be
+      defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.ssl.truststore.reload.interval</name>
+    <value>60s</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the truststore
+      certificates file has changed and needs reloading. Default is 60s. Unit could
+      be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>
@@ -3266,6 +3291,24 @@
   </property>
 
   <property>
+    <name>ozone.client.ec.grpc.retries.enabled</name>
+    <value>true</value>
+    <tag>CLIENT</tag>
+    <description>
+      To enable Grpc client retries for EC.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.ec.grpc.retries.max</name>
+    <value>3</value>
+    <tag>CLIENT</tag>
+    <description>
+      The maximum attempts GRPC client makes before failover.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.audit.log.debug.cmd.list.omaudit</name>
     <value></value>
     <tag>OM</tag>
@@ -3358,5 +3401,36 @@
     </description>
   </property>
 
+  <property>
+    <name>ozone.fs.listing.page.size</name>
+    <value>1024</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Listing page size value used by client for listing number of items on fs related sub-commands output.
+      Kindly set this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.fs.listing.page.size.max</name>
+    <value>5000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum listing page size value enforced by server for listing items on fs related sub-commands output. Kindly set
+      this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.nssummary.flush.db.max.threshold</name>
+    <value>150000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for NSSummary task in hashmap before flushing to
+      recon rocks DB namespaceSummaryTable
+    </description>
+  </property>
 
 </configuration>

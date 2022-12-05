@@ -613,21 +613,23 @@ public class ReconContainerMetadataManagerImpl
 
   private void initializeKeyContainerTable() throws IOException {
     Instant start = Instant.now();
-    TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix,
-        Integer>> iterator = containerKeyTable.iterator();
-    KeyValue<ContainerKeyPrefix, Integer> keyValue;
-    long count = 0;
-    while (iterator.hasNext()) {
-      keyValue = iterator.next();
-      ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
-      if (!StringUtils.isEmpty(containerKeyPrefix.getKeyPrefix()) &&
-          containerKeyPrefix.getContainerId() != -1) {
-        keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), 1);
+    try (TableIterator<ContainerKeyPrefix, ?
+        extends KeyValue<ContainerKeyPrefix,
+        Integer>> iterator = containerKeyTable.iterator()) {
+      KeyValue<ContainerKeyPrefix, Integer> keyValue;
+      long count = 0;
+      while (iterator.hasNext()) {
+        keyValue = iterator.next();
+        ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
+        if (!StringUtils.isEmpty(containerKeyPrefix.getKeyPrefix())
+            && containerKeyPrefix.getContainerId() != -1) {
+          keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), 1);
+        }
+        count++;
       }
-      count++;
+      long duration = Duration.between(start, Instant.now()).toMillis();
+      LOG.info("It took {} seconds to initialized {} records"
+          + " to KEY_CONTAINER table", (double) duration / 1000, count);
     }
-    long duration = Duration.between(start, Instant.now()).toMillis();
-    LOG.info("It took {} seconds to initialized {} records" +
-        " to KEY_CONTAINER table", (double) duration / 1000, count);
   }
 }

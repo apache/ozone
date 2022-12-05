@@ -44,6 +44,7 @@ public class CommandQueueReportHandler implements
     Preconditions.checkNotNull(dn, "QueueReport is "
         + "missing DatanodeDetails.");
     nodeManager.processNodeCommandQueueReport(dn,
-        queueReportFromDatanode.getReport());
+        queueReportFromDatanode.getReport(),
+        queueReportFromDatanode.getCommandsToBeSent());
   }
 }

@@ -297,10 +297,8 @@ public class ObjectEndpoint extends EndpointBase {
             partMarker, maxParts);
       }
 
-      OzoneVolume volume = getVolume();
-
-      OzoneKeyDetails keyDetails = getClientProtocol().getKeyDetails(
-          volume.getName(), bucketName, keyPath);
+      OzoneKeyDetails keyDetails = getClientProtocol()
+          .getS3KeyDetails(bucketName, keyPath);
 
       long length = keyDetails.getDataSize();
 
@@ -445,9 +443,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
-      OzoneVolume volume = getVolume();
-      key = getClientProtocol().headObject(volume.getName(),
-          bucketName, keyPath);
+      key = getClientProtocol().headS3Object(bucketName, keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(

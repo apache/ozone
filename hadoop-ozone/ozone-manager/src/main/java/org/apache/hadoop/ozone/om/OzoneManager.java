@@ -228,6 +228,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -1228,52 +1231,44 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     loginOMUserIfSecurityEnabled(conf);
     OMStorage omStorage = new OMStorage(conf);
     StorageState state = omStorage.getState();
-    if (state != StorageState.INITIALIZED) {
-      try {
-        ScmInfo scmInfo = getScmInfo(conf);
-        String clusterId = scmInfo.getClusterId();
-        String scmId = scmInfo.getScmId();
-        if (clusterId == null || clusterId.isEmpty()) {
-          throw new IOException("Invalid Cluster ID");
-        }
-        if (scmId == null || scmId.isEmpty()) {
-          throw new IOException("Invalid SCM ID");
-        }
+    String scmId = null;
+    try {
+      ScmInfo scmInfo = getScmInfo(conf);
+      scmId = scmInfo.getScmId();
+      if (scmId == null || scmId.isEmpty()) {
+        throw new IOException("Invalid SCM ID");
+      }
+      String clusterId = scmInfo.getClusterId();
+      if (clusterId == null || clusterId.isEmpty()) {
+        throw new IOException("Invalid Cluster ID");
+      }
+
+      if (state != StorageState.INITIALIZED) {
         omStorage.setClusterId(clusterId);
-        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          initializeSecurity(conf, omStorage, scmId);
-        }
         omStorage.initialize();
         System.out.println(
             "OM initialization succeeded.Current cluster id for sd="
                 + omStorage.getStorageDir() + ";cid=" + omStorage
                 .getClusterID() + ";layoutVersion=" + omStorage
                 .getLayoutVersion());
-
-        return true;
-      } catch (IOException ioe) {
-        LOG.error("Could not initialize OM version file", ioe);
-        return false;
+      } else {
+        System.out.println(
+            "OM already initialized.Reusing existing cluster id for sd="
+                + omStorage.getStorageDir() + ";cid=" + omStorage
+                .getClusterID() + ";layoutVersion=" + omStorage
+                .getLayoutVersion());
       }
-    } else {
-      if (OzoneSecurityUtil.isSecurityEnabled(conf) &&
-          omStorage.getOmCertSerialId() == null) {
-        ScmInfo scmInfo = HAUtils.getScmInfo(conf);
-        String scmId = scmInfo.getScmId();
-        if (scmId == null || scmId.isEmpty()) {
-          throw new IOException("Invalid SCM ID");
-        }
-        LOG.info("OM storage is already initialized. Initializing security");
-        initializeSecurity(conf, omStorage, scmId);
-        omStorage.persistCurrentState();
-      }
-      System.out.println(
-          "OM already initialized.Reusing existing cluster id for sd="
-              + omStorage.getStorageDir() + ";cid=" + omStorage
-              .getClusterID() + ";layoutVersion=" + omStorage
-              .getLayoutVersion());
-      return true;
+    } catch (IOException ioe) {
+      LOG.error("Could not initialize OM version file", ioe);
+      return false;
     }
+
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      LOG.info("OM storage initialized. Initializing security");
+      initializeSecurity(conf, omStorage, scmId);
+    }
+    omStorage.persistCurrentState();
+    return true;
   }
 
   /**
@@ -1289,6 +1284,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         new OMCertificateClient(new SecurityConfig(conf),
             omStore.getOmCertSerialId());
     CertificateClient.InitResponse response = certClient.init();
+    if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      LOG.info("Re-initialize certificate client.");
+      omStore.unsetOmCertSerialId();
+      omStore.persistCurrentState();
+      certClient = new OMCertificateClient(new SecurityConfig(conf));
+      response = certClient.init();
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:
@@ -1967,7 +1969,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisServer == null) {
         // This needs to be done before initializing Ratis.
         RatisDropwizardExports.
-            registerRatisMetricReporters(ratisMetricsMap);
+            registerRatisMetricReporters(ratisMetricsMap, () -> isStopped());
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodesMap,
             secConfig, certClient, shouldBootstrap);
@@ -2663,6 +2665,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
+        String remoteUserName = remoteUserUgi.getShortUserName();
+        // if not admin nor list my own volumes, check ACL.
+        if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
+          checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+                  OzoneConsts.OZONE_ROOT, null, null);
+        }
         // List all volumes first
         List<OmVolumeArgs> listAllVolumes = volumeManager.listVolumes(
             null, prefix, prevKey, maxKeys);
@@ -3628,6 +3636,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
+    long maxListingPageSize = configuration.getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
+        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
 
     ResolvedBucket bucket = resolveBucketLink(args);
 
@@ -3643,8 +3657,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       metrics.incNumListStatus();
-      return keyManager.listStatus(args, recursive, startKey, numEntries,
-              getClientAddress(), allowPartialPrefixes);
+      return keyManager.listStatus(args, recursive, startKey,
+          maxListingPageSize, getClientAddress(), allowPartialPrefixes);
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;

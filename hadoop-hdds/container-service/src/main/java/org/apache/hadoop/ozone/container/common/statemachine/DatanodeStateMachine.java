@@ -119,6 +119,7 @@ public class DatanodeStateMachine implements Closeable {
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
   private final ECReconstructionMetrics ecReconstructionMetrics;
 
+  private final DatanodeQueueMetrics queueMetrics;
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -199,7 +200,7 @@ public class DatanodeStateMachine implements Closeable {
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
-        .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
+        .addHandler(new DeleteBlocksCommandHandler(getContainer(),
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
@@ -225,6 +226,8 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(PipelineReportsProto.class)
         .addPublisherFor(CRLStatusReport.class)
         .build();
+
+    queueMetrics = DatanodeQueueMetrics.create(this);
   }
 
   private int getEndPointTaskThreadPoolSize() {
@@ -417,6 +420,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (commandDispatcher != null) {
       commandDispatcher.stop();
+    }
+
+    if (queueMetrics != null) {
+      DatanodeQueueMetrics.unRegister();
     }
   }
 
@@ -709,5 +716,9 @@ public class DatanodeStateMachine implements Closeable {
 
   public ConfigurationSource getConf() {
     return conf;
+  }
+
+  public DatanodeQueueMetrics getQueueMetrics() {
+    return queueMetrics;
   }
 }

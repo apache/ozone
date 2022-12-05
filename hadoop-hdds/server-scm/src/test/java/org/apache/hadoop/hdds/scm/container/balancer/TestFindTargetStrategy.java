@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -88,6 +89,39 @@ public class TestFindTargetStrategy {
     Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
         .getDatanodeDetails(), dui1.getDatanodeDetails());
 
+  }
+
+  /**
+   * Tests {@link FindTargetStrategy#resetPotentialTargets(Collection)}.
+   */
+  @Test
+  public void testResetPotentialTargets() {
+    // create three datanodes with different usage infos
+    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
+        .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70));
+    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
+        .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80));
+    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
+        .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90));
+
+    List<DatanodeUsageInfo> potentialTargets = new ArrayList<>();
+    potentialTargets.add(dui1);
+    potentialTargets.add(dui2);
+    potentialTargets.add(dui3);
+    MockNodeManager mockNodeManager = new MockNodeManager(potentialTargets);
+
+    FindTargetGreedyByUsageInfo findTargetGreedyByUsageInfo =
+        new FindTargetGreedyByUsageInfo(null, null, mockNodeManager);
+    findTargetGreedyByUsageInfo.reInitialize(potentialTargets, null, null);
+
+    // now, reset potential targets to only the first datanode
+    List<DatanodeDetails> newPotentialTargets = new ArrayList<>(1);
+    newPotentialTargets.add(dui1.getDatanodeDetails());
+    findTargetGreedyByUsageInfo.resetPotentialTargets(newPotentialTargets);
+    Assertions.assertEquals(1,
+        findTargetGreedyByUsageInfo.getPotentialTargets().size());
+    Assertions.assertEquals(dui1,
+        findTargetGreedyByUsageInfo.getPotentialTargets().iterator().next());
   }
 
   /**

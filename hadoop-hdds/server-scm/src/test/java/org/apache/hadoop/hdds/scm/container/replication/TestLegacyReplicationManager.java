@@ -41,8 +41,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager
-    .ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.LegacyReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
@@ -124,7 +124,8 @@ public class TestLegacyReplicationManager {
 
   private ReplicationManager replicationManager;
   private ContainerStateManager containerStateManager;
-  private PlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy ratisContainerPlacementPolicy;
+  private PlacementPolicy ecContainerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
@@ -200,9 +201,10 @@ public class TestLegacyReplicationManager {
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    ratisContainerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    ecContainerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
-    Mockito.when(containerPlacementPolicy.chooseDatanodes(
+    Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
         Mockito.any(), Mockito.any(), Mockito.anyInt(),
             Mockito.anyLong(), Mockito.anyLong()))
         .thenAnswer(invocation -> {
@@ -212,7 +214,7 @@ public class TestLegacyReplicationManager {
               .collect(Collectors.toList());
         });
 
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.any(),
         Mockito.anyInt()
         )).thenAnswer(invocation ->
@@ -226,15 +228,15 @@ public class TestLegacyReplicationManager {
       throws Exception {
     replicationManager.stop();
     dbStore.close();
-    final LegacyReplicationManager.ReplicationManagerConfiguration conf
-        = new LegacyReplicationManager.ReplicationManagerConfiguration();
+    final LegacyReplicationManagerConfiguration conf
+        = new LegacyReplicationManagerConfiguration();
     conf.setContainerInflightReplicationLimit(replicationLimit);
     conf.setContainerInflightDeletionLimit(deletionLimit);
     createReplicationManager(conf);
   }
 
   void createReplicationManager(
-      LegacyReplicationManager.ReplicationManagerConfiguration conf)
+      LegacyReplicationManagerConfiguration conf)
       throws Exception {
     createReplicationManager(null, conf);
   }
@@ -245,7 +247,7 @@ public class TestLegacyReplicationManager {
   }
 
   void createReplicationManager(ReplicationManagerConfiguration rmConf,
-      LegacyReplicationManager.ReplicationManagerConfiguration lrmConf)
+      LegacyReplicationManagerConfiguration lrmConf)
       throws InterruptedException, IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     testDir = GenericTestUtils
@@ -264,14 +266,15 @@ public class TestLegacyReplicationManager {
       config, new SCMDBDefinition());
 
     LegacyReplicationManager legacyRM = new LegacyReplicationManager(
-        config, containerManager, containerPlacementPolicy, eventQueue,
+        config, containerManager, ratisContainerPlacementPolicy, eventQueue,
         SCMContext.emptyContext(), nodeManager, scmHAManager, clock,
         SCMDBDefinition.MOVE.getTable(dbStore));
 
     replicationManager = new ReplicationManager(
         config,
         containerManager,
-        containerPlacementPolicy,
+        ratisContainerPlacementPolicy,
+        ecContainerPlacementPolicy,
         eventQueue,
         SCMContext.emptyContext(),
         nodeManager,
@@ -1358,7 +1361,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedDueToDecommission()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
@@ -1373,12 +1376,12 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedDueToAllDecommission()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       runTestUnderReplicatedDueToAllDecommission(3);
     }
 
     Void runTestUnderReplicatedDueToAllDecommission(int expectedReplication)
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY), CLOSED);
@@ -1391,7 +1394,7 @@ public class TestLegacyReplicationManager {
     @Test
     public void testReplicationLimit() throws Exception {
       runTestLimit(1, 0, 2, 0,
-              () -> runTestUnderReplicatedDueToAllDecommission(1));
+          () -> runTestUnderReplicatedDueToAllDecommission(1));
     }
 
     /**
@@ -1400,7 +1403,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testCorrectlyReplicatedWithDecommission()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1416,7 +1419,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedDueToMaintenance()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
@@ -1431,10 +1434,10 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testNotUnderReplicatedDueToMaintenanceMinRepOne()
-            throws Exception {
+        throws Exception {
       replicationManager.stop();
       ReplicationManagerConfiguration newConf =
-              new ReplicationManagerConfiguration();
+          new ReplicationManagerConfiguration();
       newConf.setMaintenanceReplicaMinimum(1);
       dbStore.close();
       createReplicationManager(newConf);
@@ -1452,10 +1455,10 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedDueToMaintenanceMinRepOne()
-            throws Exception {
+        throws Exception {
       replicationManager.stop();
       ReplicationManagerConfiguration newConf =
-              new ReplicationManagerConfiguration();
+          new ReplicationManagerConfiguration();
       newConf.setMaintenanceReplicaMinimum(1);
       dbStore.close();
       createReplicationManager(newConf);
@@ -1473,7 +1476,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedDueToAllMaintenance()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(IN_MAINTENANCE, HEALTHY), CLOSED);
@@ -1488,7 +1491,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testCorrectlyReplicatedWithMaintenance()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1504,7 +1507,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedWithDecommissionAndMaintenance()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
@@ -1522,7 +1525,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testOverReplicatedClosedContainerWithDecomAndMaint()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONED, HEALTHY), CLOSED);
@@ -1533,7 +1536,7 @@ public class TestLegacyReplicationManager {
       addReplica(container, NodeStatus.inServiceHealthy(), CLOSED);
 
       final int currentDeleteCommandCount = datanodeCommandHandler
-              .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+          .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
       replicationManager.processAll();
       eventQueue.processAll(1000);
@@ -1541,10 +1544,10 @@ public class TestLegacyReplicationManager {
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.deleteContainerCommand));
       Assertions.assertEquals(currentDeleteCommandCount + 2,
-              replicationManager.getMetrics().getNumDeletionCmdsSent());
+          replicationManager.getMetrics().getNumDeletionCmdsSent());
       Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
       Assertions.assertEquals(1, replicationManager.getMetrics()
-              .getInflightDeletion());
+          .getInflightDeletion());
       // Get the DECOM and Maint replica and ensure none of them are scheduled
       // for removal
       Set<ContainerReplica> decom =
@@ -1556,8 +1559,8 @@ public class TestLegacyReplicationManager {
               .collect(Collectors.toSet());
       for (ContainerReplica r : decom) {
         Assertions.assertFalse(datanodeCommandHandler.received(
-                SCMCommandProto.Type.deleteContainerCommand,
-                r.getDatanodeDetails()));
+            SCMCommandProto.Type.deleteContainerCommand,
+            r.getDatanodeDetails()));
       }
       assertOverReplicatedCount(1);
     }
@@ -1570,7 +1573,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testUnderReplicatedNotHealthySource()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, NodeStatus.inServiceStale(), CLOSED);
       addReplica(container, new NodeStatus(DECOMMISSIONED, STALE), CLOSED);
@@ -1579,6 +1582,154 @@ public class TestLegacyReplicationManager {
       // gets scheduled.
       assertReplicaScheduled(0);
       assertUnderReplicatedCount(1);
+    }
+
+    @Test
+    public void overReplicatedButRemovingMakesMisReplicated()
+        throws IOException, TimeoutException {
+      // In this test, the excess replica should not be removed.
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica replicaOne = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaTwo = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaThree = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaFour = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaFive = getReplicas(
+          id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, replicaOne);
+      containerStateManager.updateContainerReplica(id, replicaTwo);
+      containerStateManager.updateContainerReplica(
+          id, replicaThree);
+      containerStateManager.updateContainerReplica(id, replicaFour);
+      containerStateManager.updateContainerReplica(id, replicaFive);
+
+      // Ensure a mis-replicated status is returned for any containers in this
+      // test where there are exactly 3 replicas checked.
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+          Mockito.argThat(list -> list.size() == 3),
+          Mockito.anyInt()
+      )).thenAnswer(
+          invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+
+      int currentDeleteCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      // The unhealthy replica should be removed, but not the other replica
+      // as each time we test with 3 replicas, Mockito ensures it returns
+      // mis-replicated
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
+          datanodeCommandHandler
+              .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
+          replicationManager.getMetrics().getNumDeletionCmdsSent());
+
+      Assertions.assertTrue(datanodeCommandHandler.received(
+          SCMCommandProto.Type.deleteContainerCommand,
+          replicaFive.getDatanodeDetails()));
+      Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
+      Assertions.assertEquals(1, replicationManager.getMetrics()
+          .getInflightDeletion());
+      assertOverReplicatedCount(1);
+    }
+
+    @Test
+    public void testOverReplicatedAndPolicySatisfied()
+        throws IOException, TimeoutException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica replicaOne = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaTwo = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaThree = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaFour = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, replicaOne);
+      containerStateManager.updateContainerReplica(id, replicaTwo);
+      containerStateManager.updateContainerReplica(
+          id, replicaThree);
+      containerStateManager.updateContainerReplica(id, replicaFour);
+
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+          Mockito.argThat(list -> list.size() == 3),
+          Mockito.anyInt()
+      )).thenAnswer(
+          invocation -> new ContainerPlacementStatusDefault(2, 2, 3));
+
+      final int currentDeleteCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
+          datanodeCommandHandler
+              .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
+          replicationManager.getMetrics().getNumDeletionCmdsSent());
+      Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
+      Assertions.assertEquals(1, replicationManager.getMetrics()
+          .getInflightDeletion());
+
+      assertOverReplicatedCount(1);
+    }
+
+    @Test
+    public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted()
+        throws IOException, TimeoutException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica replicaOne = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaTwo = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaThree = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaFour = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica replicaFive = getReplicas(
+          id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, replicaOne);
+      containerStateManager.updateContainerReplica(id, replicaTwo);
+      containerStateManager.updateContainerReplica(
+          id, replicaThree);
+      containerStateManager.updateContainerReplica(id, replicaFour);
+      containerStateManager.updateContainerReplica(id, replicaFive);
+
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+          Mockito.argThat(list -> list != null && list.size() <= 4),
+          Mockito.anyInt()
+      )).thenAnswer(
+          invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+
+      final int currentDeleteCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentDeleteCommandCount + 2,
+          datanodeCommandHandler
+              .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+      Assertions.assertEquals(currentDeleteCommandCount + 2,
+          replicationManager.getMetrics().getNumDeletionCmdsSent());
+      Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
+      Assertions.assertEquals(1, replicationManager.getMetrics()
+          .getInflightDeletion());
     }
   }
 
@@ -1965,7 +2116,7 @@ public class TestLegacyReplicationManager {
       // Ensure a mis-replicated status is returned for any containers in this
       // test where there are 3 replicas. When there are 2 or 4 replicas
       // the status returned will be healthy.
-      Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
               Mockito.argThat(list -> list.size() == 3),
               Mockito.anyInt()
       )).thenAnswer(invocation -> {
@@ -2001,7 +2152,7 @@ public class TestLegacyReplicationManager {
       // Now make it so that all containers seem mis-replicated no matter how
       // many replicas. This will test replicas are not scheduled if the new
       // replica does not fix the mis-replication.
-      Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
               Mockito.anyList(),
               Mockito.anyInt()
       )).thenAnswer(invocation -> {
@@ -2054,7 +2205,7 @@ public class TestLegacyReplicationManager {
 
       // Ensure a mis-replicated status is returned for any containers in this
       // test where there are exactly 3 replicas checked.
-      Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
               Mockito.argThat(list -> list.size() == 3),
               Mockito.anyInt()
       )).thenAnswer(
@@ -2105,7 +2256,7 @@ public class TestLegacyReplicationManager {
               id, replicaThree);
       containerStateManager.updateContainerReplica(id, replicaFour);
 
-      Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
               Mockito.argThat(list -> list.size() == 3),
               Mockito.anyInt()
       )).thenAnswer(
@@ -2153,7 +2304,7 @@ public class TestLegacyReplicationManager {
       containerStateManager.updateContainerReplica(id, replicaFour);
       containerStateManager.updateContainerReplica(id, replicaFive);
 
-      Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
               Mockito.argThat(list -> list != null && list.size() <= 4),
               Mockito.anyInt()
       )).thenAnswer(

@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -544,6 +545,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCreateBucketRequest(req)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString()).build();
   }
@@ -566,6 +568,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCreateBucketRequest(req)
+            .setVersion(ClientVersion.CURRENT_VERSION)
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setClientId(UUID.randomUUID().toString()).build();
   }

@@ -434,7 +434,8 @@ public class ReplicationNodeManagerMock implements NodeManager {
 
   @Override
   public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport) {
+      CommandQueueReportProto commandReport,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     // Do nothing.
   }
 
@@ -449,6 +450,18 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) {
     return -1;
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
   }
 
   @Override

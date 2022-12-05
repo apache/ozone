@@ -143,6 +143,12 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.connection.request.timeout";
   public static final String
       OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
+
+  public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
+      "ozone.recon.nssummary.flush.db.max.threshold";
+
+  public static final long
+      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
   /**
    * Private constructor for utility class.
    */

@@ -410,7 +410,9 @@ public class TestKeyInputStream extends TestInputStreamBase {
         .setKeyName(keyName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
-    OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
+    OmKeyInfo keyInfo = getCluster().getOzoneManager()
+        .getKeyInfo(keyArgs, false)
+        .getKeyInfo();
 
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     Assert.assertNotNull(locations);
