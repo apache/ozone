@@ -451,3 +451,17 @@ message ContainerBalancerConfigurationProto {
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
 }
+
+message TransferLeadershipRequest {
+    enum Type {
+        OM = 1;
+        SCM = 2;
+    }
+    required Type type = 1;
+    optional string omId = 2;
+    optional string scmId = 3;
+}
+
+message TransferLeadershipResponse {
+    required bool success = 1;
+}

@@ -67,6 +67,7 @@ import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.SetConfigurationRequest;
+import org.apache.ratis.protocol.TransferLeadershipRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
@@ -837,4 +838,64 @@ public final class OzoneManagerRatisServer {
     return null;
   }
 
+  public Collection<RaftPeer> getPeers() throws IOException {
+    return getDivision().getGroup().getPeers();
+  }
+
+  public RaftServer.Division getDivision() throws IOException {
+    return server.getDivision(raftGroupId);
+  }
+
+  public boolean transferLeadership(RaftPeerId newLeaderId) throws IOException {
+    try {
+      List<RaftPeer> peers = new ArrayList<>(getPeers());
+
+      int maxPriority =
+          peers.stream().map(RaftPeer::getPriority).max(Integer::compare)
+              .orElse(-1);
+      RaftPeer oriPeer = null;
+      for (RaftPeer peer : peers) {
+        if (peer.getId().equals(newLeaderId)) {
+          oriPeer = peer;
+          break;
+        }
+      }
+
+      Preconditions.checkNotNull(oriPeer);
+
+      peers.remove(oriPeer);
+      peers.add(
+          RaftPeer.newBuilder(oriPeer).setPriority(maxPriority + 1).build());
+
+      SetConfigurationRequest setConfigurationRequest =
+          new SetConfigurationRequest(clientId, raftPeerId, raftGroupId,
+              nextCallId(), peers);
+
+      RaftClientReply raftClientReply = getDivision().getRaftServer()
+          .setConfiguration(setConfigurationRequest);
+      if (raftClientReply.isSuccess()) {
+        LOG.info("Successfully setConfiguration to Peers: {}", peers);
+      } else {
+        LOG.error("Failed to setConfiguration to Peers: {}. Ratis reply: {}",
+            peers, raftClientReply);
+      }
+
+      TransferLeadershipRequest transferLeadershipRequest =
+          new TransferLeadershipRequest(clientId, raftPeerId, raftGroupId,
+              nextCallId(), newLeaderId, 20 * 1000);
+      raftClientReply = getDivision().getRaftServer()
+          .transferLeadership(transferLeadershipRequest);
+      if (raftClientReply.isSuccess()) {
+        LOG.info("Successfully transferred leadership to OM: {}.", newLeaderId);
+      } else {
+        LOG.error("Failed to transfer leadership to OM: {}. Ratis reply: {}",
+            newLeaderId, raftClientReply);
+        throw new IOException(raftClientReply.getException());
+      }
+      return raftClientReply.isSuccess();
+    } catch (IOException e) {
+      LOG.error("Failed to transfer leadership to OM: {}", newLeaderId, e);
+      throw e;
+    }
+  }
 }

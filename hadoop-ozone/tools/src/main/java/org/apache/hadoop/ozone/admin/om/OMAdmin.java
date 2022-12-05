@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.TransferLeadershipRequest;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -58,7 +59,8 @@ import java.util.Collection;
         CancelPrepareSubCommand.class,
         FinalizationStatusSubCommand.class,
         DecommissionOMSubcommand.class,
-        UpdateRangerSubcommand.class
+        UpdateRangerSubcommand.class,
+        TransferLeadershipSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {

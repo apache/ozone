@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequest;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponse;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -1441,6 +1443,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           .map(ServiceInfo::getFromProtobuf)
           .collect(Collectors.toList());
 
+  }
+
+  @Override
+  public boolean transferLeadership(String omId) throws IOException {
+    TransferLeadershipRequest req = TransferLeadershipRequest.newBuilder()
+        .setType(TransferLeadershipRequest.Type.OM)
+        .setOmId(omId).build();
+
+    OMRequest omRequest = createOMRequest(Type.TransferLeadership)
+        .setTransferLeadershipRequest(req)
+        .build();
+
+    final TransferLeadershipResponse resp = handleError(submitRequest(omRequest))
+        .getTransferLeadershipResponse();
+
+    return resp.getSuccess();
   }
 
   @Override

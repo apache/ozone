@@ -283,9 +283,11 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -4561,6 +4563,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                     int payloadSizeResp)
           throws IOException {
     return null;
+  }
+
+  @Override
+  public boolean transferLeadership(String omId) throws IOException {
+    if (!isRatisEnabled || !peerNodesMap.containsKey(omId)) {
+      return false;
+    }
+
+    return getOmRatisServer().transferLeadership(RaftPeerId.valueOf(omId));
   }
 
   /**

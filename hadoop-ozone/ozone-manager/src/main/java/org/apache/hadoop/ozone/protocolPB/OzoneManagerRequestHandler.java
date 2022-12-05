@@ -30,6 +30,8 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequest;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponse;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -283,6 +285,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case GetKeyInfo:
         responseBuilder.setGetKeyInfoResponse(
             getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
+        break;
+      case TransferLeadership:
+        TransferLeadershipResponse transferLeadershipResponse = transferLeadership(
+            request.getTransferLeadershipRequest());
+        responseBuilder.setTransferLeadershipResponse(transferLeadershipResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1213,6 +1220,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private GetS3VolumeContextResponse getS3VolumeContext()
       throws IOException {
     return impl.getS3VolumeContext().getProtobuf();
+  }
+
+  private TransferLeadershipResponse transferLeadership(TransferLeadershipRequest request)
+      throws IOException {
+    TransferLeadershipResponse.Builder resp = TransferLeadershipResponse.newBuilder();
+
+    return resp.setSuccess(impl.transferLeadership(request.getOmId())).build();
   }
 
   public OzoneManager getOzoneManager() {

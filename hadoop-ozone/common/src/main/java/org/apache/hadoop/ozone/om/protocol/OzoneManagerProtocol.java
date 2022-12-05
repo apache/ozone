@@ -405,6 +405,8 @@ public interface OzoneManagerProtocol
    */
   List<ServiceInfo> getServiceList() throws IOException;
 
+  boolean transferLeadership(String omId) throws IOException;
+
   ServiceInfoEx getServiceInfo() throws IOException;
 
   /**
