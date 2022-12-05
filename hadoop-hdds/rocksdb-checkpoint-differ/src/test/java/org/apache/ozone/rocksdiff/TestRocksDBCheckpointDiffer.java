@@ -19,10 +19,6 @@ package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
-import static org.junit.jupiter.api.Assertions.fail;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -31,7 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
-
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
@@ -51,6 +46,13 @@ import org.rocksdb.RocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
+
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test RocksDBCheckpointDiffer basic functionality.
@@ -186,6 +188,52 @@ public class TestRocksDBCheckpointDiffer {
       Assertions.assertEquals(expectedDifferResult.get(index), sstDiffList);
       ++index;
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3, 4, 5})
+  void testRemoveSnapshotFileFromDag(int snapshotIndex) throws Exception {
+    String clDirStr = "compaction-log";
+    String metadataDirStr = ".";
+    String sstDirStr = "compaction-sst-backup";
+    List<List<String>> expectedDiff = asList(
+        asList("000024", "000017", "000028", "000026", "000019", "000021"),
+        asList("000024", "000028", "000026", "000019", "000021"),
+        asList("000024", "000028", "000026", "000021"),
+        asList("000024", "000028", "000026"),
+        asList("000028", "000026"),
+        Collections.singletonList("000028"),
+        Collections.emptyList()
+    );
+
+    File clDir = new File(clDirStr);
+
+    if (clDir.exists()) {
+      deleteDirectory(clDir);
+    }
+
+    File dbLocation = new File(TEST_DB_PATH);
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(metadataDirStr,
+        sstDirStr,
+        clDirStr,
+        dbLocation);
+
+    File sstDir = new File(sstDirStr);
+    deleteDirectory(sstDir);
+
+    RocksDB rocksDB = createRocksDBInstanceAndWriteKeys(TEST_DB_PATH, differ);
+    readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
+
+    DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
+    differ.pruneSnapshotFileNodesFromDag(snapshots.get(snapshotIndex));
+
+    for (int index = snapshotIndex + 1; index < snapshots.size(); index++) {
+      DifferSnapshotInfo snap = snapshots.get(index);
+      List<String> sstDiffList = differ.getSSTDiffList(src, snap);
+      assertEquals(expectedDiff.get(index), sstDiffList);
+    }
+
+    rocksDB.close();
   }
 
   /**

@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -931,6 +932,137 @@ public class RocksDBCheckpointDiffer {
       }
     }
 
+  }
+
+  /**
+   * Prunes DAGs when oldest snapshot compaction history gets deleted.
+   * <p>
+   * Idea here is to first remove the nodes and arcs which were created before
+   * snapshot, to be deleted, was created because they are not needed to
+   * generate the diff anymore.
+   * [pruneDownstreamDag] does that pruning and removes nodes and arcs from
+   * forward and backward DAGs by going over the successors from forward DAG of
+   * current level's node.
+   * Once older nodes and arcs get deleted from the oldest snapshot compaction
+   * history, remove the nodes and arcs which are not needed to generate
+   * diff for newer snapshots.
+   * [pruneUpstreamDag] does remaining pruning and removes nodes and arcs from
+   * both forward and backward DAGs by going over the successors from backward
+   * DAG of current level's node. If node in the current level doesn't have any
+   * successors in forward DAG, arc to the successor and current node can be
+   * deleted.
+   */
+  public void pruneSnapshotFileNodesFromDag(DifferSnapshotInfo snapshotInfo) {
+    Set<String> snapshotSstFiles = readRocksDBLiveFiles(snapshotInfo.dbPath);
+    if (snapshotSstFiles.isEmpty()) {
+      LOG.info("Snapshot '{}' doesn't have any sst file to remove.",
+          snapshotInfo.dbPath);
+      return;
+    }
+
+    Set<CompactionNode> startNodes = new HashSet<>();
+    for (String sstFile: snapshotSstFiles) {
+      CompactionNode infileNode = compactionNodeMap.get(sstFile);
+      if (infileNode == null) {
+        LOG.error("Compaction node doesn't exist for sstFile: {}.", sstFile);
+        continue;
+      }
+
+      startNodes.add(infileNode);
+    }
+
+    Set<String> prunedSstFilesFromPruningDownstreamDag = pruneDownstreamDag(startNodes);
+    Set<String> prunedSstFilesFromPruningUpstreamDag = pruneUpstreamDag(startNodes);
+
+    Set<String> allSstFilesPruned = new HashSet<>();
+    allSstFilesPruned.addAll(prunedSstFilesFromPruningDownstreamDag);
+    allSstFilesPruned.addAll(prunedSstFilesFromPruningUpstreamDag);
+    LOG.info("Pruned SST nodes from DAG: {}.", allSstFilesPruned);
+  }
+
+  /**
+   * Prunes DAGs in downstream fashion of forward DAG.
+   * <p>
+   * This traversal is to remove sst file nodes, got created before
+   * the snapshot was taken.
+   */
+  private Set<String> pruneDownstreamDag(Set<CompactionNode> startNodes) {
+    Set<String> removedFiles = new HashSet<>();
+    Set<CompactionNode> currentLevel = startNodes;
+
+    Set<CompactionNode> removeNodes = new HashSet<>();
+    Set<Pair<CompactionNode, CompactionNode>> removeArcs = new HashSet<>();
+
+    while (!currentLevel.isEmpty()) {
+      Set<CompactionNode> nextLevel = new HashSet<>();
+      for (CompactionNode current : currentLevel) {
+        if (!forwardCompactionDAG.nodes().contains(current)) {
+          continue;
+        }
+
+        for (CompactionNode successorInForwardDag:
+            forwardCompactionDAG.successors(current)) {
+          removeArcs.add(Pair.of(current, successorInForwardDag));
+          nextLevel.add(successorInForwardDag);
+        }
+      }
+
+      nextLevel.forEach(node -> {
+        removeNodes.add(node);
+        removedFiles.add(node.fileName);
+      });
+
+      currentLevel = nextLevel;
+    }
+
+    removeArcs.forEach(arc -> {
+      forwardCompactionDAG.removeEdge(arc.getLeft(), arc.getRight());
+      backwardCompactionDAG.removeEdge(arc.getRight(), arc.getLeft());
+    });
+
+    removeNodes.forEach(node -> {
+      forwardCompactionDAG.removeNode(node);
+      backwardCompactionDAG.removeNode(node);
+    });
+
+    return removedFiles;
+  }
+
+  /**
+   * Prunes DAGs in upstream fashion of forward DAG.
+   * <p>
+   * This traversal is to remove sst file nodes and arcs which are not needed
+   * to generate snapshot diff.
+   */
+  private Set<String> pruneUpstreamDag(Set<CompactionNode> startNodes) {
+    Set<String> removedFiles = new HashSet<>();
+    Set<CompactionNode> currentLevel = startNodes;
+
+    while (!currentLevel.isEmpty()) {
+      Set<CompactionNode> nextLevel = new HashSet<>();
+      for (CompactionNode current : currentLevel) {
+        if (!forwardCompactionDAG.nodes().contains(current) ||
+            !forwardCompactionDAG.successors(current).isEmpty()) {
+          continue;
+        }
+
+        for (CompactionNode successorInBackwardDag:
+            backwardCompactionDAG.successors(current)) {
+          forwardCompactionDAG.removeEdge(successorInBackwardDag, current);
+          backwardCompactionDAG.removeEdge(current, successorInBackwardDag);
+          nextLevel.add(successorInBackwardDag);
+        }
+
+        forwardCompactionDAG.removeNode(current);
+        backwardCompactionDAG.removeNode(current);
+        compactionNodeMap.remove(current.fileName, current);
+        removedFiles.add(current.fileName);
+      }
+
+      currentLevel = nextLevel;
+    }
+
+    return removedFiles;
   }
 
   @VisibleForTesting
