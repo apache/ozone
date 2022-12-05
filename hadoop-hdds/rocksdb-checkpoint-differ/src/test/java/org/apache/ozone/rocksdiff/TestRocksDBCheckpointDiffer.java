@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -141,7 +143,8 @@ public class TestRocksDBCheckpointDiffer {
             snapshotSstFiles1,
             new HashSet<>(asList("000059", "000053")),
             new HashSet<>(asList(
-                "000066", "000105", "000080", "000087", "000073", "000095"))),
+                "000066", "000105", "000080", "000087", "000073", "000095")),
+            false),
         Arguments.of("Test 2: Crafted input: One source " +
                 "('to' snapshot) SST file is never compacted (newly flushed)",
             snapshotInfo4,
@@ -150,7 +153,8 @@ public class TestRocksDBCheckpointDiffer {
             snapshotSstFiles3,
             new HashSet<>(asList(
                 "000088", "000105", "000059", "000053", "000095")),
-            new HashSet<>(asList("000108"))),
+            new HashSet<>(asList("000108")),
+            false),
         Arguments.of("Test 3: Crafted input: Same SST files " +
                 "found during SST expansion",
             snapshotInfo2,
@@ -159,7 +163,8 @@ public class TestRocksDBCheckpointDiffer {
             snapshotSstFiles1Alt1,
             new HashSet<>(asList("000066", "000059", "000053")),
             new HashSet<>(asList(
-                "000080", "000087", "000073", "000095"))),
+                "000080", "000087", "000073", "000095")),
+            false),
         Arguments.of("Test 4: Crafted input: Skipping known " +
                 "processed SST.",
             snapshotInfo2,
@@ -167,7 +172,8 @@ public class TestRocksDBCheckpointDiffer {
             snapshotSstFiles2Alt2,
             snapshotSstFiles1Alt2,
             new HashSet<>(),
-            new HashSet<>()),
+            new HashSet<>(),
+            true),
         Arguments.of("Test 5: Hit snapshot generation early exit " +
                 "condition",
             snapshotInfo2,
@@ -176,7 +182,8 @@ public class TestRocksDBCheckpointDiffer {
             snapshotSstFiles1,
             new HashSet<>(asList("000059", "000053")),
             new HashSet<>(asList(
-                "000066", "000080", "000087", "000073", "000062")))
+                "000066", "000080", "000087", "000073", "000062")),
+            false)
     );
   }
 
@@ -186,15 +193,18 @@ public class TestRocksDBCheckpointDiffer {
    */
   @ParameterizedTest(name = "{0}")
   @MethodSource("testGetSSTDiffListWithoutDBCases")
+  @SuppressWarnings("parameternumber")
   public void testGetSSTDiffListWithoutDB(String description,
       DifferSnapshotInfo srcSnapshot,
       DifferSnapshotInfo destSnapshot,
       Set<String> srcSnapshotSstFiles,
       Set<String> destSnapshotSstFiles,
       Set<String> expectedSameSstFiles,
-      Set<String> expectedDiffSstFiles) {
+      Set<String> expectedDiffSstFiles,
+      boolean expectingException) {
 
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+    boolean exceptionThrown = false;
 
     String compactionLog = ""
         + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5\n"  // Snapshot 0
@@ -219,17 +229,31 @@ public class TestRocksDBCheckpointDiffer {
 
     Set<String> actualSameSstFiles = new HashSet<>();
     Set<String> actualDiffSstFiles = new HashSet<>();
-    differ.internalGetSSTDiffList(
-        srcSnapshot,
-        destSnapshot,
-        srcSnapshotSstFiles,
-        destSnapshotSstFiles,
-        differ.getForwardCompactionDAG(),
-        actualSameSstFiles,
-        actualDiffSstFiles);
+
+    try {
+      differ.internalGetSSTDiffList(
+              srcSnapshot,
+              destSnapshot,
+              srcSnapshotSstFiles,
+              destSnapshotSstFiles,
+              differ.getForwardCompactionDAG(),
+              actualSameSstFiles,
+              actualDiffSstFiles);
+    } catch (RuntimeException rtEx) {
+      if (!expectingException) {
+        fail("Unexpected exception thrown in test.");
+      } else {
+        exceptionThrown = true;
+      }
+    }
+
     // Check same and different SST files result
     Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
     Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+
+    if (expectingException && !exceptionThrown) {
+      fail("Expecting exception but none thrown.");
+    }
   }
 
   /**

@@ -604,7 +604,11 @@ public class RocksDBCheckpointDiffer {
       line = line.substring(COMPACTION_LOG_ENTRY_LINE_PREFIX.length());
       final String[] io = line.split(":");
       if (io.length != 2) {
-        LOG.error("Invalid line in compaction log: {}", line);
+        if (line.endsWith(":")) {
+          LOG.debug("Ignoring compaction log line for SST deletion");
+        } else {
+          LOG.error("Invalid line in compaction log: {}", line);
+        }
         return;
       }
       final String[] inputFiles = io[0].split(",");
@@ -739,14 +743,17 @@ public class RocksDBCheckpointDiffer {
             level++, currentLevel.size());
 
         if (level >= 1000000) {
-          LOG.error("Graph traversal level exceeded allowed maximum ({}). "
+          final String errorMsg = String.format(
+                  "Graph traversal level exceeded allowed maximum (%d). "
                   + "This could be due to invalid input generating a "
-                  + "loop in the traversal path. Same SSTs found so far: {}, "
-                  + "different SSTs: {}", level, sameFiles, differentFiles);
-          // Clear output to indicate an error. Expect fall back to full diff
+                  + "loop in the traversal path. Same SSTs found so far: %s, "
+                  + "different SSTs: %s", level, sameFiles, differentFiles);
+          LOG.error(errorMsg);
+          // Clear output in case of error. Expect fall back to full diff
           sameFiles.clear();
           differentFiles.clear();
-          return;
+          // TODO: Revisit error handling here. Use custom exception?
+          throw new RuntimeException(errorMsg);
         }
 
         final Set<CompactionNode> nextLevel = new HashSet<>();
