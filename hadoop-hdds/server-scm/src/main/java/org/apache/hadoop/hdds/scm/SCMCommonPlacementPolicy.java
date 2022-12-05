@@ -433,8 +433,9 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   /**
-   * Given a set of replicas of a container, return a set of replicas to copy
-   * to another node to fix misreplication.
+   * Given a set of replicas of a container which are
+   * neither over underreplicated nor overreplicated,
+   * return a set of replicas to copy to another node to fix misreplication.
    * @param replicas
    */
   @Override
