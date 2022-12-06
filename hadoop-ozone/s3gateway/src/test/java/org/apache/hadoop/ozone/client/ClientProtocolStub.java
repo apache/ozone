@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
@@ -583,4 +584,11 @@ public class ClientProtocolStub implements ClientProtocol {
       throws IOException {
     return null;
   }
+
+  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
+                                         String fromSnapshot, String toSnapshot)
+      throws IOException {
+    return null;
+  }
+
 }
