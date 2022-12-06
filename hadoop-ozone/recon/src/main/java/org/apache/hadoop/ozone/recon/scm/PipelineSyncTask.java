@@ -71,18 +71,20 @@ public class PipelineSyncTask extends ReconScmTask {
   @Override
   protected synchronized void run() {
     try {
-      lock.writeLock().lock();
       while (canRun()) {
-        triggerPipelineSyncTask();
-        wait(interval);
+        try {
+          lock.writeLock().lock();
+          triggerPipelineSyncTask();
+        } finally {
+          lock.writeLock().unlock();
+        }
+        Thread.sleep(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Pipeline sync Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 

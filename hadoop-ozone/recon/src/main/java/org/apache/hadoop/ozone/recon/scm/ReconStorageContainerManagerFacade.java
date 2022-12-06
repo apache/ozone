@@ -216,7 +216,7 @@ public class ReconStorageContainerManagerFacade
             conf, pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
         pipelineManager, containerManager,
-        scmServiceProvider, containerHealthTask);
+        scmServiceProvider, containerHealthTask, pipelineSyncTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);

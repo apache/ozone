@@ -41,19 +41,20 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconDeadNodeHandler.class);
 
-
   private StorageContainerServiceProvider scmClient;
-
   private ContainerHealthTask containerHealthTask;
+  private PipelineSyncTask pipelineSyncTask;
 
   public ReconDeadNodeHandler(NodeManager nodeManager,
                               PipelineManager pipelineManager,
                               ContainerManager containerManager,
                               StorageContainerServiceProvider scmClient,
-                              ContainerHealthTask containerHealthTask) {
+                              ContainerHealthTask containerHealthTask,
+                              PipelineSyncTask pipelineSyncTask) {
     super(nodeManager, pipelineManager, containerManager);
     this.scmClient = scmClient;
     this.containerHealthTask = containerHealthTask;
+    this.pipelineSyncTask = pipelineSyncTask;
   }
 
   @Override
@@ -77,6 +78,7 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
             "information about it.", datanodeDetails);
       }
       containerHealthTask.triggerContainerHealthCheck();
+      pipelineSyncTask.triggerPipelineSyncTask();
     } catch (Exception ioEx) {
       LOG.error("Error trying to verify Node operational state from SCM.",
           ioEx);

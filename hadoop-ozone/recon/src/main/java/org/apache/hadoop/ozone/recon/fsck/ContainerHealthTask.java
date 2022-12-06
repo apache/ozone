@@ -85,18 +85,20 @@ public class ContainerHealthTask extends ReconScmTask {
   @Override
   public void run() {
     try {
-      lock.writeLock().lock();
       while (canRun()) {
+        try {
+          lock.writeLock().lock();
+          triggerContainerHealthCheck();
+        } finally {
+          lock.writeLock().unlock();
+        }
         Thread.sleep(interval);
-        triggerContainerHealthCheck();
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
