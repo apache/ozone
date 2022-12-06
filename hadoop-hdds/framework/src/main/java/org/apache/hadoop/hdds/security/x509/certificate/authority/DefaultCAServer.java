@@ -493,9 +493,9 @@ public class DefaultCAServer implements CertificateServer {
         };
       }
       break;
-      default:
-        /* Make CheckStyle happy */
-        break;
+    default:
+      /* Make CheckStyle happy */
+      break;
     }
     return consumer;
   }
