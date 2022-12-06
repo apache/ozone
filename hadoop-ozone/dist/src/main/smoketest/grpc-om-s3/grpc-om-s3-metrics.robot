@@ -82,21 +82,21 @@ Check that metrics are registered
 
 Check bytes sent
     IF      '${GRPC_ENABLED}' == 'true'
-        SentBytes are higher than zero
+        Wait Until Keyword Succeeds     90sec      10sec        SentBytes are higher than zero
     ELSE
         SentBytes are equal to zero
     END
 
 Check bytes received
     IF      '${GRPC_ENABLED}' == 'true'
-        ReceivedBytes are higher than zero
+        Wait Until Keyword Succeeds     90sec      10sec        ReceivedBytes are higher than zero
     ELSE
         ReceivedBytes are equal to zero
     END
 
 Check active connections
     IF      '${GRPC_ENABLED}' == 'true'
-        NumOpenClientConnections are higher than zero
+        Wait Until Keyword Succeeds     90sec      10sec        NumOpenClientConnections are higher than zero
     ELSE
         NumOpenClientConnections are equal to zero
     END
