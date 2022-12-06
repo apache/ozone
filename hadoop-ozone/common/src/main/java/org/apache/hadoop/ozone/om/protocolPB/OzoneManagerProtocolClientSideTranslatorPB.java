@@ -183,6 +183,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -1135,6 +1136,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .map(snapshotInfo -> SnapshotInfo.getFromProtobuf(snapshotInfo))
         .collect(Collectors.toList());
     return snapshotInfos;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
+                                         String fromSnapshot, String toSnapshot)
+      throws IOException {
+    final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setFromSnapshot(fromSnapshot)
+            .setToSnapshot(toSnapshot);
+
+    final OMRequest omRequest = createOMRequest(Type.SnapshotDiff)
+        .setSnapshotDiffRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    return SnapshotDiffReport.fromProtobuf(omResponse
+        .getSnapshotDiffResponse().getSnapshotDiffReport());
   }
 
   /**
