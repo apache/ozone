@@ -167,7 +167,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete, volumeId, bucketId);
+        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete,
+        volumeId, bucketId);
   }
 
   @Override
