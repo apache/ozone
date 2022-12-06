@@ -110,9 +110,9 @@ public class SecurityConfig {
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
-  private String externalRootCaPublicKeyPath;
-  private String externalRootCaPrivateKeyPath;
-  private String externalRootCaCert;
+  private final String externalRootCaPublicKeyPath;
+  private final String externalRootCaPrivateKeyPath;
+  private final String externalRootCaCert;
 
   /**
    * Constructs a SecurityConfig.
@@ -184,9 +184,15 @@ public class SecurityConfig {
           "greater than maximum Certificate duration");
     }
 
-    this.externalRootCaCert = this.configuration.get(HDDS_EXTERNAL_ROOT_CA_CERT_PATH, HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
-    this.externalRootCaPublicKeyPath = this.configuration.get(HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH, HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
-    this.externalRootCaPrivateKeyPath = this.configuration.get(HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH, HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT);
+    this.externalRootCaCert = this.configuration.get(
+        HDDS_EXTERNAL_ROOT_CA_CERT_PATH,
+        HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
+    this.externalRootCaPublicKeyPath = this.configuration.get(
+        HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH,
+        HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
+    this.externalRootCaPrivateKeyPath = this.configuration.get(
+        HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH,
+        HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT);
 
     this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
         HDDS_X509_CRL_NAME_DEFAULT);

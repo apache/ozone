@@ -455,9 +455,11 @@ public class DefaultCAServer implements CertificateServer {
       break;
     case MISSING_KEYS:
       consumer = (arg) -> {
-        LOG.error("We have found the Certificate for this CertificateServer, " +
+        LOG.error("We have found the Certificate for this " +
+            "CertificateServer, " +
             "but keys used by this CertificateServer is missing. This is a " +
-            "non-recoverable error. Please restart the system after locating " +
+            "non-recoverable error. Please restart the system after " +
+            "locating " +
             "the Keys used by the CertificateServer.");
         LOG.error("Exiting due to unrecoverable CertificateServer error.");
         throw new IllegalStateException("Missing Keys, cannot continue.");
@@ -466,11 +468,13 @@ public class DefaultCAServer implements CertificateServer {
     case MISSING_CERTIFICATE:
       consumer = (arg) -> {
         LOG.error("We found the keys, but the root certificate for this " +
-            "CertificateServer is missing. Please restart SCM after locating " +
+            "CertificateServer is missing. Please restart SCM after " +
+            "locating " +
             "the " +
             "Certificates.");
         LOG.error("Exiting due to unrecoverable CertificateServer error.");
-        throw new IllegalStateException("Missing Root Certs, cannot continue.");
+        throw new IllegalStateException("Missing Root Certs, cannot " +
+            "continue.");
       };
       break;
     case INITIALIZE:
@@ -481,32 +485,33 @@ public class DefaultCAServer implements CertificateServer {
         // both keys/certs are missing, init/bootstrap is missed to be
         // performed.
         consumer = (arg) -> {
-          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is started " +
+          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is " +
+              "started " +
               "with out init/bootstrap");
           throw new IllegalStateException("INTERMEDIARY_CA Should not be" +
               " in Initialize State during startup.");
         };
       }
       break;
-      default:
-        /* Make CheckStyle happy */
-        break;
+    default:
+      /* Make CheckStyle happy */
+      break;
     }
     return consumer;
   }
 
-  private void initRootCa(SecurityConfig config) {
-    if (isExternalCaSpecified(config)) {
-      initWithExternalRootCa(config);
+  private void initRootCa(SecurityConfig securityConfig) {
+    if (isExternalCaSpecified(securityConfig)) {
+      initWithExternalRootCa(securityConfig);
     } else {
       try {
-        generateSelfSignedCA(config);
+        generateSelfSignedCA(securityConfig);
       } catch (NoSuchProviderException | NoSuchAlgorithmException
                | IOException e) {
         LOG.error("Unable to initialize CertificateServer.", e);
       }
     }
-    VerificationStatus newStatus = verifySelfSignedCA(config);
+    VerificationStatus newStatus = verifySelfSignedCA(securityConfig);
     if (newStatus != VerificationStatus.SUCCESS) {
       LOG.error("Unable to initialize CertificateServer, failed in " +
           "verification.");
@@ -545,8 +550,9 @@ public class DefaultCAServer implements CertificateServer {
    * @throws IOException          - on Error.
    * @throws SCMSecurityException - on Error.
    */
-  private void generateRootCertificate(SecurityConfig securityConfig,
-                                       KeyPair key) throws IOException, SCMSecurityException {
+  private void generateRootCertificate(
+      SecurityConfig securityConfig, KeyPair key)
+      throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
     LocalDateTime beginDate =
         LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
@@ -587,34 +593,45 @@ public class DefaultCAServer implements CertificateServer {
 
   private void initWithExternalRootCa(SecurityConfig conf) {
     String externalRootCaLocation = conf.getExternalRootCaCert();
-    CertificateCodec certificateCodec =
-        new CertificateCodec(config, componentName);
-    KeyCodec keyCodec = new KeyCodec(config, componentName);
     Path extCertPath = Paths.get(externalRootCaLocation);
     Path extPrivateKeyPath = Paths.get(conf.getExternalRootCaPrivateKeyPath());
     String externalPublicKeyLocation = conf.getExternalRootCaPublicKeyPath();
 
+    KeyCodec keyCodec = new KeyCodec(config, componentName);
+    CertificateCodec certificateCodec =
+        new CertificateCodec(config, componentName);
     try {
+      X509CertificateHolder certHolder = certificateCodec.readCertificate(
+          extCertPath.getParent(), extCertPath.getFileName().toString());
       PrivateKey privateKey = keyCodec.readPrivateKey(
           extPrivateKeyPath.getParent(),
           extPrivateKeyPath.getFileName().toString());
-      X509CertificateHolder certHolder = certificateCodec.readCertificate(
-          extCertPath.getParent(), extCertPath.getFileName().toString());
       PublicKey publicKey;
-      if (externalPublicKeyLocation.isEmpty()) {
-        publicKey = CertificateCodec.getX509Certificate(certHolder)
-            .getPublicKey();
-      } else {
-        Path publicKeyPath = Paths.get(externalPublicKeyLocation);
-        publicKey = keyCodec.readPublicKey(
-            publicKeyPath.getParent(), publicKeyPath.getFileName().toString());
-      }
+      publicKey = readPublicKeyWithExternalData(
+          externalPublicKeyLocation, keyCodec, certHolder);
       keyCodec.writeKey(new KeyPair(publicKey, privateKey));
       certificateCodec.writeCertificate(certHolder);
     } catch (IOException | CertificateException | NoSuchAlgorithmException |
              InvalidKeySpecException e) {
       LOG.error("External root CA certificate initialization failed", e);
     }
+  }
+
+  private PublicKey readPublicKeyWithExternalData(
+      String externalPublicKeyLocation, KeyCodec keyCodec,
+      X509CertificateHolder certHolder)
+      throws CertificateException, NoSuchAlgorithmException,
+      InvalidKeySpecException, IOException {
+    PublicKey publicKey;
+    if (externalPublicKeyLocation.isEmpty()) {
+      publicKey = CertificateCodec.getX509Certificate(certHolder)
+          .getPublicKey();
+    } else {
+      Path publicKeyPath = Paths.get(externalPublicKeyLocation);
+      publicKey = keyCodec.readPublicKey(
+          publicKeyPath.getParent(), publicKeyPath.getFileName().toString());
+    }
+    return publicKey;
   }
 
   /**
