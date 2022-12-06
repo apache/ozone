@@ -29,10 +29,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.concurrent.Callable;
@@ -51,7 +50,7 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
   @CommandLine.Option(names = {"--db"},
       required = true,
       description = "Database file path")
-  private String dbFile;
+  private String dbFilePath;
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -63,18 +62,20 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
 
     OzoneConfiguration configuration = parent.createOzoneConfiguration();
 
-    if (!Files.exists(Paths.get(dbFile))) {
-      System.out.println("DB path does not exist: " + dbFile);
+    File db = new File(dbFilePath);
+    if (!db.exists()) {
+      System.out.println("DB path does not exist: " + dbFilePath);
       return null;
     }
 
     try {
       DBStore dbStore = HAUtils.loadDB(
-          configuration, Paths.get(dbFile).getParent().toFile(),
-          Paths.get(dbFile).getFileName().toString(), new SCMDBDefinition());
+          configuration, db.getParentFile(),
+          db.getName(), new SCMDBDefinition());
       removeExpiredCertificates(dbStore);
-    } catch (IOException e) {
-      System.out.println("Error trying to open file: " + dbFile +
+    } catch (Exception e) {
+
+      System.out.println("Error trying to open file: " + dbFilePath +
           " failed with exception: " + e);
     }
     return null;
