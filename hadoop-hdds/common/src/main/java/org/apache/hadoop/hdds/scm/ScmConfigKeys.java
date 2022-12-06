@@ -344,6 +344,8 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
+  public static final String OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY =
+      "ozone.scm.pipeline.placement.impl";
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
       "ozone.scm.container.placement.ec.impl";
 

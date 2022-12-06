@@ -56,7 +56,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -149,16 +149,19 @@ public class TestPipelinePlacementFactory {
   @Test
   public void testDefaultPolicy() throws IOException {
     PlacementPolicy policy = PipelinePlacementPolicyFactory
-        .getPolicy(conf, null, null, null, true, null);
+        .getPolicy(null, null, conf);
     Assertions.assertSame(PipelinePlacementPolicy.class, policy.getClass());
   }
 
   @Test
-  public void testRackScatterPolicy() throws IOException {
-    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+  public void testRackScatterPolicy() throws Exception {
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementRackScatter.class.getCanonicalName());
+    // for this test, rack setup does not matter, just
+    // need a non-null NetworkTopologyMap within the nodeManager
+    setupRacks(6, 3);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
-        .getPolicy(conf, null, null, null, true, null);
+        .getPolicy(nodeManager, stateManager, conf);
     Assertions.assertSame(SCMContainerPlacementRackScatter.class,
         policy.getClass());
   }
@@ -170,7 +173,7 @@ public class TestPipelinePlacementFactory {
   public void testDefaultPipelineProviderRackPlacement() throws Exception {
     setupRacks(6, 2);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
-        .getPolicy(conf, nodeManager, stateManager, cluster, true, null);
+        .getPolicy(nodeManager, stateManager, conf);
 
     int nodeNum = 3;
     List<DatanodeDetails> datanodeDetails =
@@ -188,12 +191,12 @@ public class TestPipelinePlacementFactory {
   // pipeline created with node on each rack
   @Test
   public void testRackScatterPipelineProviderRackPlacement() throws Exception {
-    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementRackScatter.class.getCanonicalName());
 
     setupRacks(6, 2);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
-        .getPolicy(conf, nodeManager, stateManager, cluster, true, null);
+        .getPolicy(nodeManager, stateManager, conf);
 
     int nodeNum = 3;
     List<DatanodeDetails> excludedNodes = new ArrayList<>();

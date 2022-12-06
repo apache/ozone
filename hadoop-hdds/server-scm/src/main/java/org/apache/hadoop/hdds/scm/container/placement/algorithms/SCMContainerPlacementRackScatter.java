@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +76,19 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = networkTopology;
     this.metrics = metrics;
+  }
+
+  /**
+   * Constructor for Pipeline Provider Pipeline Placement with rack awareness.
+   * @param nodeManager Node Manager
+   * @param stateManager State Manager
+   * @param conf Configuration
+   */
+  public SCMContainerPlacementRackScatter(NodeManager nodeManager,
+      PipelineStateManager stateManager, ConfigurationSource conf) {
+    super(nodeManager, conf);
+    this.networkTopology = nodeManager.getClusterNetworkTopologyMap();
+    this.metrics = null;
   }
 
   public Set<DatanodeDetails> chooseNodesFromRacks(List<Node> racks,

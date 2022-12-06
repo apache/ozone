@@ -51,7 +51,6 @@ import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesti
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Implements Api for creating ratis pipelines.
  */
@@ -81,16 +80,8 @@ public class RatisPipelineProvider
     this.conf = conf;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
-    PlacementPolicy policy = null;
-    try {
-      policy = PipelinePlacementPolicyFactory
-          .getPolicy(conf, nodeManager, stateManager,
-              nodeManager.getClusterNetworkTopologyMap(), true, null);
-    } catch (Exception e) {
-      LOG.info("Cannot create pipeline policy for pipeline");
-    } finally {
-      this.placementPolicy = policy;
-    }
+    this.placementPolicy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);

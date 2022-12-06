@@ -62,7 +62,7 @@ import static org.apache.commons.collections.CollectionUtils.intersection;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -325,7 +325,7 @@ public class TestRatisPipelineProvider {
   public void testFactorTHREEPipelineRackScatterEngagement()
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementRackScatter.class.getCanonicalName());
     conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "0");
     init(0, conf);
