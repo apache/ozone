@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -49,7 +50,9 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -136,7 +139,24 @@ public class TestOMSnapshotDAG {
     // Use RocksDB transaction sequence number in SnapshotInfo, which is
     // persisted at the time of snapshot creation, as the snapshot generation
     return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
-        snapshotInfo.getDbTxSequenceNumber());
+        snapshotInfo.getDbTxSequenceNumber(),
+        getTablePrefixes(omMetadataManager, volumeName, bucketName));
+  }
+
+  private Map<String, String> getTablePrefixes(
+      OMMetadataManager omMetadataManager, String volumeName, String bucketName)
+      throws IOException {
+    HashMap<String, String> tablePrefixes = new HashMap<>();
+    String volumeId = String.valueOf(omMetadataManager.getVolumeId(volumeName));
+    String bucketId =
+        String.valueOf(omMetadataManager.getBucketId(volumeName, bucketName));
+    tablePrefixes.put(OmMetadataManagerImpl.KEY_TABLE,
+        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
+    tablePrefixes.put(OmMetadataManagerImpl.FILE_TABLE,
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
+    tablePrefixes.put(OmMetadataManagerImpl.DIRECTORY_TABLE,
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
+    return tablePrefixes;
   }
 
   @Test

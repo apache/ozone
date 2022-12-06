@@ -554,4 +554,6 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
 
+  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
 }
