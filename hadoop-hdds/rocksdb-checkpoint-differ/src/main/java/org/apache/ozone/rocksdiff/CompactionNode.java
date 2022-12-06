@@ -36,7 +36,7 @@ public class CompactionNode {
    * @param numKeys Number of keys in the SST
    * @param seqNum Snapshot generation (sequence number)
    */
-  CompactionNode(String file, String ssId, long numKeys, long seqNum) {
+  public CompactionNode(String file, String ssId, long numKeys, long seqNum) {
     fileName = file;
     snapshotId = ssId;
     totalNumberOfKeys = numKeys;

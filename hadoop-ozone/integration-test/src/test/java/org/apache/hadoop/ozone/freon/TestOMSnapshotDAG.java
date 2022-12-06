@@ -74,7 +74,6 @@ public class TestOMSnapshotDAG {
    * Create a MiniDFSCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
-   *
    */
   @BeforeAll
   public static void init() throws Exception {
@@ -145,9 +144,10 @@ public class TestOMSnapshotDAG {
   }
 
   @Test
-  void testZeroSizeKey()
-      throws IOException, InterruptedException, TimeoutException {
+  public void testDAGReconstruction()
+          throws IOException, InterruptedException, TimeoutException {
 
+    // Generate keys
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
@@ -155,7 +155,7 @@ public class TestOMSnapshotDAG {
         "--num-of-buckets", "1",
         "--num-of-keys", "500",
         "--num-of-threads", "1",
-        "--key-size", "0",
+        "--key-size", "0",  // zero size keys. since we don't need to test DNs
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
@@ -233,7 +233,7 @@ public class TestOMSnapshotDAG {
     List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
     Assertions.assertTrue(sstDiffList22.isEmpty());
 
-    // Restart OM, do the same diffs again. See if DAG reconstruction works
+    // Test DAG reconstruction by restarting OM. Then do the same diffs again
     cluster.restartOzoneManager();
 
     List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);

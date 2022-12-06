@@ -45,8 +45,8 @@ public class DifferSnapshotInfo {
 
   @Override
   public String toString() {
-    return "DifferSnapshotInfo{" + "dbPath='" + dbPath + '\''
-        + ", snapshotID='" + snapshotID + '\'' + ", snapshotGeneration="
-        + snapshotGeneration + '}';
+    return String.format("DifferSnapshotInfo{" +
+            "dbPath='%s', snapshotID='%s', snapshotGeneration=%d}",
+            dbPath, snapshotID, snapshotGeneration);
   }
 }

@@ -284,7 +284,7 @@ public final class DBStoreBuilder {
 
     // If default column family was not added, add it with the default options.
     cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
-        getDefaultCfOptions(rocksDbCfWriteBufferSize));
+            getCfOptions(rocksDbCfWriteBufferSize));
 
     for (Map.Entry<String, ManagedColumnFamilyOptions> entry:
         cfOptions.entrySet()) {
@@ -294,7 +294,7 @@ public final class DBStoreBuilder {
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
         tableConfigs.add(new TableConfig(name,
-            getDefaultCfOptions(rocksDbCfWriteBufferSize)));
+                getCfOptions(rocksDbCfWriteBufferSize)));
       } else {
         tableConfigs.add(new TableConfig(name, options));
       }
@@ -314,7 +314,7 @@ public final class DBStoreBuilder {
    * @param writeBufferSize Specify column family write buffer size.
    * @return ManagedColumnFamilyOptions
    */
-  private ManagedColumnFamilyOptions getDefaultCfOptions(long writeBufferSize) {
+  private ManagedColumnFamilyOptions getCfOptions(long writeBufferSize) {
     ManagedColumnFamilyOptions cfOpts = getDefaultCfOptions();
     cfOpts.setWriteBufferSize(writeBufferSize);
     return cfOpts;

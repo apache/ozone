@@ -106,7 +106,7 @@ public class TestRocksDBCheckpointDiffer {
   /**
    * Test cases for testGetSSTDiffListWithoutDB.
    */
-  private static Stream<Arguments> testGetSSTDiffListWithoutDBCases() {
+  private static Stream<Arguments> casesGetSSTDiffListWithoutDB() {
 
     DifferSnapshotInfo snapshotInfo1 = new DifferSnapshotInfo(
         "/path/to/dbcp1", "ssUUID1", 3008L);
@@ -192,7 +192,7 @@ public class TestRocksDBCheckpointDiffer {
    * Focuses on testing edge cases in internalGetSSTDiffList().
    */
   @ParameterizedTest(name = "{0}")
-  @MethodSource("testGetSSTDiffListWithoutDBCases")
+  @MethodSource("casesGetSSTDiffListWithoutDB")
   @SuppressWarnings("parameternumber")
   public void testGetSSTDiffListWithoutDB(String description,
       DifferSnapshotInfo srcSnapshot,
@@ -263,7 +263,7 @@ public class TestRocksDBCheckpointDiffer {
    * Does actual DB write, flush, compaction.
    */
   @Test
-  void testWithDB() throws Exception {
+  void testDifferWithDB() throws Exception {
 
     final String clDirStr = "compaction-log";
     // Delete the compaction log dir for the test, if it exists
@@ -549,7 +549,7 @@ public class TestRocksDBCheckpointDiffer {
    * @param reverseMutableGraph
    * @param fwdMutableGraph
    */
-  void traverseGraph(
+  private void traverseGraph(
       ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
       MutableGraph<CompactionNode> reverseMutableGraph,
       MutableGraph<CompactionNode> fwdMutableGraph) {
@@ -570,7 +570,8 @@ public class TestRocksDBCheckpointDiffer {
       }
     }
 
-    HashSet<CompactionNode> visited = new HashSet<>();
+    Set<CompactionNode> visited = new HashSet<>();
+
     for (CompactionNode infileNode : nodeList) {
       if (visited.contains(infileNode)) {
         continue;
@@ -608,7 +609,7 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
-  void printMutableGraphFromAGivenNode(
+  private void printMutableGraphFromAGivenNode(
       ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
       String fileName,
       int sstLevel,
@@ -639,7 +640,7 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
-  void printMutableGraph(String srcSnapId, String destSnapId,
+  private void printMutableGraph(String srcSnapId, String destSnapId,
       MutableGraph<CompactionNode> mutableGraph) {
 
     LOG.debug("Gathering all SST file nodes from src '{}' to dest '{}'",
