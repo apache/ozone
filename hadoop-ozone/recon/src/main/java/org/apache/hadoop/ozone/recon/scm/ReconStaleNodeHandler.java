@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 public class ReconStaleNodeHandler extends StaleNodeHandler {
 
   private static final Logger LOG =
-        LoggerFactory.getLogger(ReconDeadNodeHandler.class);
+        LoggerFactory.getLogger(ReconStaleNodeHandler.class);
   private PipelineSyncTask pipelineSyncTask;
 
   public ReconStaleNodeHandler(NodeManager nodeManager,
