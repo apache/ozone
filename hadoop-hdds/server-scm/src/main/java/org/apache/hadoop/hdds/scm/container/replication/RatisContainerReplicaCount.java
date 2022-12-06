@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
@@ -69,7 +70,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
-      } else {
+      } else if (cr.getState() != State.UNHEALTHY){
         healthyCount++;
       }
     }
