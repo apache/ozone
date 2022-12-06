@@ -69,7 +69,7 @@ public class PipelineSyncTask extends ReconScmTask {
   }
 
   @Override
-  protected synchronized void run() {
+  public void run() {
     try {
       while (canRun()) {
         try {
