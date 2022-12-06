@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -360,11 +361,12 @@ public abstract class SCMCommonPlacementPolicy implements
    * we return numReplicas, from this default implementation.
    *
    * @param numReplicas - The desired replica counts
+   * @param numberOfRacks - The desired number of racks
    * @return The max number of replicas per rack
    */
-  protected int getMaxReplicasPerRack(int numReplicas) {
-    return numReplicas / getRequiredRackCount(numReplicas)
-            + Math.min(numReplicas % getRequiredRackCount(numReplicas), 1);
+  protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    return numReplicas / numberOfRacks
+            + Math.min(numReplicas % numberOfRacks, 1);
   }
 
 
@@ -387,7 +389,7 @@ public abstract class SCMCommonPlacementPolicy implements
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     int requiredRacks = getRequiredRackCount(replicas);
-    int maxReplicasPerRack = getMaxReplicasPerRack(replicas);
+    int maxReplicasPerRack = getMaxReplicasPerRack(replicas, requiredRacks);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -468,44 +470,24 @@ public abstract class SCMCommonPlacementPolicy implements
     int totalNumberOfReplicas = replicas.size();
     int requiredNumberOfPlacementGroups =
             getRequiredRackCount(totalNumberOfReplicas);
-    int additionalNumberOfRacksRequired = Math.max(
-            requiredNumberOfPlacementGroups - placementGroupReplicaIdMap.size(),
-            0);
-    int replicasPerPlacementGroup =
-            getMaxReplicasPerRack(totalNumberOfReplicas);
     Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
-
-    for (List<ContainerReplica> replicaList: placementGroupReplicaIdMap
-            .values()) {
-      if (replicaList.size() > replicasPerPlacementGroup) {
-        List<ContainerReplica> replicasToBeCopied = replicaList.stream()
-                .limit(replicaList.size() - replicasPerPlacementGroup)
-                .collect(Collectors.toList());
-        copyReplicaSet.addAll(replicasToBeCopied);
-        replicaList.removeAll(replicasToBeCopied);
-      }
-    }
-    if (additionalNumberOfRacksRequired > copyReplicaSet.size()) {
-      additionalNumberOfRacksRequired -= copyReplicaSet.size();
-      Queue<List<ContainerReplica>> placementGroupReplicas =
-              new PriorityQueue<>((o1, o2) ->
-                      Integer.compare(o2.size(), o1.size()));
-      placementGroupReplicas.addAll(placementGroupReplicaIdMap.values());
-      while (placementGroupReplicas.size() > 0
-              && additionalNumberOfRacksRequired > 0) {
-        List<ContainerReplica> replicaList = placementGroupReplicas.poll();
-        int numberOfReplicasToBeCopied = Math.max(1,
-                Math.min(replicaList.size()
-                        - Optional.ofNullable(placementGroupReplicas.peek())
-                          .map(List::size).orElse(0),
-                        additionalNumberOfRacksRequired));
+    List<List<ContainerReplica>> replicaSet = placementGroupReplicaIdMap
+            .values().stream()
+            .sorted((o1, o2) -> Integer.compare(o2.size(), o1.size()))
+            .collect(Collectors.toList());
+    for (List<ContainerReplica> replicaList: replicaSet) {
+      int maxReplicasPerPlacementGroup = getMaxReplicasPerRack(
+              totalNumberOfReplicas, requiredNumberOfPlacementGroups);
+      int numberOfReplicasToBeCopied = Math.max(0,
+              replicaList.size() - maxReplicasPerPlacementGroup);
+      totalNumberOfReplicas -= Math.min(replicaList.size(),
+              maxReplicasPerPlacementGroup);
+      requiredNumberOfPlacementGroups -= 1;
+      if (numberOfReplicasToBeCopied > 0) {
         List<ContainerReplica> replicasToBeCopied = replicaList.stream()
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
         copyReplicaSet.addAll(replicasToBeCopied);
-        replicaList.removeAll(replicasToBeCopied);
-        placementGroupReplicas.add(replicaList);
-        additionalNumberOfRacksRequired -= replicasToBeCopied.size();
       }
     }
     return copyReplicaSet;

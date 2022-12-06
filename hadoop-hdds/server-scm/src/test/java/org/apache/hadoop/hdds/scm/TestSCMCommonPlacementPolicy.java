@@ -150,14 +150,8 @@ public class TestSCMCommonPlacementPolicy {
     replicas = HddsTestUtils.getReplicas(new ContainerID(1),
             CLOSED, 0, replicaDns);
 
-    int idx = 0;
-    Map<Node, Integer> expectedRackCnt = Maps.newHashMap();
-    expectedRackCnt.put(racks.get(0), 1);
-    expectedRackCnt.put(racks.get(3), 0);
-    expectedRackCnt.compute(expectedRackCnt.keySet().stream().findFirst().get(),
-            (node, integer) -> integer + 1);
     testReplicasToFixMisreplication(replicas, dummyPlacementPolicy, 2,
-            expectedRackCnt);
+            ImmutableMap.of(racks.get(0), 1, racks.get(3), 1));
     dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 2);
     racks = dummyPlacementPolicy.racks;
