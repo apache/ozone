@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -559,5 +560,10 @@ public class ObjectStore {
   public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
       throws IOException {
     return proxy.listSnapshot(volumeName, bucketName);
+  }
+  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
+                                         String fromSnapshot, String toSnapshot)
+      throws IOException {
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot);
   }
 }
