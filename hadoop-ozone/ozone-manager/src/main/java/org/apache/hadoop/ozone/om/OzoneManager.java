@@ -1418,6 +1418,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Get snapshot manager.
+   *
+   * @return Om snapshot manager.
+   */
+  public OmSnapshotManager getOmSnapshotManager() {
+    return omSnapshotManager;
+  }
+
+  /**
    * Get metadata manager.
    *
    * @return metadata manager.
