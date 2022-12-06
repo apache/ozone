@@ -228,9 +228,11 @@ public class TestKeyDeletingService {
     // Create 2 versions of the same key
     String keyName = String.format("key%s",
         RandomStringUtils.randomAlphanumeric(5));
-    OmKeyArgs keyArgs = createAndCommitKey(keyManager, volumeName, bucketName,
-        keyName, 1);
-    createAndCommitKey(keyManager, volumeName, bucketName, keyName, 2);
+    OmKeyArgs keyArgs =
+        createAndCommitKey(writeClient, keyManager, volumeName, bucketName,
+            keyName, 1);
+    createAndCommitKey(writeClient, keyManager, volumeName, bucketName, keyName,
+        2);
 
     // Delete the key
     writeClient.deleteKey(keyArgs);
@@ -266,15 +268,16 @@ public class TestKeyDeletingService {
       createVolumeAndBucket(keyManager, volumeName, bucketName, false);
 
       // Create the key
-      OmKeyArgs keyArg = createAndCommitKey(keyManager, volumeName, bucketName,
-          keyName, numBlocks);
+      OmKeyArgs keyArg =
+          createAndCommitKey(writeClient, keyManager, volumeName, bucketName,
+              keyName, numBlocks);
 
       // Delete the key
       writeClient.deleteKey(keyArg);
     }
   }
 
-  private void createVolumeAndBucket(KeyManager keyManager, String volumeName,
+  static void createVolumeAndBucket(KeyManager keyManager, String volumeName,
       String bucketName, boolean isVersioningEnabled) throws IOException {
     // cheat here, just create a volume and bucket entry so that we can
     // create the keys, we put the same data for key and value since the
@@ -293,7 +296,8 @@ public class TestKeyDeletingService {
             .build());
   }
 
-  private OmKeyArgs createAndCommitKey(KeyManager keyManager, String volumeName,
+  static OmKeyArgs createAndCommitKey(OzoneManagerProtocol writeClient,
+      KeyManager keyManager, String volumeName,
       String bucketName, String keyName, int numBlocks) throws IOException {
     OmKeyArgs keyArg =
         new OmKeyArgs.Builder()

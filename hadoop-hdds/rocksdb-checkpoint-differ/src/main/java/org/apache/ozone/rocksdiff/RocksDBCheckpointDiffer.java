@@ -30,9 +30,11 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileReader;
+import org.rocksdb.SstFileReaderIterator;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -480,21 +483,28 @@ public class RocksDBCheckpointDiffer {
     Options option = new Options();
     SstFileReader reader = new SstFileReader(option);
 
-    File sstFile = new File(sstBackupDir + filename);
-    File sstFileInActiveDB = new File(activeDBLocationStr + filename);
-    if (sstFile.exists()) {
-      reader.open(sstBackupDir + filename);
-    } else if (sstFileInActiveDB.exists()) {
-      reader.open(activeDBLocationStr + filename);
-    } else {
-      throw new RuntimeException("Can't find SST file: " + filename);
-    }
+    reader.open(getAbsoluteSstFilePath(filename));
 
     TableProperties properties = reader.getTableProperties();
     if (LOG.isDebugEnabled()) {
       LOG.debug("{} has {} keys", filename, properties.getNumEntries());
     }
     return properties.getNumEntries();
+  }
+
+  private String getAbsoluteSstFilePath(String filename) {
+    if (!filename.endsWith(SST_FILE_EXTENSION)) {
+      filename += SST_FILE_EXTENSION;
+    }
+    File sstFile = new File(sstBackupDir + filename);
+    File sstFileInActiveDB = new File(activeDBLocationStr + filename);
+    if (sstFile.exists()) {
+      return sstBackupDir + filename;
+    } else if (sstFileInActiveDB.exists()) {
+      return activeDBLocationStr + filename;
+    } else {
+      throw new RuntimeException("Can't find SST file: " + filename);
+    }
   }
 
   /**
@@ -701,7 +711,43 @@ public class RocksDBCheckpointDiffer {
       LOG.debug("{}", logSB);
     }
 
+    if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
+      filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes());
+    }
+
     return new ArrayList<>(fwdDAGDifferentFiles);
+  }
+
+  public void filterRelevantSstFiles(Set<String> inputFiles,
+      Map<String, String> tableToPrefixMap) {
+    for (String filename : inputFiles) {
+      String filepath = getAbsoluteSstFilePath(filename);
+      try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
+        sstFileReader.open(filepath);
+        TableProperties properties = sstFileReader.getTableProperties();
+        String tableName = new String(properties.getColumnFamilyName(), UTF_8);
+        if (tableToPrefixMap.containsKey(tableName)) {
+          String prefix = tableToPrefixMap.get(tableName);
+          SstFileReaderIterator iterator =
+              sstFileReader.newIterator(new ReadOptions());
+          iterator.seekToFirst();
+          String firstKey = RocksDiffUtils
+              .constructBucketKey(new String(iterator.key(), UTF_8));
+          iterator.seekToLast();
+          String lastKey = RocksDiffUtils
+              .constructBucketKey(new String(iterator.key(), UTF_8));
+          if (!RocksDiffUtils
+              .isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
+            inputFiles.remove(filename);
+          }
+        } else {
+          // entry from other tables
+          inputFiles.remove(filename);
+        }
+      } catch (RocksDBException e) {
+        e.printStackTrace();
+      }
+    }
   }
 
   /**
@@ -907,4 +953,5 @@ public class RocksDBCheckpointDiffer {
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
   }
+
 }

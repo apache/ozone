@@ -17,6 +17,8 @@
  */
 package org.apache.ozone.rocksdiff;
 
+import java.util.Map;
+
 /**
  * Snapshot information node class for the differ.
  */
@@ -25,10 +27,14 @@ public class DifferSnapshotInfo {
   private final String snapshotID;
   private final long snapshotGeneration;
 
-  public DifferSnapshotInfo(String db, String id, long gen) {
+  private final Map<String, String> tablePrefixes;
+
+  public DifferSnapshotInfo(String db, String id, long gen,
+                            Map<String, String> prefixes) {
     dbPath = db;
     snapshotID = id;
     snapshotGeneration = gen;
+    tablePrefixes = prefixes;
   }
 
   public String getDbPath() {
@@ -43,10 +49,15 @@ public class DifferSnapshotInfo {
     return snapshotGeneration;
   }
 
+  public Map<String, String> getTablePrefixes() {
+    return tablePrefixes;
+  }
+
   @Override
   public String toString() {
-    return String.format("DifferSnapshotInfo{" +
-            "dbPath='%s', snapshotID='%s', snapshotGeneration=%d}",
-            dbPath, snapshotID, snapshotGeneration);
+    return String.format("DifferSnapshotInfo{dbPath='%s', snapshotID='%s', " +
+                    "snapshotGeneration=%d, tablePrefixes size=%s}",
+            dbPath, snapshotID, snapshotGeneration, tablePrefixes.size());
   }
+
 }

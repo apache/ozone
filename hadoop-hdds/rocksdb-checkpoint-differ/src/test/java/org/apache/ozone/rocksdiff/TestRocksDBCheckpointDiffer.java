@@ -109,13 +109,13 @@ public class TestRocksDBCheckpointDiffer {
   private static Stream<Arguments> casesGetSSTDiffListWithoutDB() {
 
     DifferSnapshotInfo snapshotInfo1 = new DifferSnapshotInfo(
-        "/path/to/dbcp1", "ssUUID1", 3008L);
+        "/path/to/dbcp1", "ssUUID1", 3008L, null);
     DifferSnapshotInfo snapshotInfo2 = new DifferSnapshotInfo(
-        "/path/to/dbcp2", "ssUUID2", 14980L);
+        "/path/to/dbcp2", "ssUUID2", 14980L, null);
     DifferSnapshotInfo snapshotInfo3 = new DifferSnapshotInfo(
-        "/path/to/dbcp3", "ssUUID3", 17975L);
+        "/path/to/dbcp3", "ssUUID3", 17975L, null);
     DifferSnapshotInfo snapshotInfo4 = new DifferSnapshotInfo(
-        "/path/to/dbcp4", "ssUUID4", 18000L);
+        "/path/to/dbcp4", "ssUUID4", 18000L, null);
 
     Set<String> snapshotSstFiles1 = new HashSet<>(asList(
         "000059", "000053"));
@@ -392,7 +392,7 @@ public class TestRocksDBCheckpointDiffer {
     createCheckPoint(TEST_DB_PATH, cpPath, rocksDB);
     final String snapshotId = "snap_id_" + snapshotGeneration;
     final DifferSnapshotInfo currentSnapshot =
-        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration);
+        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null);
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do

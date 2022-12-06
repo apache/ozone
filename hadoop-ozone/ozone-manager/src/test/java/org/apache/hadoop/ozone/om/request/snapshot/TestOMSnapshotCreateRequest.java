@@ -147,7 +147,42 @@ public class TestOMSnapshotCreateRequest {
         "Invalid snapshot name: " + badName,
         () -> doPreExecute(omRequest));
   }
-  
+
+  @Test
+  public void testPreExecuteNameOnlyNumbers() throws Exception {
+    // check invalid snapshot name containing only numbers
+    String badNameON = "1234";
+    OMRequest omRequest =
+            OMRequestTestUtils.createSnapshotRequest(
+                    volumeName, bucketName, badNameON);
+    LambdaTestUtils.intercept(OMException.class,
+            "Invalid snapshot name: " + badNameON,
+            () -> doPreExecute(omRequest));
+  }
+
+  @Test
+  public void testPreExecuteNameLength() throws Exception {
+    // check snapshot name length
+    String name63 =
+            "snap75795657617173401188448010125899089001363595171500499231286";
+    String name64 =
+            "snap156808943643007724443266605711479126926050896107709081166294";
+
+    // name length = 63
+    when(ozoneManager.isOwner(any(), any())).thenReturn(true);
+    OMRequest omRequest = OMRequestTestUtils.createSnapshotRequest(
+                    volumeName, bucketName, name63);
+    // should not throw any error
+    doPreExecute(omRequest);
+
+    // name length = 64
+    OMRequest omRequest2 = OMRequestTestUtils.createSnapshotRequest(
+                    volumeName, bucketName, name64);
+    LambdaTestUtils.intercept(OMException.class,
+            "Invalid snapshot name: " + name64,
+            () -> doPreExecute(omRequest2));
+  }
+
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);

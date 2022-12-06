@@ -102,6 +102,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
@@ -282,6 +284,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
             getSnapshots(request.getListSnapshotRequest());
         responseBuilder.setListSnapshotResponse(listSnapshotResponse);
+        break;
+      case SnapshotDiff:
+        SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
+            request.getSnapshotDiffRequest());
+        responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1197,6 +1204,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     return impl.getS3VolumeContext().getProtobuf();
   }
+
+  private SnapshotDiffResponse snapshotDiff(
+      SnapshotDiffRequest snapshotDiffRequest) throws IOException {
+    return SnapshotDiffResponse.newBuilder().setSnapshotDiffReport(
+        impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
+            snapshotDiffRequest.getBucketName(),
+            snapshotDiffRequest.getFromSnapshot(),
+            snapshotDiffRequest.getToSnapshot()).toProtobuf()).build();
+  }
+
 
   public OzoneManager getOzoneManager() {
     return impl;

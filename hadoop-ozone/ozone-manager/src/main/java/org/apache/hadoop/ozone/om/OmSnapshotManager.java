@@ -33,7 +33,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
