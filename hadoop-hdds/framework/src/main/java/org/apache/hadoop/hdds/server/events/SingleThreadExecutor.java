@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
-import org.apache.hadoop.hdds.metrics.MetricsUtil;
+import org.apache.hadoop.hdds.utils.MetricsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
