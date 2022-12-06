@@ -320,6 +320,16 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.filtering.limit.per.task";
+  public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
+
+  public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
+      "ozone.snapshot.filtering.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
+
+
   public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
       "ozone.om.grpc.maximum.response.length";
   /** Default value for GRPC_MAXIMUM_RESPONSE_LENGTH. */
