@@ -1169,13 +1169,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
       throws IOException {
     if (Strings.isNullOrEmpty(volumeName)) {
-      throw new OMException("Volume name is required.",
-          ResultCodes.VOLUME_NOT_FOUND);
+      throw new OMException("Volume name is required.", VOLUME_NOT_FOUND);
     }
 
     if (Strings.isNullOrEmpty(bucketName)) {
-      throw new OMException("Bucket name is required.",
-          ResultCodes.BUCKET_NOT_FOUND);
+      throw new OMException("Bucket name is required.", BUCKET_NOT_FOUND);
+    }
+
+    String bucketNameBytes = getBucketKey(volumeName, bucketName);
+    if (getBucketTable().get(bucketNameBytes) == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+          BUCKET_NOT_FOUND);
     }
 
     String prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
@@ -1207,6 +1211,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
       KeyValue< String, SnapshotInfo> snapshotinfo;
+      snapshotIter.seek(prefix);
       while (snapshotIter.hasNext()) {
         snapshotinfo = snapshotIter.next();
         if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix)) {
