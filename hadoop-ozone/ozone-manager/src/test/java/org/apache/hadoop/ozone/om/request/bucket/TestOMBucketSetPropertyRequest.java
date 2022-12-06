@@ -444,4 +444,92 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         contains("Cannot update bucket quota. NamespaceQuota requested " +
             "is less than used namespaceQuota"));
   }
+
+  @Test
+  public void testSettingQuotaRetainsReplication() throws Exception {
+    String volumeName1 = UUID.randomUUID().toString();
+    String bucketName1 = UUID.randomUUID().toString();
+    String volumeName2 = UUID.randomUUID().toString();
+    String bucketName2 = UUID.randomUUID().toString();
+
+    /* Bucket with default replication */
+    OMRequestTestUtils.addVolumeAndBucketToDB(
+            volumeName1, bucketName1, omMetadataManager);
+
+    String bucketKey = omMetadataManager
+            .getBucketKey(volumeName1, bucketName1);
+
+    OmBucketInfo dbBucketInfoBefore =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    /* Setting quota on a bucket with default replication */
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName1,
+            bucketName1, true, 20 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+            new OMBucketSetPropertyRequest(omRequest);
+
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+            .validateAndUpdateCache(ozoneManager, 1,
+                    ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(true, omClientResponse.getOMResponse().getSuccess());
+
+    OmBucketInfo dbBucketInfoAfter =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    Assert.assertEquals(null,
+            dbBucketInfoAfter.getDefaultReplicationConfig());
+    Assert.assertEquals(
+            dbBucketInfoBefore.getDefaultReplicationConfig(),
+            dbBucketInfoAfter.getDefaultReplicationConfig());
+    Assert.assertEquals(20 * GB,
+            dbBucketInfoAfter.getQuotaInBytes());
+    Assert.assertEquals(1000L,
+            dbBucketInfoAfter.getQuotaInNamespace());
+
+    /* Bucket with EC replication */
+    OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
+            .setVolumeName(volumeName2)
+            .setBucketName(bucketName2)
+            .setDefaultReplicationConfig(new DefaultReplicationConfig(
+                    EC, new ECReplicationConfig(3, 2)));
+
+    OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketInfo);
+
+    bucketKey = omMetadataManager
+            .getBucketKey(volumeName2, bucketName2);
+    dbBucketInfoBefore =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    /* Setting quota on a bucket with non-default EC replication */
+    omRequest = createSetBucketPropertyRequest(volumeName2,
+            bucketName2, true, 20 * GB);
+
+    omBucketSetPropertyRequest =
+            new OMBucketSetPropertyRequest(omRequest);
+
+    omClientResponse = omBucketSetPropertyRequest
+            .validateAndUpdateCache(ozoneManager, 1,
+                    ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(true, omClientResponse.getOMResponse().getSuccess());
+
+    dbBucketInfoAfter =
+            omMetadataManager.getBucketTable().get(bucketKey);
+
+    Assert.assertEquals(EC,
+            dbBucketInfoAfter.getDefaultReplicationConfig().getType());
+    Assert.assertEquals(
+            dbBucketInfoBefore.getDefaultReplicationConfig().getType(),
+            dbBucketInfoAfter.getDefaultReplicationConfig().getType());
+    Assert.assertEquals(
+            dbBucketInfoBefore.getDefaultReplicationConfig().getFactor(),
+            dbBucketInfoAfter.getDefaultReplicationConfig().getFactor());
+    Assert.assertEquals(20 * GB,
+            dbBucketInfoAfter.getQuotaInBytes());
+    Assert.assertEquals(1000L,
+            dbBucketInfoAfter.getQuotaInNamespace());
+  }
 }
