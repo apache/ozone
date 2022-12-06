@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertifi
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -347,23 +348,53 @@ public class TestDefaultCAServer {
 
   @Test
   public void testExternalRootCA(@TempDir Path tempDir) throws Exception {
-    String externalCaCert = "CaCert.pem";
+    //Given an external certificate
+    String externalCaCertFileName = "CaCert.pem";
+    setExternalPathsInConfig(tempDir, externalCaCertFileName);
+
     SecurityConfig securityConfig = new SecurityConfig(conf);
     SCMCertificateClient scmCertificateClient =
         new SCMCertificateClient(new SecurityConfig(conf));
-    KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
+
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
         scmCertificateClient.getComponentName());
+
     keyPEMWriter.writeKey(tempDir, keyPair, true);
-    X509CertificateHolder certificateHolder = generateExternalCert(securityConfig);
+    X509CertificateHolder externalCert = generateExternalCert(keyPair);
 
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         scmCertificateClient.getComponentName());
 
-    certificateCodec.writeCertificate(tempDir, externalCaCert,
-        CertificateCodec.getPEMEncodedString(certificateHolder), true);
-    
-    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_PATH, tempDir.toString());
+    certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
+        CertificateCodec.getPEMEncodedString(externalCert), true);
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        RandomStringUtils.randomAlphabetic(4),
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    //When initializing a CA server with external cert
+    testCA.init(securityConfig, SELF_SIGNED_CA);
+    //Then the external cert is set as CA cert for the server.
+    assertEquals(externalCert, testCA.getCACertificate());
+  }
+
+  private void setExternalPathsInConfig(Path tempDir,
+                                        String externalCaCertFileName) {
+    String externalCaCertPart = Paths.get(tempDir.toString(),
+        externalCaCertFileName).toString();
+    String privateKeyPath = Paths.get(tempDir.toString(),
+        HddsConfigKeys.HDDS_PRIVATE_KEY_FILE_NAME_DEFAULT).toString();
+    String publicKeyPath = Paths.get(tempDir.toString(),
+        HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT).toString();
+
+    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_PATH,
+        externalCaCertPart);
+    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH,
+        privateKeyPath);
+    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH,
+        publicKeyPath);
   }
 
   @Test
@@ -441,15 +472,13 @@ public class TestDefaultCAServer {
 
   }
 
-  private X509CertificateHolder generateExternalCert(SecurityConfig securityConfig) throws Exception {
+  private X509CertificateHolder generateExternalCert(KeyPair keyPair)
+      throws Exception {
     LocalDateTime notBefore = LocalDateTime.now();
     LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
-    HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
-    KeyPair keyPair = keyGen.generateKey();
 
     SelfSignedCertificate.Builder builder =
         SelfSignedCertificate.newBuilder()
@@ -478,8 +507,6 @@ public class TestDefaultCAServer {
           "Error while adding ip to CA self signed certificate", e,
           CSR_ERROR);
     }
-
     return builder.build();
   }
-
 }
