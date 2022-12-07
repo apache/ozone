@@ -44,7 +44,7 @@ public final class PipelineLeaderInfoMetrics {
 
   private MetricsRegistry registry;
   private static PipelineLeaderInfoMetrics instance;
-  private static PipelineManagerImpl pipelineManager;
+  private PipelineManagerImpl pipelineManager;
 
 
   private static final Logger LOG =
