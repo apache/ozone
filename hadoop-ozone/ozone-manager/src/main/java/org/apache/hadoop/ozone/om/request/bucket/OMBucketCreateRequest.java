@@ -92,7 +92,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
     boolean clientReqIsS3NamingCompliant = ozoneManager.isS3NamingCompliant();
-    // client side configuration could override the property isS3NamingCompliant on server
+    // client side flag could override the isS3NamingCompliant of OM
+    // default value of OM's isS3NamingCompliant = true
     clientReqIsS3NamingCompliant = bucketInfo.getIsS3NamingCompliant();
     // Verify resource name
     OmUtils.verifyBucketNameAllowNonS3Compliant(bucketInfo.getBucketName(), clientReqIsS3NamingCompliant);

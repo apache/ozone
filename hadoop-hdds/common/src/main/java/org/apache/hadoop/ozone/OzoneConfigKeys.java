@@ -482,7 +482,6 @@ public final class OzoneConfigKeys {
       false;
 
   public static final String OZONE_OM_METADATA_S3_NAMING_COMPLIANT = "ozone.om.s3.naming.compliant";
-  public static final String OZONE_CLIENT_METADATA_S3_NAMING_COMPLIANT = "ozone.client.s3.naming.compliant";
 
   public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =

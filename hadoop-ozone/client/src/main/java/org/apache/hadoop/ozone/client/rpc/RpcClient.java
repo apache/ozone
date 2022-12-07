@@ -619,7 +619,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     // there're other types of volume/bucket/key operation using the original verifyBucketName method,
     // in order not to change all those methods for now, I created a separate method  verifyBucketNameAllowNonS3Compliant,
-    // which accepts a boolean parameter to read client side's configuration of property: ozone.client.s3.naming.compliant.
+    // which accepts a boolean parameter to read client side's flag of isS3NamingCompliant.
     verifyBucketNameAllowNonS3Compliant(bucketName, bucketArgs.getIsS3NamingCompliant());
     Preconditions.checkNotNull(bucketArgs);
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());

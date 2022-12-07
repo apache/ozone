@@ -65,6 +65,10 @@ public class CreateBucketHandler extends BucketHandler {
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
   private AllowedBucketLayouts allowedBucketLayout;
 
+  @Option(names = { "--nonS3Naming"},
+      description = "Allowed Bucket name created as non-S3 naming compliant")
+  private Boolean allowedNonS3Naming;
+
   @CommandLine.Mixin
   private ShellReplicationOptions replication;
 
@@ -84,7 +88,7 @@ public class CreateBucketHandler extends BucketHandler {
 
     BucketArgs.Builder bb =
         new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-            .setVersioning(false).setOwner(ownerName);
+            .setVersioning(false).setOwner(ownerName).setIsS3NamingCompliant(true);
     if (allowedBucketLayout != null) {
       BucketLayout bucketLayout =
           BucketLayout.fromString(allowedBucketLayout.toString());
@@ -107,6 +111,10 @@ public class CreateBucketHandler extends BucketHandler {
         out().printf("Bucket Encryption enabled with Key Name: %s%n",
             bekName);
       }
+    }
+
+    if (allowedNonS3Naming != null) {
+      bb.setIsS3NamingCompliant(!allowedNonS3Naming.booleanValue());
     }
 
     replication.fromParams(getConf()).ifPresent(config ->
