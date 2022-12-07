@@ -474,6 +474,7 @@ public abstract class SCMCommonPlacementPolicy implements
     List<List<ContainerReplica>> replicaSet = placementGroupReplicaIdMap
             .values().stream()
             .sorted((o1, o2) -> Integer.compare(o2.size(), o1.size()))
+            .limit(requiredNumberOfPlacementGroups)
             .collect(Collectors.toList());
     for (List<ContainerReplica> replicaList: replicaSet) {
       int maxReplicasPerPlacementGroup = getMaxReplicasPerRack(
