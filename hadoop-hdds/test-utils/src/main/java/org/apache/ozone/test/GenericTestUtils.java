@@ -25,10 +25,13 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import javafx.util.Pair;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -43,6 +46,7 @@ import org.junit.Assert;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertTrue;
@@ -281,6 +285,12 @@ public abstract class GenericTestUtils {
     modifiersField.setAccessible(modifierFieldAccessible);
     field.setAccessible(isAccessible);
     return value;
+  }
+
+  public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
+    return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
+            .map(v ->new Pair<>(v, entry.getKey())))
+            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
   /**
