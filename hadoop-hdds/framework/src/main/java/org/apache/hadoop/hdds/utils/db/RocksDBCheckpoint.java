@@ -19,15 +19,12 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 
 /**
  * Class to hold information and location of a RocksDB Checkpoint.
@@ -81,12 +78,5 @@ public class RocksDBCheckpoint implements DBCheckpoint {
     LOG.info("Cleaning up RocksDB checkpoint at {}",
             checkpointLocation.toString());
     FileUtils.deleteDirectory(checkpointLocation.toFile());
-    File a = checkpointLocation.toFile();
-    if (a.getName().equals(SNAPSHOT_CANDIDATE_DIR) && !a.exists()) {
-      boolean success = a.mkdir();
-      if (!success) {
-        LOG.warn("Unable to create RocksDB checkpoint candidate directory");
-      }
-    }
   }
 }
