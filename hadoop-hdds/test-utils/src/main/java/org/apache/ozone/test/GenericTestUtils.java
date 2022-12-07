@@ -31,10 +31,10 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
-import javafx.util.Pair;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -289,7 +289,7 @@ public abstract class GenericTestUtils {
 
   public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
-            .map(v -> new Pair<>(v, entry.getKey())))
+            .map(v -> Pair.of(v, entry.getKey())))
             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
