@@ -122,6 +122,7 @@ public class PipelineManagerImpl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.freezePipelineCreation = new AtomicBoolean();
+    new PipelineLeaderInfoMetrics(this);
   }
 
   @SuppressWarnings("checkstyle:parameterNumber")
