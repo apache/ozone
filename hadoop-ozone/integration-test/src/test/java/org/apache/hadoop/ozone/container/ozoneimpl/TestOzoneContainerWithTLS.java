@@ -62,6 +62,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -75,7 +76,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -239,13 +239,10 @@ public class TestOzoneContainerWithTLS {
         containerIdList.add(containerId);
       }
 
-      // Wait certificate with 5s lifetime to expire
-      Thread.sleep(5000);
-      try {
-        caClient.getCertificate().checkValidity();
-        fail("Certificate should have expired.");
-      } catch (Exception e) {
-      }
+      // Wait certificate to expire
+      GenericTestUtils.waitFor(() ->
+              caClient.getCertificate().getNotAfter().before(new Date()),
+          500, 5000);
 
       List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
       sourceDatanodes.add(dn);

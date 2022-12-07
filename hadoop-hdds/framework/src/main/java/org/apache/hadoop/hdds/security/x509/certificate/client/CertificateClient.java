@@ -326,18 +326,12 @@ public interface CertificateClient extends Closeable {
   boolean processCrl(CRLInfo crl);
 
   /**
-   * Return the store factory for with key manager and trust manager for server.
+   * Return the store factory for key manager and trust manager for server.
    */
-  default KeyStoresFactory getServerKeyStoresFactory()
-      throws CertificateException {
-    return null;
-  }
+  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
 
   /**
-   * Return the store factory for with key manager and trust manager for client.
+   * Return the store factory for key manager and trust manager for client.
    */
-  default KeyStoresFactory getClientKeyStoresFactory(boolean mutualAuth)
-      throws CertificateException {
-    return null;
-  }
+  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
 }

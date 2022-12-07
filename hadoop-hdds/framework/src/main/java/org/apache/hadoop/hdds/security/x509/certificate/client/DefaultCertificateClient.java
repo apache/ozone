@@ -112,7 +112,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private List<String> pemEncodedCACerts = null;
   private final Lock lock;
   private KeyStoresFactory serverKeyStoresFactory;
-  // for mutual authentication client
   private KeyStoresFactory clientKeyStoresFactory;
 
   DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
@@ -1077,10 +1076,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public KeyStoresFactory getClientKeyStoresFactory(boolean mutualAuth)
+  public KeyStoresFactory getClientKeyStoresFactory()
       throws CertificateException {
-    Preconditions.checkArgument(mutualAuth,
-        "Only support mutual authentication client now.");
     if (clientKeyStoresFactory == null) {
       clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
           securityConfig, this, true);
@@ -1089,7 +1086,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     if (serverKeyStoresFactory != null) {
       serverKeyStoresFactory.destroy();
     }
