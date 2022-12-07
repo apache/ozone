@@ -463,14 +463,15 @@ public final class SnapshotInfo implements Auditable {
    * Factory for making standard instance.
    */
   public static SnapshotInfo newInstance(String volumeName,
-      String bucketName, String snapshotName) {
+                                         String bucketName,
+                                         String snapshotName,
+                                         String snapshotId) {
     SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
-    String id = UUID.randomUUID().toString();
     long initialTime = Time.now();
     if (StringUtils.isBlank(snapshotName)) {
       snapshotName = generateName(initialTime);
     }
-    builder.setSnapshotID(id)
+    builder.setSnapshotID(snapshotId)
         .setName(snapshotName)
         .setCreationTime(initialTime)
         .setDeletionTime(INVALID_TIMESTAMP)
@@ -479,7 +480,7 @@ public final class SnapshotInfo implements Auditable {
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setCheckpointDir(getCheckpointDirName(id));
+        .setCheckpointDir(getCheckpointDirName(snapshotId));
     return builder.build();
   }
 
