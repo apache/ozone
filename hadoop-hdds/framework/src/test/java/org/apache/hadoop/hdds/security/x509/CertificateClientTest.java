@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -215,6 +216,18 @@ public class CertificateClientTest implements CertificateClient {
   @Override
   public boolean processCrl(CRLInfo crl) {
     return false;
+  }
+
+  @Override
+  public KeyStoresFactory getServerKeyStoresFactory()
+      throws CertificateException {
+    return null;
+  }
+
+  @Override
+  public KeyStoresFactory getClientKeyStoresFactory()
+      throws CertificateException {
+    return null;
   }
 
   @Override

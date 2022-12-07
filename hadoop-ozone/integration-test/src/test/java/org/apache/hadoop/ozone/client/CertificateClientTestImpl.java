@@ -337,7 +337,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public KeyStoresFactory getClientKeyStoresFactory(boolean mutualAuth) {
+  public KeyStoresFactory getClientKeyStoresFactory() {
     return clientKeyStoresFactory;
   }
 

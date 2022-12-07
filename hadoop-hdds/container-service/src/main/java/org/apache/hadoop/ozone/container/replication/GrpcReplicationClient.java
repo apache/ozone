@@ -73,7 +73,7 @@ public class GrpcReplicationClient implements AutoCloseable {
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (certClient != null) {
-        KeyStoresFactory factory = certClient.getClientKeyStoresFactory(true);
+        KeyStoresFactory factory = certClient.getClientKeyStoresFactory();
         sslContextBuilder
             .trustManager(factory.getTrustManagers()[0])
             .clientAuth(ClientAuth.REQUIRE)
