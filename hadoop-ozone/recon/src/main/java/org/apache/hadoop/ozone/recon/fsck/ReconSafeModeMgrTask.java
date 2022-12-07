@@ -59,7 +59,7 @@ public class ReconSafeModeMgrTask {
     this.nodeManager = nodeManager;
     this.allNodes = nodeManager.getAllNodes();
     this.containers = containerManager.getContainers();
-    interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    interval = reconTaskConfig.getSafeModeWaitThreshold().toMillis();
   }
 
   public synchronized void start() {
