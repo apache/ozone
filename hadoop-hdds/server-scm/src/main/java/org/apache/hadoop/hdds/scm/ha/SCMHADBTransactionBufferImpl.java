@@ -39,7 +39,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
-  private RWBatchOperation currentBatchOperation;
+  private volatile RWBatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
 

@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.rocksdb.ColumnFamilyHandle;
 
@@ -27,5 +28,10 @@ import org.rocksdb.ColumnFamilyHandle;
  */
 public interface RWBatchOperation extends BatchOperation {
   ManagedRocksIterator newIteratorWithBase(
-      ColumnFamilyHandle handle, ManagedRocksIterator newIterator);
+      ColumnFamilyHandle handle, ManagedRocksIterator newIterator)
+      throws IOException;
+
+  void lockOperation() throws IOException;
+  
+  void releaseOperation();
 }

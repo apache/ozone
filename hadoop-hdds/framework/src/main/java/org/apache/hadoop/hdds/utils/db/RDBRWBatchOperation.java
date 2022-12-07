@@ -19,11 +19,15 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyHandle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
 
@@ -31,8 +35,15 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.manag
  * Read Write Batch operation implementation for rocks db.
  */
 public class RDBRWBatchOperation implements RWBatchOperation {
-
+  public static final Logger LOG =
+      LoggerFactory.getLogger(RDBRWBatchOperation.class);
   private final ManagedReadWriteBatch writeBatch;
+  
+  private final AtomicLong operationCount = new AtomicLong(0);
+  
+  private final AtomicBoolean isActive = new AtomicBoolean(true);
+
+  private final Object lock = new Object();
 
   public RDBRWBatchOperation() {
     writeBatch = new ManagedReadWriteBatch();
@@ -55,7 +66,23 @@ public class RDBRWBatchOperation implements RWBatchOperation {
 
   @Override
   public void close() {
+    synchronized (lock) {
+      isActive.set(false);
+    }
+
+    waitForNoOperation();
     writeBatch.close();
+  }
+
+  private void waitForNoOperation() {
+    while (operationCount.get() > 0) {
+      try {
+        Thread.sleep(1);
+      } catch (InterruptedException ex) {
+        LOG.error("RWBatch Interrupted exception while wait", ex);
+        return;
+      }
+    }
   }
 
   @Override
@@ -71,7 +98,28 @@ public class RDBRWBatchOperation implements RWBatchOperation {
 
   @Override
   public ManagedRocksIterator newIteratorWithBase(
-      ColumnFamilyHandle handle, ManagedRocksIterator newIterator) {
-    return managed(writeBatch.newIteratorWithBase(handle, newIterator.get()));
+      ColumnFamilyHandle handle, ManagedRocksIterator newIterator)
+      throws IOException {
+    synchronized (lock) {
+      if (!isActive.get()) {
+        throw new IOException("RWBatch is closed, retry");
+      }
+      return managed(writeBatch.newIteratorWithBase(handle, newIterator.get()));
+    }
+  }
+
+  @Override
+  public void lockOperation() throws IOException {
+    synchronized (lock) {
+      if (!isActive.get()) {
+        throw new IOException("RWBatch is closed, retry");
+      }
+      operationCount.incrementAndGet();
+    }
+  }
+
+  @Override
+  public void releaseOperation() {
+    operationCount.decrementAndGet();
   }
 }

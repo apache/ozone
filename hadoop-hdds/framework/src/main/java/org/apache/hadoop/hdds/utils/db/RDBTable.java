@@ -164,7 +164,7 @@ class RDBTable implements Table<byte[], byte[]> {
   public TableIterator<byte[], ByteArrayKeyValue> iterator(
       RWBatchOperation writeBatch) throws IOException {
     return new RDBStoreIterator(db.newIterator(family, writeBatch, false),
-        this);
+        writeBatch, this);
   }
 
   @Override

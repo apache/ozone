@@ -43,6 +43,7 @@ public class RDBStoreIterator
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private byte[] prefix;
+  private RWBatchOperation rwBatch = null;
 
   public RDBStoreIterator(ManagedRocksIterator iterator) {
     this(iterator, null);
@@ -50,6 +51,16 @@ public class RDBStoreIterator
 
   public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table) {
     this(iterator, table, null);
+  }
+
+  public RDBStoreIterator(
+      ManagedRocksIterator iterator, RWBatchOperation rwBatch,
+      RDBTable table) throws IOException {
+    this.rocksDBIterator = iterator;
+    this.rocksDBTable = table;
+    this.rwBatch = rwBatch;
+    rwBatch.lockOperation();
+    seekToFirst();
   }
 
   public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table,
@@ -137,6 +148,9 @@ public class RDBStoreIterator
   @Override
   public void close() throws IOException {
     rocksDBIterator.close();
+    if (null != rwBatch) {
+      rwBatch.releaseOperation();
+    }
   }
 
   private static boolean startsWith(byte[] prefix, byte[] value) {
