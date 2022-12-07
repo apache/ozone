@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -32,8 +33,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -49,7 +50,6 @@ import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +77,6 @@ public class TestOMSnapshotDAG {
    * Create a MiniDFSCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
-   *
    */
   @BeforeAll
   public static void init() throws Exception {
@@ -94,7 +93,12 @@ public class TestOMSnapshotDAG {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
+    // Set DB CF write buffer to a much lower value so that flush and compaction
+    // happens much more frequently without having to create a lot of keys.
+    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE,
+        "256KB");
+
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
 
     store = cluster.getClient().getObjectStore();
@@ -160,28 +164,29 @@ public class TestOMSnapshotDAG {
   }
 
   @Test
-  void testZeroSizeKey()
-      throws IOException, InterruptedException, TimeoutException {
+  public void testDAGReconstruction()
+          throws IOException, InterruptedException, TimeoutException {
 
+    // Generate keys
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
-        "--num-of-keys", "600",
+        "--num-of-keys", "500",
         "--num-of-threads", "1",
-        "--key-size", "0",
+        "--key-size", "0",  // zero size keys. since we don't need to test DNs
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
     );
 
-    Assertions.assertEquals(600L, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(600L,
+    Assertions.assertEquals(500L, randomKeyGenerator.getNumberOfKeysAdded());
+    Assertions.assertEquals(500L,
         randomKeyGenerator.getSuccessfulValidationCount());
 
     List<OmVolumeArgs> volList = cluster.getOzoneManager()
-        .listAllVolumes("", "", 10);
+        .listAllVolumes("", "", 2);
     LOG.debug("List of all volumes: {}", volList);
     final String volumeName = volList.stream().filter(e ->
         !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))  // Ignore s3v vol
@@ -198,12 +203,12 @@ public class TestOMSnapshotDAG {
     final OzoneVolume volume = store.getVolume(volumeName);
     final OzoneBucket bucket = volume.getBucket(bucketName);
 
-    for (int i = 0; i < 6000; i++) {
+    for (int i = 0; i < 2000; i++) {
       bucket.createKey("b_" + i, 0).close();
     }
 
     // Create another snapshot
-    resp = store.createSnapshot(volumeName, bucketName, "snap3");
+    resp = store.createSnapshot(volumeName, bucketName, "snap2");
     LOG.debug("Snapshot created: {}", resp);
 
     // Get snapshot SST diff list
@@ -214,27 +219,51 @@ public class TestOMSnapshotDAG {
 
     DifferSnapshotInfo snap1 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap1");
-    DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap3");
+    DifferSnapshotInfo snap2 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap2");
 
     // RocksDB does checkpointing in a separate thread, wait for it
     final File checkpointSnap1 = new File(snap1.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap1::exists, 2000, 20000);
+    final File checkpointSnap2 = new File(snap2.getDbPath());
+    GenericTestUtils.waitFor(checkpointSnap2::exists, 2000, 20000);
+
+    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1);
+    LOG.debug("Got diff list: {}", sstDiffList21);
+
+    // Delete 1000 keys, take a 3rd snapshot, and do another diff
+    for (int i = 0; i < 1000; i++) {
+      bucket.deleteKey("b_" + i);
+    }
+
+    resp = store.createSnapshot(volumeName, bucketName, "snap3");
+    LOG.debug("Snapshot created: {}", resp);
+
+    DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap3");
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
-    List<String> actualDiffList = differ.getSSTDiffList(snap3, snap1);
-    LOG.debug("Got diff list: {}", actualDiffList);
-    // Hard-coded expected output.
-    // The result is deterministic. Retrieved from a successful run.
-    final List<String> expectedDiffList = Collections.singletonList("000059");
-    Assertions.assertEquals(expectedDiffList, actualDiffList);
+    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2);
 
-    // TODO: Use smaller DB write buffer size (currently it is set to 128 MB
-    //  in DBProfile), or generate enough keys (in the millions) to trigger
-    //  RDB compaction. Take another snapshot and do the diff again.
-    //  Then restart OM, do the same diff again to see if DAG reconstruction
-    //  works.
+    // snap3-snap1 diff result is a combination of snap3-snap2 and snap2-snap1
+    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1);
+
+    // Same snapshot. Result should be empty list
+    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
+    Assertions.assertTrue(sstDiffList22.isEmpty());
+
+    // Test DAG reconstruction by restarting OM. Then do the same diffs again
+    cluster.restartOzoneManager();
+
+    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
+    Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
+
+    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
+    Assertions.assertEquals(sstDiffList32, sstDiffList32Run2);
+
+    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
+    Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
   }
 
 }
