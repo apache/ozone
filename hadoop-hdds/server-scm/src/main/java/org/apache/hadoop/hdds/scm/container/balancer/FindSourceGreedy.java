@@ -20,9 +20,12 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,13 +68,30 @@ public class FindSourceGreedy implements FindSourceStrategy {
     this.lowerLimit = lowerLimit;
   }
 
-  private void setPotentialSources(
-      List<DatanodeUsageInfo> potentialSourceDataNodes) {
+  /**
+   * {@inheritDoc}
+   */
+  public void resetPotentialSources(
+      @NotNull Collection<DatanodeDetails> sources) {
+    List<DatanodeUsageInfo> usageInfos = new ArrayList<>(sources.size());
+    sources.forEach(source -> usageInfos.add(nodeManager.getUsageInfo(source)));
+    resetSources(usageInfos);
+  }
+
+  /**
+   * Resets the collection of source datanodes that are considered when
+   * selecting the next source datanode.
+   * @param sources potential sources
+   */
+  private void resetSources(Collection<DatanodeUsageInfo> sources) {
     potentialSources.clear();
-    sizeLeavingNode.clear();
-    potentialSourceDataNodes.forEach(
-        c -> sizeLeavingNode.put(c.getDatanodeDetails(), 0L));
-    potentialSources.addAll(potentialSourceDataNodes);
+    /* since sizeLeavingNode map is being used to track how much data has
+    left a DN in an iteration, put keys only if they don't already exist
+     */
+    sources.forEach(source -> {
+      sizeLeavingNode.putIfAbsent(source.getDatanodeDetails(), 0L);
+      potentialSources.add(source);
+    });
   }
 
   private void setConfiguration(ContainerBalancerConfiguration conf) {
@@ -153,6 +173,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
                            Double lowLimit) {
     setConfiguration(conf);
     setLowerLimit(lowLimit);
-    setPotentialSources(potentialDataNodes);
+    sizeLeavingNode.clear();
+    resetSources(potentialDataNodes);
   }
 }

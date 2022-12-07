@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.file;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -49,18 +50,21 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   private Result result;
   private long volumeId;
   private long bucketId;
+  private OmBucketInfo bucketInfo;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull long volumeId, @Nonnull long bucketId,
       @Nonnull OmDirectoryInfo dirInfo,
       @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull OmBucketInfo bucketInfo) {
     super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
     this.result = result;
     this.volumeId = volumeId;
     this.bucketId = bucketId;
+    this.bucketInfo = bucketInfo;
   }
 
   /**
@@ -100,6 +104,10 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
               dirInfo.getParentObjectID(), dirInfo.getName());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation, dirKey,
               dirInfo);
+      String bucketKey = omMetadataManager.getBucketKey(
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, bucketInfo);
     } else {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.

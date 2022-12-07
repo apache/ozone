@@ -92,7 +92,7 @@ public class ContainerBalancerSelectionCriteria {
    * @return NavigableSet of candidate containers that satisfy the criteria.
    */
   public NavigableSet<ContainerID> getCandidateContainers(
-      DatanodeDetails node) {
+      DatanodeDetails node, long sizeMovedAlready) {
     NavigableSet<ContainerID> containerIDSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
@@ -109,7 +109,8 @@ public class ContainerBalancerSelectionCriteria {
       containerIDSet.removeAll(selectedContainers);
     }
 
-    containerIDSet.removeIf(containerID -> shouldBeExcluded(containerID, node));
+    containerIDSet.removeIf(
+        containerID -> shouldBeExcluded(containerID, node, sizeMovedAlready));
     return containerIDSet;
   }
 
@@ -161,7 +162,7 @@ public class ContainerBalancerSelectionCriteria {
   }
 
   private boolean shouldBeExcluded(ContainerID containerID,
-                                   DatanodeDetails node) {
+      DatanodeDetails node, long sizeMovedAlready) {
     ContainerInfo container;
     try {
       container = containerManager.getContainer(containerID);
@@ -172,7 +173,8 @@ public class ContainerBalancerSelectionCriteria {
     }
     return !isContainerClosed(container) || isECContainer(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
-        !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes());
+        !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
+        || breaksMaxSizeToMoveLimit(container, sizeMovedAlready);
   }
 
   /**
@@ -183,6 +185,18 @@ public class ContainerBalancerSelectionCriteria {
    */
   private boolean isContainerClosed(ContainerInfo container) {
     return container.getState().equals(HddsProtos.LifeCycleState.CLOSED);
+  }
+
+  private boolean breaksMaxSizeToMoveLimit(ContainerInfo container,
+      long sizeMovedAlready) {
+    // check max size to move per iteration limit
+    if (sizeMovedAlready + container.getUsedBytes() >
+        balancerConfiguration.getMaxSizeToMovePerIteration()) {
+      LOG.debug("Removing container {} because it fails max size " +
+            "to move per iteration check.", container.containerID());
+      return true;
+    }
+    return false;
   }
 
   public void setExcludeContainers(

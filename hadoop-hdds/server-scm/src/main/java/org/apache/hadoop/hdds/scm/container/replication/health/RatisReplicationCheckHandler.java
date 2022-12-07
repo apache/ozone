@@ -82,16 +82,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         report.incrementAndSample(ReplicationManagerReport.HealthState.MISSING,
             container.containerID());
       }
-      if (underHealth.isMisReplicated()) {
-        report.incrementAndSample(
-            ReplicationManagerReport.HealthState.MIS_REPLICATED,
-            container.containerID());
-      }
       // TODO - if it is unrecoverable, should we return false to other
       //        handlers can be tried?
       if (!underHealth.isUnrecoverable() &&
-          (underHealth.isMisReplicatedAfterPending() ||
-              !underHealth.isSufficientlyReplicatedAfterPending())) {
+          !underHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
       return true;
@@ -104,8 +98,20 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           container.containerID());
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
+      }
+      return true;
+    }
+    if (health.getHealthState() ==
+        ContainerHealthResult.HealthState.MIS_REPLICATED) {
+      report.incrementAndSample(
+          ReplicationManagerReport.HealthState.MIS_REPLICATED,
+          container.containerID());
+      ContainerHealthResult.MisReplicatedHealthResult misRepHealth
+          = ((ContainerHealthResult.MisReplicatedHealthResult) health);
+      if (!misRepHealth.isReplicatedOkAfterPending()) {
+        request.getReplicationQueue().enqueue(misRepHealth);
       }
       return true;
     }
@@ -136,30 +142,15 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         new RatisContainerReplicaCount(container, replicas, pendingAdd,
             pendingDelete, requiredNodes, minReplicasForMaintenance);
 
-    ContainerPlacementStatus placementStatus =
-        getPlacementStatus(replicas, requiredNodes, Collections.emptyList());
-
-    ContainerPlacementStatus placementStatusWithPending = placementStatus;
-    if (replicaPendingOps.size() > 0) {
-      placementStatusWithPending =
-          getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
-    }
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
-    boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
-    if (!sufficientlyReplicated || !isPolicySatisfied) {
+    if (!sufficientlyReplicated) {
       ContainerHealthResult.UnderReplicatedHealthResult result =
           new ContainerHealthResult.UnderReplicatedHealthResult(
           container, replicaCount.getRemainingRedundancy(),
-          isPolicySatisfied
-              && replicas.size() - pendingDelete >= requiredNodes,
+          replicas.size() - pendingDelete >= requiredNodes,
           replicaCount.isSufficientlyReplicated(true),
           replicaCount.isUnrecoverable());
-      result.setMisReplicated(!isPolicySatisfied)
-          .setMisReplicatedAfterPending(
-              !placementStatusWithPending.isPolicySatisfied())
-          .setDueToMisReplication(
-              !isPolicySatisfied && replicaCount.isSufficientlyReplicated());
       return result;
     }
 
@@ -169,6 +160,19 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       return new ContainerHealthResult.OverReplicatedHealthResult(
           container, replicaCount.getExcessRedundancy(false), repOkWithPending);
     }
+
+    ContainerPlacementStatus placementStatus =
+        getPlacementStatus(replicas, requiredNodes, Collections.emptyList());
+    ContainerPlacementStatus placementStatusWithPending = placementStatus;
+    if (!placementStatus.isPolicySatisfied()) {
+      if (replicaPendingOps.size() > 0) {
+        placementStatusWithPending =
+            getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
+      }
+      return new ContainerHealthResult.MisReplicatedHealthResult(
+          container, placementStatusWithPending.isPolicySatisfied());
+    }
+
     // No issues detected, just return healthy.
     return new ContainerHealthResult.HealthyResult(container);
   }

@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.jetbrains.annotations.NotNull;
@@ -41,6 +42,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 
 /**
  * Tests for EcContainerReplicaCounts.
@@ -99,6 +101,29 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(1, rcnt.unavailableIndexes(true).size());
     Assertions.assertEquals(1,
         rcnt.unavailableIndexes(true).get(0).intValue());
+  }
+
+  @Test
+  public void testUnderReplicationDueToUnhealthyReplica() {
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicas(container.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+    ContainerReplica unhealthyIndex5 =
+        createContainerReplica(container.containerID(), 5,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyIndex5);
+
+    List<ContainerReplicaOp> pending =
+        getContainerReplicaOps(ImmutableList.of(5), ImmutableList.of());
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, replicas, pending, 1);
+
+    Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
+    Assertions.assertTrue(rcnt.isSufficientlyReplicated(true));
+    Assertions.assertEquals(1, rcnt.unavailableIndexes(false).size());
+    Assertions.assertEquals(5,
+        rcnt.unavailableIndexes(false).get(0).intValue());
+    Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
   }
 
   @Test
@@ -206,6 +231,13 @@ public class TestECContainerReplicaCount {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2));
+    // this copy of index 4 is unhealthy, so it should not cause over
+    // replication of index 4
+    ContainerReplica unhealthyIndex4 =
+        createContainerReplica(container.containerID(), 4,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    replica.add(unhealthyIndex4);
+
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
 

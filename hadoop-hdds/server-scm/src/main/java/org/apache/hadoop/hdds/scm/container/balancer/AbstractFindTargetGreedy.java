@@ -222,10 +222,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     setConfiguration(conf);
     setUpperLimit(upLimit);
     sizeEnteringNode.clear();
-    potentialDataNodes.forEach(
-        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
-    potentialTargets.clear();
-    potentialTargets.addAll(potentialDataNodes);
+    resetTargets(potentialDataNodes);
   }
 
   @VisibleForTesting
@@ -240,4 +237,22 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    */
   @VisibleForTesting
   public abstract void sortTargetForSource(DatanodeDetails source);
+
+  /**
+   * Resets the collection of potential target datanodes that are considered
+   * to identify a target for a source.
+   * @param targets potential targets
+   */
+  void resetTargets(Collection<DatanodeUsageInfo> targets) {
+    potentialTargets.clear();
+    targets.forEach(datanodeUsageInfo -> {
+      sizeEnteringNode.putIfAbsent(datanodeUsageInfo.getDatanodeDetails(), 0L);
+      potentialTargets.add(datanodeUsageInfo);
+    });
+  }
+
+  NodeManager getNodeManager() {
+    return nodeManager;
+  }
+
 }

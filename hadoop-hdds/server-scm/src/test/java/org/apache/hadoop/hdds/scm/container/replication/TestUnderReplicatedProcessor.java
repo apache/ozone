@@ -25,26 +25,20 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests for the UnderReplicatedProcessor class.
@@ -52,10 +46,7 @@ import static org.mockito.ArgumentMatchers.eq;
 public class TestUnderReplicatedProcessor {
 
   private ConfigurationSource conf;
-  private TestClock clock;
-  private ContainerReplicaPendingOps pendingOps;
   private ReplicationManager replicationManager;
-  private EventPublisher eventPublisher;
   private ECReplicationConfig repConfig;
   private UnderReplicatedProcessor underReplicatedProcessor;
 
@@ -64,14 +55,10 @@ public class TestUnderReplicatedProcessor {
     conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    pendingOps = new ContainerReplicaPendingOps(conf, clock);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    eventPublisher = Mockito.mock(EventPublisher.class);
     repConfig = new ECReplicationConfig(3, 2);
     underReplicatedProcessor = new UnderReplicatedProcessor(
-        replicationManager, pendingOps, eventPublisher,
-        rmConf.getUnderReplicatedInterval());
+        replicationManager, rmConf.getUnderReplicatedInterval());
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
     Mockito.when(replicationManager.getMetrics())
         .thenReturn(ReplicationManagerMetrics.create(replicationManager));
@@ -103,24 +90,14 @@ public class TestUnderReplicatedProcessor {
             sourceNodes, targetNodes, missingIndexes, repConfig));
 
     Mockito.when(replicationManager
-            .processUnderReplicatedContainer(Mockito.any()))
+            .processUnderReplicatedContainer(any()))
         .thenReturn(commands);
     underReplicatedProcessor.processAll();
 
-    Mockito.verify(eventPublisher, Mockito.times(1))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), Mockito.any());
+    Mockito.verify(replicationManager, Mockito.times(1))
+        .sendDatanodeCommand(any(), any(), any());
     Mockito.verify(replicationManager, Mockito.times(0))
-        .requeueUnderReplicatedContainer(Mockito.any());
-
-    // Ensure pending ops is updated for the target DNs in the command and the
-    // correct indexes.
-    List<ContainerReplicaOp> ops = pendingOps
-        .getPendingOps(container.containerID());
-    Assert.assertEquals(2, ops.size());
-    for (ContainerReplicaOp op : ops) {
-      int ind = targetNodes.indexOf(op.getTarget());
-      Assert.assertEquals(missingIndexes[ind], op.getReplicaIndex());
-    }
+        .requeueUnderReplicatedContainer(any());
   }
 
   @Test
@@ -142,24 +119,14 @@ public class TestUnderReplicatedProcessor {
     commands.put(targetDn, rcc);
 
     Mockito.when(replicationManager
-            .processUnderReplicatedContainer(Mockito.any()))
+            .processUnderReplicatedContainer(any()))
         .thenReturn(commands);
     underReplicatedProcessor.processAll();
 
-    Mockito.verify(eventPublisher, Mockito.times(1))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), Mockito.any());
+    Mockito.verify(replicationManager, Mockito.times(1))
+        .sendDatanodeCommand(any(), any(), any());
     Mockito.verify(replicationManager, Mockito.times(0))
-        .requeueUnderReplicatedContainer(Mockito.any());
-
-    // Ensure pending ops is updated for the target DNs in the command and the
-    // correct indexes.
-    List<ContainerReplicaOp> ops = pendingOps
-        .getPendingOps(container.containerID());
-    //Check InFlight Replication
-    Assert.assertEquals(pendingOps
-        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD), 1);
-    Assert.assertEquals(1, ops.size());
-    Assert.assertEquals(3, ops.get(0).getReplicaIndex());
+        .requeueUnderReplicatedContainer(any());
   }
 
   @Test
@@ -172,18 +139,13 @@ public class TestUnderReplicatedProcessor {
             (ContainerHealthResult.UnderReplicatedHealthResult) null);
 
     Mockito.when(replicationManager
-            .processUnderReplicatedContainer(Mockito.any()))
+            .processUnderReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"));
     underReplicatedProcessor.processAll();
 
-    Mockito.verify(eventPublisher, Mockito.times(0))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), Mockito.any());
+    Mockito.verify(replicationManager, Mockito.times(0))
+        .sendDatanodeCommand(any(), any(), any());
     Mockito.verify(replicationManager, Mockito.times(1))
-        .requeueUnderReplicatedContainer(Mockito.any());
-
-    // Ensure pending ops has nothing for this container.
-    List<ContainerReplicaOp> ops = pendingOps
-        .getPendingOps(container.containerID());
-    Assert.assertEquals(0, ops.size());
+        .requeueUnderReplicatedContainer(any());
   }
 }
