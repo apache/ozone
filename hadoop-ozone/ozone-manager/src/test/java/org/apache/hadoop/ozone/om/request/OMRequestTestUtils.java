@@ -344,7 +344,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
-        bucketName, snapshotName);
+        bucketName, snapshotName, UUID.randomUUID().toString());
     addSnapshotToTable(false, 0L, snapshotInfo, omMetadataManager);
   }
 
@@ -355,7 +355,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-        snapshotName);
+        snapshotName, UUID.randomUUID().toString());
     addSnapshotToTable(true, 0L, snapshotInfo, omMetadataManager);
   }
 
@@ -1102,17 +1102,26 @@ public final class OMRequestTestUtils {
 
   /**
    * Create OMRequest for Create Snapshot.
-   * @param name
-   * @param snapshotPath
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
    */
   public static OMRequest createSnapshotRequest(String volumeName,
-      String bucketName, String snapshotName) {
-    return OMRequest.newBuilder().setCreateSnapshotRequest(
-            OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
-                .setVolumeName(volumeName).setBucketName(bucketName)
-                .setSnapshotName(snapshotName))
+                                                String bucketName,
+                                                String snapshotName) {
+    OzoneManagerProtocolProtos.CreateSnapshotRequest createSnapshotRequest =
+        OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotId(UUID.randomUUID().toString())
+            .setSnapshotName(snapshotName)
+            .build();
+
+    return OMRequest.newBuilder()
+        .setCreateSnapshotRequest(createSnapshotRequest)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateSnapshot)
-        .setClientId(UUID.randomUUID().toString()).build();
+        .setClientId(UUID.randomUUID().toString())
+        .build();
   }
 
   /**
