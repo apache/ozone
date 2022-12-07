@@ -185,7 +185,6 @@ public final class OMNodeDetails extends NodeDetails {
     return url;
   }
 
-
   public String getOMPrintInfo() {
     return getNodeId() + "[" + getHostAddress() + ":" + getRpcPort() + "]";
   }

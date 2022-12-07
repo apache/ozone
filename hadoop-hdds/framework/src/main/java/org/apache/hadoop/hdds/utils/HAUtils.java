@@ -378,7 +378,7 @@ public final class HAUtils {
     if (tempArray != null) {
       sstList = Arrays.asList(tempArray);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Get SST files {} in {}.", sstList, db.getAbsolutePath());
+        LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());
       }
     }
     return sstList;
