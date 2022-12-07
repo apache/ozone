@@ -384,7 +384,12 @@ public abstract class SCMCommonPlacementPolicy implements
   public ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
-    int requiredRacks = getRequiredRackCount(replicas);
+    // We have a network topology so calculate if it is satisfied or not.
+    final int maxLevel = topology.getMaxLevel();
+    // The leaf nodes are all at max level, so the number of nodes at
+    // leafLevel - 1 is the rack count
+    int numRacks = topology.getNumOfNodes(maxLevel - 1);
+    int requiredRacks = Math.min(getRequiredRackCount(replicas), numRacks);
     int maxReplicasPerRack = getMaxReplicasPerRack(replicas, requiredRacks);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
@@ -394,12 +399,6 @@ public abstract class SCMCommonPlacementPolicy implements
         return invalidPlacement;
       }
     }
-    // We have a network topology so calculate if it is satisfied or not.
-    int numRacks = 1;
-    final int maxLevel = topology.getMaxLevel();
-    // The leaf nodes are all at max level, so the number of nodes at
-    // leafLevel - 1 is the rack count
-    numRacks = topology.getNumOfNodes(maxLevel - 1);
     Map<Node, Long> currentRackCount = dns.stream()
             .collect(Collectors.groupingBy(this::getPlacementGroup,
                     Collectors.counting()));
