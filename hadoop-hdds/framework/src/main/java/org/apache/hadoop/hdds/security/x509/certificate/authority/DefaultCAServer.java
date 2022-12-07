@@ -67,8 +67,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
@@ -455,11 +455,9 @@ public class DefaultCAServer implements CertificateServer {
       break;
     case MISSING_KEYS:
       consumer = (arg) -> {
-        LOG.error("We have found the Certificate for this " +
-            "CertificateServer, " +
+        LOG.error("We have found the Certificate for this CertificateServer, " +
             "but keys used by this CertificateServer is missing. This is a " +
-            "non-recoverable error. Please restart the system after " +
-            "locating " +
+            "non-recoverable error. Please restart the system after locating " +
             "the Keys used by the CertificateServer.");
         LOG.error("Exiting due to unrecoverable CertificateServer error.");
         throw new IllegalStateException("Missing Keys, cannot continue.");
@@ -468,13 +466,11 @@ public class DefaultCAServer implements CertificateServer {
     case MISSING_CERTIFICATE:
       consumer = (arg) -> {
         LOG.error("We found the keys, but the root certificate for this " +
-            "CertificateServer is missing. Please restart SCM after " +
-            "locating " +
+            "CertificateServer is missing. Please restart SCM after locating " +
             "the " +
             "Certificates.");
         LOG.error("Exiting due to unrecoverable CertificateServer error.");
-        throw new IllegalStateException("Missing Root Certs, cannot " +
-            "continue.");
+        throw new IllegalStateException("Missing Root Certs, cannot continue.");
       };
       break;
     case INITIALIZE:
@@ -485,8 +481,7 @@ public class DefaultCAServer implements CertificateServer {
         // both keys/certs are missing, init/bootstrap is missed to be
         // performed.
         consumer = (arg) -> {
-          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is " +
-              "started " +
+          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is started " +
               "with out init/bootstrap");
           throw new IllegalStateException("INTERMEDIARY_CA Should not be" +
               " in Initialize State during startup.");
