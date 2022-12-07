@@ -23,58 +23,73 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 
 /**
  * Encapsulates the low level bucket info.
  */
 public class BucketObjectDBInfo extends ObjectDBInfo {
-  /** volume name from om db. */
   @JsonProperty("volumeName")
   private String volumeName;
 
-  /** storage type for the object. */
   @JsonProperty("storageType")
   private StorageType storageType;
 
-  /** is versioning enabled for the object. */
   @JsonProperty("versioning")
   private boolean isVersioningEnabled;
 
-  /** used bytes for the object. */
   @JsonProperty("usedBytes")
   private String usedBytes;
 
-  /**
-   * Bucket encryption key info if encryption is enabled.
-   */
   @JsonProperty("encryptionInfo")
   private BucketEncryptionKeyInfo bekInfo;
 
-  /**
-   * Optional default replication for bucket.
-   */
   @JsonProperty("replicationConfigInfo")
   private DefaultReplicationConfig defaultReplicationConfig;
 
-  /** source volume. */
   @JsonProperty("sourceVolume")
   private String sourceVolume;
 
-  /** source bucket. */
   @JsonProperty("sourceBucket")
   private String sourceBucket;
 
-  /**
-   * Bucket Layout.
-   */
   @JsonProperty("bucketLayout")
   private BucketLayout bucketLayout;
 
-  /**
-   * bucket owner.
-   */
   @JsonProperty("owner")
   private String owner;
+
+  public static BucketObjectDBInfo.Builder newBuilder() {
+    return new BucketObjectDBInfo.Builder();
+  }
+
+  public BucketObjectDBInfo() {
+
+  }
+
+  public BucketObjectDBInfo(Builder b) {
+    this.setMetadata(b.getOmBucketInfo().getMetadata());
+    this.setVolumeName(b.getOmBucketInfo().getVolumeName());
+    this.setName(b.getOmBucketInfo().getBucketName());
+    this.setQuotaInBytes(b.getOmBucketInfo().getQuotaInBytes());
+    this.setQuotaInNamespace(
+        b.getOmBucketInfo().getQuotaInNamespace());
+    this.setUsedNamespace(b.getOmBucketInfo().getUsedNamespace());
+    this.setCreationTime(b.getOmBucketInfo().getCreationTime());
+    this.setModificationTime(
+        b.getOmBucketInfo().getModificationTime());
+    this.setAcls(b.getOmBucketInfo().getAcls());
+    this.setSourceBucket(b.getOmBucketInfo().getSourceBucket());
+    this.setSourceVolume(b.getOmBucketInfo().getSourceVolume());
+    this.setBekInfo(b.getOmBucketInfo().getEncryptionKeyInfo());
+    this.setVersioningEnabled(
+        b.getOmBucketInfo().getIsVersionEnabled());
+    this.setStorageType(b.getOmBucketInfo().getStorageType());
+    this.setDefaultReplicationConfig(
+        b.getOmBucketInfo().getDefaultReplicationConfig());
+    this.setBucketLayout(b.getOmBucketInfo().getBucketLayout());
+    this.setOwner(b.getOmBucketInfo().getOwner());
+  }
 
   public String getVolumeName() {
     return volumeName;
@@ -155,5 +170,33 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
 
   public void setOwner(String owner) {
     this.owner = owner;
+  }
+
+  /**
+   * Builder for BucketObjectDBInfo.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class Builder {
+    private OmBucketInfo omBucketInfo;
+    public Builder() {
+
+    }
+
+    public BucketObjectDBInfo.Builder setOmBucketInfo(
+        OmBucketInfo omBucketInfo) {
+      this.omBucketInfo = omBucketInfo;
+      return this;
+    }
+
+    public OmBucketInfo getOmBucketInfo() {
+      return omBucketInfo;
+    }
+
+    public BucketObjectDBInfo build() {
+      if (null == this.omBucketInfo) {
+        return new BucketObjectDBInfo();
+      }
+      return new BucketObjectDBInfo(this);
+    }
   }
 }

@@ -66,15 +66,13 @@ public class RootEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         volumes.size(), allBuckets.size(), totalNumDir, totalNumKey);
 
-    NamespaceSummaryResponse namespaceSummaryResponse =
+    return
         NamespaceSummaryResponse.newBuilder()
             .setEntityType(EntityType.ROOT)
             .setCountStats(countStats)
             .setObjectDBInfo(getPrefixObjDbInfo())
             .setStatus(ResponseStatus.OK)
             .build();
-
-    return namespaceSummaryResponse;
   }
 
   private ObjectDBInfo getPrefixObjDbInfo()
@@ -82,13 +80,9 @@ public class RootEntityHandler extends EntityHandler {
     OmPrefixInfo omPrefixInfo =
         getOmMetadataManager().getPrefixTable().
             getSkipCache(OzoneConsts.OM_KEY_PREFIX);
-    ObjectDBInfo objectDBInfo = new ObjectDBInfo();
-    if (null != omPrefixInfo) {
-      objectDBInfo.setMetadata(omPrefixInfo.getMetadata());
-      objectDBInfo.setName(omPrefixInfo.getName());
-      objectDBInfo.setAcls(omPrefixInfo.getAcls());
-    }
-    return objectDBInfo;
+    return ObjectDBInfo.newPrefixObjectDbInfoBuilder()
+        .setOmPrefixInfo(omPrefixInfo)
+        .build();
   }
 
   @Override

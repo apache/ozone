@@ -67,15 +67,13 @@ public class VolumeEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         -1, buckets.size(), totalDir, totalKey);
 
-    NamespaceSummaryResponse namespaceSummaryResponse =
+    return
         NamespaceSummaryResponse.newBuilder()
             .setEntityType(EntityType.VOLUME)
             .setCountStats(countStats)
             .setObjectDBInfo(getVolumeObjDbInfo(names))
             .setStatus(ResponseStatus.OK)
             .build();
-
-    return namespaceSummaryResponse;
   }
 
   private VolumeObjectDBInfo getVolumeObjDbInfo(String[] names)
@@ -83,20 +81,9 @@ public class VolumeEntityHandler extends EntityHandler {
     String dbVolumeKey = getOmMetadataManager().getVolumeKey(names[0]);
     OmVolumeArgs volumeArgs =
         getOmMetadataManager().getVolumeTable().getSkipCache(dbVolumeKey);
-    VolumeObjectDBInfo objectDBInfo = new VolumeObjectDBInfo();
-    if (null != volumeArgs) {
-      objectDBInfo.setMetadata(volumeArgs.getMetadata());
-      objectDBInfo.setName(volumeArgs.getVolume());
-      objectDBInfo.setAdmin(volumeArgs.getAdminName());
-      objectDBInfo.setOwner(volumeArgs.getOwnerName());
-      objectDBInfo.setQuotaInBytes(volumeArgs.getQuotaInBytes());
-      objectDBInfo.setQuotaInNamespace(volumeArgs.getQuotaInNamespace());
-      objectDBInfo.setUsedNamespace(volumeArgs.getUsedNamespace());
-      objectDBInfo.setCreationTime(volumeArgs.getCreationTime());
-      objectDBInfo.setModificationTime(volumeArgs.getModificationTime());
-      objectDBInfo.setAcls(volumeArgs.getAcls());
-    }
-    return objectDBInfo;
+    return VolumeObjectDBInfo.newBuilder()
+        .setVolumeArgs(volumeArgs)
+        .build();
   }
 
   @Override

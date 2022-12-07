@@ -19,18 +19,38 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 
 /**
  * Encapsulates the low level volume info.
  */
 public class VolumeObjectDBInfo extends ObjectDBInfo {
-  /** object admin from om db. */
   @JsonProperty("admin")
   private String admin;
 
-  /** owner of the object. */
   @JsonProperty("owner")
   private String owner;
+
+  public static VolumeObjectDBInfo.Builder newBuilder() {
+    return new VolumeObjectDBInfo.Builder();
+  }
+
+  public VolumeObjectDBInfo() {
+
+  }
+
+  public VolumeObjectDBInfo(Builder b) {
+    this.setMetadata(b.getVolumeArgs().getMetadata());
+    this.setName(b.getVolumeArgs().getVolume());
+    this.setAdmin(b.getVolumeArgs().getAdminName());
+    this.setOwner(b.getVolumeArgs().getOwnerName());
+    this.setQuotaInBytes(b.getVolumeArgs().getQuotaInBytes());
+    this.setQuotaInNamespace(b.getVolumeArgs().getQuotaInNamespace());
+    this.setUsedNamespace(b.getVolumeArgs().getUsedNamespace());
+    this.setCreationTime(b.getVolumeArgs().getCreationTime());
+    this.setModificationTime(b.getVolumeArgs().getModificationTime());
+    this.setAcls(b.getVolumeArgs().getAcls());
+  }
 
   public String getAdmin() {
     return admin;
@@ -46,5 +66,33 @@ public class VolumeObjectDBInfo extends ObjectDBInfo {
 
   public void setOwner(String owner) {
     this.owner = owner;
+  }
+
+  /**
+   * Builder for VolumeObjectDBInfo.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class Builder {
+    private OmVolumeArgs volumeArgs;
+    public Builder() {
+
+    }
+
+    public VolumeObjectDBInfo.Builder setVolumeArgs(
+        OmVolumeArgs volumeArgs) {
+      this.volumeArgs = volumeArgs;
+      return this;
+    }
+
+    public OmVolumeArgs getVolumeArgs() {
+      return volumeArgs;
+    }
+
+    public VolumeObjectDBInfo build() {
+      if (null == this.volumeArgs) {
+        return new VolumeObjectDBInfo();
+      }
+      return new VolumeObjectDBInfo(this);
+    }
   }
 }

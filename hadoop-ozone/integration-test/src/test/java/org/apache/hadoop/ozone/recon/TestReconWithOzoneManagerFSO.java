@@ -130,6 +130,8 @@ public class TestReconWithOzoneManagerFSO {
     Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
     Assert.assertEquals(1, entity.getCountStats().getNumTotalKey());
     Assert.assertEquals(0, entity.getCountStats().getNumTotalDir());
+    Assert.assertEquals(-1, entity.getCountStats().getNumVolume());
+    Assert.assertEquals(-1, entity.getCountStats().getNumBucket());
     for (int i = 0; i < 10; i++) {
       Assert.assertNotNull(impl.getOMMetadataManagerInstance()
               .getVolumeTable().get("/vol" + i));

@@ -60,15 +60,13 @@ public class BucketEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         -1, -1,
         getTotalDirCount(bucketObjectId), getTotalKeyCount(bucketObjectId));
-    NamespaceSummaryResponse namespaceSummaryResponse =
+    return
         NamespaceSummaryResponse.newBuilder()
             .setEntityType(EntityType.BUCKET)
             .setCountStats(countStats)
             .setObjectDBInfo(getBucketObjDbInfo(names))
             .setStatus(ResponseStatus.OK)
             .build();
-
-    return namespaceSummaryResponse;
   }
 
   private BucketObjectDBInfo getBucketObjDbInfo(String[] names)
@@ -79,31 +77,9 @@ public class BucketEntityHandler extends EntityHandler {
         getBucketKey(volName, bucketName);
     OmBucketInfo omBucketInfo =
         getOmMetadataManager().getBucketTable().getSkipCache(bucketKey);
-    BucketObjectDBInfo bucketObjectDBInfo = new BucketObjectDBInfo();
-    if (null != omBucketInfo) {
-      bucketObjectDBInfo.setMetadata(omBucketInfo.getMetadata());
-      bucketObjectDBInfo.setVolumeName(omBucketInfo.getVolumeName());
-      bucketObjectDBInfo.setName(omBucketInfo.getBucketName());
-      bucketObjectDBInfo.setQuotaInBytes(omBucketInfo.getQuotaInBytes());
-      bucketObjectDBInfo.setQuotaInNamespace(
-          omBucketInfo.getQuotaInNamespace());
-      bucketObjectDBInfo.setUsedNamespace(omBucketInfo.getUsedNamespace());
-      bucketObjectDBInfo.setCreationTime(omBucketInfo.getCreationTime());
-      bucketObjectDBInfo.setModificationTime(
-          omBucketInfo.getModificationTime());
-      bucketObjectDBInfo.setAcls(omBucketInfo.getAcls());
-      bucketObjectDBInfo.setSourceBucket(omBucketInfo.getSourceBucket());
-      bucketObjectDBInfo.setSourceVolume(omBucketInfo.getSourceVolume());
-      bucketObjectDBInfo.setBekInfo(omBucketInfo.getEncryptionKeyInfo());
-      bucketObjectDBInfo.setVersioningEnabled(
-          omBucketInfo.getIsVersionEnabled());
-      bucketObjectDBInfo.setStorageType(omBucketInfo.getStorageType());
-      bucketObjectDBInfo.setDefaultReplicationConfig(
-          omBucketInfo.getDefaultReplicationConfig());
-      bucketObjectDBInfo.setBucketLayout(omBucketInfo.getBucketLayout());
-      bucketObjectDBInfo.setOwner(omBucketInfo.getOwner());
-    }
-    return bucketObjectDBInfo;
+    return BucketObjectDBInfo.newBuilder()
+        .setOmBucketInfo(omBucketInfo)
+        .build();
   }
 
   @Override

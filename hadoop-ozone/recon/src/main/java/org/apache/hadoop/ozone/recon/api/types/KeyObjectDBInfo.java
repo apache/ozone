@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
 import java.util.List;
@@ -56,6 +57,31 @@ public class KeyObjectDBInfo extends ObjectDBInfo {
    * keyName is "a/b/key1" then the fileName stores "key1".
    */
   private String fileName;
+
+  public static KeyObjectDBInfo.Builder newBuilder() {
+    return new KeyObjectDBInfo.Builder();
+  }
+
+  public KeyObjectDBInfo() {
+
+  }
+
+  public KeyObjectDBInfo(Builder b) {
+    this.setVolumeName(b.getOmKeyInfo().getVolumeName());
+    this.setBucketName(b.getOmKeyInfo().getBucketName());
+    this.setName(b.getOmKeyInfo().getKeyName());
+    this.setKeyName(b.getOmKeyInfo().getKeyName());
+    this.setDataSize(b.getOmKeyInfo().getDataSize());
+    this.setKeyLocationVersions(b.getOmKeyInfo().getKeyLocationVersions());
+    this.setCreationTime(b.getOmKeyInfo().getCreationTime());
+    this.setModificationTime(b.getOmKeyInfo().getModificationTime());
+    this.setReplicationConfig(b.getOmKeyInfo().getReplicationConfig());
+    this.setEncInfo(b.getOmKeyInfo().getFileEncryptionInfo());
+    this.setFileName(b.getOmKeyInfo().getFileName());
+    this.setFile(b.getOmKeyInfo().isFile());
+    this.setAcls(b.getOmKeyInfo().getAcls());
+    this.setMetadata(b.getOmKeyInfo().getMetadata());
+  }
 
   public String getVolumeName() {
     return volumeName;
@@ -128,5 +154,33 @@ public class KeyObjectDBInfo extends ObjectDBInfo {
 
   public void setEncInfo(FileEncryptionInfo encInfo) {
     this.encInfo = encInfo;
+  }
+
+  /**
+   * Builder for KeyObjectDBInfo.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class Builder {
+    private OmKeyInfo omKeyInfo;
+    public Builder() {
+
+    }
+
+    public KeyObjectDBInfo.Builder setOmKeyInfo(
+        OmKeyInfo omKeyInfo) {
+      this.omKeyInfo = omKeyInfo;
+      return this;
+    }
+
+    public OmKeyInfo getOmKeyInfo() {
+      return omKeyInfo;
+    }
+
+    public KeyObjectDBInfo build() {
+      if (null == this.omKeyInfo) {
+        return new KeyObjectDBInfo();
+      }
+      return new KeyObjectDBInfo(this);
+    }
   }
 }

@@ -58,30 +58,14 @@ public class KeyEntityHandler extends EntityHandler {
         .setObjectDBInfo(getKeyDbObjectInfo(getNames()))
         .setStatus(ResponseStatus.OK)
         .build();
-
   }
 
   private ObjectDBInfo getKeyDbObjectInfo(String[] names)
       throws IOException {
     OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(names);
-    KeyObjectDBInfo keyObjectDBInfo = new KeyObjectDBInfo();
-    if (null != keyInfo) {
-      keyObjectDBInfo.setVolumeName(keyInfo.getVolumeName());
-      keyObjectDBInfo.setBucketName(keyInfo.getBucketName());
-      keyObjectDBInfo.setName(keyInfo.getKeyName());
-      keyObjectDBInfo.setKeyName(keyInfo.getKeyName());
-      keyObjectDBInfo.setDataSize(keyInfo.getDataSize());
-      keyObjectDBInfo.setKeyLocationVersions(keyInfo.getKeyLocationVersions());
-      keyObjectDBInfo.setCreationTime(keyInfo.getCreationTime());
-      keyObjectDBInfo.setModificationTime(keyInfo.getModificationTime());
-      keyObjectDBInfo.setReplicationConfig(keyInfo.getReplicationConfig());
-      keyObjectDBInfo.setEncInfo(keyInfo.getFileEncryptionInfo());
-      keyObjectDBInfo.setFileName(keyInfo.getFileName());
-      keyObjectDBInfo.setFile(keyInfo.isFile());
-      keyObjectDBInfo.setAcls(keyInfo.getAcls());
-      keyObjectDBInfo.setMetadata(keyInfo.getMetadata());
-    }
-    return keyObjectDBInfo;
+    return KeyObjectDBInfo.newBuilder()
+        .setOmKeyInfo(keyInfo)
+        .build();
   }
 
   @Override

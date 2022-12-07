@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 
 import java.util.List;
 import java.util.Map;
@@ -28,37 +30,61 @@ import java.util.Map;
  * Encapsulates the low level volume/bucket/dir info.
  */
 public class ObjectDBInfo {
-  /** object metadata from om db. */
   @JsonProperty("metadata")
   private Map<String, String> metadata;
 
-  /** name of the object. */
   @JsonProperty("name")
   private String name;
 
-  /** quota in bytes. */
   @JsonProperty("quotaInBytes")
   private long quotaInBytes;
 
-  /** quota in namespace. */
   @JsonProperty("quotaInNamespace")
   private long quotaInNamespace;
 
-  /** used namespace. */
   @JsonProperty("usedNamespace")
   private long usedNamespace;
 
-  /** creation time. */
   @JsonProperty("creationTime")
   private long creationTime;
 
-  /** modification time. */
   @JsonProperty("modificationTime")
   private long modificationTime;
 
-  /** acl list. */
   @JsonProperty("acls")
   private List<OzoneAcl> acls;
+
+  public static ObjectDBInfo.PrefixObjectDbInfoBuilder
+      newPrefixObjectDbInfoBuilder() {
+    return new ObjectDBInfo.PrefixObjectDbInfoBuilder();
+  }
+
+  public ObjectDBInfo(PrefixObjectDbInfoBuilder
+                          prefixObjectDbInfoBuilder) {
+    this.setMetadata(prefixObjectDbInfoBuilder.
+        getOmPrefixInfo().getMetadata());
+    this.setName(prefixObjectDbInfoBuilder.
+        getOmPrefixInfo().getName());
+    this.setAcls(prefixObjectDbInfoBuilder.
+        getOmPrefixInfo().getAcls());
+  }
+
+  public static ObjectDBInfo.DirObjectDbInfoBuilder
+      newDirObjectDbInfoBuilder() {
+    return new ObjectDBInfo.DirObjectDbInfoBuilder();
+  }
+
+  public ObjectDBInfo() {
+
+  }
+
+  public ObjectDBInfo(DirObjectDbInfoBuilder b) {
+    this.setName(b.getDirInfo().getName());
+    this.setCreationTime(b.getDirInfo().getCreationTime());
+    this.setModificationTime(b.getDirInfo().getModificationTime());
+    this.setAcls(b.getDirInfo().getAcls());
+    this.setMetadata(b.getDirInfo().getMetadata());
+  }
 
   public Map<String, String> getMetadata() {
     return metadata;
@@ -122,5 +148,63 @@ public class ObjectDBInfo {
 
   public void setAcls(List<OzoneAcl> acls) {
     this.acls = acls;
+  }
+
+  /**
+   * Builder for Directory ObjectDBInfo.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class DirObjectDbInfoBuilder {
+    private OmDirectoryInfo dirInfo;
+
+    public DirObjectDbInfoBuilder() {
+
+    }
+
+    public DirObjectDbInfoBuilder setDirInfo(
+        OmDirectoryInfo dirInfo) {
+      this.dirInfo = dirInfo;
+      return this;
+    }
+
+    public OmDirectoryInfo getDirInfo() {
+      return dirInfo;
+    }
+
+    public ObjectDBInfo build() {
+      if (null == this.dirInfo) {
+        return new ObjectDBInfo();
+      }
+      return new ObjectDBInfo(this);
+    }
+  }
+
+  /**
+   * Builder for Prefix ObjectDBInfo.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static final class PrefixObjectDbInfoBuilder {
+    private OmPrefixInfo omPrefixInfo;
+
+    public PrefixObjectDbInfoBuilder() {
+
+    }
+
+    public PrefixObjectDbInfoBuilder setOmPrefixInfo(
+        OmPrefixInfo omPrefixInfo) {
+      this.omPrefixInfo = omPrefixInfo;
+      return this;
+    }
+
+    public OmPrefixInfo getOmPrefixInfo() {
+      return omPrefixInfo;
+    }
+
+    public ObjectDBInfo build() {
+      if (null == this.omPrefixInfo) {
+        return new ObjectDBInfo();
+      }
+      return new ObjectDBInfo(this);
+    }
   }
 }
