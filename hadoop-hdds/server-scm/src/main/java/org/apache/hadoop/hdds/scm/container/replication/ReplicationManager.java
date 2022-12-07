@@ -159,6 +159,7 @@ public class ReplicationManager implements SCMService {
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
+  private final RatisOverReplicationHandler ratisOverReplicationHandler;
   private final int maintenanceRedundancy;
   private final int ratisMaintenanceMinReplicas;
   private Thread underReplicatedProcessorThread;
@@ -223,6 +224,8 @@ public class ReplicationManager implements SCMService {
         new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, nodeManager);
+    ratisOverReplicationHandler =
+        new RatisOverReplicationHandler(ratisContainerPlacement);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -531,8 +534,12 @@ public class ReplicationManager implements SCMService {
         containerID);
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
-    return ecOverReplicationHandler.processAndCreateCommands(replicas,
-        pendingOps, result, maintenanceRedundancy);
+    if (result.getContainerInfo().getReplicationType() == EC) {
+      return ecOverReplicationHandler.processAndCreateCommands(replicas,
+          pendingOps, result, maintenanceRedundancy);
+    }
+    return ratisOverReplicationHandler.processAndCreateCommands(replicas,
+        pendingOps, result, ratisMaintenanceMinReplicas);
   }
 
   public long getScmTerm() throws NotLeaderException {
