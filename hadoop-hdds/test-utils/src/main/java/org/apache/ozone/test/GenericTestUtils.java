@@ -289,7 +289,7 @@ public abstract class GenericTestUtils {
 
   public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
-            .map(v ->new Pair<>(v, entry.getKey())))
+            .map(v -> new Pair<>(v, entry.getKey())))
             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 

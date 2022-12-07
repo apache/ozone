@@ -19,9 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import javafx.util.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -31,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.common.collect.ImmutableMap;
@@ -40,9 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -162,7 +156,7 @@ public class TestSCMCommonPlacementPolicy {
 
   @Test
   public void
-    testReplicasToFixMisreplicationWithThreeMisreplicationOnDifferentRack() {
+      testReplicasToFixMisreplicationWithThreeMisreplicationOnDifferentRack() {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -184,7 +178,8 @@ public class TestSCMCommonPlacementPolicy {
 
   @Test
   public void
-    testReplicasToFixMisreplicationWithReplicationFactorLessThanNumberOfRack() {
+      testReplicasToFixMisreplicationWithReplicationFactorLessThanNumberOfRack(
+  ) {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -206,7 +201,8 @@ public class TestSCMCommonPlacementPolicy {
 
   @Test
   public void
-    testReplicasToFixMisreplicationWithReplicationFactorMoreThanNumberOfRack() {
+      testReplicasToFixMisreplicationWithReplicationFactorMoreThanNumberOfRack(
+  ) {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(

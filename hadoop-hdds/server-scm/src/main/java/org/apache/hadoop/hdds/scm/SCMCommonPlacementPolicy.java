@@ -38,13 +38,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.PriorityQueue;
-import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -481,8 +477,7 @@ public abstract class SCMCommonPlacementPolicy implements
               totalNumberOfReplicas, requiredNumberOfPlacementGroups);
       int numberOfReplicasToBeCopied = Math.max(0,
               replicaList.size() - maxReplicasPerPlacementGroup);
-      totalNumberOfReplicas -= Math.min(replicaList.size(),
-              maxReplicasPerPlacementGroup);
+      totalNumberOfReplicas -= maxReplicasPerPlacementGroup;
       requiredNumberOfPlacementGroups -= 1;
       if (numberOfReplicasToBeCopied > 0) {
         List<ContainerReplica> replicasToBeCopied = replicaList.stream()
