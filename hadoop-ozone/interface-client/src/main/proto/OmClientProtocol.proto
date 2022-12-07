@@ -1646,6 +1646,7 @@ message CreateSnapshotRequest {
   required string volumeName = 1;
   required string bucketName = 2;
   optional string snapshotName = 3;
+  optional string snapshotId = 4;
 }
 
 message ListSnapshotRequest {

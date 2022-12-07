@@ -79,8 +79,11 @@ public class TestOMSnapshotCreateResponse {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String snapshotName = UUID.randomUUID().toString();
-    SnapshotInfo snapshotInfo =
-        SnapshotInfo.newInstance(volumeName, bucketName, snapshotName);
+    String snapshotId = UUID.randomUUID().toString();
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
+        bucketName,
+        snapshotName,
+        snapshotId);
 
     // confirm table is empty
     Assert.assertEquals(0,
