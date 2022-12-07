@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * This class maintains Pipeline related metrics.
+ * This class maintains Pipeline Leader related metrics.
  */
 @InterfaceAudience.Private
 @Metrics(about = "Pipeline Leader-Info Metrics", context = OzoneConsts.OZONE)
@@ -50,7 +50,6 @@ public final class PipelineLeaderInfoMetrics {
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineLeaderInfoMetrics.class);
 
-  /** Private constructor. */
   public PipelineLeaderInfoMetrics(PipelineManagerImpl ref) {
     this.registry = new MetricsRegistry(SOURCE_NAME);
     this.pipelineManager = ref;
