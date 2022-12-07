@@ -116,9 +116,9 @@ public class SecurityConfig {
   private boolean grpcTlsUseTestCert;
   private final long keystoreReloadInterval;
   private final long truststoreReloadInterval;
-  private String externalRootCaPublicKeyPath;
-  private String externalRootCaPrivateKeyPath;
-  private String externalRootCaCert;
+  private final String externalRootCaPublicKeyPath;
+  private final String externalRootCaPrivateKeyPath;
+  private final String externalRootCaCert;
 
   /**
    * Constructs a SecurityConfig.
