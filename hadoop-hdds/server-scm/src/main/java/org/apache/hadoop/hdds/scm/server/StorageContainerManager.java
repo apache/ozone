@@ -1769,7 +1769,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
       throw new AccessControlException(
           "Access denied for user " + remoteUser.getUserName() +
-              ". Superuser privilege is required.");
+              ". SCM superuser privilege is required.");
     }
   }
 
