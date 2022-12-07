@@ -107,7 +107,7 @@ public class TestPrometheusMetricsSink {
 
   @Test
   public void testPublishWithSameName() throws IOException {
-    //GIVEN
+    // GIVEN
     metrics.register("FooBar", "fooBar", (MetricsSource) (collector, all) -> {
       collector.addRecord("RpcMetrics").add(new MetricsTag(PORT_INFO, "1234"))
           .addGauge(COUNTER_INFO, COUNTER_1).endRecord();
@@ -131,7 +131,7 @@ public class TestPrometheusMetricsSink {
 
   @Test
   public void testTypeWithSameNameButDifferentLabels() throws IOException {
-    //GIVEN
+    // GIVEN
     metrics.register("SameName", "sameName",
         (MetricsSource) (collector, all) -> {
           collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "1234"))
@@ -146,6 +146,62 @@ public class TestPrometheusMetricsSink {
     // THEN
     Assertions.assertEquals(1, StringUtils.countMatches(writtenMetrics,
         "# TYPE same_name_counter"));
+
+    // both metrics should be present
+    Assertions.assertTrue(
+        writtenMetrics.contains("same_name_counter{port=\"1234\""),
+        "The expected metric line is present in prometheus metrics output");
+    Assertions.assertTrue(
+        writtenMetrics.contains("same_name_counter{port=\"2345\""),
+        "The expected metric line is present in prometheus metrics output");
+  }
+
+  /**
+   * Make sure Prometheus metrics start fresh after each flush.
+   */
+  @Test
+  public void testRemovingStaleMetricsOnFlush() throws IOException {
+    // GIVEN
+    metrics.register("StaleMetric", "staleMetric",
+        (MetricsSource) (collector, all) -> {
+          collector.addRecord("StaleMetric")
+              .add(new MetricsTag(PORT_INFO, "1234"))
+              .addGauge(COUNTER_INFO, COUNTER_1).endRecord();
+        });
+
+    metrics.register("SomeMetric", "someMetric",
+        (MetricsSource) (collector, all) -> {
+          collector.addRecord("SomeMetric")
+              .add(new MetricsTag(PORT_INFO, "4321"))
+              .addGauge(COUNTER_INFO, COUNTER_2).endRecord();
+        });
+
+    // WHEN
+    String writtenMetrics = publishMetricsAndGetOutput();
+
+    // Both metrics should be present
+    Assertions.assertTrue(
+        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
+        "The expected metric line is present in prometheus metrics output");
+    Assertions.assertTrue(
+        writtenMetrics.contains("some_metric_counter{port=\"4321\""),
+        "The expected metric line is present in prometheus metrics output");
+
+    // unregister the metric
+    metrics.unregisterSource("StaleMetric");
+
+    // publish and flush metrics again
+    writtenMetrics = publishMetricsAndGetOutput();
+
+    // THEN
+
+    // The first metric shouldn't be present
+    Assertions.assertFalse(
+        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
+        "The expected metric line is present in prometheus metrics output");
+    Assertions.assertTrue(
+        writtenMetrics.contains("some_metric_counter{port=\"4321\""),
+        "The expected metric line is present in prometheus metrics output");
   }
 
   @Test
