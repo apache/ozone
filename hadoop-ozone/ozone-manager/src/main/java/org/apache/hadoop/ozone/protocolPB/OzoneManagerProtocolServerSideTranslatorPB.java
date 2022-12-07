@@ -169,12 +169,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         }
       }
 
-      if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
-      }
-
       if (!isRatisEnabled) {
         return submitRequestDirectlyToOM(request);
+      }
+
+      if (OmUtils.isReadOnly(request)) {
+        return submitReadRequestToOM(request);
       }
 
       // To validate credentials we have already verified leader status.
