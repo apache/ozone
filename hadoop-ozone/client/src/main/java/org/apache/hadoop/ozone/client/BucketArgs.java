@@ -93,7 +93,8 @@ public final class BucketArgs {
       List<OzoneAcl> acls, Map<String, String> metadata,
       String bucketEncryptionKey, String sourceVolume, String sourceBucket,
       long quotaInBytes, long quotaInNamespace, BucketLayout bucketLayout,
-      String owner, DefaultReplicationConfig defaultReplicationConfig, boolean isS3NamingCompliant) {
+      String owner, DefaultReplicationConfig defaultReplicationConfig, 
+      boolean isS3NamingCompliant) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
@@ -294,8 +295,8 @@ public final class BucketArgs {
       return this;
     }
 
-    public BucketArgs.Builder setIsS3NamingCompliant(boolean isS3NamingCompliant) {
-      isS3NamingCompliant = isS3NamingCompliant;
+    public BucketArgs.Builder setIsS3NamingCompliant(boolean isS3NamingComp) {
+      isS3NamingCompliant = isS3NamingComp;
       return this;
     }
 
@@ -306,7 +307,8 @@ public final class BucketArgs {
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
           bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
-          quotaInNamespace, bucketLayout, owner, defaultReplicationConfig, isS3NamingCompliant);
+          quotaInNamespace, bucketLayout, owner, defaultReplicationConfig, 
+          isS3NamingCompliant);
     }
   }
 }

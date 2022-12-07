@@ -127,19 +127,22 @@ public final class HddsClientUtils {
     }
   }
 
-  private static boolean isSupportedCharacter(char c, boolean isS3NamingCompliant) {
+  private static boolean isSupportedCharacter(char c, 
+      boolean isS3NamingCompliant) {
     if (isS3NamingCompliant) {
       return (c == '.' || c == '-' ||
         Character.isLowerCase(c) || Character.isDigit(c));
     } else {
       // allow to follow other volume/bucket naming convention,
-      // for example, here allows 'underscore', which is a valid character in POSIX-compliant system, like HDFS.
+      // for example, here allows 'underscore', 
+      // which is a valid character in POSIX-compliant system, like HDFS.
       return (c == '.' || c == '-' || c == '_' ||
         Character.isLowerCase(c) || Character.isDigit(c));
     }
   }
 
-  private static void doCharacterChecks(char currChar, char prev, boolean isS3NamingCompliant) {
+  private static void doCharacterChecks(char currChar, char prev, 
+      boolean isS3NamingCompliant) {
     if (Character.isUpperCase(currChar)) {
       throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
@@ -181,8 +184,12 @@ public final class HddsClientUtils {
       if (currChar != '.') {
         isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
       }
-      // verifyResourceName is used by other types of volume/bucket/key operation except createBucketRequest,
-      // for those non-createBucketRequest operation, set the default value for isS3NamingCompliant to true for now.
+      // Besides createBucketRequest,
+      // verifyResourceName is used by other types of volume, bucket, 
+      // key operation,
+      // For those non-createBucketRequest operation, 
+      // set the default value for isS3NamingCompliant to true for now.
+      // Need to update those operation method as well later. 
       doCharacterChecks(currChar, prev, true);
       prev = currChar;
     }
@@ -194,7 +201,8 @@ public final class HddsClientUtils {
   }
 
 
-  public static void verifyResourceNameAllowNonS3Compliant(String resName, boolean isS3NamingCompliant) {
+  public static void verifyResourceNameAllowNonS3Compliant(String resName, 
+      boolean isS3NamingCompliant) {
 
     doNameChecks(resName);
 

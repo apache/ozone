@@ -188,7 +188,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return bucketName;
   }
 
-  public boolean getIsS3NamingCompliant(){
+  public boolean getIsS3NamingCompliant() {
     return isS3NamingCompliant;
   }
 
@@ -476,7 +476,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       this.quotaInBytes = OzoneConsts.QUOTA_RESET;
       this.quotaInNamespace = OzoneConsts.QUOTA_RESET;
       this.bucketLayout = BucketLayout.DEFAULT;
-      this.isS3NamingCompliant = True;
+      this.isS3NamingCompliant = true;
     }
 
     public Builder setVolumeName(String volume) {

@@ -88,7 +88,8 @@ public class CreateBucketHandler extends BucketHandler {
 
     BucketArgs.Builder bb =
         new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-            .setVersioning(false).setOwner(ownerName).setIsS3NamingCompliant(true);
+            .setVersioning(false).setOwner(ownerName)
+            .setIsS3NamingCompliant(true);
     if (allowedBucketLayout != null) {
       BucketLayout bucketLayout =
           BucketLayout.fromString(allowedBucketLayout.toString());
