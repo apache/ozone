@@ -596,11 +596,22 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certificateCodec =
         new CertificateCodec(config, componentName);
     try {
+      Path extCertParent = extCertPath.getParent();
+      Path extCertName = extCertPath.getFileName();
+      if (extCertParent == null || extCertName == null) {
+        throw new IOException("External cert path is not correct: " +
+            extCertPath);
+      }
       X509CertificateHolder certHolder = certificateCodec.readCertificate(
-          extCertPath.getParent(), extCertPath.getFileName().toString());
-      PrivateKey privateKey = keyCodec.readPrivateKey(
-          extPrivateKeyPath.getParent(),
-          extPrivateKeyPath.getFileName().toString());
+          extCertParent, extCertName.toString());
+      Path extPrivateKeyParent = extPrivateKeyPath.getParent();
+      Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
+      if (extPrivateKeyParent == null || extPrivateKeyFileName == null) {
+        throw new IOException("External private key path is not correct: " +
+            extPrivateKeyPath);
+      }
+      PrivateKey privateKey = keyCodec.readPrivateKey(extPrivateKeyParent,
+          extPrivateKeyFileName.toString());
       PublicKey publicKey;
       publicKey = readPublicKeyWithExternalData(
           externalPublicKeyLocation, keyCodec, certHolder);
@@ -623,8 +634,13 @@ public class DefaultCAServer implements CertificateServer {
           .getPublicKey();
     } else {
       Path publicKeyPath = Paths.get(externalPublicKeyLocation);
+      Path publicKeyPathFileName = publicKeyPath.getFileName();
+      Path publicKeyParent = publicKeyPath.getParent();
+      if (publicKeyPathFileName == null || publicKeyParent == null) {
+        throw new IOException("Public key path incorrect: " + publicKeyParent);
+      }
       publicKey = keyCodec.readPublicKey(
-          publicKeyPath.getParent(), publicKeyPath.getFileName().toString());
+          publicKeyParent, publicKeyPathFileName.toString());
     }
     return publicKey;
   }

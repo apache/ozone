@@ -85,11 +85,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Tests the Default CA Server.
  */
 public class TestDefaultCAServer {
-  private static OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneConfiguration conf;
   private MockCAStore caStore;
 
   @BeforeEach
   public void init(@TempDir Path tempDir) throws IOException {
+    conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     caStore = new MockCAStore();
   }
