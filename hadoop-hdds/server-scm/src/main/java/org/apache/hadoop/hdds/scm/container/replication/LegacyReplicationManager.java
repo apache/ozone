@@ -1289,25 +1289,36 @@ public class LegacyReplicationManager {
           r.getDatanodeDetails().getPersistedOpState() !=
               NodeOperationalState.IN_SERVICE);
 
-      if (container.getState() == LifeCycleState.CLOSED &&
-          deleteCandidates.stream().noneMatch(
-              r -> compareState(container.getState(), r.getState()))) {
+      if (container.getState() == LifeCycleState.CLOSED) {
         // The under replicated handler runs before the over replicated
         // handler. This will restore the correct number of healthy
-        // replicas if a healthy replica is available, otherwise restore
-        // using unhealthy replicas. If there are no healthy
-        // replicas, we should save unhealthy replicas with the highest BCSIDs.
-        final int requiredNodes = container.getReplicationConfig()
-            .getRequiredNodes();
-        List<ContainerReplica> unhealthySorted =
-            deleteCandidates.stream()
-                .sorted(Comparator.comparingLong(
-                    ContainerReplica::getSequenceId))
-                .limit(requiredNodes)
-                .collect(Collectors.toList());
-        deleteCandidates.removeAll(unhealthySorted);
+        // replicas if a healthy replica is available.
+        List<ContainerReplica> unhealthyReplicas = deleteCandidates.stream()
+            .filter(r -> !compareState(container.getState(), r.getState()))
+            .collect(Collectors.toList());
+        if (unhealthyReplicas.size() < deleteCandidates.size()) {
+          // There are healthy replicas which were already replicated by the
+          // under replication handler. We can delete all the unhealthy ones.
+          // Do not consider unhealthy replicas for topology information.
+          unhealthyReplicas.forEach(r ->
+              sendDeleteCommand(container, r.getDatanodeDetails(), true));
+          deleteCandidates.removeAll(unhealthyReplicas);
+          excess -= unhealthyReplicas.size();
+          // If there is still excess, the remaining healthy containers in
+          // deleteCandidates will be chosen for deletion based on topology
+          // information below.
+        } else {
+          // All replicas are unhealthy. Save the ones with the highest
+          // BCSIDs and leave the rest for deletion.
+          List<ContainerReplica> unhealthyByBcsIDs = deleteCandidates.stream()
+              .filter(r -> !compareState(container.getState(), r.getState()))
+              .sorted(Comparator.comparingLong(ContainerReplica::getSequenceId))
+              .limit(excess)
+              .collect(Collectors.toList());
+          deleteCandidates.removeAll(unhealthyByBcsIDs);
+        }
       } else {
-        // Container is not yet closed. Save all replicas from a
+        // Container is quasi-closed. Save all replicas from a
         // unique origin node ID, including unhealthy replicas.
         // If it is ever possible to recover unhealthy
         // replicas, this could be used to close the container.
