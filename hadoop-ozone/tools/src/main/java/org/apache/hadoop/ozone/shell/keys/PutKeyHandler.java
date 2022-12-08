@@ -70,7 +70,7 @@ public class PutKeyHandler extends KeyHandler {
 
     if (isVerbose()) {
       try (InputStream stream = new FileInputStream(dataFile)) {
-        String hash = DigestUtils.md5Hex(stream);
+        String hash = DigestUtils.sha256Hex(stream);
         out().printf("File Hash : %s%n", hash);
       }
     }

@@ -90,7 +90,7 @@ public class GetKeyHandler extends KeyHandler {
 
     if (isVerbose() && !"/dev/null".equals(dataFile.getAbsolutePath())) {
       try (InputStream stream = new FileInputStream(dataFile)) {
-        String hash = DigestUtils.md5Hex(stream);
+        String hash = DigestUtils.sha256Hex(stream);
         out().printf("Downloaded file hash : %s%n", hash);
       }
     }
