@@ -158,6 +158,10 @@ public class TestPrometheusMetricsSink {
 
   /**
    * Make sure Prometheus metrics start fresh after each flush.
+   * Instead of calling publishMetricsAndGetOutput(), we will
+   * publish the metrics, then unregister one of them,
+   * publish the metrics again and then check that the unregistered
+   * metric is not present.
    */
   @Test
   public void testRemovingStaleMetricsOnFlush() throws IOException {
@@ -176,25 +180,16 @@ public class TestPrometheusMetricsSink {
               .addGauge(COUNTER_INFO, COUNTER_2).endRecord();
         });
 
-    // WHEN
-    String writtenMetrics = publishMetricsAndGetOutput();
-
-    // Both metrics should be present
-    Assertions.assertTrue(
-        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
-        "The expected metric line is present in prometheus metrics output");
-    Assertions.assertTrue(
-        writtenMetrics.contains("some_metric_counter{port=\"4321\""),
-        "The expected metric line is present in prometheus metrics output");
+    metrics.publishMetricsNow();
 
     // unregister the metric
     metrics.unregisterSource("StaleMetric");
 
+    // WHEN
     // publish and flush metrics again
     String newWrittenMetrics = publishMetricsAndGetOutput();
 
     // THEN
-
     // The first metric shouldn't be present
     Assertions.assertFalse(
         newWrittenMetrics.contains("stale_metric_counter{port=\"1234\""),
@@ -259,7 +254,6 @@ public class TestPrometheusMetricsSink {
     OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
 
     sink.writeMetrics(writer);
-    sink.flush();
     writer.flush();
 
     return stream.toString(UTF_8.name());
