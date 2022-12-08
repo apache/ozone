@@ -313,6 +313,9 @@ public class SCMDatanodeProtocolServer implements
     // In HA mode, it is the term of current leader SCM.
     // In non-HA mode, it is the default value 0.
     builder.setTerm(cmd.getTerm());
+    // The default deadline is 0, which means no deadline. Individual commands
+    // may have a deadline set.
+    builder.setDeadlineMsSinceEpoch(cmd.getDeadline());
 
     switch (cmd.getType()) {
     case reregisterCommand:
