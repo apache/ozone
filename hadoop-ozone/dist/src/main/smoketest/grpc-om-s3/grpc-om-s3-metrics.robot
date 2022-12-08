@@ -24,12 +24,20 @@ Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
 
 *** Variables ***
-${GRPC_ENABLED}             false
 ${OM_URL}                   http://${OM_SERVICE_ID}:9874
 ${OM_JMX_ENDPOINT}          ${OM_URL}/jmx
-${GRPC_OM_METRICS_NAME}     GrpcOzoneManagerMetrics
+${GRPC_METRICS_NAME}        GrpcMetrics
 
 *** Keywords ***
+Check gRPC conf
+    ${confKey} =        Execute And Ignore Error        ozone getconf confKey ozone.om.transport.class
+    ${result} =         Evaluate                        "GrpcOmTransport" in """${confKey}"""
+    IF      ${result} == ${True}
+        Set Suite Variable      ${GRPC_ENABLED}         true
+    ELSE
+        Set Suite Variable      ${GRPC_ENABLED}         false
+    END
+
 Verify endpoint is up
     [arguments]         ${url}
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
@@ -37,15 +45,15 @@ Verify endpoint is up
     Should contain      ${result}       200 OK
 
 Get SentBytes
-    ${sentBytes} =              Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_OM_METRICS_NAME}/,/}/p' | grep 'SentBytes' | grep -Eo '[0-9]{1,}'
+    ${sentBytes} =              Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_METRICS_NAME}/,/}/p' | grep 'SentBytes' | grep -Eo '[0-9]{1,}'
     [return]                    ${sentBytes}
 
 Get ReceivedBytes
-    ${receivedBytes} =          Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_OM_METRICS_NAME}/,/}/p' | grep 'ReceivedBytes' | grep -Eo '[0-9]{1,}'
+    ${receivedBytes} =          Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_METRICS_NAME}/,/}/p' | grep 'ReceivedBytes' | grep -Eo '[0-9]{1,}'
     [return]                    ${receivedBytes}
 
 Get NumOpenClientConnections
-    ${activeConnections} =      Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_OM_METRICS_NAME}/,/}/p' | grep 'NumOpenClientConnections' | grep -Eo '[0-9]{1,}'
+    ${activeConnections} =      Execute         curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | sed -n '/${GRPC_METRICS_NAME}/,/}/p' | grep 'NumOpenClientConnections' | grep -Eo '[0-9]{1,}'
     [return]                    ${activeConnections}
 
 SentBytes are equal to zero
@@ -73,12 +81,15 @@ NumOpenClientConnections are higher than zero
                                         Should be true      ${activeConnections} > 0
 
 *** Test Cases ***
+Test gRPC conf
+    Check gRPC conf
+
 Test OM JMX endpoint
     Verify endpoint is up       ${OM_JMX_ENDPOINT}
 
 Check that metrics are registered
-    ${result} =         Execute                             curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | grep ${GRPC_OM_METRICS_NAME}
-                        Should contain      ${result}       ${GRPC_OM_METRICS_NAME}
+    ${result} =         Execute                             curl --negotiate -u : -LSs ${OM_JMX_ENDPOINT} | grep ${GRPC_METRICS_NAME}
+                        Should contain      ${result}       ${GRPC_METRICS_NAME}
 
 Check bytes sent
     IF      '${GRPC_ENABLED}' == 'true'
