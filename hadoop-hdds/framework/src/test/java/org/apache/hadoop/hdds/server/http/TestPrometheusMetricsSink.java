@@ -191,16 +191,16 @@ public class TestPrometheusMetricsSink {
     metrics.unregisterSource("StaleMetric");
 
     // publish and flush metrics again
-    writtenMetrics = publishMetricsAndGetOutput();
+    String newWrittenMetrics = publishMetricsAndGetOutput();
 
     // THEN
 
     // The first metric shouldn't be present
     Assertions.assertFalse(
-        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
+        newWrittenMetrics.contains("stale_metric_counter{port=\"1234\""),
         "The expected metric line is present in prometheus metrics output");
     Assertions.assertTrue(
-        writtenMetrics.contains("some_metric_counter{port=\"4321\""),
+        newWrittenMetrics.contains("some_metric_counter{port=\"4321\""),
         "The expected metric line is present in prometheus metrics output");
   }
 
