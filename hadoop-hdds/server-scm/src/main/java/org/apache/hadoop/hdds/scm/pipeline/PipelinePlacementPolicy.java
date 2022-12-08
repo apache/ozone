@@ -107,6 +107,9 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
   @Override
   protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    if (numberOfRacks == 1) {
+      return numReplicas;
+    }
     return Math.max(numReplicas - 1, 1);
   }
 
