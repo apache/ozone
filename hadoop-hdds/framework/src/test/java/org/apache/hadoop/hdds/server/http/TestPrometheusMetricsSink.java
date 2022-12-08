@@ -158,10 +158,9 @@ public class TestPrometheusMetricsSink {
 
   /**
    * Make sure Prometheus metrics start fresh after each flush.
-   * Instead of calling publishMetricsAndGetOutput(), we will
-   * publish the metrics, then unregister one of them,
-   * publish the metrics again and then check that the unregistered
-   * metric is not present.
+   * Publish the metrics and flush them, then unregister one of them,
+   * publish and flush the metrics again and then check that
+   * the unregistered metric is not present.
    */
   @Test
   public void testRemovingStaleMetricsOnFlush() throws IOException {
@@ -186,7 +185,7 @@ public class TestPrometheusMetricsSink {
     metrics.unregisterSource("StaleMetric");
 
     // WHEN
-    // publish and flush metrics again
+    // publish and flush metrics
     String newWrittenMetrics = publishMetricsAndGetOutput();
 
     // THEN
