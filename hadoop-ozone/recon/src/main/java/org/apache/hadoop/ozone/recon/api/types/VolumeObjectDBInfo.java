@@ -31,25 +31,25 @@ public class VolumeObjectDBInfo extends ObjectDBInfo {
   @JsonProperty("owner")
   private String owner;
 
-  public static VolumeObjectDBInfo.Builder newBuilder() {
-    return new VolumeObjectDBInfo.Builder();
-  }
+  @JsonProperty("volume")
+  private String volume;
 
   public VolumeObjectDBInfo() {
 
   }
 
-  public VolumeObjectDBInfo(Builder b) {
-    this.setMetadata(b.getVolumeArgs().getMetadata());
-    this.setName(b.getVolumeArgs().getVolume());
-    this.setAdmin(b.getVolumeArgs().getAdminName());
-    this.setOwner(b.getVolumeArgs().getOwnerName());
-    this.setQuotaInBytes(b.getVolumeArgs().getQuotaInBytes());
-    this.setQuotaInNamespace(b.getVolumeArgs().getQuotaInNamespace());
-    this.setUsedNamespace(b.getVolumeArgs().getUsedNamespace());
-    this.setCreationTime(b.getVolumeArgs().getCreationTime());
-    this.setModificationTime(b.getVolumeArgs().getModificationTime());
-    this.setAcls(b.getVolumeArgs().getAcls());
+  public VolumeObjectDBInfo(OmVolumeArgs omVolumeArgs) {
+    super.setMetadata(omVolumeArgs.getMetadata());
+    super.setName(omVolumeArgs.getVolume());
+    super.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
+    super.setQuotaInNamespace(omVolumeArgs.getQuotaInNamespace());
+    super.setUsedNamespace(omVolumeArgs.getUsedNamespace());
+    super.setCreationTime(omVolumeArgs.getCreationTime());
+    super.setModificationTime(omVolumeArgs.getModificationTime());
+    super.setAcls(omVolumeArgs.getAcls());
+    this.setAdmin(omVolumeArgs.getAdminName());
+    this.setOwner(omVolumeArgs.getOwnerName());
+    this.setVolume(omVolumeArgs.getVolume());
   }
 
   public String getAdmin() {
@@ -68,31 +68,11 @@ public class VolumeObjectDBInfo extends ObjectDBInfo {
     this.owner = owner;
   }
 
-  /**
-   * Builder for VolumeObjectDBInfo.
-   */
-  @SuppressWarnings("checkstyle:hiddenfield")
-  public static final class Builder {
-    private OmVolumeArgs volumeArgs;
-    public Builder() {
+  public String getVolume() {
+    return volume;
+  }
 
-    }
-
-    public VolumeObjectDBInfo.Builder setVolumeArgs(
-        OmVolumeArgs volumeArgs) {
-      this.volumeArgs = volumeArgs;
-      return this;
-    }
-
-    public OmVolumeArgs getVolumeArgs() {
-      return volumeArgs;
-    }
-
-    public VolumeObjectDBInfo build() {
-      if (null == this.volumeArgs) {
-        return new VolumeObjectDBInfo();
-      }
-      return new VolumeObjectDBInfo(this);
-    }
+  public void setVolume(String volume) {
+    this.volume = volume;
   }
 }

@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 
+
 /**
  * Encapsulates the low level bucket info.
  */
@@ -59,36 +60,28 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
   @JsonProperty("owner")
   private String owner;
 
-  public static BucketObjectDBInfo.Builder newBuilder() {
-    return new BucketObjectDBInfo.Builder();
-  }
-
   public BucketObjectDBInfo() {
 
   }
 
-  public BucketObjectDBInfo(Builder b) {
-    this.setMetadata(b.getOmBucketInfo().getMetadata());
-    this.setVolumeName(b.getOmBucketInfo().getVolumeName());
-    this.setName(b.getOmBucketInfo().getBucketName());
-    this.setQuotaInBytes(b.getOmBucketInfo().getQuotaInBytes());
-    this.setQuotaInNamespace(
-        b.getOmBucketInfo().getQuotaInNamespace());
-    this.setUsedNamespace(b.getOmBucketInfo().getUsedNamespace());
-    this.setCreationTime(b.getOmBucketInfo().getCreationTime());
-    this.setModificationTime(
-        b.getOmBucketInfo().getModificationTime());
-    this.setAcls(b.getOmBucketInfo().getAcls());
-    this.setSourceBucket(b.getOmBucketInfo().getSourceBucket());
-    this.setSourceVolume(b.getOmBucketInfo().getSourceVolume());
-    this.setBekInfo(b.getOmBucketInfo().getEncryptionKeyInfo());
-    this.setVersioningEnabled(
-        b.getOmBucketInfo().getIsVersionEnabled());
-    this.setStorageType(b.getOmBucketInfo().getStorageType());
-    this.setDefaultReplicationConfig(
-        b.getOmBucketInfo().getDefaultReplicationConfig());
-    this.setBucketLayout(b.getOmBucketInfo().getBucketLayout());
-    this.setOwner(b.getOmBucketInfo().getOwner());
+  public BucketObjectDBInfo(OmBucketInfo omBucketInfo) {
+    super.setMetadata(omBucketInfo.getMetadata());
+    super.setName(omBucketInfo.getBucketName());
+    super.setQuotaInBytes(omBucketInfo.getQuotaInBytes());
+    super.setQuotaInNamespace(omBucketInfo.getQuotaInNamespace());
+    super.setUsedNamespace(omBucketInfo.getUsedNamespace());
+    super.setCreationTime(omBucketInfo.getCreationTime());
+    super.setModificationTime(omBucketInfo.getModificationTime());
+    super.setAcls(omBucketInfo.getAcls());
+    this.volumeName = omBucketInfo.getVolumeName();
+    this.sourceBucket = omBucketInfo.getSourceBucket();
+    this.sourceVolume = omBucketInfo.getSourceVolume();
+    this.isVersioningEnabled = omBucketInfo.getIsVersionEnabled();
+    this.storageType = omBucketInfo.getStorageType();
+    this.defaultReplicationConfig = omBucketInfo.getDefaultReplicationConfig();
+    this.bucketLayout = omBucketInfo.getBucketLayout();
+    this.owner = omBucketInfo.getOwner();
+    this.bekInfo = omBucketInfo.getEncryptionKeyInfo();
   }
 
   public String getVolumeName() {
@@ -172,31 +165,4 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.owner = owner;
   }
 
-  /**
-   * Builder for BucketObjectDBInfo.
-   */
-  @SuppressWarnings("checkstyle:hiddenfield")
-  public static final class Builder {
-    private OmBucketInfo omBucketInfo;
-    public Builder() {
-
-    }
-
-    public BucketObjectDBInfo.Builder setOmBucketInfo(
-        OmBucketInfo omBucketInfo) {
-      this.omBucketInfo = omBucketInfo;
-      return this;
-    }
-
-    public OmBucketInfo getOmBucketInfo() {
-      return omBucketInfo;
-    }
-
-    public BucketObjectDBInfo build() {
-      if (null == this.omBucketInfo) {
-        return new BucketObjectDBInfo();
-      }
-      return new BucketObjectDBInfo(this);
-    }
-  }
 }

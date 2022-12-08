@@ -58,29 +58,25 @@ public class KeyObjectDBInfo extends ObjectDBInfo {
    */
   private String fileName;
 
-  public static KeyObjectDBInfo.Builder newBuilder() {
-    return new KeyObjectDBInfo.Builder();
-  }
-
   public KeyObjectDBInfo() {
 
   }
 
-  public KeyObjectDBInfo(Builder b) {
-    this.setVolumeName(b.getOmKeyInfo().getVolumeName());
-    this.setBucketName(b.getOmKeyInfo().getBucketName());
-    this.setName(b.getOmKeyInfo().getKeyName());
-    this.setKeyName(b.getOmKeyInfo().getKeyName());
-    this.setDataSize(b.getOmKeyInfo().getDataSize());
-    this.setKeyLocationVersions(b.getOmKeyInfo().getKeyLocationVersions());
-    this.setCreationTime(b.getOmKeyInfo().getCreationTime());
-    this.setModificationTime(b.getOmKeyInfo().getModificationTime());
-    this.setReplicationConfig(b.getOmKeyInfo().getReplicationConfig());
-    this.setEncInfo(b.getOmKeyInfo().getFileEncryptionInfo());
-    this.setFileName(b.getOmKeyInfo().getFileName());
-    this.setFile(b.getOmKeyInfo().isFile());
-    this.setAcls(b.getOmKeyInfo().getAcls());
-    this.setMetadata(b.getOmKeyInfo().getMetadata());
+  public KeyObjectDBInfo(OmKeyInfo omKeyInfo) {
+    super.setName(omKeyInfo.getKeyName());
+    super.setCreationTime(omKeyInfo.getCreationTime());
+    super.setModificationTime(omKeyInfo.getModificationTime());
+    super.setAcls(omKeyInfo.getAcls());
+    super.setMetadata(omKeyInfo.getMetadata());
+    this.setVolumeName(omKeyInfo.getVolumeName());
+    this.setBucketName(omKeyInfo.getBucketName());
+    this.setKeyName(omKeyInfo.getKeyName());
+    this.setDataSize(omKeyInfo.getDataSize());
+    this.setKeyLocationVersions(omKeyInfo.getKeyLocationVersions());
+    this.setReplicationConfig(omKeyInfo.getReplicationConfig());
+    this.setEncInfo(omKeyInfo.getFileEncryptionInfo());
+    this.setFileName(omKeyInfo.getFileName());
+    this.setFile(omKeyInfo.isFile());
   }
 
   public String getVolumeName() {
@@ -154,33 +150,5 @@ public class KeyObjectDBInfo extends ObjectDBInfo {
 
   public void setEncInfo(FileEncryptionInfo encInfo) {
     this.encInfo = encInfo;
-  }
-
-  /**
-   * Builder for KeyObjectDBInfo.
-   */
-  @SuppressWarnings("checkstyle:hiddenfield")
-  public static final class Builder {
-    private OmKeyInfo omKeyInfo;
-    public Builder() {
-
-    }
-
-    public KeyObjectDBInfo.Builder setOmKeyInfo(
-        OmKeyInfo omKeyInfo) {
-      this.omKeyInfo = omKeyInfo;
-      return this;
-    }
-
-    public OmKeyInfo getOmKeyInfo() {
-      return omKeyInfo;
-    }
-
-    public KeyObjectDBInfo build() {
-      if (null == this.omKeyInfo) {
-        return new KeyObjectDBInfo();
-      }
-      return new KeyObjectDBInfo(this);
-    }
   }
 }

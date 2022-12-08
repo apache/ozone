@@ -61,21 +61,21 @@ public class DirectoryEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         -1, -1,
         getTotalDirCount(dirObjectId), getTotalKeyCount(dirObjectId));
-    return
-        NamespaceSummaryResponse.newBuilder()
-            .setEntityType(EntityType.DIRECTORY)
-            .setCountStats(countStats)
-            .setObjectDBInfo(getDirectoryObjDbInfo(getNames()))
-            .setStatus(ResponseStatus.OK)
-            .build();
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.DIRECTORY)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getDirectoryObjDbInfo(getNames()))
+        .setStatus(ResponseStatus.OK)
+        .build();
   }
 
   private ObjectDBInfo getDirectoryObjDbInfo(String[] names)
       throws IOException {
-    OmDirectoryInfo dirInfo = getBucketHandler().getDirInfo(names);
-    return ObjectDBInfo.newDirObjectDbInfoBuilder()
-        .setDirInfo(dirInfo)
-        .build();
+    OmDirectoryInfo omDirectoryInfo = getBucketHandler().getDirInfo(names);
+    if (null == omDirectoryInfo) {
+      return new ObjectDBInfo();
+    }
+    return new ObjectDBInfo(omDirectoryInfo);
   }
 
   @Override

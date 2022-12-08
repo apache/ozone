@@ -60,13 +60,12 @@ public class BucketEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         -1, -1,
         getTotalDirCount(bucketObjectId), getTotalKeyCount(bucketObjectId));
-    return
-        NamespaceSummaryResponse.newBuilder()
-            .setEntityType(EntityType.BUCKET)
-            .setCountStats(countStats)
-            .setObjectDBInfo(getBucketObjDbInfo(names))
-            .setStatus(ResponseStatus.OK)
-            .build();
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.BUCKET)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getBucketObjDbInfo(names))
+        .setStatus(ResponseStatus.OK)
+        .build();
   }
 
   private BucketObjectDBInfo getBucketObjDbInfo(String[] names)
@@ -75,11 +74,15 @@ public class BucketEntityHandler extends EntityHandler {
     String bucketName = names[1];
     String bucketKey = getOmMetadataManager().
         getBucketKey(volName, bucketName);
-    OmBucketInfo omBucketInfo =
-        getOmMetadataManager().getBucketTable().getSkipCache(bucketKey);
-    return BucketObjectDBInfo.newBuilder()
-        .setOmBucketInfo(omBucketInfo)
-        .build();
+    if (null == bucketKey) {
+      return new BucketObjectDBInfo();
+    }
+    OmBucketInfo omBucketInfo = getOmMetadataManager()
+        .getBucketTable().getSkipCache(bucketKey);
+    if (null == omBucketInfo) {
+      return new BucketObjectDBInfo();
+    }
+    return new BucketObjectDBInfo(omBucketInfo);
   }
 
   @Override

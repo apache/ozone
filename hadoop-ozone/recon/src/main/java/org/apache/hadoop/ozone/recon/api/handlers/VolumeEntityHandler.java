@@ -67,23 +67,26 @@ public class VolumeEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         -1, buckets.size(), totalDir, totalKey);
 
-    return
-        NamespaceSummaryResponse.newBuilder()
-            .setEntityType(EntityType.VOLUME)
-            .setCountStats(countStats)
-            .setObjectDBInfo(getVolumeObjDbInfo(names))
-            .setStatus(ResponseStatus.OK)
-            .build();
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.VOLUME)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getVolumeObjDbInfo(names))
+        .setStatus(ResponseStatus.OK)
+        .build();
   }
 
   private VolumeObjectDBInfo getVolumeObjDbInfo(String[] names)
       throws IOException {
     String dbVolumeKey = getOmMetadataManager().getVolumeKey(names[0]);
+    if (null == dbVolumeKey) {
+      return new VolumeObjectDBInfo();
+    }
     OmVolumeArgs volumeArgs =
         getOmMetadataManager().getVolumeTable().getSkipCache(dbVolumeKey);
-    return VolumeObjectDBInfo.newBuilder()
-        .setVolumeArgs(volumeArgs)
-        .build();
+    if (null == volumeArgs) {
+      return new VolumeObjectDBInfo();
+    }
+    return new VolumeObjectDBInfo(volumeArgs);
   }
 
   @Override

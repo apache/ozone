@@ -66,23 +66,22 @@ public class RootEntityHandler extends EntityHandler {
     CountStats countStats = new CountStats(
         volumes.size(), allBuckets.size(), totalNumDir, totalNumKey);
 
-    return
-        NamespaceSummaryResponse.newBuilder()
-            .setEntityType(EntityType.ROOT)
-            .setCountStats(countStats)
-            .setObjectDBInfo(getPrefixObjDbInfo())
-            .setStatus(ResponseStatus.OK)
-            .build();
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.ROOT)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getPrefixObjDbInfo())
+        .setStatus(ResponseStatus.OK)
+        .build();
   }
 
   private ObjectDBInfo getPrefixObjDbInfo()
       throws IOException {
-    OmPrefixInfo omPrefixInfo =
-        getOmMetadataManager().getPrefixTable().
-            getSkipCache(OzoneConsts.OM_KEY_PREFIX);
-    return ObjectDBInfo.newPrefixObjectDbInfoBuilder()
-        .setOmPrefixInfo(omPrefixInfo)
-        .build();
+    OmPrefixInfo omPrefixInfo = getOmMetadataManager().getPrefixTable()
+        .getSkipCache(OzoneConsts.OM_KEY_PREFIX);
+    if (null == omPrefixInfo) {
+      return new ObjectDBInfo();
+    }
+    return new ObjectDBInfo(omPrefixInfo);
   }
 
   @Override

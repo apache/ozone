@@ -62,10 +62,11 @@ public class KeyEntityHandler extends EntityHandler {
 
   private ObjectDBInfo getKeyDbObjectInfo(String[] names)
       throws IOException {
-    OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(names);
-    return KeyObjectDBInfo.newBuilder()
-        .setOmKeyInfo(keyInfo)
-        .build();
+    OmKeyInfo omKeyInfo = getBucketHandler().getKeyInfo(names);
+    if (null == omKeyInfo) {
+      return new KeyObjectDBInfo();
+    }
+    return new KeyObjectDBInfo(omKeyInfo);
   }
 
   @Override
