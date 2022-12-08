@@ -58,6 +58,7 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
@@ -245,20 +246,34 @@ public class TestSCMContainerPlacementRackScatter {
     nodeNum = 5;
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount >= NODE_PER_RACK);
-      datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assertions.assertEquals(nodeNum, datanodeDetails.size());
-      Assertions.assertEquals(getRackSize(datanodeDetails),
-          Math.min(nodeNum, rackNum));
+      if (datanodeCount == 6) {
+        int finalNodeNum = nodeNum;
+        SCMException e = assertThrows(SCMException.class,
+                () -> policy.chooseDatanodes(null, null, finalNodeNum, 0, 15));
+        assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
+      } else {
+        datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
+        Assertions.assertEquals(nodeNum, datanodeDetails.size());
+        Assertions.assertEquals(getRackSize(datanodeDetails),
+                Math.min(nodeNum, rackNum));
+      }
     }
 
     //  10 replicas
     nodeNum = 10;
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount > 2 * NODE_PER_RACK);
-      datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assertions.assertEquals(nodeNum, datanodeDetails.size());
-      Assertions.assertEquals(getRackSize(datanodeDetails),
-          Math.min(nodeNum, rackNum));
+      if (datanodeCount == 11) {
+        int finalNodeNum = nodeNum;
+        SCMException e = assertThrows(SCMException.class,
+                () -> policy.chooseDatanodes(null, null, finalNodeNum, 0, 15));
+        assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
+      } else {
+        datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
+        Assertions.assertEquals(nodeNum, datanodeDetails.size());
+        Assertions.assertEquals(getRackSize(datanodeDetails),
+                Math.min(nodeNum, rackNum));
+      }
     }
   }
 
@@ -314,11 +329,20 @@ public class TestSCMContainerPlacementRackScatter {
     totalNum = 5;
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
-    datanodeDetails = policy.chooseDatanodes(
-        excludedNodes, null, nodeNum, 0, 15);
-    Assertions.assertEquals(nodeNum, datanodeDetails.size());
-    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
-        Math.min(totalNum, rackNum));
+    if (datanodeCount == 6) {
+      int finalNodeNum = nodeNum;
+      SCMException e = assertThrows(SCMException.class,
+              () -> policy.chooseDatanodes(excludedNodes, null,
+                      finalNodeNum, 0, 15));
+      assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
+    } else {
+      datanodeDetails = policy.chooseDatanodes(
+              excludedNodes, null, nodeNum, 0, 15);
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+              Math.min(totalNum, rackNum));
+    }
+
 
     // 5 replicas, two existing datanodes on different rack
     nodeNum = 3;
@@ -344,7 +368,9 @@ public class TestSCMContainerPlacementRackScatter {
       SCMException e = assertThrows(SCMException.class,
           () -> policy.chooseDatanodes(excludedNodes, null, 3, 0, 15));
       String message = e.getMessage();
-      assumeTrue(message.contains("ContainerPlacementPolicy not met"));
+      assertTrue(message.contains("Chosen nodes size from Unique Racks: 1," +
+              " but required nodes to choose from Unique Racks: " +
+              "2 do not match."));
     } else {
       datanodeDetails = policy.chooseDatanodes(
           excludedNodes, null, nodeNum, 0, 15);
@@ -567,7 +593,7 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals("Chosen nodes size from Unique Racks: 1, but required " +
             "nodes to choose from Unique Racks: 2 do not match.",
             exception.getMessage());
-    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES,
+    assertEquals(FAILED_TO_FIND_HEALTHY_NODES,
             exception.getResult());
   }
 

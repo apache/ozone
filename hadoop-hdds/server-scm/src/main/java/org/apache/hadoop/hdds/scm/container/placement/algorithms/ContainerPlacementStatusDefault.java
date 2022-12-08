@@ -65,7 +65,7 @@ public class ContainerPlacementStatusDefault
     if (isPolicySatisfied()) {
       return null;
     }
-    if (currentRacks < Math.min(requiredRacks, maxReplicasPerRack)) {
+    if (currentRacks < Math.min(requiredRacks, totalRacks)) {
       return "The container is mis-replicated as it is on " + currentRacks +
               " racks but should be on " + requiredRacks + " racks.";
     }

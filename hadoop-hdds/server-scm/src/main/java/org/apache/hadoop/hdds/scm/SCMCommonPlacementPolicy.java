@@ -385,12 +385,7 @@ public abstract class SCMCommonPlacementPolicy implements
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
-    final int maxLevel = topology.getMaxLevel();
-    // The leaf nodes are all at max level, so the number of nodes at
-    // leafLevel - 1 is the rack count
-    int numRacks = topology.getNumOfNodes(maxLevel - 1);
-    int requiredRacks = Math.min(getRequiredRackCount(replicas), numRacks);
-    int maxReplicasPerRack = getMaxReplicasPerRack(replicas, requiredRacks);
+    int requiredRacks = getRequiredRackCount(replicas);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -402,10 +397,15 @@ public abstract class SCMCommonPlacementPolicy implements
     Map<Node, Long> currentRackCount = dns.stream()
             .collect(Collectors.groupingBy(this::getPlacementGroup,
                     Collectors.counting()));
-
+    final int maxLevel = topology.getMaxLevel();
+    // The leaf nodes are all at max level, so the number of nodes at
+    // leafLevel - 1 is the rack count
+    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
+    int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
+            Math.min(requiredRacks, numRacks));
     return new ContainerPlacementStatusDefault(
         currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
             currentRackCount.values().stream().map(Long::intValue)
