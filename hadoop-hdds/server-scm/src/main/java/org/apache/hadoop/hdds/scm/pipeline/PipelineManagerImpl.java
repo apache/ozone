@@ -54,13 +54,8 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
+
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -122,7 +117,6 @@ public class PipelineManagerImpl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.freezePipelineCreation = new AtomicBoolean();
-    new PipelineLeaderInfoMetrics(this);
   }
 
   @SuppressWarnings("checkstyle:parameterNumber")
@@ -695,6 +689,28 @@ public class PipelineManagerImpl implements PipelineManager {
     stateManager.getPipelines().forEach(pipeline ->
         pipelineInfo.computeIfPresent(
             pipeline.getPipelineState().toString(), (k, v) -> v + 1));
+    return pipelineInfo;
+  }
+
+  @Override
+  public Map<String, String[]> getPipelineLeaders() throws NotLeaderException {
+    final Map<String, String[]> pipelineInfo = new HashMap<>();
+    List<Pipeline> pipelines = getPipelines();
+    pipelines.forEach(pipeline -> {
+      String leaderNode = "";
+      UUID pipelineId = pipeline.getId().getId();
+
+      try {
+        leaderNode = pipeline.getLeaderNode().getHostName();
+      } catch (IOException ioEx) {
+        LOG.warn("Cannot get leader node for pipeline {}",
+            pipelineId, ioEx);
+      }
+      String[] info = {pipeline.getReplicationConfig().toString(), leaderNode};
+
+      pipelineInfo.put(pipelineId.toString(), info);
+    });
+
     return pipelineInfo;
   }
 
