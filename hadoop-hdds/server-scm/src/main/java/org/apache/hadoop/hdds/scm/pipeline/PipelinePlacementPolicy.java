@@ -105,6 +105,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         && !p.isClosed();
   }
 
+  @Override
+  protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    if (numberOfRacks == 1) {
+      return numReplicas;
+    }
+    return Math.max(numReplicas - 1, 1);
+  }
+
   /**
    * Filter out viable nodes based on
    * 1. nodes that are healthy

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -35,7 +36,10 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -78,13 +82,19 @@ public final class SCMContainerPlacementRackScatter
   }
 
   public Set<DatanodeDetails> chooseNodesFromRacks(List<Node> racks,
-          List<Node> unavailableNodes,
-          List<DatanodeDetails> mutableFavoredNodes,
-          int nodesRequired, final long metadataSizeRequired,
-          final long dataSizeRequired, int maxOuterLoopIterations) {
+       List<Node> unavailableNodes,
+       List<DatanodeDetails> mutableFavoredNodes,
+       int nodesRequired, final Pair<Long, Long> metadatasizeDatasizePair,
+       int maxOuterLoopIterations, final Pair<Map<Node, Integer>, Integer>
+       rackCntMapMaxReplicaPerRackPair) {
     if (nodesRequired <= 0) {
       return Collections.emptySet();
     }
+    final long metadataSizeRequired = metadatasizeDatasizePair.getKey();
+    final long dataSizeRequired = metadatasizeDatasizePair.getValue();
+    final Map<Node, Integer> rackCntMap =
+            rackCntMapMaxReplicaPerRackPair.getKey();
+    final int maxReplicasPerRack = rackCntMapMaxReplicaPerRackPair.getValue();
     List<Node> toChooseRacks = new LinkedList<>();
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>();
     Set<Node> skippedRacks = new HashSet<>();
@@ -97,8 +107,10 @@ public final class SCMContainerPlacementRackScatter
       int chosenListSize = chosenNodes.size();
 
       // Refill toChooseRacks, we put skippedRacks in front of toChooseRacks
-      // for a even distribution
-      toChooseRacks.addAll(racks);
+      // for an even distribution
+      toChooseRacks.addAll(racks.stream()
+              .filter(rack -> rackCntMap.getOrDefault(rack, 0)
+                      < maxReplicasPerRack).collect(Collectors.toList()));
       if (!skippedRacks.isEmpty()) {
         toChooseRacks.removeAll(skippedRacks);
         toChooseRacks.addAll(0, skippedRacks);
@@ -111,6 +123,7 @@ public final class SCMContainerPlacementRackScatter
           Node curRack = getRackOfDatanodeDetails(favoredNode);
           if (toChooseRacks.contains(curRack)) {
             chosenNodes.add(favoredNode);
+            rackCntMap.merge(curRack, 1, Math::addExact);
             toChooseRacks.remove(curRack);
             chosenFavoredNodesInForLoop.add(favoredNode);
             unavailableNodes.add(favoredNode);
@@ -137,6 +150,7 @@ public final class SCMContainerPlacementRackScatter
                 metadataSizeRequired, dataSizeRequired);
         if (node != null) {
           chosenNodes.add((DatanodeDetails) node);
+          rackCntMap.merge(rack, 1, Math::addExact);
           mutableFavoredNodes.remove(node);
           unavailableNodes.add(node);
           nodesRequired--;
@@ -208,7 +222,6 @@ public final class SCMContainerPlacementRackScatter
           " ExcludedNode = " + excludedNodesCount,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
     if (favoredNodes != null) {
       // Generate mutableFavoredNodes, only stores valid favoredNodes
@@ -228,14 +241,15 @@ public final class SCMContainerPlacementRackScatter
       usedNodes = Collections.emptyList();
     }
     List<Node> racks = getAllRacks();
-    Set<Node> usedRacks = usedNodes.stream()
+    Map<Node, Integer> usedRacksCntMap = usedNodes.stream()
             .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
             .filter(node -> node != null)
-            .collect(Collectors.toSet());
+            .collect(Collectors.toMap(Function.identity(), e -> 1,
+                    Math::addExact));
     int requiredReplicationFactor = usedNodes.size() + nodesRequired;
-    int numberOfRacksRequired =
-            getRequiredRackCount(requiredReplicationFactor);
-    int additionalRacksRequired = numberOfRacksRequired - usedRacks.size();
+    int numberOfRacksRequired = getRequiredRackCount(requiredReplicationFactor);
+    int additionalRacksRequired =
+            numberOfRacksRequired - usedRacksCntMap.size();
     if (nodesRequired < additionalRacksRequired) {
       String reason = "Required nodes size: " + nodesRequired
               + " is less than required number of racks to choose: "
@@ -243,12 +257,15 @@ public final class SCMContainerPlacementRackScatter
       LOG.warn("Placement policy cannot choose the enough racks. {}"
                       + "Total number of Required Racks: {} Used Racks Count:" +
                       " {}, Required Nodes count: {}",
-              reason, numberOfRacksRequired, usedRacks.size(), nodesRequired);
+              reason, numberOfRacksRequired, usedRacksCntMap.size(),
+              nodesRequired);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
+    int maxReplicasPerRack = getMaxReplicasPerRack(requiredReplicationFactor,
+            numberOfRacksRequired);
     // For excluded nodes, we sort their racks at rear
-    racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacks);
+    racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacksCntMap);
 
     List<Node> unavailableNodes = new ArrayList<>();
     if (excludedNodes != null) {
@@ -265,14 +282,16 @@ public final class SCMContainerPlacementRackScatter
       LOG.warn("Placement policy cannot choose the enough racks. {}"
                       + "Total number of Required Racks: {} Used Racks Count:" +
                       " {}, Required Nodes count: {}",
-              reason, numberOfRacksRequired, usedRacks.size(), nodesRequired);
+              reason, numberOfRacksRequired, usedRacksCntMap.size(),
+              nodesRequired);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, additionalRacksRequired,
-            metadataSizeRequired, dataSizeRequired, 1));
+            Pair.of(metadataSizeRequired, dataSizeRequired), 1,
+            Pair.of(usedRacksCntMap, maxReplicasPerRack)));
 
     if (chosenNodes.size() < additionalRacksRequired) {
       String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
@@ -288,16 +307,13 @@ public final class SCMContainerPlacementRackScatter
     }
 
     if (chosenNodes.size() < nodesRequired) {
-      racks.addAll(usedRacks);
-      usedRacks.addAll(chosenNodes.stream()
-              .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
-              .filter(node -> node != null)
-              .collect(Collectors.toSet()));
-      sortRackWithExcludedNodes(racks, excludedNodes, usedRacks);
-      racks.addAll(usedRacks);
+      racks.addAll(usedRacksCntMap.keySet());
+      racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacksCntMap);
+      racks.addAll(usedRacksCntMap.keySet());
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
               mutableFavoredNodes, nodesRequired - chosenNodes.size(),
-              metadataSizeRequired, dataSizeRequired, Integer.MAX_VALUE));
+              Pair.of(metadataSizeRequired, dataSizeRequired),
+              Integer.MAX_VALUE, Pair.of(usedRacksCntMap, maxReplicasPerRack)));
     }
 
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
@@ -319,9 +335,8 @@ public final class SCMContainerPlacementRackScatter
                       .flatMap(List::stream).collect(Collectors.toList()),
                 requiredReplicationFactor);
     if (!placementStatus.isPolicySatisfied()) {
-      String errorMsg = "ContainerPlacementPolicy not met, currentRacks is " +
-          placementStatus.actualPlacementCount() + " desired racks is " +
-          placementStatus.expectedPlacementCount();
+      String errorMsg = "ContainerPlacementPolicy not met. Misreplication" +
+              " Reason: " + placementStatus.misReplicatedReason();
       throw new SCMException(errorMsg, null);
     }
     return result;
@@ -416,7 +431,7 @@ public final class SCMContainerPlacementRackScatter
    * @return
    */
   private List<Node> sortRackWithExcludedNodes(List<Node> racks,
-          List<DatanodeDetails> excludedNodes, Set<Node> usedRacks) {
+          List<DatanodeDetails> excludedNodes, Map<Node, Integer> usedRacks) {
     if ((excludedNodes == null || excludedNodes.isEmpty())
             && usedRacks.isEmpty()) {
       return racks;
@@ -425,12 +440,12 @@ public final class SCMContainerPlacementRackScatter
         .map(node -> networkTopology.getAncestor(node, RACK_LEVEL))
         // Dead Nodes have been removed from the topology and so have a
         // null rack. We need to exclude those from the rack list.
-        .filter(node -> node != null)
-        .filter(node -> !usedRacks.contains(node))
+        .filter(Objects::nonNull)
+        .filter(node -> !usedRacks.containsKey(node))
         .collect(Collectors.toSet());
     List <Node> result = new ArrayList<>();
     for (Node rack : racks) {
-      if (!usedRacks.contains(rack) && !lessPreferredRacks.contains(rack)) {
+      if (!usedRacks.containsKey(rack) && !lessPreferredRacks.contains(rack)) {
         result.add(rack);
       }
     }
