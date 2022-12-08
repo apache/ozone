@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEM
 /**
  * Pipeline placement factor for pipeline providers to create placement instance
  * based on configuration property.
- * {@link ScmConfigKeys#OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY}
+ * {@link ScmConfigKeys#OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY}
  */
 public final class PipelinePlacementPolicyFactory {
 
