@@ -326,13 +326,6 @@ public final class OMConfigKeys {
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
       false;
-  public static final String OZONE_OM_S3_GPRC_METRICS_QUANTILE_ENABLED =
-      "ozone.om.s3.grpc.metrics.quantile.enabled";
-  public static final boolean OZONE_OM_S3_GPRC_METRICS_QUANTILE_ENABLED_DEFAULT
-      = false;
-  public static final String OZONE_OM_S3_GPRC_METRICS_PERCENTILES_INTERVALS_KEY
-      = "ozone.om.s3.grpc.metrics.percentiles.intervals";
-
   /**
    * Configuration properties for OMAdminProtcol service.
    */

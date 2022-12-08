@@ -15,10 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.grpc;
+package org.apache.hadoop.ozone.grpc;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.ozone.om.grpc.metrics.GrpcOzoneManagerMetrics;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
@@ -35,16 +35,16 @@ import java.nio.ByteBuffer;
 /**
  * Interceptor to gather metrics based on grpc server request.
  */
-public class GrpcOmServerRequestInterceptor implements ServerInterceptor {
+public class GrpcServerRequestInterceptor implements ServerInterceptor {
 
-  private final GrpcOzoneManagerMetrics grpcMetrics;
+  private final GrpcMetrics grpcMetrics;
   private long bytesReceived;
   private long receivedTime;
   private long startTime;
   private long endTime;
 
-  public GrpcOmServerRequestInterceptor(
-      GrpcOzoneManagerMetrics grpcMetrics) {
+  public GrpcServerRequestInterceptor(
+      GrpcMetrics grpcMetrics) {
     super();
     this.grpcMetrics = grpcMetrics;
     this.bytesReceived = 0;
@@ -103,10 +103,10 @@ public class GrpcOmServerRequestInterceptor implements ServerInterceptor {
         int processingTime = (int) (endTime - startTime);
 
         // set metrics queue time
-        grpcMetrics.addGrpcOmQueueTime(queueTime);
+        grpcMetrics.addGrpcQueueTime(queueTime);
 
         // set metrics processing time
-        grpcMetrics.addGrpcOmProcessingTime(processingTime);
+        grpcMetrics.addGrpcProcessingTime(processingTime);
       }
     };
   }

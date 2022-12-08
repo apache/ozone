@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.grpc;
+package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.OptionalInt;
@@ -23,15 +23,16 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.grpc.GrpcServerRequestInterceptor;
+import org.apache.hadoop.ozone.grpc.GrpcServerResponseInterceptor;
+import org.apache.hadoop.ozone.grpc.GrpcServerTransportFilter;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.grpc.metrics.GrpcOzoneManagerMetrics;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -55,7 +56,7 @@ public class GrpcOzoneManagerServer {
       LoggerFactory.getLogger(GrpcOzoneManagerServer.class);
 
   private static final int CLIENT_TIMEOUT_SECS = 60;
-  private final GrpcOzoneManagerMetrics omS3gGrpcMetrics;
+  private final GrpcMetrics omS3gGrpcMetrics;
   private Server server;
   private int port;
   private final int maxSize;
@@ -82,8 +83,7 @@ public class GrpcOzoneManagerServer {
           getPort();
     }
 
-    this.omS3gGrpcMetrics = GrpcOzoneManagerMetrics
-        .create(this, config);
+    this.omS3gGrpcMetrics = GrpcMetrics.create(config);
 
     init(omTranslator,
         delegationTokenMgr,
@@ -102,10 +102,10 @@ public class GrpcOzoneManagerServer {
             new OzoneManagerServiceGrpc(omTranslator,
                 delegationTokenMgr,
                 omServerConfig),
-            new GrpcOmServerResponseInterceptor(omS3gGrpcMetrics),
-            new GrpcOmServerRequestInterceptor(omS3gGrpcMetrics)))
+            new GrpcServerResponseInterceptor(omS3gGrpcMetrics),
+            new GrpcServerRequestInterceptor(omS3gGrpcMetrics)))
         .addTransportFilter(
-            new GrpcOmServerTransportFilter(omS3gGrpcMetrics));
+            new GrpcServerTransportFilter(omS3gGrpcMetrics));
 
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isGrpcTlsEnabled()) {

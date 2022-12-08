@@ -17,6 +17,6 @@
  */
 
 /**
- * This package contains classes for using GRPC between OM and S3G.
+ * This package contains metrics for using GRPC between OM and S3G.
  */
-package org.apache.hadoop.ozone.om.grpc;
+package org.apache.hadoop.ozone.grpc.metrics;

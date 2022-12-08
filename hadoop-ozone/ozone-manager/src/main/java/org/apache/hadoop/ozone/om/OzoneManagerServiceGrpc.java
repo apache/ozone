@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.grpc;
+package org.apache.hadoop.ozone.om;
 
 import io.grpc.Status;
 import com.google.protobuf.RpcController;
