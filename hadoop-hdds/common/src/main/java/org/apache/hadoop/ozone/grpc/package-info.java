@@ -17,6 +17,6 @@
  */
 
 /**
- * This package contains classes for using GRPC between OM and S3G.
+ * This package contains classes for using gRPC.
  */
 package org.apache.hadoop.ozone.grpc;
