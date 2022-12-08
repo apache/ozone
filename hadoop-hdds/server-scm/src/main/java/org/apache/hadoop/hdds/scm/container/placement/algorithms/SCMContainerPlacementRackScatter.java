@@ -291,7 +291,7 @@ public final class SCMContainerPlacementRackScatter
     chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, additionalRacksRequired,
             Pair.of(metadataSizeRequired, dataSizeRequired), 1,
-            usedRacksCntMap, maxReplicasPerRack));
+            Pair.of(usedRacksCntMap, maxReplicasPerRack)));
 
     if (chosenNodes.size() < additionalRacksRequired) {
       String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
@@ -313,7 +313,7 @@ public final class SCMContainerPlacementRackScatter
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
               mutableFavoredNodes, nodesRequired - chosenNodes.size(),
               Pair.of(metadataSizeRequired, dataSizeRequired),
-              Integer.MAX_VALUE, usedRacksCntMap, maxReplicasPerRack));
+              Integer.MAX_VALUE, Pair.of(usedRacksCntMap, maxReplicasPerRack)));
     }
 
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
