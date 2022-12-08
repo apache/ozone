@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -49,6 +50,7 @@ public class ReplicationSupervisor {
   private final ContainerReplicator replicator;
   private final ExecutorService executor;
   private final StateContext context;
+  private final Clock clock;
 
   private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
@@ -64,35 +66,27 @@ public class ReplicationSupervisor {
   @VisibleForTesting
   ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ExecutorService executor) {
+      ContainerReplicator replicator, ExecutorService executor,
+      Clock clock) {
     this.containerSet = containerSet;
     this.replicator = replicator;
     this.containersInFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
+    this.clock = clock;
   }
 
   public ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
-    this(containerSet, context, replicator,
-        replicationConfig.getReplicationMaxStreams());
-  }
-
-  public ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, int poolSize) {
+      ContainerReplicator replicator, ReplicationConfig replicationConfig,
+      Clock clock) {
     this(containerSet, context, replicator, new ThreadPoolExecutor(
-        poolSize, poolSize, 60, TimeUnit.SECONDS,
+        replicationConfig.getReplicationMaxStreams(),
+        replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
-            .build()));
-  }
-
-  public ReplicationSupervisor(ContainerSet containerSet,
-      ContainerReplicator replicator, int poolSize) {
-    this(containerSet, null, replicator, poolSize);
+            .build()), clock);
   }
 
   /**

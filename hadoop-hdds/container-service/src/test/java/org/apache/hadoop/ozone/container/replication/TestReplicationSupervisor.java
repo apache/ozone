@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
@@ -39,6 +42,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -76,6 +80,7 @@ public class TestReplicationSupervisor {
   private ContainerSet set;
 
   private final ContainerLayoutVersion layout;
+  private Clock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
 
   public TestReplicationSupervisor(ContainerLayoutVersion layout) {
     this.layout = layout;
@@ -231,7 +236,7 @@ public class TestReplicationSupervisor {
   public void testDownloadAndImportReplicatorFailure() {
     ReplicationSupervisor supervisor =
         new ReplicationSupervisor(set, null, mutableReplicator,
-            newDirectExecutorService());
+            newDirectExecutorService(), clock);
 
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
@@ -265,7 +270,8 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, null, mutableReplicator, executor);
+        new ReplicationSupervisor(set, null, mutableReplicator, executor,
+            clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }
