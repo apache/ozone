@@ -720,10 +720,9 @@ public class StateContext {
 
     // if commandQueue is not empty, init termOfLeaderSCM
     // with the largest term found in commandQueue
-    commandQueue.stream()
+    termOfLeaderSCM = commandQueue.stream()
         .mapToLong(SCMCommand::getTerm)
-        .max()
-        .ifPresent(term -> termOfLeaderSCM = OptionalLong.of(term));
+        .max();
   }
 
   /**
