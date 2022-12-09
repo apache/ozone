@@ -349,9 +349,9 @@ public class TestRootedOzoneFileSystem {
         }, 1000, 120000);
       }
       FileStatus fileStatus = fs.getFileStatus(parent);
-      Assert.assertEquals(fileStatus.isErasureCoded(),
-              size >= dirs.size() - 1
-              && !bucketLayout.isFileSystemOptimized());
+      Assert.assertEquals((size == dirs.size() - 1 &&
+           !bucketLayout.isFileSystemOptimized()) || size == dirs.size(),
+           fileStatus.isErasureCoded());
     }
 
   }
