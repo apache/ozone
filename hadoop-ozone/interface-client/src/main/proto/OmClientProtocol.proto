@@ -457,6 +457,8 @@ enum Status {
     FEATURE_NOT_ENABLED = 86;
 
     INVALID_SNAPSHOT_ERROR = 87;
+
+    BUCKET_SNAPSHOT_EXISTS = 88;
 }
 
 /**
