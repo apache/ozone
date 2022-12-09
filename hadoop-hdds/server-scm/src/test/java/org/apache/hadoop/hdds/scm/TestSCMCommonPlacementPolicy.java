@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -37,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,9 +76,22 @@ public class TestSCMCommonPlacementPolicy {
           List<ContainerReplica> replicas,
           DummyPlacementPolicy placementPolicy,
           int expectedNumberOfReplicasToCopy,
-          Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
+          Map<Node, Integer> expectedNumberOfCopyOperationFromRack)
+          throws IOException {
+    testReplicasToFixMisreplication(replicas.stream().distinct().collect(
+            Collectors.toMap(Function.identity(), r -> true)), placementPolicy,
+            expectedNumberOfReplicasToCopy,
+            expectedNumberOfCopyOperationFromRack);
+  }
+
+  private void testReplicasToFixMisreplication(
+          Map<ContainerReplica, Boolean> replicas,
+          DummyPlacementPolicy placementPolicy,
+          int expectedNumberOfReplicasToCopy,
+          Map<Node, Integer> expectedNumberOfCopyOperationFromRack)
+          throws IOException {
     Set<ContainerReplica> replicasToCopy = placementPolicy
-            .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
+            .replicasToCopyToFixMisreplication(replicas);
     Assertions.assertEquals(expectedNumberOfReplicasToCopy,
             replicasToCopy.size());
     Map<Node, Long> rackCopyMap =
@@ -86,7 +99,7 @@ public class TestSCMCommonPlacementPolicy {
                     replica -> placementPolicy
                             .getPlacementGroup(replica.getDatanodeDetails()),
             Collectors.counting()));
-    Set<Node> racks = replicas.stream()
+    Set<Node> racks = replicas.keySet().stream()
             .map(ContainerReplica::getDatanodeDetails)
             .map(placementPolicy::getPlacementGroup)
             .collect(Collectors.toSet());
@@ -98,7 +111,8 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationWithOneMisreplication() {
+  public void testReplicasToFixMisreplicationWithOneMisreplication()
+          throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<Node> racks = dummyPlacementPolicy.racks;
@@ -113,7 +127,8 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationWithTwoMisreplication() {
+  public void testReplicasToFixMisreplicationWithTwoMisreplication()
+          throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -134,7 +149,8 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationWithThreeMisreplication() {
+  public void testReplicasToFixMisreplicationWithThreeMisreplication()
+          throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -156,7 +172,8 @@ public class TestSCMCommonPlacementPolicy {
 
   @Test
   public void
-      testReplicasToFixMisreplicationWithThreeMisreplicationOnDifferentRack() {
+      testReplicasToFixMisreplicationWithThreeMisreplicationOnDifferentRack()
+          throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -179,7 +196,7 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void
       testReplicasToFixMisreplicationWithReplicationFactorLessThanNumberOfRack(
-  ) {
+  ) throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -202,7 +219,7 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void
       testReplicasToFixMisreplicationWithReplicationFactorMoreThanNumberOfRack(
-  ) {
+  ) throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -223,7 +240,8 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationMaxReplicaPerRack() {
+  public void testReplicasToFixMisreplicationMaxReplicaPerRack()
+          throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 2);
     List<Node> racks = dummyPlacementPolicy.racks;
@@ -238,18 +256,19 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasWithoutMisreplication() {
+  public void testReplicasWithoutMisreplication() throws IOException {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list = nodeManager.getAllNodes();
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
-    List<ContainerReplica> replicas =
+    Map<ContainerReplica, Boolean> replicas =
             HddsTestUtils.getReplicasWithReplicaIndex(new ContainerID(1),
-                    CLOSED, 0, 0, 0, replicaDns);
-
+                    CLOSED, 0, 0, 0, replicaDns)
+                    .stream()
+                    .collect(Collectors.toMap(Function.identity(), r -> true));
     Set<ContainerReplica> replicasToCopy = dummyPlacementPolicy
-            .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
+            .replicasToCopyToFixMisreplication(replicas);
     Assertions.assertEquals(0, replicasToCopy.size());
   }
 

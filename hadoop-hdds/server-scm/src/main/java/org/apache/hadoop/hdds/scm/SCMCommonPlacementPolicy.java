@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -453,14 +454,16 @@ public abstract class SCMCommonPlacementPolicy implements
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas
+   * @param replicas: Map of replicas with value signifying if
+   *                  replica can be copied
    */
   @Override
   public Set<ContainerReplica> replicasToCopyToFixMisreplication(
-         Set<ContainerReplica> replicas) {
+         Map<ContainerReplica, Boolean> replicas) throws IOException {
     Map<Node, List<ContainerReplica>> placementGroupReplicaIdMap
-            = replicas.stream().collect(Collectors.groupingBy(replica ->
-            this.getPlacementGroup(replica.getDatanodeDetails())));
+            = replicas.keySet().stream()
+            .collect(Collectors.groupingBy(replica ->
+                    getPlacementGroup(replica.getDatanodeDetails())));
 
     int totalNumberOfReplicas = replicas.size();
     int requiredNumberOfPlacementGroups =
@@ -480,8 +483,21 @@ public abstract class SCMCommonPlacementPolicy implements
       requiredNumberOfPlacementGroups -= 1;
       if (numberOfReplicasToBeCopied > 0) {
         List<ContainerReplica> replicasToBeCopied = replicaList.stream()
+                .filter(replicas::get)
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
+        if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
+          Node rack = this.getPlacementGroup(
+                  replicaList.stream().findAny()
+                  .map(ContainerReplica::getDatanodeDetails)
+                  .orElse(null));
+          throw new IOException(String.format(
+                  "Not enough copyable replicas available in rack %s. " +
+                  "Required number of Replicas to be copied: %d." +
+                  " Available Replicas to be copied: %d",
+                  rack.toString(), numberOfReplicasToBeCopied,
+                  replicasToBeCopied.size()));
+        }
         copyReplicaSet.addAll(replicasToBeCopied);
       }
     }
