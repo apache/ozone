@@ -36,6 +36,8 @@ public class ReplicationTask {
 
   private final Instant queued = Instant.now();
 
+  private long deadlineMsSinceEpoch = 0;
+
   /**
    * Counter for the transferred bytes.
    */
@@ -47,6 +49,23 @@ public class ReplicationTask {
   ) {
     this.containerId = containerId;
     this.sources = sources;
+  }
+
+  /**
+   * Set the time, in milliseconds since the epoch when this task should have
+   * completed by, otherwise it should be dropped.
+   * @param msSinceEpoch The task deadline in milliseconds since the epoch.
+   */
+  public void setDeadline(long msSinceEpoch) {
+    this.deadlineMsSinceEpoch = msSinceEpoch;
+  }
+
+  /**
+   * Returns any deadline set on this task, in milliseconds since the epoch.
+   * A returned value of zero indicates no deadline.
+   */
+  public long getDeadline() {
+    return deadlineMsSinceEpoch;
   }
 
   @Override

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -80,7 +79,7 @@ public class TestReplicationSupervisor {
   private ContainerSet set;
 
   private final ContainerLayoutVersion layout;
-  private Clock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+  private TestClock clock;
 
   public TestReplicationSupervisor(ContainerLayoutVersion layout) {
     this.layout = layout;
@@ -93,6 +92,7 @@ public class TestReplicationSupervisor {
 
   @Before
   public void setUp() throws Exception {
+    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
   }
 
@@ -259,6 +259,34 @@ public class TestReplicationSupervisor {
     Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
     Assert.assertTrue(logCapturer.getOutput()
         .contains("Container 1 replication was unsuccessful."));
+  }
+
+  @Test
+  public void testTaskBeyondDeadline() {
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+
+    ReplicationTask task1 = new ReplicationTask(1L, emptyList());
+    task1.setDeadline(clock.millis() + 10000);
+    ReplicationTask task2 = new ReplicationTask(2L, emptyList());
+    task2.setDeadline(clock.millis() + 20000);
+    ReplicationTask task3 = new ReplicationTask(3L, emptyList());
+    // no deadline set
+
+    clock.fastForward(15000);
+
+    supervisor.addTask(task1);
+    supervisor.addTask(task2);
+    supervisor.addTask(task3);
+
+    Assert.assertEquals(3, supervisor.getReplicationRequestCount());
+    Assert.assertEquals(2, supervisor.getReplicationSuccessCount());
+    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assert.assertEquals(0, supervisor.getInFlightReplications());
+    Assert.assertEquals(0, supervisor.getQueueSize());
+    Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
+    Assert.assertEquals(2, set.containerCount());
+
   }
 
   private ReplicationSupervisor supervisorWithReplicator(

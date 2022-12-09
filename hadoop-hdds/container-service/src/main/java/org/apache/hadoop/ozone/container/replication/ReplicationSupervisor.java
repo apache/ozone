@@ -55,6 +55,7 @@ public class ReplicationSupervisor {
   private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
+  private final AtomicLong timeoutCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -142,6 +143,14 @@ public class ReplicationSupervisor {
       try {
         requestCounter.incrementAndGet();
 
+        if (task.getDeadline() > 0 && clock.millis() > task.getDeadline()) {
+          LOG.info("Ignoring this replicate container command for container" +
+              " {} since the current time {}ms is past the deadline {}ms",
+              containerId, clock.millis(), task.getDeadline());
+          timeoutCounter.incrementAndGet();
+          return;
+        }
+
         if (context != null) {
           DatanodeDetails dn = context.getParent().getDatanodeDetails();
           if (dn.getPersistedOpState() !=
@@ -200,4 +209,9 @@ public class ReplicationSupervisor {
   public long getReplicationFailureCount() {
     return failureCounter.get();
   }
+
+  public long getReplicationTimeoutCount() {
+    return timeoutCounter.get();
+  }
+
 }
