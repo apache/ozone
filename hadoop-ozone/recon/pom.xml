@@ -24,7 +24,7 @@
   <modelVersion>4.0.0</modelVersion>
   <artifactId>ozone-recon</artifactId>
   <properties>
-    <pnpm.version>5.18.9</pnpm.version>
+    <pnpm.version>7.18.1</pnpm.version>
   </properties>
   <build>
     <resources>
@@ -103,7 +103,7 @@
               <goal>install-node-and-npm</goal>
             </goals>
             <configuration>
-              <nodeVersion>v16.14.2</nodeVersion>
+              <nodeVersion>v18.12.1</nodeVersion>
             </configuration>
           </execution>
           <execution>
