@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +80,19 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = networkTopology;
     this.metrics = metrics;
+  }
+
+  /**
+   * Constructor for Pipeline Provider Pipeline Placement with rack awareness.
+   * @param nodeManager Node Manager
+   * @param stateManager State Manager
+   * @param conf Configuration
+   */
+  public SCMContainerPlacementRackScatter(NodeManager nodeManager,
+      PipelineStateManager stateManager, ConfigurationSource conf) {
+    super(nodeManager, conf);
+    this.networkTopology = nodeManager.getClusterNetworkTopologyMap();
+    this.metrics = null;
   }
 
   public Set<DatanodeDetails> chooseNodesFromRacks(List<Node> racks,
@@ -205,7 +219,9 @@ public final class SCMContainerPlacementRackScatter
           "than 0, but the given num is " + nodesRequiredToChoose;
       throw new SCMException(errorMsg, null);
     }
-    metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
+    if (metrics != null) {
+      metrics.incrDatanodeRequestCount(nodesRequiredToChoose);
+    }
     int nodesRequired = nodesRequiredToChoose;
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
@@ -363,7 +379,9 @@ public final class SCMContainerPlacementRackScatter
       long metadataSizeRequired, long dataSizeRequired) {
     int maxRetry = INNER_LOOP_MAX_RETRY;
     while (true) {
-      metrics.incrDatanodeChooseAttemptCount();
+      if (metrics != null) {
+        metrics.incrDatanodeChooseAttemptCount();
+      }
       Node node = null;
       try {
         node = networkTopology.chooseRandom(scope, excludedNodes);
@@ -379,7 +397,9 @@ public final class SCMContainerPlacementRackScatter
         DatanodeDetails datanodeDetails = (DatanodeDetails) node;
         if (isValidNode(datanodeDetails, metadataSizeRequired,
             dataSizeRequired)) {
-          metrics.incrDatanodeChooseSuccessCount();
+          if (metrics != null) {
+            metrics.incrDatanodeChooseSuccessCount();
+          }
           return node;
         }
         // exclude the unavailable node for the following retries.
