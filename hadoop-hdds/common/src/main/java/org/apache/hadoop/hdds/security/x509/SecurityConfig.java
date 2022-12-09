@@ -68,7 +68,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
@@ -90,7 +93,7 @@ public class SecurityConfig {
   private final int size;
   private final String keyAlgo;
   private final String providerString;
-  private final String metadatDir;
+  private final String metadataDir;
   private final String keyDir;
   private final String privateKeyFileName;
   private final String publicKeyFileName;
@@ -106,6 +109,8 @@ public class SecurityConfig {
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
+  private final long keystoreReloadInterval;
+  private final long truststoreReloadInterval;
 
   /**
    * Constructs a SecurityConfig.
@@ -123,10 +128,8 @@ public class SecurityConfig {
 
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
-    // TODO: We might want to fix this later.
-    this.metadatDir = this.configuration.get(HDDS_METADATA_DIR_NAME,
-        configuration.get(OZONE_METADATA_DIRS,
-            configuration.get(HDDS_DATANODE_DIR_KEY)));
+    this.metadataDir = this.configuration.get(HDDS_METADATA_DIR_NAME,
+        configuration.get(OZONE_METADATA_DIRS));
     this.keyDir = this.configuration.get(HDDS_KEY_DIR_NAME,
         HDDS_KEY_DIR_NAME_DEFAULT);
     this.privateKeyFileName = this.configuration.get(HDDS_PRIVATE_KEY_FILE_NAME,
@@ -193,6 +196,15 @@ public class SecurityConfig {
         }
       }
     }
+
+    this.keystoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.truststoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -271,9 +283,9 @@ public class SecurityConfig {
    * @return Path Key location.
    */
   public Path getKeyLocation(String component) {
-    Preconditions.checkNotNull(this.metadatDir, "Metadata directory can't be"
+    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
         + " null. Please check configs.");
-    return Paths.get(metadatDir, component, keyDir);
+    return Paths.get(metadataDir, component, keyDir);
   }
 
   /**
@@ -284,9 +296,9 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getCertificateLocation(String component) {
-    Preconditions.checkNotNull(this.metadatDir, "Metadata directory can't be"
+    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
         + " null. Please check configs.");
-    return Paths.get(metadatDir, component, certificateDir);
+    return Paths.get(metadataDir, component, certificateDir);
   }
 
   /**
@@ -423,5 +435,13 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
+  }
+
+  public long getSslKeystoreReloadInterval() {
+    return keystoreReloadInterval;
+  }
+
+  public long getSslTruststoreReloadInterval() {
+    return truststoreReloadInterval;
   }
 }

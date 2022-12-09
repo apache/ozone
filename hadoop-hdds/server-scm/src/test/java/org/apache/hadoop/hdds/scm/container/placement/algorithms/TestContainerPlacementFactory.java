@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -31,6 +33,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -176,7 +179,8 @@ public class TestContainerPlacementFactory {
   /**
    * A dummy container placement implementation for test.
    */
-  public static class DummyImpl implements PlacementPolicy {
+  public static class DummyImpl implements
+          PlacementPolicy<ContainerReplica> {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,
@@ -190,6 +194,12 @@ public class TestContainerPlacementFactory {
     public ContainerPlacementStatus
         validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
       return new ContainerPlacementStatusDefault(1, 1, 1);
+    }
+
+    @Override
+    public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+            Set<ContainerReplica> replicas) {
+      return Collections.emptySet();
     }
   }
 

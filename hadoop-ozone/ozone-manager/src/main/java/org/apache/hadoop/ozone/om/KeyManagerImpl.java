@@ -1228,6 +1228,8 @@ public class KeyManagerImpl implements KeyManager {
     final String keyName = args.getKeyName();
 
     OmKeyInfo fileKeyInfo = null;
+    OmKeyInfo dirKeyInfo = null;
+    OmKeyInfo fakeDirKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1240,28 +1242,27 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      fileKeyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
-          .get(fileKeyBytes);
+      BucketLayout layout =
+          getBucketLayout(metadataManager, volumeName, bucketName);
+      fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
+      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
       // Check if the key is a directory.
       if (fileKeyInfo == null) {
-        String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
-        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable(
-                getBucketLayout(metadataManager, volumeName, bucketName))
-            .get(dirKeyBytes);
-        if (dirKeyInfo != null) {
-          return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+        dirKeyInfo = metadataManager.getKeyTable(layout).get(dirKeyBytes);
+        if (dirKeyInfo == null) {
+          fakeDirKeyInfo =
+              createFakeDirIfShould(volumeName, bucketName, keyName, layout);
         }
       }
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
-
-      // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
+        // if the key is a file
+        // then do refresh pipeline info in OM by asking SCM
         if (args.getLatestVersionLocation()) {
           slimLocationVersion(fileKeyInfo);
         }
@@ -1276,8 +1277,19 @@ public class KeyManagerImpl implements KeyManager {
             sortDatanodes(clientAddress, fileKeyInfo);
           }
         }
-        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
+    }
+
+    if (fileKeyInfo != null) {
+      return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+    }
+
+    if (dirKeyInfo != null) {
+      return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+    }
+
+    if (fakeDirKeyInfo != null) {
+      return new OzoneFileStatus(fakeDirKeyInfo, scmBlockSize, true);
     }
 
     // Key is not found, throws exception
@@ -1289,6 +1301,38 @@ public class KeyManagerImpl implements KeyManager {
     throw new OMException("Unable to get file status: volume: " +
             volumeName + " bucket: " + bucketName + " key: " + keyName,
             FILE_NOT_FOUND);
+  }
+
+  /**
+   * Create a fake directory if the key is a path prefix,
+   * otherwise returns null.
+   * Some keys may contain '/' Ozone will treat '/' as directory separator
+   * such as : key name is 'a/b/c', 'a' and 'b' may not really exist,
+   * but Ozone treats 'a' and 'b' as a directory.
+   * we need create a fake directory 'a' or 'a/b'
+   *
+   * @return OmKeyInfo if the key is a path prefix, otherwise returns null.
+   */
+  private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
+      String keyName, BucketLayout layout) throws IOException {
+    OmKeyInfo fakeDirKeyInfo = null;
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
+    Table.KeyValue<String, OmKeyInfo> keyValue =
+            metadataManager.getKeyTable(layout).iterator()
+                .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+
+    if (keyValue != null) {
+      Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+      Path subPath = Paths.get(dirKey);
+      OmKeyInfo omKeyInfo = keyValue.getValue();
+      if (fullPath.startsWith(subPath)) {
+        // create fake directory
+        fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+      }
+    }
+
+    return fakeDirKeyInfo;
   }
 
 
@@ -1368,6 +1412,7 @@ public class KeyManagerImpl implements KeyManager {
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
+        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())

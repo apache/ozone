@@ -19,19 +19,11 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -44,17 +36,12 @@ public class UnderReplicatedProcessor implements Runnable {
   private static final Logger LOG = LoggerFactory
       .getLogger(UnderReplicatedProcessor.class);
   private final ReplicationManager replicationManager;
-  private final ContainerReplicaPendingOps pendingOps;
-  private final EventPublisher eventPublisher;
   private volatile boolean runImmediately = false;
   private final long intervalInMillis;
 
   public UnderReplicatedProcessor(ReplicationManager replicationManager,
-      ContainerReplicaPendingOps pendingOps,
-      EventPublisher eventPublisher, long intervalInMillis) {
+      long intervalInMillis) {
     this.replicationManager = replicationManager;
-    this.pendingOps = pendingOps;
-    this.eventPublisher = eventPublisher;
     this.intervalInMillis = intervalInMillis;
   }
 
@@ -98,41 +85,8 @@ public class UnderReplicatedProcessor implements Runnable {
     Map<DatanodeDetails, SCMCommand<?>> cmds = replicationManager
         .processUnderReplicatedContainer(underRep);
     for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
-      SCMCommand<?> scmCmd = cmd.getValue();
-      scmCmd.setTerm(replicationManager.getScmTerm());
-      final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(cmd.getKey().getUuid(), scmCmd);
-      eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-      adjustPendingOps(underRep.getContainerInfo().containerID(),
-          scmCmd, cmd.getKey());
-    }
-  }
-
-  private void adjustPendingOps(ContainerID containerID, SCMCommand<?> cmd,
-      DatanodeDetails targetDatanode)
-      throws IOException {
-    if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.reconstructECContainersCommand) {
-      ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
-      List<DatanodeDetails> targets = rcc.getTargetDatanodes();
-      byte[] targetIndexes = rcc.getMissingContainerIndexes();
-      for (int i = 0; i < targetIndexes.length; i++) {
-        pendingOps.scheduleAddReplica(containerID, targets.get(i),
-            targetIndexes[i]);
-        replicationManager.getMetrics().incrEcReconstructionCmdsSentTotal();
-      }
-    } else if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.replicateContainerCommand) {
-      ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
-      pendingOps.scheduleAddReplica(
-          containerID, targetDatanode, rcc.getReplicaIndex());
-      if (rcc.getReplicaIndex() > 0) {
-        replicationManager.getMetrics().incrEcReplicationCmdsSentTotal();
-      } else if (rcc.getReplicaIndex() == 0) {
-        replicationManager.getMetrics().incrNumReplicationCmdsSent();
-      }
-    } else {
-      throw new IOException("Unexpected command type " + cmd.getType());
+      replicationManager.sendDatanodeCommand(cmd.getValue(),
+          underRep.getContainerInfo(), cmd.getKey());
     }
   }
 

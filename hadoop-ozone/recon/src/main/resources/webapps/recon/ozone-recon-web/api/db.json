@@ -18,7 +18,7 @@
     "totalCount": 12,
     "datanodes": [
       {
-        "hostname": "localhost1.storage.enterprise.com",
+        "hostname": "localhost2.storage.enterprise.com",
         "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "IN_SERVICE",
@@ -51,7 +51,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost2.storage.enterprise.com",
+        "hostname": "localhost1.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONING",
@@ -66,40 +66,7 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
-          },
-          {
-            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
-            "replicationType": "RATIS",
-            "replicationFactor": 1,
             "leaderNode": "localhost2.storage.enterprise.com"
-          }
-        ],
-        "containers": 8192,
-        "openContainers": 8182,
-        "leaderCount": 1,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724805059,
-        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
-        "buildDate": "2020-07-20T15:45Z"
-      },
-      {
-        "hostname": "localhost3.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
-        "state": "HEALTHY",
-        "opState": "DECOMMISSIONED",
-        "lastHeartbeat": 1574724876059,
-        "storageReport": {
-          "capacity": 549755813888,
-          "used": 450971566080,
-          "remaining": 95784247808
-        },
-        "pipelines": [
-          {
-            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
-            "replicationType": "RATIS",
-            "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
@@ -120,6 +87,39 @@
         "hostname": "localhost4.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
+        "opState": "DECOMMISSIONED",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": {
+          "capacity": 549755813888,
+          "used": 450971566080,
+          "remaining": 95784247808
+        },
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1,
+            "leaderNode": "localhost3.storage.enterprise.com"
+          }
+        ],
+        "containers": 8192,
+        "openContainers": 8182,
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724805059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
+      },
+      {
+        "hostname": "localhost3.storage.enterprise.com",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
+        "state": "HEALTHY",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -132,13 +132,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost4.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost2.storage.enterprise.com"
+            "leaderNode": "localhost4.storage.enterprise.com"
           }
         ],
         "containers": 8192,
@@ -150,7 +150,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost5.storage.enterprise.com",
+        "hostname": "localhost6.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "IN_MAINTENANCE",
@@ -165,13 +165,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost5.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost2.storage.enterprise.com"
+            "leaderNode": "localhost5.storage.enterprise.com"
           }
         ],
         "containers": 8192,
@@ -183,7 +183,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost6.storage.enterprise.com",
+        "hostname": "localhost5.storage.enterprise.com",
         "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
         "opState": "IN_SERVICE",
@@ -198,19 +198,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost6.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost6.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost6.storage.enterprise.com"
           }
         ],
         "containers": 43,
@@ -237,19 +237,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost7.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost7.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost7.storage.enterprise.com"
           }
         ],
         "containers": 43,
@@ -276,19 +276,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost8.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost8.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost8.storage.enterprise.com"
           }
         ],
         "containers": 43,
@@ -315,19 +315,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost9.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost9.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost9.storage.enterprise.com"
           }
         ],
         "containers": 43,
@@ -354,19 +354,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost10.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost10.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost10.storage.enterprise.com"
           }
         ],
         "containers": 43,
@@ -413,13 +413,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost12.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost12.storage.enterprise.com"
           }
         ],
         "containers": 643,
@@ -446,13 +446,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost13.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost6.storage.enterprise.com"
+            "leaderNode": "localhost13.storage.enterprise.com"
           }
         ],
         "containers": 5,
@@ -479,19 +479,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost14.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost7.storage.enterprise.com"
+            "leaderNode": "localhost14.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost7.storage.enterprise.com"
+            "leaderNode": "localhost14.storage.enterprise.com"
           }
         ],
         "containers": 64,
@@ -518,13 +518,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost15.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost8.storage.enterprise.com"
+            "leaderNode": "localhost15.storage.enterprise.com"
           }
         ],
         "containers": 21,
@@ -551,13 +551,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost16.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost9.storage.enterprise.com"
+            "leaderNode": "localhost16.storage.enterprise.com"
           }
         ],
         "containers": 897,
@@ -584,19 +584,19 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost17.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost10.storage.enterprise.com"
+            "leaderNode": "localhost17.storage.enterprise.com"
           },
           {
             "pipelineID": "01f2e105-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost10.storage.enterprise.com"
+            "leaderNode": "localhost17.storage.enterprise.com"
           }
         ],
         "containers": 6754,
@@ -623,13 +623,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost18.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost18.storage.enterprise.com"
           }
         ],
         "containers": 78,
@@ -656,13 +656,13 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost19.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost12.storage.enterprise.com"
+            "leaderNode": "localhost19.storage.enterprise.com"
           }
         ],
         "containers": 543,
