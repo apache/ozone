@@ -734,8 +734,12 @@ public class StateContext {
       LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-    termOfLeaderSCM = OptionalLong.of(
-        Long.max(termOfLeaderSCM.getAsLong(), command.getTerm()));
+
+    final long currentTerm = termOfLeaderSCM.getAsLong();
+    final long newTerm = command.getTerm();
+    if (currentTerm < newTerm) {
+      termOfLeaderSCM = OptionalLong.of(newTerm);
+    }
   }
 
   /**
