@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -142,7 +142,7 @@ public class StateContext {
    *
    * For non-HA mode, term of SCMCommand will be 0.
    */
-  private Optional<Long> termOfLeaderSCM = Optional.empty();
+  private OptionalLong termOfLeaderSCM = OptionalLong.empty();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -723,7 +723,7 @@ public class StateContext {
     commandQueue.stream()
         .mapToLong(SCMCommand::getTerm)
         .max()
-        .ifPresent(term -> termOfLeaderSCM = Optional.of(term));
+        .ifPresent(term -> termOfLeaderSCM = OptionalLong.of(term));
   }
 
   /**
@@ -735,8 +735,8 @@ public class StateContext {
       LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-    termOfLeaderSCM = Optional.of(
-        Long.max(termOfLeaderSCM.get(), command.getTerm()));
+    termOfLeaderSCM = OptionalLong.of(
+        Long.max(termOfLeaderSCM.getAsLong(), command.getTerm()));
   }
 
   /**
@@ -759,13 +759,13 @@ public class StateContext {
         }
 
         updateTermOfLeaderSCM(command);
-        if (command.getTerm() == termOfLeaderSCM.get()) {
+        if (command.getTerm() == termOfLeaderSCM.getAsLong()) {
           return command;
         }
 
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
-            command, command.getTerm(), termOfLeaderSCM.get());
+            command, command.getTerm(), termOfLeaderSCM.getAsLong());
       }
     } finally {
       lock.unlock();
