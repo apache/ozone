@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,7 +37,9 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.scm.pipeline.PipelinePlacementPolicy.DnWithPipelines;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -59,7 +62,7 @@ public class RatisPipelineProvider
 
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
-  private final PipelinePlacementPolicy placementPolicy;
+  private final PlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
   private final LeaderChoosePolicy leaderChoosePolicy;
@@ -77,8 +80,8 @@ public class RatisPipelineProvider
     this.conf = conf;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
-    this.placementPolicy =
-        new PipelinePlacementPolicy(nodeManager, stateManager, conf);
+    this.placementPolicy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
@@ -163,6 +166,14 @@ public class RatisPipelineProvider
           containerSizeBytes);
       break;
     case THREE:
+      List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
+      if (excludeDueToEngagement.size() > 0) {
+        if (excludedNodes.size() == 0) {
+          excludedNodes = excludeDueToEngagement;
+        } else {
+          excludedNodes.addAll(excludeDueToEngagement);
+        }
+      }
       dns = placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
           containerSizeBytes);
@@ -220,6 +231,23 @@ public class RatisPipelineProvider
         .stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList()));
+  }
+
+  private List<DatanodeDetails> filterPipelineEngagement() {
+    List<DatanodeDetails> healthyNodes =
+        getNodeManager().getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> excluded = healthyNodes.stream()
+        .map(d ->
+            new DnWithPipelines(d,
+                PipelinePlacementPolicy
+                    .currentRatisThreePipelineCount(getNodeManager(),
+                    getPipelineStateManager(), d)))
+        .filter(d ->
+            (d.getPipelines() >= getNodeManager().pipelineLimit(d.getDn())))
+        .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
+        .map(d -> d.getDn())
+        .collect(Collectors.toList());
+    return excluded;
   }
 
   @Override

@@ -58,6 +58,7 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
@@ -555,6 +556,45 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals(isSatisfied, stat.isPolicySatisfied());
     assertEquals(misReplication, stat.misReplicationCount());
   }
+
+  @Test
+  public void testPipelineProviderRackScatter() throws SCMException {
+    setup(3, 1);
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        SCMContainerPlacementRackScatter.class.getCanonicalName());
+    List<DatanodeDetails> usedDns = new ArrayList<>();
+    List<DatanodeDetails> excludedDns = new ArrayList<>();
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+  }
+
+  // Test for pipeline provider placement when number of racks less than
+  // number of node required and nodes cannot be scattered.  In this case
+  // the placement spreads the nodes as much as possible.  In one case
+  // 3 nodes required and 2 racks placing 2 in one 1 in another.  When
+  // only 1 rack placing all nodes in same rack.
+  @Test
+  public void testPipelineProviderRackScatterFallback() throws SCMException {
+    setup(3, 2);
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        SCMContainerPlacementRackScatter.class.getCanonicalName());
+    List<DatanodeDetails> usedDns = new ArrayList<>();
+    List<DatanodeDetails> excludedDns = new ArrayList<>();
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+
+    setup(3, 3);
+    additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+  }
+
+  // add test for pipeline engagement
 
   @Test
   public void testValidChooseNodesWithUsedNodes() throws SCMException {
