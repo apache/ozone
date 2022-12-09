@@ -17,27 +17,28 @@
  */
 package org.apache.hadoop.hdds.scm.metadata;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.cert.X509Certificate;
+
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
+import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.security.cert.X509Certificate;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Generic interface for data stores for SCM.
@@ -128,8 +129,7 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    * @return Iterator<X509Certificate>
    * @throws IOException on failure.
    */
-  TableIterator<?, ? extends Table.KeyValue<?, ?>> getAllCerts(
-      CertificateStore.CertType certType)
+  TableIterator getAllCerts(CertificateStore.CertType certType)
       throws IOException;
 
   /**
