@@ -731,7 +731,6 @@ public class StateContext {
    */
   private void updateTermOfLeaderSCM(SCMCommand<?> command) {
     if (!termOfLeaderSCM.isPresent()) {
-      LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
 
@@ -784,6 +783,7 @@ public class StateContext {
   public void addCommand(SCMCommand command) {
     lock.lock();
     try {
+      updateTermOfLeaderSCM(command);
       commandQueue.add(command);
     } finally {
       lock.unlock();
