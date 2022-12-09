@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -47,6 +49,8 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class)
 public class CleanExpired implements Callable<Void>, SubcommandWithParent {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CleanExpired.class);
+
   @CommandLine.Option(names = {"--db"},
       required = true,
       description = "Database file path")
@@ -64,7 +68,11 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
 
     File db = new File(dbFilePath);
     if (!db.exists()) {
-      System.out.println("DB path does not exist: " + dbFilePath);
+      LOG.error("DB path does not exist: " + dbFilePath);
+      return null;
+    }
+    if (!db.isDirectory()) {
+      LOG.error("DB path does not point to a directory: " + dbFilePath);
       return null;
     }
 
@@ -74,8 +82,7 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
           db.getName(), new SCMDBDefinition());
       removeExpiredCertificates(dbStore);
     } catch (Exception e) {
-
-      System.out.println("Error trying to open file: " + dbFilePath +
+      LOG.error("Error trying to open file: " + dbFilePath +
           " failed with exception: " + e);
     }
     return null;
@@ -92,13 +99,13 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
         Table.KeyValue<?, ?> certPair = tableIterator.next();
         X509Certificate certificate = (X509Certificate) certPair.getValue();
         if (Instant.now().isAfter(certificate.getNotAfter().toInstant())) {
-          System.out.println("Certificate with id " + certPair.getKey() +
+          LOG.info("Certificate with id " + certPair.getKey() +
               " and value: " + certificate + "will be deleted");
           tableIterator.removeFromDB();
         }
       }
     } catch (IOException e) {
-      System.out.println("Error when trying to open " +
+      LOG.error("Error when trying to open " +
           "certificate table from db: " + e);
     }
   }
