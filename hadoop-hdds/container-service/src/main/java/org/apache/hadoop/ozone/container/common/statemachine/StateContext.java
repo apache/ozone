@@ -762,13 +762,14 @@ public class StateContext {
         }
 
         updateTermOfLeaderSCM(command);
-        if (command.getTerm() == termOfLeaderSCM.getAsLong()) {
+        final long currentTerm = termOfLeaderSCM.getAsLong();
+        if (command.getTerm() == currentTerm) {
           return command;
         }
 
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
-            command, command.getTerm(), termOfLeaderSCM.getAsLong());
+            command, command.getTerm(), currentTerm);
       }
     } finally {
       lock.unlock();
