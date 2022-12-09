@@ -2087,13 +2087,40 @@
     <description>Max time for which certificate issued by SCM CA are valid.
       This duration is used for self-signed root cert and scm sub-ca certs
       issued by root ca. The formats accepted are based on the ISO-8601
-      duration format PnDTnHnMn.nS</description>
+      duration format PnDTnHnMn.nS
+    </description>
   </property>
   <property>
     <name>hdds.x509.signature.algorithm</name>
     <value>SHA256withRSA</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>X509 signature certificate.</description>
+  </property>
+  <property>
+    <name>hdds.external.root.ca.cert</name>
+    <value></value>
+    <description>Path to an external CA certificate. This certificate is
+      used when initializing SCM to create a root certificate authority.
+      By default, a self-signed certificate is generated instead.
+    </description>
+  </property>
+  <property>
+    <name>hdds.external.root.ca.private.key</name>
+    <value></value>
+    <description>Path to an external private key. This private key is later used
+      when initializing SCM to sign certificates as the root certificate
+      authority. When not specified a private and public key is generated
+      instead.
+    </description>
+  </property>
+  <property>
+    <name>hdds.external.root.ca.public.key</name>
+    <value></value>
+    <description>Path to an external public key. This public key is later used
+      when initializing SCM to sign certificates as the root certificate
+      authority. When only the private key is specified
+      the public key is read from the external certificate.
+    </description>
   </property>
   <property>
     <name>ozone.scm.security.handler.count.key</name>
