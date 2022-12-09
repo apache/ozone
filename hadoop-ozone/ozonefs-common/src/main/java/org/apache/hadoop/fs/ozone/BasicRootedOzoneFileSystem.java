@@ -1323,28 +1323,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
-    Path symLink = null;
-    try {
-      fileStatusAdapter.getSymlink();
-    } catch (Exception ex) {
-      //NOOP: If not symlink symlink remains null.
-    }
-
-    FileStatus fileStatus = new FileStatus(
-        fileStatusAdapter.getLength(),
-        fileStatusAdapter.isDir(),
-        fileStatusAdapter.getBlockReplication(),
-        fileStatusAdapter.getBlocksize(),
-        fileStatusAdapter.getModificationTime(),
-        fileStatusAdapter.getAccessTime(),
-        new FsPermission(fileStatusAdapter.getPermission()),
-        fileStatusAdapter.getOwner(),
-        fileStatusAdapter.getGroup(),
-        symLink,
-        fileStatusAdapter.getPath()
+  protected FileStatus constructFileStatus(
+          FileStatusAdapter fileStatusAdapter) {
+    return new FileStatus(fileStatusAdapter.getLength(),
+            fileStatusAdapter.isDir(),
+            fileStatusAdapter.getBlockReplication(),
+            fileStatusAdapter.getBlocksize(),
+            fileStatusAdapter.getModificationTime(),
+            fileStatusAdapter.getAccessTime(),
+            new FsPermission(fileStatusAdapter.getPermission()),
+            fileStatusAdapter.getOwner(),
+            fileStatusAdapter.getGroup(),
+            fileStatusAdapter.getSymlink(),
+            fileStatusAdapter.getPath(),
+            false,
+            fileStatusAdapter.isEncrypted(),
+            fileStatusAdapter.isErasureCoded()
     );
+  }
 
+  FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
+    FileStatus fileStatus = constructFileStatus(fileStatusAdapter);
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
     if (blockLocations == null || blockLocations.length == 0) {
       return fileStatus;
