@@ -44,14 +44,14 @@ public final class OzoneConfigUtil {
 
   /**
    * Return list of OzoneAdministrators from config.
+   * The service startup user will default to an admin.
    */
-  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf)
-          throws IOException {
-    Collection<String> ozAdmins =
-            conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!ozAdmins.contains(omSPN)) {
-      ozAdmins.add(omSPN);
+  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
+      String starterUser) {
+    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS);
+    if (!ozAdmins.contains(starterUser)) {
+      ozAdmins.add(starterUser);
     }
     return ozAdmins;
   }
