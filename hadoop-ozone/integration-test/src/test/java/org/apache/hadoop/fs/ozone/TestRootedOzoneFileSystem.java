@@ -322,8 +322,6 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusWithIntermediateDirWithECEnabled()
           throws Exception {
     String key = "object-dir/object-name1";
-    Path volPathTest = new Path(OZONE_URI_DELIMITER, volumeName);
-    Path bucketPathTest = new Path(volPathTest, bucketName);
 
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
