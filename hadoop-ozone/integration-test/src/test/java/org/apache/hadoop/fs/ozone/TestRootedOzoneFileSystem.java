@@ -63,7 +63,10 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -316,6 +319,46 @@ public class TestRootedOzoneFileSystem {
 
     // Cleanup
     fs.delete(grandparent, true);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDirWithECEnabled()
+          throws Exception {
+    String key = "object-dir/object-name1";
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, volumeName);
+    Path bucketPathTest = new Path(volPathTest, bucketName);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    new ECReplicationConfig("RS-3-2-1024"),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+
+    List<String> dirs = Arrays.asList(volumeName, bucketName, "object-dir",
+            "object-name1");
+    for (int size = 1; size <= dirs.size(); size++) {
+      String path = "/" + dirs.subList(0, size).stream()
+              .collect(Collectors.joining("/"));
+      Path parent = new Path(path);
+      // Wait until the filestatus is updated
+      if (!enabledFileSystemPaths) {
+        GenericTestUtils.waitFor(() -> {
+          try {
+            fs.getFileStatus(parent);
+            return true;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 1000, 120000);
+      }
+      FileStatus fileStatus = fs.getFileStatus(parent);
+      Assert.assertEquals(fileStatus.isErasureCoded(),
+              size >= dirs.size() - 1
+              && !bucketLayout.isFileSystemOptimized());
+    }
+
   }
 
   @Test
