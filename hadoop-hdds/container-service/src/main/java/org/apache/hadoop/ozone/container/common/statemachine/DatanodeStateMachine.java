@@ -211,7 +211,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new ReconstructECContainersCommandHandler(conf,
             ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getContainerDeleteThreads()))
+            dnConf.getContainerDeleteThreads(), clock))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))
