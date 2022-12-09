@@ -46,11 +46,15 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -226,6 +230,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
@@ -339,6 +344,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * OM super user / admin list.
    */
+  private final String omStarterUser;
   private final OzoneAdmins omAdmins;
   private final OzoneAdmins s3OzoneAdmins;
 
@@ -444,6 +450,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final boolean isSecurityEnabled;
 
+
+  /** A list of property that are reconfigurable at runtime. */
+  private final TreeSet<String> reconfigurableProperties = Sets.newTreeSet(Lists.newArrayList(
+      OZONE_ADMINISTRATORS
+  ));
+  
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -582,10 +594,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
 
     // Get admin list
+    omStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     Collection<String> omAdminUsernames =
-        OzoneConfigUtil.getOzoneAdminsFromConfig(configuration);
+        OzoneConfigUtil.getOzoneAdminsFromConfig(configuration, omStarterUser);
     Collection<String> omAdminGroups =
         OzoneConfigUtil.getOzoneAdminsGroupsFromConfig(configuration);
+    LOG.info("OM start with adminUsers: {}", omAdminUsernames);
     omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups);
 
     Collection<String> s3AdminUsernames =
@@ -4031,6 +4045,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return LOG;
   }
 
+  // ReconfigurableBase get base configuration
+  @Override
+  public Configuration getConf() {
+    return getConfiguration();
+  }
+
   public OzoneConfiguration getConfiguration() {
     return configuration;
   }
@@ -4187,6 +4207,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isAdmin(UserGroupInformation callerUgi) {
     return callerUgi != null && omAdmins.isAdmin(callerUgi);
+  }
+
+  /**
+   * Check ozone admin privilege, throws exception if not admin.
+   */
+  public void checkAdminUserPrivilege(String operation) throws IOException {
+    final UserGroupInformation ugi = getRemoteUser();
+    if (!isAdmin(ugi)) {
+      throw new OMException("Only Ozone admins are allowed to " + operation,
+          PERMISSION_DENIED);
+    }
   }
 
   public boolean isS3Admin(UserGroupInformation callerUgi) {
@@ -4581,4 +4612,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
+
+  @Override
+  public Collection<String> getReconfigurableProperties() {
+    return reconfigurableProperties;
+  }
+
+  @Override
+  protected String reconfigurePropertyImpl(String property, String newVal)
+      throws ReconfigurationException {
+    if (property.equals(OZONE_ADMINISTRATORS)) {
+      return reconfOzoneAdmins(newVal);
+    } else {
+      throw new ReconfigurationException(property, newVal, getConfiguration().get(property));
+    }
+  }
+
+  private String reconfOzoneAdmins(String newVal) {
+    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
+    Collection<String> admins =
+        OzoneConfigUtil.getOzoneAdminsFromConfig(getConfiguration(), omStarterUser);
+    omAdmins.setAdminUsernames(admins);
+    LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS, newVal, admins);
+    return String.valueOf(newVal);
+  }
+
 }

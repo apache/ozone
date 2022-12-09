@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.om.protocol;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
+
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.KerberosInfo;
@@ -39,4 +43,23 @@ public interface OMAdminProtocol extends Closeable {
    * Remove OM from HA ring.
    */
   void decommission(OMNodeDetails removeOMNode) throws IOException;
+
+  /**
+   * Asynchronously reload configuration on disk and apply changes.
+   */
+  @Idempotent
+  void startOmReconfiguration() throws IOException;
+
+  /**
+   * Get the status of the previously issued reconfig task.
+   * @see org.apache.hadoop.conf.ReconfigurationTaskStatus
+   */
+  @Idempotent
+  ReconfigurationTaskStatus getOmReconfigurationStatus() throws IOException;
+
+  /**
+   * Get a list of allowed properties for reconfiguration.
+   */
+  @Idempotent
+  List<String> listOmReconfigurableProperties() throws IOException;
 }
