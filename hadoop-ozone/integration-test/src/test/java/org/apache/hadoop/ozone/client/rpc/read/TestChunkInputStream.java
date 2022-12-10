@@ -44,6 +44,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
   public void testAll() throws Exception {
     testChunkReadBuffers();
     testBufferRelease();
+    testCloseReleasesBuffers();
   }
 
 
@@ -110,6 +111,25 @@ public class TestChunkInputStream extends TestInputStreamBase {
     chunk0Stream.read(new byte[1]);
     Assert.assertNull("ChunkInputStream did not release buffers after " +
         "reaching EOF.", chunk0Stream.getCachedBuffers());
+  }
+
+  private void testCloseReleasesBuffers() throws Exception {
+    String keyName = getNewKeyName();
+    writeRandomBytes(keyName, CHUNK_SIZE);
+
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+      BlockInputStream block0Stream =
+          (BlockInputStream) keyInputStream.getBlockStreams().get(0);
+      block0Stream.initialize();
+
+      ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
+      readDataFromChunk(chunk0Stream, 0, 1);
+      Assert.assertNotNull(chunk0Stream.getCachedBuffers());
+
+      chunk0Stream.close();
+
+      Assert.assertNull(chunk0Stream.getCachedBuffers());
+    }
   }
 
   /**

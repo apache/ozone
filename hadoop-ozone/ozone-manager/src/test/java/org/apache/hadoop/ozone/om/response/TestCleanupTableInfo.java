@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
@@ -189,6 +190,8 @@ public class TestCleanupTableInfo {
   public void testKeyCreateRequestSetsAllTouchedTableCachesForEviction() {
     OMKeyCreateRequest request = anOMKeyCreateRequest();
     when(om.getEnableFileSystemPaths()).thenReturn(true);
+    when(om.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(false, false));
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 

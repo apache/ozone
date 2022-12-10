@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
@@ -51,6 +52,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *     will eventually go away.
  *   * Any pending deletes are treated as if they have deleted
  *   * Pending adds are ignored as they may fail to create.
+ *   * Unhealthy replicas contribute to under replication - an index with
+ *   only unhealthy and no closed replicas is considered under replicated
  *
  * Similar for over replication:
  *
@@ -58,6 +61,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *   * Pending delete replicas will complete
  *   * Pending adds are ignored as they may not complete.
  *   * Maintenance copies are not considered until they are back to IN_SERVICE
+ *   * Having unhealthy replicas is not considered over replication
  */
 
 public class ECContainerReplicaCount implements ContainerReplicaCount {
@@ -93,6 +97,25 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     }
 
     for (ContainerReplica replica : replicas) {
+      /*
+      Remove UNHEALTHY replicas because they are unavailable. They could be a
+      reason for under replication but should not be a reason for over
+      replication.
+
+      For example, consider the following set of replicas for an EC 3-2
+      container:
+      Replica Index 1: Closed
+      Replica Index 2: Closed
+      Replica Index 3: Closed, Unhealthy (2 replicas for this index)
+      Replica Index 4: Unhealthy
+      Replica Index 5: Closed
+
+      This is a case of under replication because index 4 is unavailable. Index
+      3 is not considered over replicated because its second copy is unhealthy.
+      */
+      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        continue;
+      }
       HddsProtos.NodeOperationalState state =
           replica.getDatanodeDetails().getPersistedOpState();
       int index = replica.getReplicaIndex();
@@ -197,6 +220,33 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
+   * Gets a set containing all maintenance only indexes. These are replicas
+   * that are only on maintenance nodes, without any copies on healthy nodes.
+   *
+   * @param includePendingAdd true if any indexes that are pending an add
+   * {@link ContainerReplicaOp.PendingOpType#ADD} should be excluded
+   * @return set containing maintenance only indexes or empty set if none are
+   * in maintenance
+   */
+  public Set<Integer> maintenanceOnlyIndexes(boolean includePendingAdd) {
+    Set<Integer> maintenanceOnlyIndexes = new HashSet<>();
+    for (Integer i : maintenanceIndexes.keySet()) {
+      if (!healthyIndexes.containsKey(i)) {
+        maintenanceOnlyIndexes.add(i);
+      }
+    }
+
+    // Now we have a set of maintenance only indexes. Remove any pending add
+    // as they should eventually recover.
+    if (includePendingAdd) {
+      for (Integer i : pendingAdd) {
+        maintenanceOnlyIndexes.remove(i);
+      }
+    }
+    return maintenanceOnlyIndexes;
+  }
+
+  /**
    * Return true if there are insufficient replicas to recover this container.
    * Ie, less than EC Datanum containers are present.
    * @return True if the container cannot be recovered, false otherwise.
@@ -256,23 +306,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
-   * Returns an unsorted list of replicas that are on a maintenance node, but
-   * have no other copies on in_service nodes. This list can be used in
-   * conjunction with additionalMaintenanceCopiesNeeded, to select replicas to
-   * copy to ensure the maintenance redundancy goal is met.
-   * @return
-   */
-  public List<Integer> maintenanceOnlyIndexes() {
-    List<Integer> maintenanceOnly = new ArrayList<>();
-    for (Integer i : maintenanceIndexes.keySet()) {
-      if (!healthyIndexes.containsKey(i)) {
-        maintenanceOnly.add(i);
-      }
-    }
-    return maintenanceOnly;
-  }
-
-  /**
    * Get the number of additional replicas needed to make the container
    * sufficiently replicated for maintenance. For EC-3-2, if there is a
    * remainingMaintenanceRedundancy of 1, and two replicas in maintenance,
@@ -280,8 +313,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * copied to an in-service node to meet the redundancy guarantee.
    * @return
    */
-  public int additionalMaintenanceCopiesNeeded() {
-    List<Integer> maintenanceOnly = maintenanceOnlyIndexes();
+  public int additionalMaintenanceCopiesNeeded(boolean includePendingAdd) {
+    Set<Integer> maintenanceOnly = maintenanceOnlyIndexes(includePendingAdd);
     return Math.max(0, maintenanceOnly.size() - getMaxMaintenance());
   }
 

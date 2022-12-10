@@ -115,8 +115,8 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-    Assert.assertEquals(scmContainerManager.getContainerIDs(),
-        reconContainerManager.getContainerIDs());
+    Assert.assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());

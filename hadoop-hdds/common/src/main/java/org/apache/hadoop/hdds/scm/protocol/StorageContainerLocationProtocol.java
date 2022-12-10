@@ -116,7 +116,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException;
+      Iterable<? extends Long> containerIDs) throws IOException;
 
   /**
    * Ask SCM which containers of the given list exist.
@@ -307,6 +307,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   ScmInfo getScmInfo() throws IOException;
+
+  /**
+   * Reset the expired deleted block retry count.
+   *
+   * @param txIDs transactionId list to be reset
+   * @return num of successful reset
+   * @throws IOException
+   */
+  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
   /**
    * Check if SCM is in safe mode.

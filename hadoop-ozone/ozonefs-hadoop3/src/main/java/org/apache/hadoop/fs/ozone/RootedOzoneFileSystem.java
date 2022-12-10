@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 
 /**
@@ -91,5 +92,10 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
       String omHost, int omPort) throws IOException {
     return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,
         storageStatistics);
+  }
+
+  @Override
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new CapableOzoneFSInputStream(inputStream, statistics);
   }
 }

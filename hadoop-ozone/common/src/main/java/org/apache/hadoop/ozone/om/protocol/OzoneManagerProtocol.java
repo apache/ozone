@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -268,8 +270,22 @@ public interface OzoneManagerProtocol
    * @param args the args of the key.
    * @return OmKeyInfo instance that client uses to talk to container.
    * @throws IOException
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Deprecated
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
+
+  /**
+   * Lookup for the container of an existing key.
+   *
+   * @param args the args of the key.
+   * @param assumeS3Context if true OM will automatically lookup the S3
+   *                        volume context and includes in the response.
+   * @return KeyInfoWithVolumeContext includes info that client uses to talk
+   *         to containers and S3 volume context info if assumeS3Context is set.
+   */
+  KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args, boolean assumeS3Context)
+      throws IOException;
 
   /**
    * Rename an existing key within a bucket.
@@ -743,7 +759,9 @@ public interface OzoneManagerProtocol
    *                     if bucket does not exist
    * @throws IOException if there is error in the db
    *                     invalid arguments
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Deprecated
   OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
 
   /**
@@ -908,4 +926,17 @@ public interface OzoneManagerProtocol
   default CancelPrepareResponse cancelOzoneManagerPrepare() throws IOException {
     return CancelPrepareResponse.newBuilder().build();
   }
+
+  /**
+   * Send RPC request with or without payload to OM
+   * to benchmark RPC communication performance.
+   * @param payloadReq payload in request.
+   * @param payloadSizeResp payload size of response.
+   * @throws IOException if there is error in the RPC communication.
+   * @return EchoRPCResponse.
+   */
+  EchoRPCResponse echoRPCReq(byte[] payloadReq,
+                             int payloadSizeResp)
+          throws IOException;
+
 }

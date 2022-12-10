@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
@@ -45,7 +46,6 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -66,11 +66,12 @@ public class DBCheckpointServlet extends HttpServlet {
 
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
-  private Collection<String> allowedUsers;
+  private transient OzoneAdmins admins;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
                          Collection<String> allowedAdminUsers,
+                         Collection<String> allowedAdminGroups,
                          boolean isSpnegoAuthEnabled)
       throws ServletException {
 
@@ -82,7 +83,7 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     this.aclEnabled = omAclEnabled;
-    this.allowedUsers = allowedAdminUsers;
+    this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
@@ -90,9 +91,7 @@ public class DBCheckpointServlet extends HttpServlet {
     // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
     // enabled
     if (aclEnabled && isSpnegoEnabled) {
-      return allowedUsers.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || allowedUsers.contains(user.getShortUserName())
-          || allowedUsers.contains(user.getUserName());
+      return admins.isAdmin(user);
     } else {
       return true;
     }

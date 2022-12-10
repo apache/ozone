@@ -18,6 +18,27 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import com.google.common.primitives.Longs;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import picocli.CommandLine;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -29,25 +50,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.ozone.OzoneConsts;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.kohsuke.MetaInfServices;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
-import picocli.CommandLine;
-
 /**
- * Parser for scm.db file.
+ * Parser for scm.db, om.db or container db file.
  */
 @CommandLine.Command(
         name = "scan",
@@ -76,10 +83,19 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private static String fileName;
 
+  @CommandLine.Option(names = {"--startkey", "-sk"},
+      description = "Key from which to iterate the DB")
+  private static String startKey;
+
   @CommandLine.Option(names = {"--dnSchema", "-d"},
-      description = "Datanode DB Schema Version : V1/V2",
+      description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
+
+  @CommandLine.Option(names = {"--container-id", "-cid"},
+      description = "Container ID when datanode DB Schema is V3",
+      defaultValue = "-1")
+  private static long containerId;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -88,10 +104,31 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private List<Object> scannedObjects;
 
-  private static List<Object> displayTable(RocksIterator iterator,
+  public static byte[] getValueObject(
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+    Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
+    if (keyType.equals(String.class)) {
+      return startKey.getBytes(StandardCharsets.UTF_8);
+    } else if (keyType.equals(ContainerID.class)) {
+      return new ContainerID(Long.parseLong(startKey)).getBytes();
+    } else if (keyType.equals(Long.class)) {
+      return Longs.toByteArray(Long.parseLong(startKey));
+    } else if (keyType.equals(PipelineID.class)) {
+      return PipelineID.valueOf(UUID.fromString(startKey)).getProtobuf()
+          .toByteArray();
+    } else {
+      throw new IllegalArgumentException(
+          "StartKey is not supported for this table.");
+    }
+  }
+
+  private static List<Object> displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
-    iterator.seekToFirst();
+
+    if (startKey != null) {
+      iterator.get().seek(getValueObject(dbColumnFamilyDefinition));
+    }
 
     Writer fileWriter = null;
     PrintWriter printWriter = null;
@@ -101,17 +138,29 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             new FileOutputStream(fileName), StandardCharsets.UTF_8);
         printWriter = new PrintWriter(fileWriter);
       }
-      while (iterator.isValid()) {
+
+      boolean schemaV3 = dnDBSchemaVersion != null &&
+          dnDBSchemaVersion.equals("V3");
+      while (iterator.get().isValid()) {
         StringBuilder result = new StringBuilder();
         if (withKey) {
           Object key = dbColumnFamilyDefinition.getKeyCodec()
-              .fromPersistedFormat(iterator.key());
+              .fromPersistedFormat(iterator.get().key());
           Gson gson = new GsonBuilder().setPrettyPrinting().create();
-          result.append(gson.toJson(key));
+          if (schemaV3) {
+            int index =
+                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
+            String cid = key.toString().substring(0, index);
+            String blockId = key.toString().substring(index);
+            result.append(gson.toJson(Longs.fromByteArray(
+                FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
+          } else {
+            result.append(gson.toJson(key));
+          }
           result.append(" -> ");
         }
         Object o = dbColumnFamilyDefinition.getValueCodec()
-            .fromPersistedFormat(iterator.value());
+            .fromPersistedFormat(iterator.get().value());
         outputs.add(o);
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         result.append(gson.toJson(o));
@@ -121,7 +170,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           System.out.println(result.toString());
         }
         limit--;
-        iterator.next();
+        iterator.get().next();
         if (limit == 0) {
           break;
         }
@@ -159,6 +208,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   public static void setFileName(String name) {
     DBScanner.fileName = name;
+  }
+
+  public static void setContainerId(long id) {
+    DBScanner.containerId = id;
+  }
+
+  public static void setDnDBSchemaVersion(String version) {
+    DBScanner.dnDBSchemaVersion = version;
+  }
+
+  public static void setWithKey(boolean withKey) {
+    DBScanner.withKey = withKey;
   }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
@@ -199,7 +260,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+    ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
            rocksDB, parent.getDbPath());
@@ -208,7 +269,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          RocksDB rocksDB, String dbPath) throws IOException {
+          ManagedRocksDB rocksDB, String dbPath) throws IOException {
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
               "List length should be a positive number. Only allowed negative" +
@@ -231,7 +292,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }
-        RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
+        ManagedRocksIterator iterator;
+        if (containerId > 0 && dnDBSchemaVersion != null &&
+            dnDBSchemaVersion.equals("V3")) {
+          ManagedReadOptions readOptions = new ManagedReadOptions();
+          readOptions.setIterateUpperBound(new ManagedSlice(
+              FixedLengthStringUtils.string2Bytes(
+                  DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId + 1))));
+          iterator = new ManagedRocksIterator(
+              rocksDB.get().newIterator(columnFamilyHandle, readOptions));
+          iterator.get().seek(FixedLengthStringUtils.string2Bytes(
+              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId)));
+        } else {
+          iterator = new ManagedRocksIterator(
+              rocksDB.get().newIterator(columnFamilyHandle));
+          iterator.get().seekToFirst();
+        }
         scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {
@@ -249,6 +327,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return RDBParser.class;
+  }
+
+  public static void setStartKey(String startKey) {
+    DBScanner.startKey = startKey;
   }
 }
 

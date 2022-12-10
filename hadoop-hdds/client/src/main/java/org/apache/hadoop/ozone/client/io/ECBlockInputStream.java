@@ -420,7 +420,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void seek(long pos) throws IOException {
     checkOpen();
-    if (pos < 0 || pos >= getLength()) {
+    if (pos < 0 || pos > getLength()) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception

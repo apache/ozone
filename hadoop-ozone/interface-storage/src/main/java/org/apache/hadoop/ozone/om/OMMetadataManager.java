@@ -433,7 +433,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
       getBucketIterator();
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator();
+      getKeyIterator() throws IOException;
 
   /**
    * Given parent object id and path component name, return the corresponding

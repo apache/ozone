@@ -33,6 +33,7 @@
         <th>Available Space</th>
         <th>Reserved</th>
         <th>Total Capacity</th>
+        <th>State</th>
     </tr>
     </thead>
     <tbody>
@@ -44,6 +45,7 @@
         <td>{{volumeInfo.Available}}</td>
         <td>{{volumeInfo.Reserved}}</td>
         <td>{{volumeInfo.TotalCapacity}}</td>
+        <td>{{volumeInfo["tag.VolumeState"]}}</td>
     </tr>
     </tbody>
 </table>

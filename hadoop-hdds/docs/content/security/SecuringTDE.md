@@ -33,7 +33,7 @@ when a bucket is created.
 
 To use TDE, admin must setup a Key Management Server and provide that URI to
 Ozone/HDFS. Since Ozone and HDFS can use the same Key Management Server, this
- configuration can be provided via *hdfs-site.xml*.
+ configuration can be provided via *core-site.xml*.
 
 Property| Value
 -----------------------------------|-----------------------------------------
@@ -49,7 +49,7 @@ To create an encrypted bucket, client need to:
   how you would use HDFS encryption zones.
 
   ```bash
-  hadoop key create encKey
+  hadoop key create enckey
   ```
   The above command creates an encryption key for the bucket you want to protect.
   Once the key is created, you can tell Ozone to use that key when you are
@@ -58,11 +58,11 @@ To create an encrypted bucket, client need to:
    * Assign the encryption key to a bucket.
 
   ```bash
-  ozone sh bucket create -k encKey /vol/encryptedbucket
+  ozone sh bucket create -k enckey /vol/encryptedbucket
   ```
 
 After this command, all data written to the _encryptedbucket_ will be encrypted
-via the encKey and while reading the clients will talk to Key Management
+via the enckey and while reading the clients will talk to Key Management
 Server and read the key and decrypt it. In other words, the data stored
 inside Ozone is always encrypted. The fact that data is encrypted at rest
 will be completely transparent to the clients and end users.
@@ -74,13 +74,13 @@ There are two ways to create an encrypted bucket that can be accessed via S3 Gat
 #### Option 1. Create a bucket using shell under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey --layout=OBJECT_STORE /s3v/encryptedbucket
+  ozone sh bucket create -k enckey --layout=OBJECT_STORE /s3v/encryptedbucket
   ```
 
 #### Option 2. Create a link to an encrypted bucket under "/s3v" volume
 
   ```bash
-  ozone sh bucket create -k encKey --layout=OBJECT_STORE /vol/encryptedbucket
+  ozone sh bucket create -k enckey --layout=OBJECT_STORE /vol/encryptedbucket
   ozone sh bucket link /vol/encryptedbucket /s3v/linkencryptedbucket
   ```
 

@@ -27,9 +27,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,34 +122,13 @@ public enum ContainerLayoutVersion {
 
   public File getChunkFile(ContainerData containerData, BlockID blockID,
       ChunkInfo info) throws StorageContainerException {
-    File chunkDir = getChunkDir(containerData);
+    File chunkDir = ContainerUtils.getChunkDir(containerData);
     return getChunkFile(chunkDir, blockID, info);
   }
 
   @Override
   public String toString() {
     return "ContainerLayout:v" + version;
-  }
-
-  private static File getChunkDir(ContainerData containerData)
-      throws StorageContainerException {
-    Preconditions.checkNotNull(containerData, "Container data can't be null");
-
-    String chunksPath = containerData.getChunksPath();
-    if (chunksPath == null) {
-      LOG.error("Chunks path is null in the container data");
-      throw new StorageContainerException("Unable to get Chunks directory.",
-          UNABLE_TO_FIND_DATA_DIR);
-    }
-
-    File chunksDir = new File(chunksPath);
-    if (!chunksDir.exists()) {
-      LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
-      throw new StorageContainerException("Chunks directory " +
-          chunksDir.getAbsolutePath() + " does not exist.",
-          UNABLE_TO_FIND_DATA_DIR);
-    }
-    return chunksDir;
   }
 
 }

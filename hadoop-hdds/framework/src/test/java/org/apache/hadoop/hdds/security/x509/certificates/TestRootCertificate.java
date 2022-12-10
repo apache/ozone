@@ -45,8 +45,8 @@ import java.security.NoSuchProviderException;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.UUID;
 
@@ -71,8 +71,8 @@ public class TestRootCertificate {
       throws SCMSecurityException, NoSuchProviderException,
       NoSuchAlgorithmException, CertificateException,
       SignatureException, InvalidKeyException, IOException {
-    LocalDate notBefore = LocalDate.now();
-    LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -98,15 +98,15 @@ public class TestRootCertificate {
 
 
     // Make sure that NotBefore is before the current Date
-    Date invalidDate = java.sql.Date.valueOf(
-        notBefore.minus(1, ChronoUnit.DAYS));
+    Date invalidDate = Date.from(
+        notBefore.minusDays(1).atZone(ZoneId.systemDefault()).toInstant());
     Assertions.assertFalse(
         certificateHolder.getNotBefore()
             .before(invalidDate));
 
     //Make sure the end date is honored.
-    invalidDate = java.sql.Date.valueOf(
-        notAfter.plus(1, ChronoUnit.DAYS));
+    invalidDate = Date.from(
+        notAfter.plusDays(1).atZone(ZoneId.systemDefault()).toInstant());
     Assertions.assertFalse(
         certificateHolder.getNotAfter()
             .after(invalidDate));
@@ -134,8 +134,8 @@ public class TestRootCertificate {
   public void testCACert(@TempDir Path basePath)
       throws SCMSecurityException, NoSuchProviderException,
       NoSuchAlgorithmException, IOException, CertificateException {
-    LocalDate notBefore = LocalDate.now();
-    LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
@@ -203,8 +203,8 @@ public class TestRootCertificate {
   public void testInvalidParamFails()
       throws SCMSecurityException, NoSuchProviderException,
       NoSuchAlgorithmException, IOException {
-    LocalDate notBefore = LocalDate.now();
-    LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";

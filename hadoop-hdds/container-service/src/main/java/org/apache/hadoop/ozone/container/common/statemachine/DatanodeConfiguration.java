@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +72,20 @@ public class DatanodeConfiguration {
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
 
-  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
+  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
+  static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
+  static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
+  // one hour
+  static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
+      1L * 60 * 60 * 1000 * 1000;
+  static final int ROCKSDB_MAX_OPEN_FILES_DEFAULT = 1024;
+  public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
+      "hdds.datanode.rocksdb.log.max-file-size";
+  public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY =
+      "hdds.datanode.rocksdb.log.max-file-num";
+  public static final String
+      ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
+      "hdds.datanode.rocksdb.delete_obsolete_files_period";
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -160,6 +174,12 @@ public class DatanodeConfiguration {
 
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
+  }
+
+  public void setRecoveringContainerScrubInterval(
+          Duration recoveringContainerScrubInterval) {
+    this.recoveringContainerScrubInterval =
+            recoveringContainerScrubInterval.toMillis();
   }
 
   public Duration getRecoveringContainerScrubInterval() {
@@ -280,7 +300,7 @@ public class DatanodeConfiguration {
   }
 
   @Config(key = "container.schema.v3.enabled",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
       description = "Enable use of container schema v3(one rocksdb per disk)."
@@ -296,6 +316,53 @@ public class DatanodeConfiguration {
            " meta key name."
   )
   private String containerSchemaV3KeySeparator = "|";
+
+  /**
+   * Following RocksDB related configuration applies to Schema V3 only.
+   */
+  @Config(key = "rocksdb.log.level",
+      defaultValue = "INFO",
+      type = ConfigType.STRING,
+      tags = { DATANODE },
+      description =
+          "The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL))"
+  )
+  private String rocksdbLogLevel = "INFO";
+
+  @Config(key = "rocksdb.log.max-file-size",
+      defaultValue = "32MB",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "The max size of each user log file of RocksDB. " +
+          "O means no size limit."
+  )
+  private long rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+
+  @Config(key = "rocksdb.log.max-file-num",
+      defaultValue = "64",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The max user log file number to keep for each RocksDB"
+  )
+  private int rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+
+  @Config(key = "rocksdb.delete-obsolete-files-period",
+      defaultValue = "1h", timeUnit = MICROSECONDS,
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Periodicity when obsolete files get deleted. " +
+          "Default is 1h."
+  )
+  private long rocksdbDeleteObsoleteFilesPeriod =
+      ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+
+  @Config(key = "rocksdb.max-open-files",
+      defaultValue = "1024",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The total number of files that a RocksDB can open. "
+  )
+  private int rocksdbMaxOpenFiles = ROCKSDB_MAX_OPEN_FILES_DEFAULT;
 
   @PostConstruct
   public void validate() {
@@ -349,6 +416,30 @@ public class DatanodeConfiguration {
           diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
+
+    if (rocksdbMaxFileSize < 0) {
+      LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
+              " must be no less than zero and was set to {}. Defaulting to {}",
+          rocksdbMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
+      rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+    }
+
+    if (rocksdbMaxFileNum <= 0) {
+      LOG.warn(ROCKSDB_LOG_MAX_FILE_NUM_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          rocksdbMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
+      rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+    }
+
+    if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
+      LOG.warn(ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY +
+              " must be greater than zero and was set to {}. Defaulting to {}",
+          rocksdbDeleteObsoleteFilesPeriod,
+          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT);
+      rocksdbDeleteObsoleteFilesPeriod =
+          ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+    }
+
   }
 
   public void setContainerDeleteThreads(int containerDeleteThreads) {
@@ -454,5 +545,45 @@ public class DatanodeConfiguration {
 
   public void setContainerSchemaV3KeySeparator(String separator) {
     this.containerSchemaV3KeySeparator = separator;
+  }
+
+  public String getRocksdbLogLevel() {
+    return rocksdbLogLevel;
+  }
+
+  public void setRocksdbLogLevel(String level) {
+    this.rocksdbLogLevel = level;
+  }
+
+  public void setRocksdbMaxFileNum(int count) {
+    this.rocksdbMaxFileNum = count;
+  }
+
+  public int getRocksdbMaxFileNum() {
+    return rocksdbMaxFileNum;
+  }
+
+  public void setRocksdbMaxFileSize(long size) {
+    this.rocksdbMaxFileSize = size;
+  }
+
+  public long getRocksdbMaxFileSize() {
+    return rocksdbMaxFileSize;
+  }
+
+  public long getRocksdbDeleteObsoleteFilesPeriod() {
+    return rocksdbDeleteObsoleteFilesPeriod;
+  }
+
+  public void setRocksdbDeleteObsoleteFilesPeriod(long period) {
+    this.rocksdbDeleteObsoleteFilesPeriod = period;
+  }
+
+  public void setRocksdbMaxOpenFiles(int count) {
+    this.rocksdbMaxOpenFiles = count;
+  }
+
+  public int getRocksdbMaxOpenFiles() {
+    return this.rocksdbMaxOpenFiles;
   }
 }

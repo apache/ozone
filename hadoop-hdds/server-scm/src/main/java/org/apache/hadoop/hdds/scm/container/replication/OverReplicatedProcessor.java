@@ -17,13 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,20 +31,18 @@ import java.util.Map;
  * queue, calculate the delete commands and assign to the datanodes
  * via the eventQueue.
  */
-public class OverReplicatedProcessor {
+public class OverReplicatedProcessor implements Runnable {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(OverReplicatedProcessor.class);
   private final ReplicationManager replicationManager;
-  private final ContainerReplicaPendingOps pendingOps;
-  private final EventPublisher eventPublisher;
+  private volatile boolean runImmediately = false;
+  private final long intervalInMillis;
 
   public OverReplicatedProcessor(ReplicationManager replicationManager,
-      ContainerReplicaPendingOps pendingOps,
-      EventPublisher eventPublisher) {
+      long intervalInMillis) {
     this.replicationManager = replicationManager;
-    this.pendingOps = pendingOps;
-    this.eventPublisher = eventPublisher;
+    this.intervalInMillis = intervalInMillis;
   }
 
   /**
@@ -65,6 +58,9 @@ public class OverReplicatedProcessor {
     int processed = 0;
     int failed = 0;
     while (true) {
+      if (!replicationManager.shouldRun()) {
+        break;
+      }
       ContainerHealthResult.OverReplicatedHealthResult overRep =
           replicationManager.dequeueOverReplicatedContainer();
       if (overRep == null) {
@@ -73,7 +69,7 @@ public class OverReplicatedProcessor {
       try {
         processContainer(overRep);
         processed++;
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error("Error processing over replicated container {}",
             overRep.getContainerInfo(), e);
         failed++;
@@ -90,25 +86,34 @@ public class OverReplicatedProcessor {
         .processOverReplicatedContainer(overRep);
     for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
       SCMCommand<?> scmCmd = cmd.getValue();
-      scmCmd.setTerm(replicationManager.getScmTerm());
-      final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(cmd.getKey().getUuid(), scmCmd);
-      eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-      adjustPendingOps(overRep.getContainerInfo().containerID(),
-          scmCmd, cmd.getKey());
+      replicationManager.sendDatanodeCommand(scmCmd, overRep.getContainerInfo(),
+          cmd.getKey());
     }
   }
 
-  private void adjustPendingOps(ContainerID containerID, SCMCommand<?> cmd,
-      DatanodeDetails targetDatanode)
-      throws IOException {
-    if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.deleteContainerCommand) {
-      DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
-      pendingOps.scheduleDeleteReplica(containerID, targetDatanode,
-          rcc.getReplicaIndex());
-    } else {
-      throw new IOException("Unexpected command type " + cmd.getType());
+  @Override
+  public void run() {
+    try {
+      while (!Thread.currentThread().isInterrupted()) {
+        if (replicationManager.shouldRun()) {
+          processAll();
+        }
+        synchronized (this) {
+          if (!runImmediately) {
+            wait(intervalInMillis);
+          }
+          runImmediately = false;
+        }
+      }
+    } catch (InterruptedException e) {
+      LOG.warn("{} interrupted. Exiting...", Thread.currentThread().getName());
+      Thread.currentThread().interrupt();
     }
+  }
+
+  @VisibleForTesting
+  synchronized void runImmediately() {
+    runImmediately = true;
+    notify();
   }
 }

@@ -111,9 +111,8 @@ public final class SCMCertStore implements CertificateStore {
   public void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException {
     lock.lock();
-    try {
-      BatchOperation batchOperation =
-          scmMetadataStore.getBatchHandler().initBatchOperation();
+    try (BatchOperation batchOperation =
+             scmMetadataStore.getBatchHandler().initBatchOperation()) {
       scmMetadataStore.getValidSCMCertsTable().putWithBatch(batchOperation,
           serialID, certificate);
       scmMetadataStore.getValidCertsTable().putWithBatch(batchOperation,

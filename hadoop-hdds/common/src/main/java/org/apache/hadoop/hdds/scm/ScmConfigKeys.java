@@ -344,6 +344,8 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
+  public static final String OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY =
+      "ozone.scm.pipeline.placement.impl";
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
       "ozone.scm.container.placement.ec.impl";
 
@@ -434,15 +436,9 @@ public final class ScmConfigKeys {
       "ozone.scm.block.deletion.max.retry";
   public static final int OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT = 4096;
 
-  public static final String HDDS_SCM_WATCHER_TIMEOUT =
-      "hdds.scm.watcher.timeout";
-
   public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
       "ozone.scm.sequence.id.batch.size";
   public static final int OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT = 1000;
-
-  public static final String HDDS_SCM_WATCHER_TIMEOUT_DEFAULT =
-      "10m";
 
   // Network topology
   public static final String OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE =
@@ -490,6 +486,18 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_EVENT_CONTAINER_REPORT_THREAD_POOL_SIZE =
       OZONE_SCM_EVENT_PREFIX + "ContainerReport.thread.pool.size";
   public static final int OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT = 10;
+  /**
+  SCM Event Report queue default queue wait time in millisec, i.e. 1 minute.
+   */
+  public static final int OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT
+      = 60000;
+  /**
+  SCM Event Report queue execution time wait in millisec, i.e. 2 minute.
+   */
+  public static final int OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT
+      = 120000;
+  public static final int OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT 
+      = 100000;
 
   public static final String OZONE_SCM_HA_RATIS_RPC_TYPE =
           "ozone.scm.ha.ratis.rpc.type";

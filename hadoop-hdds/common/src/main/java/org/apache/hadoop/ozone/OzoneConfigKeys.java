@@ -119,6 +119,13 @@ public final class OzoneConfigKeys {
       "ozone.client.max.ec.stripe.write.retries";
   public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
       "10";
+  public static final String OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED =
+      "ozone.client.ec.grpc.retries.enabled";
+  public static final boolean OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT
+      = true;
+  public static final String OZONE_CLIENT_EC_GRPC_RETRIES_MAX =
+      "ozone.client.ec.grpc.retries.max";
+  public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
 
   /**
    * Ozone administrator users delimited by comma.
@@ -129,6 +136,14 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS =
       "ozone.administrators";
+
+  public static final String OZONE_ADMINISTRATORS_GROUPS =
+      "ozone.administrators.groups";
+
+  public static final String OZONE_S3_ADMINISTRATORS =
+          "ozone.s3.administrators";
+  public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
+          "ozone.s3.administrators.groups";
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
@@ -511,6 +526,25 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";
+
+  // Items listing page size for fs client sub-commands output
+  public static final String
+      OZONE_FS_LISTING_PAGE_SIZE = "ozone.fs.listing.page.size";
+
+  public static final int
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
+
+  public static final int
+      OZONE_FS_MAX_LISTING_PAGE_SIZE = 5000;
+
+  public static final String
+      OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
+
+
+  public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
+  public static final String FS_TRASH_CLASSNAME_DEFAULT =
+      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+
   /**
    * There is no need to instantiate this class.
    */

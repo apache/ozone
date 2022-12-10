@@ -376,6 +376,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.administrators.groups</name>
+    <value/>
+    <tag>OZONE, SECURITY</tag>
+    <description>Ozone administrator groups delimited by the comma.
+      This is the list of groups who can access admin only information
+      from ozone.
+      It is enough to either have the name defined in ozone.administrators
+      or be directly or indirectly in a group defined in this property.
+    </description>
+  </property>
+  <property>
     <name>ozone.block.deleting.container.limit.per.interval</name>
     <value>10</value>
     <tag>OZONE, PERFORMANCE, SCM</tag>
@@ -597,7 +608,11 @@
     <description>
       Allows everyone to list all volumes when set to true. Defaults to true.
       When set to false, non-admin users can only list the volumes they have
-      access to. Admins can always list all volumes.
+      access to. Admins can always list all volumes. Note that this config
+      only applies to OzoneNativeAuthorizer. For other authorizers, admin
+      needs to set policies accordingly to allow all volume listing
+      e.g. for Ranger, a new policy with special volume "/" can be added to
+      allow group public LIST access.
     </description>
   </property>
   <property>
@@ -1532,17 +1547,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.scm.watcher.timeout</name>
-    <value>10m</value>
-    <tag>OZONE, SCM, MANAGEMENT</tag>
-    <description>
-      Timeout for the watchers of the HDDS SCM CommandWatchers. After this
-      duration the Copy/Delete container commands will be sent again to the
-      datanode unless the datanode confirms the completion.
-    </description>
-  </property>
-
-  <property>
     <name>hdds.db.profile</name>
     <value>DISK</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -1597,6 +1601,30 @@
     <description>
       The keytab file used by SCM http server to login as its service
       principal if SPNEGO is enabled for SCM http server.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3.administrators</name>
+    <value/>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      S3 administrator users delimited by a comma.
+      This is the list of users who can access admin only information from s3.
+      If this property is empty then ozone.administrators will be able to access all
+      s3 information regardless of this setting.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.administrators.groups</name>
+    <value/>
+    <tag>OZONE, SECURITY</tag>
+    <description>
+      S3 administrator groups delimited by a comma.
+      This is the list of groups who can access admin only information
+      from S3.
+      It is enough to either have the name defined in ozone.s3.administrators
+      or be directly or indirectly in a group defined in this property.
     </description>
   </property>
 
@@ -2039,6 +2067,14 @@
       PnDTnHnMn.nS</description>
   </property>
   <property>
+    <name>hdds.x509.renew.grace.duration</name>
+    <value>P28D</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Duration of the grace period within which a certificate should be
+      * renewed before the current one expires. Default is 28 days.
+    </description>
+  </property>
+  <property>
     <name>hdds.x509.dir.name</name>
     <value>certs</value>
     <tag>OZONE, HDDS, SECURITY</tag>
@@ -2235,6 +2271,16 @@
       Iterate batch size of delete when use BasicOzoneFileSystem.
     </description>
   </property>
+
+  <property>
+    <name>fs.trash.classname</name>
+    <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+    <tag>OZONE, OZONEFS, CLIENT</tag>
+    <description>
+      Trash Policy to be used.
+    </description>
+  </property>
+
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
@@ -2342,6 +2388,24 @@
     <description>
       Comma separated list of users and groups allowed to access
       client scm container protocol.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.ssl.keystore.reload.interval</name>
+    <value>60s</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the keystore
+      certificates file has changed and needs reloading. Default is 60s. Unit could be
+      defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.ssl.truststore.reload.interval</name>
+    <value>60s</value>
+    <tag>SECURITY</tag>
+    <description>The time interval in milliseconds used to check if the truststore
+      certificates file has changed and needs reloading. Default is 60s. Unit could
+      be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>
@@ -2546,6 +2610,18 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.administrators.groups</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      Recon administrator groups delimited by a comma.
+      This is the list of groups who can access admin only information
+      from recon.
+      It is enough to either have the name defined in ozone.recon.administrators
+      or be directly or indirectly in a group defined in this property.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.http.auth.type</name>
     <value>simple</value>
     <tag>DATANODE, SECURITY, KERBEROS</tag>
@@ -2737,7 +2813,7 @@
   </property>
   <property>
     <name>ozone.recon.scm.snapshot.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
       If enabled, SCM DB Snapshot is taken by Recon.
@@ -3215,6 +3291,24 @@
   </property>
 
   <property>
+    <name>ozone.client.ec.grpc.retries.enabled</name>
+    <value>true</value>
+    <tag>CLIENT</tag>
+    <description>
+      To enable Grpc client retries for EC.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.ec.grpc.retries.max</name>
+    <value>3</value>
+    <tag>CLIENT</tag>
+    <description>
+      The maximum attempts GRPC client makes before failover.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.audit.log.debug.cmd.list.omaudit</name>
     <value></value>
     <tag>OM</tag>
@@ -3287,4 +3381,56 @@
       will create intermediate directories.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.container.location.cache.size</name>
+    <value>100000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The size of the container locations cache in Ozone Manager. This cache allows Ozone Manager to populate
+      block locations in key-read responses without calling SCM, thus increases Ozone Manager read performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.container.location.cache.ttl</name>
+    <value>360m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The time to live for container location cache in Ozone.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.fs.listing.page.size</name>
+    <value>1024</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Listing page size value used by client for listing number of items on fs related sub-commands output.
+      Kindly set this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.fs.listing.page.size.max</name>
+    <value>5000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum listing page size value enforced by server for listing items on fs related sub-commands output. Kindly set
+      this config value responsibly to avoid high resource usage. Maximum value restricted is 5000 for
+      optimum performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.nssummary.flush.db.max.threshold</name>
+    <value>150000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for NSSummary task in hashmap before flushing to
+      recon rocks DB namespaceSummaryTable
+    </description>
+  </property>
+
 </configuration>

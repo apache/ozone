@@ -76,6 +76,15 @@ public interface CertificateClient {
   X509Certificate getCertificate();
 
   /**
+   * Returns whether certificate of the specified component is renewed.
+   *
+   * @return true if it's renewed recently.
+   */
+  default boolean isCertificateRenewed() {
+    return false;
+  }
+
+  /**
    * Return the latest CA certificate known to the client.
    * @return latest ca certificate known to the client.
    */
@@ -203,7 +212,8 @@ public interface CertificateClient {
     SUCCESS,
     FAILURE,
     GETCERT,
-    RECOVER
+    RECOVER,
+    REINIT
   }
 
   /**

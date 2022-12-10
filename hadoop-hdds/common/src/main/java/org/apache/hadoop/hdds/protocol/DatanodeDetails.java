@@ -235,6 +235,17 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Checks if the OperationalState is Node is Decomissioned or Decomissioning.
+   * @return True if OperationalState is Decommissioned or Decomissioning.
+   */
+  public boolean isDecomissioned() {
+    return this.getPersistedOpState() ==
+            HddsProtos.NodeOperationalState.DECOMMISSIONED ||
+            this.getPersistedOpState() ==
+            HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  }
+
+  /**
    * Set the persistedOpState for this instance.
    *
    * @param state The new operational state.

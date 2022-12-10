@@ -74,9 +74,7 @@ Test RATIS or STAND_ALONE Type with EC Replication
                     Should contain              ${message}          not supported
     ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-6-3-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo
                     Should contain              ${message}          STAND_ALONE
-                    Should contain              ${message}          rs-6-3-1024k
-                    Should contain              ${message}          not supported
+                    Should contain              ${message}          Invalid value
     ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-3-2-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
                     Should contain              ${message}          STAND_ALONE
-                    Should contain              ${message}          rs-3-2-1024k
-                    Should contain              ${message}          not supported
+                    Should contain              ${message}          Invalid value

@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
+import com.sun.jersey.api.client.ClientResponse;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -148,17 +149,21 @@ public class RangerClientMultiTenantAccessController implements
    * @param rse RangerServiceException
    */
   private void decodeRSEStatusCodes(RangerServiceException rse) {
-
-    switch (rse.getStatus().getStatusCode()) {
-    case HTTP_STATUS_CODE_UNAUTHORIZED:
-      LOG.error("Auth failure. Please double check Ranger-related configs");
-      break;
-    case HTTP_STATUS_CODE_BAD_REQUEST:
-      LOG.error("Request failure. If this is an assign-user operation, "
-          + "check if the user name exists in Ranger.");
-      break;
-    default:
-      LOG.error("Other request failure: {}", rse.getStatus());
+    ClientResponse.Status status = rse.getStatus();
+    if (status == null) {
+      LOG.error("Request failure with no status provided.", rse);
+    } else {
+      switch (status.getStatusCode()) {
+      case HTTP_STATUS_CODE_UNAUTHORIZED:
+        LOG.error("Auth failure. Please double check Ranger-related configs");
+        break;
+      case HTTP_STATUS_CODE_BAD_REQUEST:
+        LOG.error("Request failure. If this is an assign-user operation, "
+            + "check if the user name exists in Ranger.");
+        break;
+      default:
+        LOG.error("Other request failure. Status: {}", status);
+      }
     }
   }
 

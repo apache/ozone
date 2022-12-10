@@ -42,6 +42,11 @@ import java.util.Iterator;
  */
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
+  public TestOMKeyCreateRequestWithFSO(boolean setKeyPathLock,
+                                       boolean setFileSystemPaths) {
+    super(setKeyPathLock, setFileSystemPaths);
+  }
+
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();

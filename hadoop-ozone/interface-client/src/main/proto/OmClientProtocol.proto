@@ -122,6 +122,8 @@ enum Type {
 
   SetRangerServiceVersion = 107;
   RangerBGSync = 109;
+  EchoRPC = 110;
+  GetKeyInfo = 111;
 }
 
 message OMRequest {
@@ -226,6 +228,8 @@ message OMRequest {
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
+  optional EchoRPCRequest                   EchoRPCRequest                 = 110;
+  optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
 }
 
 message OMResponse {
@@ -323,6 +327,8 @@ message OMResponse {
 
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
+  optional EchoRPCResponse                   EchoRPCResponse               = 110;
+  optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
 }
 
 enum Status {
@@ -864,6 +870,8 @@ message KeyArgs {
     // When it is a head operation which is to check whether key exist
     optional bool headOp = 18;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
+    // Force OM to update container cache location from SCL
+    optional bool forceUpdateContainerCacheFromSCM = 20;
 }
 
 message KeyLocation {
@@ -945,6 +953,7 @@ message KeyInfo {
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
+    optional bool isFile = 19;
 }
 
 message DirectoryInfo {
@@ -1048,6 +1057,17 @@ message LookupKeyResponse {
     optional uint64 ID = 3;
     // TODO : allow specifying a particular version to read.
     optional uint64 openVersion = 4;
+}
+
+message GetKeyInfoRequest {
+  required KeyArgs keyArgs = 1;
+  optional bool assumeS3Context = 2;
+}
+
+message GetKeyInfoResponse {
+  optional KeyInfo keyInfo = 1;
+  optional VolumeInfo volumeInfo = 2;
+  optional string UserPrincipal = 3;
 }
 
 message RenameKeysRequest {
@@ -1452,6 +1472,22 @@ message PartInfo {
     required uint64 modificationTime = 3;
     required uint64 size = 4;
 }
+
+/**
+ Rpc request with optional payload, used in OmRPCLoadGenerator
+ */
+message EchoRPCRequest {
+    optional bytes payloadReq = 1;
+    optional int32 payloadSizeResp = 2;
+}
+
+/**
+ Rpc response with optional payload, used in OmRPCLoadGenerator
+ */
+message EchoRPCResponse {
+    optional bytes payload = 1;
+}
+
 
 message GetDelegationTokenResponseProto {
 

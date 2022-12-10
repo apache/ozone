@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.SortedMap;
@@ -42,7 +42,8 @@ public class TestECReconstructionSupervisor {
     final CountDownLatch holdProcessing = new CountDownLatch(1);
     ECReconstructionSupervisor supervisor =
         new ECReconstructionSupervisor(null, null, 5,
-            new ECReconstructionCoordinator(new OzoneConfiguration(), null) {
+            new ECReconstructionCoordinator(new OzoneConfiguration(), null,
+                ECReconstructionMetrics.create()) {
               @Override
               public void reconstructECContainerGroup(long containerID,
                   ECReplicationConfig repConfig,
@@ -63,7 +64,7 @@ public class TestECReconstructionSupervisor {
         new ECReconstructionCommandInfo(1, new ECReplicationConfig(3, 2),
             new byte[0], ImmutableList.of(), ImmutableList.of()));
     runnableInvoked.await();
-    Assert.assertEquals(1, supervisor.getInFlightReplications());
+    Assertions.assertEquals(1, supervisor.getInFlightReplications());
     holdProcessing.countDown();
     GenericTestUtils
         .waitFor(() -> supervisor.getInFlightReplications() == 0, 100, 15000);

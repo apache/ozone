@@ -566,6 +566,7 @@ public class TestKeyValueContainer {
         ssdProfile.getColumnFamilyOptions(conf));
   }
 
+
   @Test
   public void testDBProfileAffectsDBOptions() throws Exception {
     // Create Container 1
@@ -581,6 +582,7 @@ public class TestKeyValueContainer {
 
     // Create Container 2 with different DBProfile in otherConf
     OzoneConfiguration otherConf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, otherConf);
     // Use a dedicated profile for test
     otherConf.setEnum(HDDS_DB_PROFILE, DBProfile.SSD);
 
@@ -599,9 +601,16 @@ public class TestKeyValueContainer {
       outProfile2 = ((AbstractDatanodeStore) store2).getDbProfile();
     }
 
-    // DBOtions should be different
-    Assert.assertNotEquals(outProfile1.getDBOptions().compactionReadaheadSize(),
-        outProfile2.getDBOptions().compactionReadaheadSize());
+    // DBOtions should be different, except SCHEMA-V3
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      Assert.assertEquals(
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
+    } else {
+      Assert.assertNotEquals(
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
+    }
   }
 
   @Test

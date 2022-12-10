@@ -58,7 +58,7 @@ public class ECReplicationConfig implements ReplicationConfig {
   //   RS-3-2-2048
   //   XOR-10-4-4096K
   private static final Pattern STRING_FORMAT
-      = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)((?:k|K))?");
+      = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
 
   private int data;
 

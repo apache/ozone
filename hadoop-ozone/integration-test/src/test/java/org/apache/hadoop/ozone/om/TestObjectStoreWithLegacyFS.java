@@ -145,10 +145,10 @@ public class TestObjectStoreWithLegacyFS {
   private boolean assertKeyCount(
       Table<String, OmKeyInfo> keyTable,
       String dbKey, int expectedCnt, String keyName) {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        itr = keyTable.iterator();
     int countKeys = 0;
     try {
+      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+          itr = keyTable.iterator();
       itr.seek(dbKey);
       while (itr.hasNext()) {
 

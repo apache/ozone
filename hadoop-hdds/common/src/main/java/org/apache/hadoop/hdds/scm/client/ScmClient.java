@@ -361,6 +361,13 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Reset the expired deleted block retry count.
+   * @param txIDs transactionId list to be reset
+   * @throws IOException
+   */
+  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+  /**
    * Get usage information of datanode by ipaddress or uuid.
    *
    * @param ipaddress datanode ipaddress String

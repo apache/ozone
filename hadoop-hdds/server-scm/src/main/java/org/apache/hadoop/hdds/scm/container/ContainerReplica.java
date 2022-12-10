@@ -173,7 +173,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         ", sequenceId=" + sequenceId +
         ", keyCount=" + keyCount +
         ", bytesUsed=" + bytesUsed + ((replicaIndex > 0) ?
-        ",replicaIndex= " + replicaIndex :
+        ",replicaIndex=" + replicaIndex :
         "") +
         '}';
   }

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.rocksdb.IngestExternalFileOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
 
 import java.io.Closeable;
 import java.io.File;
@@ -45,14 +45,12 @@ public class RDBSstFileLoader implements DumpFileLoader, Closeable {
     if (externalFile.length() == 0) {
       return;
     }
-    IngestExternalFileOptions ingestOptions = new IngestExternalFileOptions()
-        .setIngestBehind(false);
-    try {
+    try (ManagedIngestExternalFileOptions ingestOptions =
+             new ManagedIngestExternalFileOptions()) {
+      ingestOptions.setIngestBehind(false);
       db.ingestExternalFile(family,
           Collections.singletonList(externalFile.getAbsolutePath()),
           ingestOptions);
-    } finally {
-      ingestOptions.close();
     }
   }
 

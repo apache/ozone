@@ -233,7 +233,7 @@ public class TestValidateBCSIDOnRestart {
     // in the and what is there in RockSDB and hence the container would be
     // marked unhealthy
     index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
-    cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // Make sure the container is marked unhealthy
     Assert.assertTrue(
             cluster.getHddsDatanodes().get(index)

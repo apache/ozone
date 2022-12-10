@@ -213,7 +213,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     serviceRuntimeInfo.setStartTime();
 
     RatisDropwizardExports.
-        registerRatisMetricReporters(ratisMetricsMap);
+        registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
@@ -339,6 +339,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     LOG.info("Initializing secure Datanode.");
 
     CertificateClient.InitResponse response = dnCertClient.init();
+    if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      LOG.info("Re-initialize certificate client.");
+      dnCertClient = new DNCertificateClient(new SecurityConfig(conf));
+      response = dnCertClient.init();
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:
@@ -584,6 +589,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (Exception ex) {
         LOG.error("Datanode CRL store stop failed", ex);
       }
+      RatisDropwizardExports.clear(ratisMetricsMap);
     }
   }
 

@@ -110,7 +110,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     // equal to getClosestNode.
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
     builder.setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(keyName).setRefreshPipeline(true);
+        .setKeyName(keyName);
 
     // read key with topology aware read enabled
     try (OzoneInputStream is = bucket.readKey(keyName)) {

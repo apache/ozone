@@ -42,25 +42,19 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test Container calls.
  */
+@Timeout(300)
 public class TestGetCommittedBlockLengthAndPutKey {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
@@ -68,7 +62,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -81,7 +75,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     xceiverClientManager = new XceiverClientManager(ozoneConfig);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws InterruptedException {
     if (cluster != null) {
       cluster.shutdown();
@@ -117,9 +111,9 @@ public class TestGetCommittedBlockLengthAndPutKey {
     response = ContainerProtocolCalls
         .getCommittedBlockLength(client, blockID, null);
     // make sure the block ids in the request and response are same.
-    Assert.assertTrue(
+    Assertions.assertTrue(
         BlockID.getFromProtobuf(response.getBlockID()).equals(blockID));
-    Assert.assertTrue(response.getBlockLength() == data.length);
+    Assertions.assertTrue(response.getBlockLength() == data.length);
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -136,14 +130,13 @@ public class TestGetCommittedBlockLengthAndPutKey {
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     // move the container to closed state
     ContainerProtocolCalls.closeContainer(client, containerID, null);
-    try {
-      // There is no block written inside the container. The request should
-      // fail.
-      ContainerProtocolCalls.getCommittedBlockLength(client, blockID, null);
-      Assert.fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      Assert.assertTrue(sce.getMessage().contains("Unable to find the block"));
-    }
+
+    // There is no block written inside the container. The request should fail.
+    Throwable t = Assertions.assertThrows(StorageContainerException.class,
+        () -> ContainerProtocolCalls.getCommittedBlockLength(client, blockID,
+            null));
+    Assertions.assertTrue(t.getMessage().contains("Unable to find the block"));
+
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -172,9 +165,9 @@ public class TestGetCommittedBlockLengthAndPutKey {
         ContainerTestHelper
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     response = client.sendCommand(putKeyRequest).getPutBlock();
-    Assert.assertEquals(
+    Assertions.assertEquals(
         response.getCommittedBlockLength().getBlockLength(), data.length);
-    Assert.assertTrue(response.getCommittedBlockLength().getBlockID()
+    Assertions.assertTrue(response.getCommittedBlockLength().getBlockID()
         .getBlockCommitSequenceId() > 0);
     BlockID responseBlockID = BlockID
         .getFromProtobuf(response.getCommittedBlockLength().getBlockID());
@@ -183,7 +176,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     // make sure the block ids in the request and response are same.
     // This will also ensure that closing the container committed the block
     // on the Datanodes.
-    Assert.assertEquals(responseBlockID, blockID);
+    Assertions.assertEquals(responseBlockID, blockID);
     xceiverClientManager.releaseClient(client, false);
   }
 }

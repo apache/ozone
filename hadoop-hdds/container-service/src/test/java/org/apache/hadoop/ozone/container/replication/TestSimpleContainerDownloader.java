@@ -42,6 +42,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test SimpleContainerDownloader.
@@ -68,7 +71,8 @@ public class TestSimpleContainerDownloader {
             tempDir.newFolder().toPath());
 
     //THEN
-    Assert.assertEquals(datanodes.get(0).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(0).getUuidString(),
+        result.toString());
   }
 
   @Test
@@ -88,7 +92,8 @@ public class TestSimpleContainerDownloader {
 
     //THEN
     //first datanode is failed, second worked
-    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+        result.toString());
   }
 
   @Test
@@ -107,13 +112,15 @@ public class TestSimpleContainerDownloader {
 
     //THEN
     //first datanode is failed, second worked
-    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+        result.toString());
   }
 
   /**
    * Test if different datanode is used for each download attempt.
    */
-  @Test(timeout = 10_000L)
+  @Test
+  @Timeout(10)
   public void testRandomSelection()
       throws ExecutionException, InterruptedException, IOException {
 
@@ -144,7 +151,7 @@ public class TestSimpleContainerDownloader {
     }
 
     //there is 1/3^10_000 chance for false positive, which is practically 0.
-    Assert.fail(
+    Assertions.fail(
         "Datanodes are selected 10000 times but second datanode was never "
             + "used.");
   }

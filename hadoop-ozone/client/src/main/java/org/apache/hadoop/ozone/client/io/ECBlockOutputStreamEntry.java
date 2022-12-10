@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,9 +77,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config) {
+      OzoneClientConfig config, ContainerClientMetrics clientMetrics) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
-        token, config);
+        token, config, clientMetrics);
     assertInstanceOf(
         pipeline.getReplicationConfig(), ECReplicationConfig.class);
     this.replicationConfig =
@@ -96,7 +98,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         blockOutputStreams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
-                getBufferPool(), getConf(), getToken());
+                getBufferPool(), getConf(), getToken(), getClientMetrics());
       }
     }
   }
@@ -260,16 +262,19 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         .build();
   }
 
-  void executePutBlock(boolean isClose, long blockGroupLength) {
+  void executePutBlock(boolean isClose, long blockGroupLength,
+      ByteString checksum) {
     if (!isInitialized()) {
       return;
     }
+
     for (ECBlockOutputStream stream : blockOutputStreams) {
       if (stream == null) {
         continue;
       }
       try {
-        stream.executePutBlock(isClose, true, blockGroupLength);
+        // Set checksum only for 1st node and parity nodes
+        stream.executePutBlock(isClose, true, blockGroupLength, checksum);
       } catch (Exception e) {
         stream.setIoException(e);
       }
@@ -383,6 +388,32 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         .filter(Objects::nonNull);
   }
 
+  public ByteString calculateChecksum() throws IOException {
+    if (blockOutputStreams == null) {
+      throw new IOException("Block Output Stream is null");
+    }
+
+    List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>();
+    // First chunk should always have the additional chunks in a partial stripe.
+    int currentIdx = blockOutputStreams[0]
+        .getContainerBlockData().getChunksCount();
+    for (ECBlockOutputStream stream: blockOutputStreams) {
+      if (stream.getContainerBlockData().getChunksCount() > currentIdx - 1) {
+        chunkInfos.add(stream.getContainerBlockData()
+            .getChunksList().get(currentIdx - 1));
+      }
+    }
+
+    ByteString checksum = ByteString.EMPTY;
+    for (ContainerProtos.ChunkInfo info : chunkInfos) {
+      for (ByteString byteString : info.getChecksumData().getChecksumsList()) {
+        checksum = checksum.concat(byteString);
+      }
+    }
+
+    return checksum;
+  }
+
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
@@ -395,6 +426,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
+    private ContainerClientMetrics clientMetrics;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -440,6 +472,12 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       return this;
     }
 
+    public ECBlockOutputStreamEntry.Builder setClientMetrics(
+        ContainerClientMetrics containerClientMetrics) {
+      this.clientMetrics = containerClientMetrics;
+      return this;
+    }
+
     public ECBlockOutputStreamEntry build() {
       return new ECBlockOutputStreamEntry(blockID,
           key,
@@ -447,7 +485,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
           pipeline,
           length,
           bufferPool,
-          token, config);
+          token, config, clientMetrics);
     }
   }
 }

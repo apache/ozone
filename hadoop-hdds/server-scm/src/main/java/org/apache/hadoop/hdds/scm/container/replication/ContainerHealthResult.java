@@ -34,14 +34,16 @@ public class ContainerHealthResult {
     HEALTHY,
     UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 
   private final ContainerInfo containerInfo;
   private final HealthState healthState;
   private final List<SCMCommand> commands = new ArrayList<>();
 
-  ContainerHealthResult(ContainerInfo containerInfo, HealthState healthState) {
+  public ContainerHealthResult(ContainerInfo containerInfo,
+      HealthState healthState) {
     this.containerInfo = containerInfo;
     this.healthState = healthState;
   }
@@ -67,7 +69,7 @@ public class ContainerHealthResult {
    */
   public static class HealthyResult extends ContainerHealthResult {
 
-    HealthyResult(ContainerInfo containerInfo) {
+    public HealthyResult(ContainerInfo containerInfo) {
       super(containerInfo, HealthState.HEALTHY);
     }
   }
@@ -108,7 +110,7 @@ public class ContainerHealthResult {
     private final boolean unrecoverable;
     private int requeueCount = 0;
 
-    UnderReplicatedHealthResult(ContainerInfo containerInfo,
+    public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
         boolean replicatedOkWithPending, boolean unrecoverable) {
       super(containerInfo, HealthState.UNDER_REPLICATED);
@@ -182,7 +184,7 @@ public class ContainerHealthResult {
      * @return True if the under-replication is corrected by the pending
      *         replicas. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
     }
 
@@ -199,6 +201,28 @@ public class ContainerHealthResult {
   }
 
   /**
+   * Class to represent a container healthy state which is mis-Replicated. This
+   * means the container is neither over nor under replicated, but its replicas
+   * don't meet the requirements of the container placement policy. Eg the
+   * containers are not spread across enough racks.
+   */
+  public static class MisReplicatedHealthResult
+      extends ContainerHealthResult {
+
+    private final boolean replicatedOkAfterPending;
+
+    public MisReplicatedHealthResult(ContainerInfo containerInfo,
+        boolean replicatedOkAfterPending) {
+      super(containerInfo, HealthState.MIS_REPLICATED);
+      this.replicatedOkAfterPending = replicatedOkAfterPending;
+    }
+
+    public boolean isReplicatedOkAfterPending() {
+      return replicatedOkAfterPending;
+    }
+  }
+
+  /**
    * Class for Over Replicated Container Health Results.
    */
   public static class OverReplicatedHealthResult extends ContainerHealthResult {
@@ -207,7 +231,7 @@ public class ContainerHealthResult {
     private final boolean sufficientlyReplicatedAfterPending;
 
 
-    OverReplicatedHealthResult(ContainerInfo containerInfo,
+    public OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
       super(containerInfo, HealthState.OVER_REPLICATED);
       this.excessRedundancy = excessRedundancy;
@@ -234,7 +258,7 @@ public class ContainerHealthResult {
      * @return True if the over-replication is corrected by the pending
      *         deletes. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
     }
   }

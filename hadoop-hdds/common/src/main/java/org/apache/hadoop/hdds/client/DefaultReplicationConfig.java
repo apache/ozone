@@ -123,7 +123,7 @@ public class DefaultReplicationConfig {
     DefaultReplicationConfig that = (DefaultReplicationConfig) o;
     return Objects.equals(type, that.type) && Objects
         .equals(factor, that.factor) && Objects
-        .equals(ecReplicationConfig, ecReplicationConfig);
+        .equals(ecReplicationConfig, that.ecReplicationConfig);
   }
 
   @Override

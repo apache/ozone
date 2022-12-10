@@ -32,14 +32,10 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
- * TODO: Add extensive javadoc.
- *
- * ContainerManager class contains the mapping from a name to a pipeline
- * mapping. This is used by SCM when allocating new locations and when
- * looking up a key.
+ * ContainerManager is responsible for keeping track of all Containers and
+ * managing all containers operations like creating, deleting etc.
  */
 public interface ContainerManager extends Closeable {
-  // TODO: Rename this to ContainerManager
 
   /**
    * Reinitialize the containerManager with the updated container store.
@@ -190,12 +186,6 @@ public interface ContainerManager extends Closeable {
    */
   void deleteContainer(ContainerID containerID)
       throws IOException, TimeoutException;
-
-  /**
-   * Returns the list of containersIDs.
-   * @return list of containerIDs
-   */
-  Set<ContainerID> getContainerIDs();
 
   /**
    * Returns containerStateManger.

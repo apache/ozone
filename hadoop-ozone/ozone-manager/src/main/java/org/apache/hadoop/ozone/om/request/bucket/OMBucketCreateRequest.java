@@ -258,15 +258,26 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // return response.
     if (exception == null) {
       LOG.info("created bucket: {} of layout {} in volume: {}", bucketName,
-          bucketInfo.getBucketLayout(), volumeName);
+          omBucketInfo.getBucketLayout(), volumeName);
       omMetrics.incNumBuckets();
+      if (isECBucket(bucketInfo)) {
+        omMetrics.incEcBucketsTotal();
+      }
       return omClientResponse;
     } else {
       omMetrics.incNumBucketCreateFails();
+      if (isECBucket(bucketInfo)) {
+        omMetrics.incEcBucketCreateFailsTotal();
+      }
       LOG.error("Bucket creation failed for bucket:{} in volume:{}",
           bucketName, volumeName, exception);
       return omClientResponse;
     }
+  }
+
+  private boolean isECBucket(BucketInfo bucketInfo) {
+    return bucketInfo.hasDefaultReplicationConfig() && bucketInfo
+        .getDefaultReplicationConfig().hasEcReplicationConfig();
   }
 
   private BucketLayout getDefaultBucketLayout(OzoneManager ozoneManager,
@@ -394,10 +405,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     if (volumeQuotaInBytes < totalBucketQuota
         && volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           " set to:" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
 

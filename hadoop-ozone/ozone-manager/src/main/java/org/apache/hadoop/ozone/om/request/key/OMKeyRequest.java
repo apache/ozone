@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -809,5 +810,34 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
           trxnLogIndex, isRatisEnabled);
+  }
+
+  protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {
+    return ozoneManager.getOzoneLockProvider()
+        .createLockStrategy(getBucketLayout());
+  }
+
+  /**
+   * Wrap the uncommitted blocks as pseudoKeyInfo.
+   *
+   * @param uncommitted Uncommitted OmKeyLocationInfo
+   * @param omKeyInfo   Args for key block
+   * @return pseudoKeyInfo
+   */
+  protected OmKeyInfo wrapUncommittedBlocksAsPseudoKey(
+      List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
+    if (uncommitted.isEmpty()) {
+      return null;
+    }
+    LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+        uncommitted, omKeyInfo.getKeyName());
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    // TODO dataSize of pseudoKey is not real here
+    List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
+    // version not matters in the current logic of keyDeletingService,
+    // all versions of blocks will be deleted.
+    uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
+    pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
+    return pseudoKeyInfo;
   }
 }

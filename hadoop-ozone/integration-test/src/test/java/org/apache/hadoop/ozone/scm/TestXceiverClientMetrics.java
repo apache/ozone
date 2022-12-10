@@ -46,22 +46,17 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests the metrics of XceiverClient.
  */
+@Timeout(300)
 public class TestXceiverClientMetrics {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   // only for testing
   private volatile boolean breakFlag;
   private CountDownLatch latch;
@@ -71,7 +66,7 @@ public class TestXceiverClientMetrics {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(config).build();
@@ -80,7 +75,7 @@ public class TestXceiverClientMetrics {
         .getStorageContainerLocationClient();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     cluster.shutdown();
   }

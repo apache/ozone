@@ -25,10 +25,6 @@ summary: Storage Container Manager 的 HA 设置可以避免任何单点故障�
 
 Ozone包含两个元数据管理节点(用于键管理的 *Ozone Manager* 和用于块空间管理的 *Storage Container management* )和多个存储节点(数据节点)。通过 RAFT 共识算法实现数据在数据节点之间的复制。
 
-<div class="alert alert-warning" role="alert">
-请注意，SCM-HA 尚未准备好在安全环境中部署。 安全工作正在进行中，将很快完成。
-</div>
-
 为了避免任何单点故障，元数据管理器节点还应该具有 HA 设置。
 
 Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，内部状态通过 RAFT (使用 Apache Ratis )复制。
@@ -36,6 +32,12 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 本文档解释了 Storage Container Manager (SCM)的 HA 设置，请在[本页]({{< ref "OM-HA" >}})中查看 Ozone Manager (OM)的 HA 设置。虽然它们可以独立地为 HA 进行设置，但可靠的、完全的 HA 设置需要为两个服务启用 HA。
 
 ## 配置
+
+> &#x26a0;&#xfe0f; **注意** &#x26a0;&#xfe0f;
+>
+> SCM HA 目前仅支持新初始化的集群。
+> SCM HA 必须在 Ozone 服务首次启动前开启。
+> 当某个 SCM 以非 HA 的模式启动后，不支持将其改为 HA 模式。
 
 Storage Container Manager 的 HA 模式可以在 `ozone-site.xml` 中进行以下设置：
 
@@ -94,7 +96,7 @@ Storage Container Manager 的 HA 模式可以在 `ozone-site.xml` 中进行以�
 bin/ozone scm --init
 ```
 
-第二个和第三个节点应该被 *bootstrapped*，而不是 init。这些集群将加入到配置的 RAFT 仲裁。当前服务器的 id 通过 DNS 名称标识，也可以通过 `ozone.scm.node.id` 明确设置。大多数时候你不需要设置它，因为基于 DNS 的 id 检测可以很好地工作。
+第二个和第三个节点应该被 *bootstrap*，而不是 init。这些集群将加入到配置的 RAFT 仲裁。当前服务器的 id 通过 DNS 名称标识，也可以通过 `ozone.scm.node.id` 明确设置。大多数时候你不需要设置它，因为基于 DNS 的 id 检测可以很好地工作。
 
 ```
 bin/ozone scm --bootstrap
@@ -110,6 +112,67 @@ bin/ozone scm --bootstrap
 这可以通过使用 `ozone.scm.primordial.node.id` 更改。您可以定义原始节点。设置这个节点后，你应该在**所有**的节点上**同时**执行 `scm --init` 和 `scm --bootstrap`。
 
 根据 `ozone.scm.primordial.node.id`，初始化进程将在第二个/第三个节点上被忽略，引导进程将在除原始节点外的所有节点上被忽略。
+
+## SCM HA 安全
+
+![SCM Secure HA](scm-secure-ha.png)
+
+在一个安全 SCM HA 集群中，我们将执行初始化的 SCM 称为原始 SCM。
+原始 SCM 使用自签名证书启动根 CA，并用于颁发签名证书到它自己和其他
+引导的 SCM。 只有原始 SCM 可以为其他 SCM 颁发签名证书。
+因此，原始 SCM 在 SCM HA 集群中具有特殊的作用，因为它是唯一可以向 SCM 颁发证书的 SCM。
+
+原始 SCM 担任根 CA 角色，它使用子 CA 证书签署所有 SCM 实例。
+SCM 使用子 CA 证书来签署 OM/Datanodes 的证书。
+
+引导 SCM 时会从原始 SCM 获取签名证书并启动子 CA。
+
+SCM 上的子 CA 用于为集群中的 OM/DN 颁发签名证书。 只有 leader SCM 向 OM/DN 颁发证书。
+
+### 如何启用安全
+
+```XML
+<property>
+<config>ozone.security.enable</config>
+<value>true</value>
+</property>
+
+<property>
+<config>hdds.grpc.tls.enabled</config>
+<value>true</value>
+</property>
+```
+
+在正常的 SCM HA 配置的基础上，需要添加上述配置。
+
+### 原始 SCM
+
+原始 SCM 由配置 ozone.scm.primordial.node.id 确定。
+此值可以是 SCM 的节点 ID 或原始机名。
+如果配置是未定义的，则运行 init 的节点被视为原始 SCM。
+
+{{< highlight bash >}}
+bin/ozone scm --init
+{{< /highlight >}}
+
+这将为根 CA 设置公钥、私钥对和自签名证书
+并生成公钥、私钥对和 CSR 以从根 CA 获取子 CA 的签名证书。
+
+### 引导 SCM
+
+{{< highlight bash >}}
+bin/ozone scm --bootstrap
+{{< /highlight >}}
+
+这将为子 CA 设置公钥、私钥对并生成 CSR 以获取来自根 CA 的子 CA 签名证书。
+
+**注意**: 当原始 SCM 未定义时，请确保仅在一个 SCM 上运行 **--init**，
+在其他 SCM 节点上需使用 **--bootstrap** 进行引导。
+
+### 目前 SCM HA 安全的限制
+
+1. 当原始 SCM 失效时, 新的 SCM 不能被引导并添加到 HA 节点中。
+2. 尚未支持从非 HA 安全集群升级到 HA 安全集群。
 
 ## 实现细节
 

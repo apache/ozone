@@ -195,8 +195,8 @@ public interface ReplicationConfig {
       replicationConfig = new ECReplicationConfig(replication);
       break;
     default:
-      throw new RuntimeException("Replication type " + type + " can not "
-          + "be parsed.");
+      throw new IllegalArgumentException("Replication type " + type +
+              " can not be parsed.");
     }
 
     ReplicationConfigValidator validator =

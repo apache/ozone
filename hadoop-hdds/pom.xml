@@ -30,6 +30,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>pom</packaging>
 
   <modules>
+    <module>annotations</module>
     <module>hadoop-dependency-client</module>
     <module>hadoop-dependency-test</module>
     <module>hadoop-dependency-server</module>
@@ -152,6 +153,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-config</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-annotation-processing</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 

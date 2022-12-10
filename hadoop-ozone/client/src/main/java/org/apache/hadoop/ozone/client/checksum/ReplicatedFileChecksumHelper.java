@@ -71,7 +71,6 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
          blockIdx++) {
       OmKeyLocationInfo keyLocationInfo =
           getKeyLocationInfoList().get(blockIdx);
-      currentLength += keyLocationInfo.getLength();
       if (currentLength > getLength()) {
         return;
       }
@@ -81,6 +80,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
             "Fail to get block checksum for " + keyLocationInfo
                 + ", checksum combine mode : {}" + getCombineMode());
       }
+
+      currentLength += keyLocationInfo.getLength();
     }
   }
 
@@ -106,6 +107,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
+    setChecksumType(checksumData.getType());
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 

@@ -262,8 +262,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
     } catch (IOException ex) {
       onFailure(containerData.getVolume());
-      throw new StorageContainerException("Error while creating/ updating " +
-          ".container file. ContainerID: " + containerId, ex,
+      String containerExceptionMessage = "Error while creating/updating" +
+            " container file. ContainerID: " + containerId +
+            ", container path: " + containerFile.getAbsolutePath();
+      if (tempContainerFile == null) {
+        containerExceptionMessage += " Temporary file could not be created.";
+      }
+      throw new StorageContainerException(containerExceptionMessage, ex,
           CONTAINER_FILES_CREATE_ERROR);
     } finally {
       if (tempContainerFile != null && tempContainerFile.exists()) {
@@ -326,6 +331,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public void markContainerUnhealthy() throws StorageContainerException {
     writeLock();
+    ContainerDataProto.State prevState = containerData.getState();
     try {
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.UNHEALTHY));
@@ -333,9 +339,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
-    LOG.warn("Moving container {} to state UNHEALTHY from state:{} Trace:{}",
+    LOG.warn("Moving container {} to state {} from state:{} Trace:{}",
             containerData.getContainerPath(), containerData.getState(),
-            StringUtils.getStackTrace(Thread.currentThread()));
+            prevState, StringUtils.getStackTrace(Thread.currentThread()));
   }
 
   @Override
@@ -835,7 +841,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume());
+            containerId, containerData.getVolume(), this);
     return checker.fastCheck();
   }
 
@@ -856,7 +862,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
-            containerId, containerData.getVolume());
+            containerId, containerData.getVolume(), this);
 
     return checker.fullCheck(throttler, canceler);
   }

@@ -241,6 +241,10 @@
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3</artifactId>
         </dependency>
+        <dependency>
+          <groupId>org.apache.ozone</groupId>
+          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
+        </dependency>
       </dependencies>
     </profile>
     <profile>
@@ -336,6 +340,7 @@
                   <appendAssemblyId>false</appendAssemblyId>
                   <attach>false</attach>
                   <finalName>ozone-${project.version}-src</finalName>
+                  <tarLongFileMode>posix</tarLongFileMode>
                   <outputDirectory>target</outputDirectory>
                   <basedir>${project.basedir}/../..</basedir>
                   <!-- Not using descriptorRef and hadoop-assembly dependency -->

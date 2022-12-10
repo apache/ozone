@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -51,6 +52,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 
 /**
  * Tests the ECOverReplicationHandling functionality.
@@ -61,6 +64,7 @@ public class TestECOverReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
+  private PlacementPolicy placementPolicy;
 
   @BeforeEach
   public void setup() {
@@ -80,6 +84,10 @@ public class TestECOverReplicationHandler {
     NodeSchema[] schemas =
         new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
+    placementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(placementPolicy.validateContainerPlacement(
+        anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
   }
 
   @Test
@@ -120,6 +128,37 @@ public class TestECOverReplicationHandler {
         new ImmutableMap.Builder<Integer, Integer>()
             .put(1, 2).put(2, 2).put(3, 2).put(4, 1)
             .put(5, 1).build());
+  }
+
+  /**
+   * Even if we pass an under-replicated health state to the over-rep handler
+   * it should process it OK, and if it has over replicated indexes, then
+   * delete commands should be produced.
+   */
+  @Test
+  public void testOverReplicationWithUnderReplication() {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    ContainerHealthResult.UnderReplicatedHealthResult health =
+        new ContainerHealthResult.UnderReplicatedHealthResult(
+            container, 1, false, false, false);
+
+    ECOverReplicationHandler ecORH =
+        new ECOverReplicationHandler(policy, nodeManager);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands = ecORH
+        .processAndCreateCommands(availableReplicas, ImmutableList.of(),
+            health, 1);
+
+    Assert.assertEquals(1, commands.size());
+    for (SCMCommand<?> cmd : commands.values()) {
+      Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
+    }
   }
 
   private void testOverReplicationWithIndexes(

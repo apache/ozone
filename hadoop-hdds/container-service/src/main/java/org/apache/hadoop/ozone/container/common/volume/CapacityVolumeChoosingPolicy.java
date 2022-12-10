@@ -28,6 +28,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
+import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
+
 /**
  * Volume choosing policy that randomly choose volume with remaining
  * space to satisfy the size constraints.
@@ -51,37 +54,42 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
-    if (volumes.size() < 1) {
+    if (volumes.isEmpty()) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
-    List<HddsVolume> filtered = volumes.stream()
-        .filter(v ->
-            v.getAvailable() - v.getCommittedBytes() > maxContainerSize)
+    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
+
+    List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
+        .filter(filter)
         .collect(Collectors.toList());
-    if (filtered.size() < 1) {
-      throw new DiskOutOfSpaceException("Out of space: "
-          + "All volumes are less than the container size (=" + maxContainerSize
-          + " B).");
-    } else if (filtered.size() == 1) {
-      return filtered.get(0);
+
+    if (volumesWithEnoughSpace.isEmpty()) {
+      throwDiskOutOfSpace(filter, LOG);
     } else {
-      // Even we don't have too many volumes in filtered for choosing, this
+      logIfSomeVolumesOutOfSpace(filter, LOG);
+    }
+
+    int count = volumesWithEnoughSpace.size();
+    if (count == 1) {
+      return volumesWithEnoughSpace.get(0);
+    } else {
+      // Even if we don't have too many volumes in volumesWithEnoughSpace, this
       // algorithm will still help us choose the volume with larger
       // available space than other volumes.
-      // Say we have vol1 with larger available space than vol2, for two choices
-      // , the distribution of possibility is as follows;
+      // Say we have vol1 with more available space than vol2, for two choices,
+      // the distribution of possibility is as follows:
       // 1. vol1 + vol2: 25%, result is vol1
       // 2. vol1 + vol1: 25%, result is vol1
       // 3. vol2 + vol1: 25%, result is vol1
       // 4. vol2 + vol2: 25%, result is vol2
       // So we have a total of 75% chances to choose vol1, which meets our
       // expectation.
-      int firstIndex = random.nextInt(filtered.size());
-      int secondIndex = random.nextInt(filtered.size());
+      int firstIndex = random.nextInt(count);
+      int secondIndex = random.nextInt(count);
 
-      HddsVolume firstVolume = filtered.get(firstIndex);
-      HddsVolume secondVolume = filtered.get(secondIndex);
+      HddsVolume firstVolume = volumesWithEnoughSpace.get(firstIndex);
+      HddsVolume secondVolume = volumesWithEnoughSpace.get(secondIndex);
 
       long firstAvailable = firstVolume.getAvailable()
           - firstVolume.getCommittedBytes();

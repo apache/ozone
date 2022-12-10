@@ -47,14 +47,13 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   public static final Logger LOG =
       LoggerFactory.getLogger(ECOverReplicationHandler.class);
 
-  private final ECContainerHealthCheck ecContainerHealthCheck =
-      new ECContainerHealthCheck();
   private final NodeManager nodeManager;
 
   public ECOverReplicationHandler(PlacementPolicy placementPolicy,
-                                  NodeManager nodeManager) {
+      NodeManager nodeManager) {
     super(placementPolicy);
     this.nodeManager = nodeManager;
+
   }
 
   /**
@@ -74,37 +73,21 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy) {
     ContainerInfo container = result.getContainerInfo();
-    ContainerHealthResult currentUnderRepRes = ecContainerHealthCheck
-        .checkHealth(container, replicas, pendingOps,
-            remainingMaintenanceRedundancy);
-    LOG.debug("Handling over-replicated EC container: {}", container);
 
-    //sanity check
-    if (currentUnderRepRes.getHealthState() !=
-        ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      LOG.info("The container {} state changed and it's not in over"
-              + " replication any more. Current state is: {}",
-          container.getContainerID(), currentUnderRepRes);
-      return emptyMap();
-    }
-
-    ContainerHealthResult.OverReplicatedHealthResult containerHealthResult =
-        ((ContainerHealthResult.OverReplicatedHealthResult)
-            currentUnderRepRes);
-    if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
-      LOG.info("The container {} with replicas {} will be corrected " +
-              "by the pending delete", container.getContainerID(), replicas);
-      return emptyMap();
-    }
-
-    // we don`t support hybrid state(both under and over replicated) for
-    // EC container and we always handle under-replicated first now. it
-    // means when reaching here, we have all the replica indexes and some
-    // of them are more than 1.
-    // TODO: support hybrid state if needed.
     final ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
+    if (!replicaCount.isOverReplicated()) {
+      LOG.info("The container {} state changed and it's not in over"
+              + " replication any more", container.getContainerID());
+      return emptyMap();
+    }
+
+    if (!replicaCount.isOverReplicated(true)) {
+      LOG.info("The container {} with replicas {} will be corrected " +
+          "by the pending delete", container.getContainerID(), replicas);
+      return emptyMap();
+    }
 
     List<Integer> overReplicatedIndexes =
         replicaCount.overReplicatedIndexes(true);

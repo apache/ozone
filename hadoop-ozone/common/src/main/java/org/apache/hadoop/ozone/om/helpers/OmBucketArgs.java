@@ -50,8 +50,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private StorageType storageType;
 
-  private long quotaInBytes;
-  private long quotaInNamespace;
+  private long quotaInBytes = OzoneConsts.QUOTA_RESET;
+  private long quotaInNamespace = OzoneConsts.QUOTA_RESET;
+  private boolean quotaInBytesSet = false;
+  private boolean quotaInNamespaceSet = false;
   private DefaultReplicationConfig defaultReplicationConfig = null;
   /**
    * Bucket Owner Name.
@@ -64,21 +66,16 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    * @param bucketName - Bucket name.
    * @param isVersionEnabled - Bucket version flag.
    * @param storageType - Storage type to be used.
-   * @param quotaInBytes Volume quota in bytes.
-   * @param quotaInNamespace Volume quota in counts.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketArgs(String volumeName, String bucketName,
       Boolean isVersionEnabled, StorageType storageType,
-      Map<String, String> metadata, long quotaInBytes, long quotaInNamespace,
-      String ownerName) {
+      Map<String, String> metadata, String ownerName) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.isVersionEnabled = isVersionEnabled;
     this.storageType = storageType;
     this.metadata = metadata;
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
     this.ownerName = ownerName;
   }
 
@@ -123,12 +120,27 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
+   * Returns true if quotaInBytes has been set to a non default value.
+   */
+  public boolean hasQuotaInBytes() {
+    return quotaInBytesSet;
+  }
+
+  /**
    * Returns Bucket Quota in key counts.
    * @return quotaInNamespace.
    */
   public long getQuotaInNamespace() {
     return quotaInNamespace;
   }
+
+  /**
+   * Returns true if quotaInNamespace has been set to a non default value.
+   */
+  public boolean hasQuotaInNamespace() {
+    return quotaInNamespaceSet;
+  }
+
 
   /**
    * Returns Bucket default replication config.
@@ -144,6 +156,16 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   private void setDefaultReplicationConfig(
       DefaultReplicationConfig defaultReplicationConfig) {
     this.defaultReplicationConfig = defaultReplicationConfig;
+  }
+
+  private void setQuotaInBytes(long quotaInBytes) {
+    this.quotaInBytesSet = true;
+    this.quotaInBytes = quotaInBytes;
+  }
+
+  private void setQuotaInNamespace(long quotaInNamespace) {
+    this.quotaInNamespaceSet = true;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**
@@ -190,7 +212,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private Boolean isVersionEnabled;
     private StorageType storageType;
     private Map<String, String> metadata;
+    private boolean quotaInBytesSet = false;
     private long quotaInBytes;
+    private boolean quotaInNamespaceSet = false;
     private long quotaInNamespace;
     private DefaultReplicationConfig defaultReplicationConfig;
     private String ownerName;
@@ -228,11 +252,13 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     }
 
     public Builder setQuotaInBytes(long quota) {
+      quotaInBytesSet = true;
       quotaInBytes = quota;
       return this;
     }
 
     public Builder setQuotaInNamespace(long quota) {
+      quotaInNamespaceSet = true;
       quotaInNamespace = quota;
       return this;
     }
@@ -257,8 +283,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       Preconditions.checkNotNull(bucketName);
       OmBucketArgs omBucketArgs =
           new OmBucketArgs(volumeName, bucketName, isVersionEnabled,
-              storageType, metadata, quotaInBytes, quotaInNamespace, ownerName);
+              storageType, metadata, ownerName);
       omBucketArgs.setDefaultReplicationConfig(defaultReplicationConfig);
+      if (quotaInBytesSet) {
+        omBucketArgs.setQuotaInBytes(quotaInBytes);
+      }
+      if (quotaInNamespaceSet) {
+        omBucketArgs.setQuotaInNamespace(quotaInNamespace);
+      }
       return omBucketArgs;
     }
   }
@@ -276,10 +308,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (storageType != null) {
       builder.setStorageType(storageType.toProto());
     }
-    if (quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET) {
+    if (quotaInBytesSet && (
+        quotaInBytes > 0 || quotaInBytes == OzoneConsts.QUOTA_RESET)) {
       builder.setQuotaInBytes(quotaInBytes);
     }
-    if (quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET) {
+    if (quotaInNamespaceSet && (
+        quotaInNamespace > 0 || quotaInNamespace == OzoneConsts.QUOTA_RESET)) {
       builder.setQuotaInNamespace(quotaInNamespace);
     }
     if (defaultReplicationConfig != null) {
@@ -305,14 +339,20 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
             bucketArgs.hasStorageType() ? StorageType.valueOf(
                 bucketArgs.getStorageType()) : null,
             KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()),
-            bucketArgs.getQuotaInBytes(),
-            bucketArgs.getQuotaInNamespace(),
             bucketArgs.hasOwnerName() ?
                 bucketArgs.getOwnerName() : null);
     // OmBucketArgs ctor already has more arguments, so setting the default
     // replication config separately.
-    omBucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig()));
+    if (bucketArgs.hasDefaultReplicationConfig()) {
+      omBucketArgs.setDefaultReplicationConfig(new DefaultReplicationConfig(
+              bucketArgs.getDefaultReplicationConfig()));
+    }
+    if (bucketArgs.hasQuotaInBytes()) {
+      omBucketArgs.setQuotaInBytes(bucketArgs.getQuotaInBytes());
+    }
+    if (bucketArgs.hasQuotaInNamespace()) {
+      omBucketArgs.setQuotaInNamespace(bucketArgs.getQuotaInNamespace());
+    }
     return omBucketArgs;
   }
 }

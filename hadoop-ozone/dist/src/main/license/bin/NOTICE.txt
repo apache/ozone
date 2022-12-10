@@ -495,7 +495,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Source: https://bouncycastle.org/license.html
 
-log4j:log4j
+ch.qos.reload4j:reload4j
 ====================
 
 Apache log4j
