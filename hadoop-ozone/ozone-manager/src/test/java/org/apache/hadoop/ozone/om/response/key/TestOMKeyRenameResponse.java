@@ -89,8 +89,8 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
       Table.KeyValue<String, OmBucketInfo> keyValue =
           omMetadataManager.getBucketTable().iterator().next();
       Assert.assertEquals(omMetadataManager.getBucketKey(
-          bucketInfo.getVolumeName(), bucketInfo.getBucketName())
-          , keyValue.getKey());
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName()),
+          keyValue.getKey());
     }
   }
 
