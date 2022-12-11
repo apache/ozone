@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -29,6 +28,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.scm.storage.PartInputStream;
@@ -39,6 +39,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.stream.Collectors.groupingBy;
 
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
@@ -104,6 +106,21 @@ public class KeyInputStream extends MultipartInputStream {
     }
   }
 
+  private static LengthInputStream getFromOmKeyInfo(
+      OmKeyInfo keyInfo,
+      XceiverClientFactory xceiverClientFactory,
+      boolean verifyChecksum,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory,
+      List<OmKeyLocationInfo> locationInfos) {
+    List<BlockExtendedInputStream> streams = createStreams(keyInfo,
+        locationInfos, xceiverClientFactory, verifyChecksum, retryFunction,
+        blockStreamFactory);
+    KeyInputStream keyInputStream =
+        new KeyInputStream(keyInfo.getKeyName(), streams);
+    return new LengthInputStream(keyInputStream, keyInputStream.getLength());
+  }
+
   /**
    * For each block in keyInfo, add a BlockInputStream to blockStreams.
    */
@@ -111,59 +128,34 @@ public class KeyInputStream extends MultipartInputStream {
       XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
+
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-    List<BlockExtendedInputStream> streams = createStreams(keyInfo,
-        keyLocationInfos, xceiverClientFactory, verifyChecksum, retryFunction,
-        blockStreamFactory);
-    KeyInputStream keyInputStream =
-        new KeyInputStream(keyInfo.getKeyName(), streams);
-
-    return new LengthInputStream(keyInputStream, keyInputStream.getLength());
+    return getFromOmKeyInfo(keyInfo, xceiverClientFactory, verifyChecksum,
+        retryFunction, blockStreamFactory, keyLocationInfos);
   }
 
   public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
+
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
-
     // Iterate through each block info in keyLocationInfos and assign it the
-    // corresponding part in the partsToBlockMap. Also increment each part's
-    // length accordingly.
-    Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap = new HashMap<>();
-    Map<Integer, Long> partsLengthMap = new HashMap<>();
+    // corresponding part in the partsToBlockMap.
+    Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap =
+        keyLocationInfos.stream()
+            .collect(groupingBy(BlockLocationInfo::getPartNumber));
 
-    for (OmKeyLocationInfo omKeyLocationInfo: keyLocationInfos) {
-      int partNumber = omKeyLocationInfo.getPartNumber();
-
-      if (!partsToBlocksMap.containsKey(partNumber)) {
-        partsToBlocksMap.put(partNumber, new ArrayList<>());
-        partsLengthMap.put(partNumber, 0L);
-      }
-      // Add Block to corresponding partNumber in partsToBlocksMap
-      partsToBlocksMap.get(partNumber).add(omKeyLocationInfo);
-      // Update the part length
-      partsLengthMap.put(partNumber,
-          partsLengthMap.get(partNumber) + omKeyLocationInfo.getLength());
-    }
-
+    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
     // Create a KeyInputStream for each part.
-    for (Map.Entry<Integer, List<OmKeyLocationInfo>> entry :
-        partsToBlocksMap.entrySet()) {
-      List<BlockExtendedInputStream> streams = createStreams(keyInfo,
-          entry.getValue(), xceiverClientFactory, verifyChecksum, retryFunction,
-          blockStreamFactory);
-      KeyInputStream keyInputStream =
-          new KeyInputStream(keyInfo.getKeyName(), streams);
-      lengthInputStreams.add(new LengthInputStream(keyInputStream,
-          partsLengthMap.get(entry.getKey())));
+    for (List<OmKeyLocationInfo> locationInfo : partsToBlocksMap.values()) {
+      lengthInputStreams.add(getFromOmKeyInfo(keyInfo, xceiverClientFactory,
+          verifyChecksum, retryFunction, blockStreamFactory, locationInfo));
     }
-
     return lengthInputStreams;
   }
 
@@ -181,9 +173,9 @@ public class KeyInputStream extends MultipartInputStream {
       // chunk entries. Even EOF in the current stream would be covered in
       // this case.
       throw new IOException(String.format("Inconsistent read for blockID=%s "
-              + "length=%d numBytesToRead=%d numBytesRead=%d",
+              + "length=%d position=%d numBytesToRead=%d numBytesRead=%d",
           ((BlockExtendedInputStream) stream).getBlockID(), stream.getLength(),
-          numBytesToRead, numBytesRead));
+          stream.getPos(), numBytesToRead, numBytesRead));
     }
   }
 

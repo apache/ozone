@@ -30,7 +30,9 @@ public interface PartInputStream
     extends CanUnbuffer, Seekable {
   long getLength();
 
-  long getRemaining() throws IOException;
+  default long getRemaining() throws IOException {
+    return getLength() - getPos();
+  }
 
   void close() throws IOException;
 }

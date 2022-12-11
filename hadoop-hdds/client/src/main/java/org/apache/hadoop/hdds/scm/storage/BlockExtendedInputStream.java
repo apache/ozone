@@ -29,9 +29,13 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
   public abstract BlockID getBlockID();
 
   @Override
-  public abstract long getRemaining();
+  public long getRemaining() {
+    return getLength() - getPos();
+  }
 
   @Override
   public abstract long getLength();
 
+  @Override
+  public abstract long getPos();
 }

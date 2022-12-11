@@ -76,11 +76,6 @@ public class OzoneCryptoInputStream extends CryptoInputStream
   }
 
   @Override
-  public long getRemaining() throws IOException {
-    return length - getPos();
-  }
-
-  @Override
   public int read(byte[] b, int off, int len) throws IOException {
     // CryptoInputStream reads hadoop.security.crypto.buffer.size number of
     // bytes (default 8KB) at a time. This needs to be taken into account
