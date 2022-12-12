@@ -15,21 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.grpc;
+package org.apache.hadoop.ozone.grpc.metrics;
 
 import io.grpc.Attributes;
 import io.grpc.ServerTransportFilter;
-import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 
 /**
  * Transport filter class for tracking active client connections.
  */
-public class GrpcServerTransportFilter extends ServerTransportFilter {
+public class GrpcMetricsServerTransportFilter extends ServerTransportFilter {
 
   private GrpcMetrics grpcMetrics;
   private int activeClientCount;
 
-  public GrpcServerTransportFilter(
+  public GrpcMetricsServerTransportFilter(
       GrpcMetrics grpcMetrics) {
     super();
     this.grpcMetrics = grpcMetrics;

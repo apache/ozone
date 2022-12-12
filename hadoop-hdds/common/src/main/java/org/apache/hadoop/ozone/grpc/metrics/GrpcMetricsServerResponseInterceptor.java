@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.grpc;
+package org.apache.hadoop.ozone.grpc.metrics;
 
-import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
@@ -29,12 +28,12 @@ import java.nio.charset.StandardCharsets;
 /**
  * Interceptor to gather metrics based on grpc server response.
  */
-public class GrpcServerResponseInterceptor implements ServerInterceptor {
+public class GrpcMetricsServerResponseInterceptor implements ServerInterceptor {
 
   private final GrpcMetrics grpcMetrics;
   private long bytesSent;
 
-  public GrpcServerResponseInterceptor(
+  public GrpcMetricsServerResponseInterceptor(
       GrpcMetrics grpcMetrics) {
     super();
     this.grpcMetrics = grpcMetrics;

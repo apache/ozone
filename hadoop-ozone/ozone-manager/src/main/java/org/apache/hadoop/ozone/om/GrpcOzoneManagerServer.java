@@ -23,9 +23,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.grpc.GrpcServerRequestInterceptor;
-import org.apache.hadoop.ozone.grpc.GrpcServerResponseInterceptor;
-import org.apache.hadoop.ozone.grpc.GrpcServerTransportFilter;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerRequestInterceptor;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerTransportFilter;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
@@ -102,10 +102,10 @@ public class GrpcOzoneManagerServer {
             new OzoneManagerServiceGrpc(omTranslator,
                 delegationTokenMgr,
                 omServerConfig),
-            new GrpcServerResponseInterceptor(omS3gGrpcMetrics),
-            new GrpcServerRequestInterceptor(omS3gGrpcMetrics)))
+            new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
+            new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
         .addTransportFilter(
-            new GrpcServerTransportFilter(omS3gGrpcMetrics));
+            new GrpcMetricsServerTransportFilter(omS3gGrpcMetrics));
 
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isGrpcTlsEnabled()) {

@@ -17,6 +17,7 @@
  */
 
 /**
- * This package contains metrics for using gRPC.
+ * This package contains classes related
+ * to gathering metrics for using gRPC.
  */
 package org.apache.hadoop.ozone.grpc.metrics;
