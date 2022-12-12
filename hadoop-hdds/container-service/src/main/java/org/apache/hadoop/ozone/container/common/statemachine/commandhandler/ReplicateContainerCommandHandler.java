@@ -66,7 +66,6 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
     final List<DatanodeDetails> sourceDatanodes =
         replicateCommand.getSourceDatanodes();
     final long containerID = replicateCommand.getContainerID();
-    final long deadline = replicateCommand.getDeadline();
 
     Preconditions.checkArgument(sourceDatanodes.size() > 0,
         "Replication command is received for container %s "
