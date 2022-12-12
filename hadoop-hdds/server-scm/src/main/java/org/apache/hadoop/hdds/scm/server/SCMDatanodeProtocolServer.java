@@ -272,7 +272,7 @@ public class SCMDatanodeProtocolServer implements
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
-      cmdResponses.add(getCommandResponse(cmd));
+      cmdResponses.add(getCommandResponse(cmd, scm));
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
@@ -305,8 +305,8 @@ public class SCMDatanodeProtocolServer implements
    * @throws IOException
    */
   @VisibleForTesting
-  public SCMCommandProto getCommandResponse(SCMCommand cmd)
-      throws IOException, TimeoutException {
+  public static SCMCommandProto getCommandResponse(SCMCommand cmd,
+      OzoneStorageContainerManager scm) throws IOException, TimeoutException {
     SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
         .setEncodedToken(cmd.getEncodedToken());
 
