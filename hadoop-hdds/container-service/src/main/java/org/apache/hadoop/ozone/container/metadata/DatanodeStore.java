@@ -100,9 +100,6 @@ public interface DatanodeStore extends Closeable {
    */
   boolean isClosed();
 
-  /**
-   * Check if everything is good.
-   */
-  default void check() throws Exception {
+  default void compactionIfNeeded() throws Exception {
   }
 }

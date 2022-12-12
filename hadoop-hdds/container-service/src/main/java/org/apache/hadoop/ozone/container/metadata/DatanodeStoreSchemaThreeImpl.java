@@ -140,10 +140,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     return new File(metaDir, DUMP_DIR);
   }
 
-  /**
-   * Return true if everything is good.
-   */
-  public void check() throws Exception {
+  public void compactionIfNeeded() throws Exception {
     // Calculate number of files per level and size per level
     RocksDatabase rocksDB = ((RDBStore)getStore()).getDb();
     List<LiveFileMetaData> liveFileMetaDataList =

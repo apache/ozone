@@ -194,7 +194,7 @@ public class HddsVolume extends StorageVolume {
     // Calculate number of files per level and size per level
     RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
         new File(dbParentDir, CONTAINER_DB_NAME).getAbsolutePath(), getConf());
-    rawDB.getStore().check();
+    rawDB.getStore().compactionIfNeeded();
 
     return VolumeCheckResult.HEALTHY;
   }
