@@ -21,6 +21,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.rocksdb.AbstractEventListener;
@@ -54,7 +59,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -84,7 +88,7 @@ import static java.util.Arrays.asList;
  * It is important to note that compaction log is per-DB instance. Since
  * each OM DB instance might trigger compactions at different timings.
  */
-public class RocksDBCheckpointDiffer {
+public class RocksDBCheckpointDiffer implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
@@ -150,16 +154,35 @@ public class RocksDBCheckpointDiffer {
   private boolean skipGetSSTFileSummary = false;
 
   /**
+   * A queue which keeps the snapshot in shorted order of their creations time.
+   * It is used by DAG pruning daemon to remove snapshots older than allowed
+   * time in compaction DAG.
+   */
+  private final Queue<Pair<Long, String>> snapshots = new LinkedList<>();
+
+  private final ScheduledExecutorService executor;
+  private final long maxAllowedTimeInDag;
+
+  /**
    * Constructor.
    * Note that previous compaction logs are loaded by RDBStore after this
    * object's initialization by calling loadAllCompactionLogs().
+   *
    * @param metadataDir Ozone metadata directory.
    * @param sstBackupDir Name of the SST backup dir under metadata dir.
    * @param compactionLogDirName Name of the compaction log dir.
+   * @param activeDBLocation Active RocksDB directory's location.
+   * @param maxTimeAllowedForSnapshotInDagInMs Time after which snapshot will be
+   *                                           pruned from the DAG by daemon.
+   * @param pruneCompactionDagDaemonRunIntervalInMs Internal at which DAG
+   *                                               pruning daemon will run.
    */
-  public RocksDBCheckpointDiffer(String metadataDir, String sstBackupDir,
-      String compactionLogDirName, File activeDBLocation) {
-
+  public RocksDBCheckpointDiffer(String metadataDir,
+                                 String sstBackupDir,
+                                 String compactionLogDirName,
+                                 File activeDBLocation,
+                                 long maxTimeAllowedForSnapshotInDagInMs,
+                                 long pruneCompactionDagDaemonRunIntervalInMs) {
     setCompactionLogDir(metadataDir, compactionLogDirName);
 
     this.sstBackupDir = Paths.get(metadataDir, sstBackupDir) + "/";
@@ -175,6 +198,14 @@ public class RocksDBCheckpointDiffer {
 
     // Active DB location is used in getSSTFileSummary
     this.activeDBLocationStr = activeDBLocation.toString() + "/";
+
+    this.maxAllowedTimeInDag = maxTimeAllowedForSnapshotInDagInMs;
+    this.executor = Executors.newSingleThreadScheduledExecutor();
+    this.executor.scheduleWithFixedDelay(
+        this::pruneOlderSnapshotsWithCompactionHistory,
+        0,
+        pruneCompactionDagDaemonRunIntervalInMs,
+        TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -185,6 +216,8 @@ public class RocksDBCheckpointDiffer {
     this.skipGetSSTFileSummary = true;
     this.sstBackupDir = null;
     this.activeDBLocationStr = null;
+    this.executor = null;
+    this.maxAllowedTimeInDag = 0;
   }
 
   private void setCompactionLogDir(String metadataDir,
@@ -252,6 +285,13 @@ public class RocksDBCheckpointDiffer {
     appendToCurrentCompactionLog("");
   }
 
+  @Override
+  public void close() throws Exception {
+    if (executor != null) {
+      executor.shutdown();
+    }
+  }
+
   // Hash table to track CompactionNode for a given SST File.
   private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
       new ConcurrentHashMap<>();
@@ -310,13 +350,15 @@ public class RocksDBCheckpointDiffer {
   /**
    * Append a sequence number to the compaction log (roughly) when an Ozone
    * snapshot (RDB checkpoint) is taken.
-   * @param sequenceNum RDB sequence number
    */
   public void appendSequenceNumberToCompactionLog(long sequenceNum,
-      String snapshotID) {
+                                                  String snapshotID,
+                                                  String snapshotDir,
+                                                  long creationTime) {
     final String line = COMPACTION_LOG_SEQNUM_LINE_PREFIX + sequenceNum +
-        " " + snapshotID + "\n";
+        " " + snapshotID + " " + snapshotDir + " " + creationTime + "\n";
     appendToCurrentCompactionLog(line);
+    snapshots.add(Pair.of(creationTime, snapshotDir));
   }
 
   /**
@@ -455,11 +497,6 @@ public class RocksDBCheckpointDiffer {
           //  snapshotChainManager.getLatestGlobalSnapshot()
           populateCompactionDAG(inputFiles, outputFiles, null,
               db.getLatestSequenceNumber());
-/*
-          if (debugEnabled(DEBUG_DAG_BUILD_UP)) {
-            printMutableGraph(null, null, compactionDAGFwd);
-          }
- */
         }
       }
     };
@@ -601,13 +638,14 @@ public class RocksDBCheckpointDiffer {
       // Read sequence number, and snapshot ID
       LOG.debug("Reading sequence number as snapshot generation, "
           + "and snapshot ID");
-      final String trimmedStr =
-          line.substring(COMPACTION_LOG_SEQNUM_LINE_PREFIX.length()).trim();
-      final Scanner input = new Scanner(trimmedStr);
-      // This would the snapshot generation for the nodes to come
-      reconstructionSnapshotGeneration = input.nextLong();
-      // This is the snapshotID assigned to every single CompactionNode to come
-      reconstructionLastSnapshotID = input.nextLine().trim();
+      String[] splits = line.split(" ");
+      assert (splits.length == 5);
+
+      reconstructionSnapshotGeneration = Long.parseLong(splits[1]);
+      reconstructionLastSnapshotID = splits[2];
+      String snapshotDir = splits[3];
+      long createdAt = Long.parseLong(splits[4]);
+      snapshots.add(Pair.of(createdAt, snapshotDir));
     } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
       // Read compaction log entry
 
@@ -941,29 +979,35 @@ public class RocksDBCheckpointDiffer {
   }
 
   /**
-   * Prunes DAGs when oldest snapshot compaction history gets deleted.
-   * <p>
-   * Idea here is to first remove the nodes and arcs which were created before
-   * snapshot, to be deleted, was created because they are not needed to
-   * generate the diff anymore.
-   * [pruneDownstreamDag] does that pruning and removes nodes and arcs from
-   * forward and backward DAGs by going over the successors from forward DAG of
-   * current level's node.
-   * Once older nodes and arcs get deleted from the oldest snapshot compaction
-   * history, remove the nodes and arcs which are not needed to generate
-   * diff for newer snapshots.
-   * [pruneUpstreamDag] does remaining pruning and removes nodes and arcs from
-   * both forward and backward DAGs by going over the successors from backward
-   * DAG of current level's node. If node in the current level doesn't have any
-   * successors in forward DAG, arc to the successor and current node can be
-   * deleted.
+   * This is the task definition which is run periodically by the service
+   * executor at fixed delay.
+   * It looks for snapshots in compaction DAG which are older than the allowed
+   * time to be in compaction DAG and removes them from the DAG.
    */
-  public void pruneSnapshotFileNodesFromDag(DifferSnapshotInfo snapshotInfo) {
-    Set<String> snapshotSstFiles =
-        readRocksDBLiveFiles(snapshotInfo.getDbPath());
+  public void pruneOlderSnapshotsWithCompactionHistory() {
+    String snapshotDir = null;
+    long currentTimeMillis = System.currentTimeMillis();
+
+    while (!snapshots.isEmpty() &&
+        (currentTimeMillis - snapshots.peek().getLeft())
+            > maxAllowedTimeInDag) {
+      snapshotDir = snapshots.poll().getRight();
+    }
+
+    if (snapshotDir != null) {
+      pruneSnapshotFileNodesFromDag(snapshotDir);
+    }
+  }
+
+  /**
+   * Prunes forward and backward DAGs when oldest snapshot with compaction
+   * history gets deleted.
+   */
+  public void pruneSnapshotFileNodesFromDag(String snapshotDir) {
+    Set<String> snapshotSstFiles = readRocksDBLiveFiles(snapshotDir);
     if (snapshotSstFiles.isEmpty()) {
       LOG.info("Snapshot '{}' doesn't have any sst file to remove.",
-          snapshotInfo.getDbPath());
+          snapshotDir);
       return;
     }
 
@@ -978,93 +1022,57 @@ public class RocksDBCheckpointDiffer {
       startNodes.add(infileNode);
     }
 
-    Set<String> prunedSstFilesFromPruningDownstreamDag =
-        pruneDownstreamDag(startNodes);
-    Set<String> prunedSstFilesFromPruningUpstreamDag =
-        pruneUpstreamDag(startNodes);
+    pruneBackwardDag(backwardCompactionDAG, startNodes);
+    Set<String> sstFilesPruned = pruneForwardDag(forwardCompactionDAG,
+        startNodes);
 
-    Set<String> allSstFilesPruned = new HashSet<>();
-    allSstFilesPruned.addAll(prunedSstFilesFromPruningDownstreamDag);
-    allSstFilesPruned.addAll(prunedSstFilesFromPruningUpstreamDag);
-    LOG.info("Pruned SST nodes from DAG: {}.", allSstFilesPruned);
+    LOG.info("Pruned SST nodes from DAG: {}.", sstFilesPruned);
   }
 
   /**
-   * Prunes DAGs in downstream fashion of forward DAG.
-   * <p>
-   * This traversal is to remove sst file nodes, got created before
-   * the snapshot was taken.
+   * Prunes backward DAG's upstream from the level, that needs to be removed.
    */
-  private Set<String> pruneDownstreamDag(Set<CompactionNode> startNodes) {
+  @VisibleForTesting
+  Set<String> pruneBackwardDag(MutableGraph<CompactionNode> backwardDag,
+                               Set<CompactionNode> startNodes) {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = startNodes;
-
-    Set<CompactionNode> removeNodes = new HashSet<>();
-    Set<Pair<CompactionNode, CompactionNode>> removeArcs = new HashSet<>();
 
     while (!currentLevel.isEmpty()) {
       Set<CompactionNode> nextLevel = new HashSet<>();
       for (CompactionNode current : currentLevel) {
-        if (!forwardCompactionDAG.nodes().contains(current)) {
+        if (!backwardDag.nodes().contains(current)) {
           continue;
         }
 
-        for (CompactionNode successorInForwardDag:
-            forwardCompactionDAG.successors(current)) {
-          removeArcs.add(Pair.of(current, successorInForwardDag));
-          nextLevel.add(successorInForwardDag);
-        }
+        nextLevel.addAll(backwardDag.predecessors(current));
+        backwardDag.removeNode(current);
+        removedFiles.add(current.getFileName());
       }
-
-      nextLevel.forEach(node -> {
-        removeNodes.add(node);
-        removedFiles.add(node.getFileName());
-      });
-
       currentLevel = nextLevel;
     }
-
-    removeArcs.forEach(arc -> {
-      forwardCompactionDAG.removeEdge(arc.getLeft(), arc.getRight());
-      backwardCompactionDAG.removeEdge(arc.getRight(), arc.getLeft());
-    });
-
-    removeNodes.forEach(node -> {
-      forwardCompactionDAG.removeNode(node);
-      backwardCompactionDAG.removeNode(node);
-    });
 
     return removedFiles;
   }
 
   /**
-   * Prunes DAGs in upstream fashion of forward DAG.
-   * <p>
-   * This traversal is to remove sst file nodes and arcs which are not needed
-   * to generate snapshot diff.
+   * Prunes forward DAG's downstream from the level that needs to be removed.
    */
-  private Set<String> pruneUpstreamDag(Set<CompactionNode> startNodes) {
+  @VisibleForTesting
+  Set<String> pruneForwardDag(MutableGraph<CompactionNode> forwardDag,
+                              Set<CompactionNode> startNodes) {
     Set<String> removedFiles = new HashSet<>();
-    Set<CompactionNode> currentLevel = startNodes;
+    Set<CompactionNode> currentLevel = new HashSet<>(startNodes);
 
     while (!currentLevel.isEmpty()) {
       Set<CompactionNode> nextLevel = new HashSet<>();
       for (CompactionNode current : currentLevel) {
-        if (!forwardCompactionDAG.nodes().contains(current) ||
-            !forwardCompactionDAG.successors(current).isEmpty()) {
+        if (!forwardDag.nodes().contains(current)) {
           continue;
         }
 
-        for (CompactionNode successorInBackwardDag:
-            backwardCompactionDAG.successors(current)) {
-          forwardCompactionDAG.removeEdge(successorInBackwardDag, current);
-          backwardCompactionDAG.removeEdge(current, successorInBackwardDag);
-          nextLevel.add(successorInBackwardDag);
-        }
-
-        forwardCompactionDAG.removeNode(current);
-        backwardCompactionDAG.removeNode(current);
-        compactionNodeMap.remove(current.getFileName(), current);
+        nextLevel.addAll(forwardDag.successors(current));
+        forwardDag.removeNode(current);
         removedFiles.add(current.getFileName());
       }
 

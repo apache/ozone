@@ -534,6 +534,23 @@ public final class OzoneConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
       "ozone.om.snapshot.cache.max.size";
   public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
+
+  public static final String
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_MS =
+      "ozone.om.snapshot.compaction.dag.max.time.allowed.ms";
+
+  public static final long
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_MS_DEFAULT =
+      TimeUnit.DAYS.toMillis(30);
+
+  public static final String
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL_MS =
+      "ozone.om.snapshot.compaction.dag.prune.daemon.run.interval.ms";
+
+  public static final long
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_MS_DEFAULT =
+      TimeUnit.HOURS.toMillis(1);
+
   /**
    * There is no need to instantiate this class.
    */

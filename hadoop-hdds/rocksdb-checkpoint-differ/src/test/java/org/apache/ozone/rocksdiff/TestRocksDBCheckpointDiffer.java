@@ -19,6 +19,7 @@ package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
+import com.google.common.graph.GraphBuilder;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -31,13 +32,15 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
@@ -87,15 +90,6 @@ public class TestRocksDBCheckpointDiffer {
    */
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
   private final ArrayList<DifferSnapshotInfo> snapshots = new ArrayList<>();
-
-  /**
-   * Graph type.
-   */
-  enum GType {
-    FNAME,
-    KEYSIZE,
-    CUMUTATIVE_SIZE
-  }
 
   @BeforeAll
   public static void init() {
@@ -207,23 +201,34 @@ public class TestRocksDBCheckpointDiffer {
 
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
     boolean exceptionThrown = false;
+    long createdTime = System.currentTimeMillis();
 
     String compactionLog = ""
-        + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5\n"  // Snapshot 0
+        // Snapshot 0
+        + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 \\tmp " + createdTime
+        + " \n"
+        // Additional "compaction" to trigger and test early exit condition
         + "C 000001,000002:000062\n"
-          // Additional "compaction" to trigger and test early exit condition
-        + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5\n"  // Snapshot 1
-        + "C 000068,000062:000069\n"  // Regular compaction
+        // Snapshot 1
+        + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 \\tmp " + createdTime
+        + " \n"
+        // Regular compaction
+        + "C 000068,000062:000069\n"
+        // Trivial move
         + "C 000071,000064,000060,000052:000071,000064,000060,000052\n"
-          // Trivial move
         + "C 000073,000066:000074\n"
         + "C 000082,000076,000069:000083\n"
         + "C 000087,000080,000074:000088\n"
-        + "C 000093,000090,000083:\n"  // Deletion?
-        + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd\n"  // Snapshot 2
+        // Deletion?
+        + "C 000093,000090,000083:\n"
+        // Snapshot 2
+        + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd \\tmp " + createdTime
+        + "\n"
         + "C 000098,000096,000085,000078,000071,000064,000060,000052:000099\n"
         + "C 000105,000095,000088:000107\n"
-        + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea\n";  // Snapshot 3
+        // Snapshot 3
+        + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea \\tmp " + createdTime
+        + "\n";
 
     // Construct DAG from compaction log input
     Arrays.stream(compactionLog.split("\n")).forEach(
@@ -279,7 +284,9 @@ public class TestRocksDBCheckpointDiffer {
 
     final File dbLocation = new File(TEST_DB_PATH);
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
-        metadataDirStr, sstDirStr, clDirStr, dbLocation);
+        metadataDirStr, sstDirStr, clDirStr, dbLocation,
+        TimeUnit.DAYS.toMillis(1),
+        TimeUnit.MINUTES.toMillis(5));
 
     // Empty the SST backup folder first for testing
     File sstDir = new File(sstDirStr);
@@ -314,30 +321,7 @@ public class TestRocksDBCheckpointDiffer {
       differ.dumpCompactionNodeTable();
     }
 
-    for (GType gtype : GType.values()) {
-      String fname = "fwdGraph_" + gtype +  ".png";
-      String rname = "reverseGraph_" + gtype + ".png";
-/*
-      differ.pngPrintMutableGrapth(differ.getCompactionFwdDAG(), fname, gtype);
-      differ.pngPrintMutableGrapth(
-          differ.getCompactionReverseDAG(), rname, gtype);
- */
-    }
-
     rocksDB.close();
-  }
-
-  private String getRandomString(Random random, int length) {
-    // Ref: https://www.baeldung.com/java-random-string
-    final int leftLimit = 48; // numeral '0'
-    final int rightLimit = 122; // letter 'z'
-
-    return random.ints(leftLimit, rightLimit + 1)
-        .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
-        .limit(length)
-        .collect(StringBuilder::new,
-            StringBuilder::appendCodePoint, StringBuilder::append)
-        .toString();
   }
 
   /**
@@ -373,7 +357,7 @@ public class TestRocksDBCheckpointDiffer {
 
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 4, 5})
-  void testRemoveSnapshotFileFromDag(int snapshotIndex) throws Exception {
+  public void testRemoveSnapshotFromDag(int snapshotIndex) throws Exception {
     String clDirStr = "compaction-log";
     String metadataDirStr = ".";
     String sstDirStr = "compaction-sst-backup";
@@ -397,7 +381,9 @@ public class TestRocksDBCheckpointDiffer {
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(metadataDirStr,
         sstDirStr,
         clDirStr,
-        dbLocation);
+        dbLocation,
+        TimeUnit.DAYS.toMillis(1),
+        TimeUnit.MINUTES.toMillis(5));
 
     File sstDir = new File(sstDirStr);
     deleteDirectory(sstDir);
@@ -406,7 +392,8 @@ public class TestRocksDBCheckpointDiffer {
     readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
 
     DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
-    differ.pruneSnapshotFileNodesFromDag(snapshots.get(snapshotIndex));
+    differ.pruneSnapshotFileNodesFromDag(
+        snapshots.get(snapshotIndex).getDbPath());
 
     for (int index = snapshotIndex + 1; index < snapshots.size(); index++) {
       DifferSnapshotInfo snap = snapshots.get(index);
@@ -444,8 +431,10 @@ public class TestRocksDBCheckpointDiffer {
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
-    differ.appendSequenceNumberToCompactionLog(
-        dbLatestSequenceNumber, snapshotId);
+    differ.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber,
+        snapshotId,
+        cpPath,
+        System.currentTimeMillis());
 
     differ.setCurrentCompactionLog(dbLatestSequenceNumber);
 
@@ -501,10 +490,9 @@ public class TestRocksDBCheckpointDiffer {
 
     differ.setCurrentCompactionLog(rocksDB.getLatestSequenceNumber());
 
-    Random random = new Random();
     // key-value
     for (int i = 0; i < NUM_ROW; ++i) {
-      String generatedString = getRandomString(random, 7);
+      String generatedString = RandomStringUtils.randomAlphabetic(7);
       String keyStr = "Key-" + i + "-" + generatedString;
       String valueStr = "Val-" + i + "-" + generatedString;
       byte[] key = keyStr.getBytes(UTF_8);
@@ -725,5 +713,229 @@ public class TestRocksDBCheckpointDiffer {
     }
 
     LOG.debug("Files are: {}", allNodesSet);
+  }
+
+  private static final List<List<String>> SST_FILES_BY_LEVEL = Arrays.asList(
+      Arrays.asList("000015.sst", "000013.sst", "000011.sst", "000009.sst"),
+      Arrays.asList("000018.sst", "000016.sst", "000017.sst", "000026.sst",
+          "000024.sst", "000022.sst", "000020.sst"),
+      Arrays.asList("000027.sst", "000030.sst", "000028.sst", "000029.sst",
+          "000031.sst", "000039.sst", "000037.sst", "000035.sst",
+          "000033.sst"),
+      Arrays.asList("000040.sst", "000044.sst", "000042.sst", "000043.sst",
+          "000045.sst", "000041.sst", "000046.sst", "000054.sst",
+          "000052.sst", "000050.sst", "000048.sst"),
+      Arrays.asList("000059.sst", "000055.sst", "000056.sst", "000060.sst",
+          "000057.sst", "000058.sst"));
+
+  private static final List<List<CompactionNode>> COMPACTION_NODES_BY_LEVEL =
+      SST_FILES_BY_LEVEL.stream()
+          .map(sstFiles ->
+              sstFiles.stream()
+                  .map(
+                      sstFile -> new CompactionNode(sstFile,
+                          UUID.randomUUID().toString(),
+                          1000L,
+                          Long.parseLong(sstFile.substring(0, 6))
+                      ))
+                  .collect(Collectors.toList()))
+          .collect(Collectors.toList());
+
+  /**
+   * Creates a backward compaction DAG from a list of level nodes.
+   * It assumes that at each level files get compacted to the half of number
+   * of files at the next level.
+   * e.g. if level-1 has 7 files and level-2 has 9 files, so first 4 files
+   * at level-2 are from compaction of level-1 and rests are new.
+   */
+  private static MutableGraph<CompactionNode> createBackwardDagFromLevelNodes(
+      int fromLevel,
+      int toLevel
+  ) {
+    MutableGraph<CompactionNode> dag  = GraphBuilder.directed().build();
+
+    if (fromLevel == toLevel) {
+      COMPACTION_NODES_BY_LEVEL.get(fromLevel).forEach(dag::addNode);
+      return dag;
+    }
+
+    for (int level = fromLevel; level < toLevel; level++) {
+      List<CompactionNode> currentLevel = COMPACTION_NODES_BY_LEVEL.get(level);
+      List<CompactionNode> nextLevel = COMPACTION_NODES_BY_LEVEL.get(level + 1);
+
+      for (int i = 0; i < currentLevel.size(); i++) {
+        for (int j = 0; j < nextLevel.size(); j++) {
+          dag.addNode(currentLevel.get(i));
+          dag.addNode(nextLevel.get(j));
+
+          int child = nextLevel.size();
+          if (level < COMPACTION_NODES_BY_LEVEL.size() - 2) {
+            child /= 2;
+          }
+
+          if (j < child) {
+            dag.putEdge(currentLevel.get(i), nextLevel.get(j));
+          }
+        }
+      }
+    }
+
+    return dag;
+  }
+
+  /**
+   * Creates a forward compaction DAG from a list of level nodes.
+   * It assumes that at each level first half of the files are from the
+   * compaction of the previous level.
+   * e.g. if level-1 has 7 files and level-2 has 9 files, so first 4 files
+   * at level-2 are from compaction of level-1 and rests are new.
+   */
+  private static MutableGraph<CompactionNode> createForwardDagFromLevelNodes(
+      int fromLevel,
+      int toLevel
+  ) {
+    MutableGraph<CompactionNode> dag  = GraphBuilder.directed().build();
+
+    if (fromLevel == toLevel) {
+      COMPACTION_NODES_BY_LEVEL.get(fromLevel).forEach(dag::addNode);
+      return dag;
+    }
+
+    dag  = GraphBuilder.directed().build();
+    for (int level = fromLevel; level > toLevel; level--) {
+      List<CompactionNode> currentLevel = COMPACTION_NODES_BY_LEVEL.get(level);
+      List<CompactionNode> nextLevel = COMPACTION_NODES_BY_LEVEL.get(level - 1);
+
+      for (int i = 0; i < currentLevel.size(); i++) {
+        for (int j = 0; j < nextLevel.size(); j++) {
+          dag.addNode(currentLevel.get(i));
+          dag.addNode(nextLevel.get(j));
+
+          int parent = currentLevel.size();
+          if (level < COMPACTION_NODES_BY_LEVEL.size() - 1) {
+            parent /= 2;
+          }
+
+          if (i < parent) {
+            dag.putEdge(currentLevel.get(i), nextLevel.get(j));
+          }
+        }
+      }
+    }
+
+    return dag;
+  }
+
+  /**
+   * Test cases for pruneBackwardDag.
+   */
+  private static Stream<Arguments> pruneBackwardDagScenarios() {
+    Set<String> level0Files = new HashSet<>(SST_FILES_BY_LEVEL.get(0));
+    Set<String> level1Files = new HashSet<>(SST_FILES_BY_LEVEL.get(1));
+    Set<String> level2Files = new HashSet<>(SST_FILES_BY_LEVEL.get(2));
+    Set<String> level3Files = new HashSet<>(SST_FILES_BY_LEVEL.get(3));
+
+    level1Files.addAll(level0Files);
+    level2Files.addAll(level1Files);
+    level3Files.addAll(level2Files);
+
+    return Stream.of(
+        Arguments.of("Remove level 0 from backward DAG",
+            createBackwardDagFromLevelNodes(0, 4),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(0)),
+            createBackwardDagFromLevelNodes(1, 4),
+            level0Files
+        ),
+        Arguments.of("Remove level 1 from backward DAG",
+            createBackwardDagFromLevelNodes(0, 4),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(1)),
+            createBackwardDagFromLevelNodes(2, 4),
+            level1Files
+        ),
+        Arguments.of("Remove level 2 from backward DAG",
+            createBackwardDagFromLevelNodes(0, 4),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(2)),
+            createBackwardDagFromLevelNodes(3, 4),
+            level2Files
+        ),
+        Arguments.of("Remove level 3 from backward DAG",
+            createBackwardDagFromLevelNodes(0, 4),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(3)),
+            createBackwardDagFromLevelNodes(4, 4),
+            level3Files
+        )
+    );
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("pruneBackwardDagScenarios")
+  public void testPruneBackwardDag(String description,
+                                   MutableGraph<CompactionNode> originalDag,
+                                   Set<CompactionNode> levelToBeRemoved,
+                                   MutableGraph<CompactionNode> expectedDag,
+                                   Set<String> expectedFileNodesRemoved) {
+
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+    Set<String> actualFileNodesRemoved =
+        differ.pruneBackwardDag(originalDag, levelToBeRemoved);
+    Assertions.assertEquals(expectedDag, originalDag);
+    Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+  }
+
+
+  /**
+   * Test cases for pruneBackwardDag.
+   */
+  private static Stream<Arguments> pruneForwardDagScenarios() {
+    Set<String> level0Files = new HashSet<>(SST_FILES_BY_LEVEL.get(0));
+    Set<String> level1Files = new HashSet<>(SST_FILES_BY_LEVEL.get(1));
+    Set<String> level2Files = new HashSet<>(SST_FILES_BY_LEVEL.get(2));
+    Set<String> level3Files = new HashSet<>(SST_FILES_BY_LEVEL.get(3));
+
+    level1Files.addAll(level0Files);
+    level2Files.addAll(level1Files);
+    level3Files.addAll(level2Files);
+
+    return Stream.of(
+        Arguments.of("Remove level 0 from forward DAG",
+            createForwardDagFromLevelNodes(4, 0),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(0)),
+            createForwardDagFromLevelNodes(4, 1),
+            level0Files
+        ),
+        Arguments.of("Remove level 1 from forward DAG",
+            createForwardDagFromLevelNodes(4, 0),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(1)),
+            createForwardDagFromLevelNodes(4, 2),
+            level1Files
+        ),
+        Arguments.of("Remove level 2 from forward DAG",
+            createForwardDagFromLevelNodes(4, 0),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(2)),
+            createForwardDagFromLevelNodes(4, 3),
+            level2Files
+        ),
+        Arguments.of("Remove level 3 from forward DAG",
+            createForwardDagFromLevelNodes(4, 0),
+            new HashSet<>(COMPACTION_NODES_BY_LEVEL.get(3)),
+            createForwardDagFromLevelNodes(4, 4),
+            level3Files
+        )
+    );
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("pruneForwardDagScenarios")
+  public void testPruneForwardDag(String description,
+                                  MutableGraph<CompactionNode> originalDag,
+                                  Set<CompactionNode> levelToBeRemoved,
+                                  MutableGraph<CompactionNode> expectedDag,
+                                  Set<String> expectedFileNodesRemoved) {
+
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+    Set<String> actualFileNodesRemoved =
+        differ.pruneForwardDag(originalDag, levelToBeRemoved);
+    Assertions.assertEquals(expectedDag, originalDag);
+    Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 }
