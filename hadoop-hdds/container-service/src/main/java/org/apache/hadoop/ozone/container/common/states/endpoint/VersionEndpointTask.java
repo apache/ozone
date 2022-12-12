@@ -76,9 +76,9 @@ public class VersionEndpointTask implements
           // If end point is passive, datanode does not need to check volumes.
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
-          DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(configuration, clusterId);
+          DatanodeLayoutStorage layoutStorage
+                  = new DatanodeLayoutStorage(configuration, clusterId);
           layoutStorage.setClusterId(clusterId);
-          LOG.warn("Nishit *** " + clusterId);
           layoutStorage.forceInitialize();
 
           Preconditions.checkNotNull(scmId,
