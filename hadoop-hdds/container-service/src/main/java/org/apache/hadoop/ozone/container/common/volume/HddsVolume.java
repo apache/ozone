@@ -186,6 +186,9 @@ public class HddsVolume extends StorageVolume {
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
     VolumeCheckResult result = super.check(unused);
+    if (!isDbLoaded()) {
+      return result;
+    }
     DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
     if (result != VolumeCheckResult.HEALTHY ||
         !df.getContainerSchemaV3Enabled() || !df.autoCompactionSmallSstFile()) {
