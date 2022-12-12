@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -75,6 +76,10 @@ public class VersionEndpointTask implements
           // If end point is passive, datanode does not need to check volumes.
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
+          DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(configuration, clusterId);
+          layoutStorage.setClusterId(clusterId);
+          LOG.warn("Nishit *** " + clusterId);
+          layoutStorage.forceInitialize();
 
           Preconditions.checkNotNull(scmId,
               "Reply from SCM: scmId cannot be null");
