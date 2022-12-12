@@ -18,35 +18,40 @@
 package org.apache.hadoop.hdds.scm;
 
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-import java.util.stream.Collectors;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Random;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This policy implements a set of invariants which are common
  * for all basic placement policies, acts as the repository of helper
  * functions which are common to placement policies.
  */
-public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
+public abstract class SCMCommonPlacementPolicy implements
+        PlacementPolicy<ContainerReplica> {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
@@ -347,6 +352,22 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   }
 
   /**
+   * Default implementation to return the max number of replicas per rack.
+   * For simple policies that are not rack aware
+   * we return numReplicas, from this default implementation.
+   *
+   * @param numReplicas - The desired replica counts
+   * @param numberOfRacks - The desired number of racks
+   * @return The max number of replicas per rack
+   */
+  protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    return numReplicas / numberOfRacks
+            + Math.min(numReplicas % numberOfRacks, 1);
+  }
+
+
+
+  /**
    * This default implementation handles rack aware policies and non rack
    * aware policies. If a future placement policy needs to check more than racks
    * to validate the policy (eg node groups, HDFS like upgrade domain) this
@@ -363,6 +384,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
+    // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
@@ -372,22 +394,22 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
         return invalidPlacement;
       }
     }
-    // We have a network topology so calculate if it is satisfied or not.
-    int numRacks = 1;
+    Map<Node, Long> currentRackCount = dns.stream()
+            .collect(Collectors.groupingBy(this::getPlacementGroup,
+                    Collectors.counting()));
     final int maxLevel = topology.getMaxLevel();
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
-    numRacks = topology.getNumOfNodes(maxLevel - 1);
-    final long currentRackCount = dns.stream()
-        .map(d -> topology.getAncestor(d, 1))
-        .distinct()
-        .count();
-
+    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
+    int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
+            Math.min(requiredRacks, numRacks));
     return new ContainerPlacementStatusDefault(
-        (int)currentRackCount, requiredRacks, numRacks);
+        currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
+            currentRackCount.values().stream().map(Long::intValue)
+                    .collect(Collectors.toList()));
   }
 
   /**
@@ -425,5 +447,48 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       }
     }
     return false;
+  }
+
+  /**
+   * Given a set of replicas of a container which are
+   * neither over underreplicated nor overreplicated,
+   * return a set of replicas to copy to another node to fix misreplication.
+   * @param replicas
+   */
+  @Override
+  public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+         Set<ContainerReplica> replicas) {
+    Map<Node, List<ContainerReplica>> placementGroupReplicaIdMap
+            = replicas.stream().collect(Collectors.groupingBy(replica ->
+            this.getPlacementGroup(replica.getDatanodeDetails())));
+
+    int totalNumberOfReplicas = replicas.size();
+    int requiredNumberOfPlacementGroups =
+            getRequiredRackCount(totalNumberOfReplicas);
+    Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
+    List<List<ContainerReplica>> replicaSet = placementGroupReplicaIdMap
+            .values().stream()
+            .sorted((o1, o2) -> Integer.compare(o2.size(), o1.size()))
+            .limit(requiredNumberOfPlacementGroups)
+            .collect(Collectors.toList());
+    for (List<ContainerReplica> replicaList: replicaSet) {
+      int maxReplicasPerPlacementGroup = getMaxReplicasPerRack(
+              totalNumberOfReplicas, requiredNumberOfPlacementGroups);
+      int numberOfReplicasToBeCopied = Math.max(0,
+              replicaList.size() - maxReplicasPerPlacementGroup);
+      totalNumberOfReplicas -= maxReplicasPerPlacementGroup;
+      requiredNumberOfPlacementGroups -= 1;
+      if (numberOfReplicasToBeCopied > 0) {
+        List<ContainerReplica> replicasToBeCopied = replicaList.stream()
+                .limit(numberOfReplicasToBeCopied)
+                .collect(Collectors.toList());
+        copyReplicaSet.addAll(replicasToBeCopied);
+      }
+    }
+    return copyReplicaSet;
+  }
+
+  protected Node getPlacementGroup(DatanodeDetails dn) {
+    return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
   }
 }
