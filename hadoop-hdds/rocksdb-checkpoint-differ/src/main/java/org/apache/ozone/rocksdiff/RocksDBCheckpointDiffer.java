@@ -220,16 +220,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     this.maxAllowedTimeInDag = 0;
   }
 
-  /**
-   * This constructor is only meant for unit testing.
-   */
-  @VisibleForTesting
-  RocksDBCheckpointDiffer() {
-    this.skipGetSSTFileSummary = true;
-    this.sstBackupDir = null;
-    this.activeDBLocationStr = null;
-  }
-
   private void setCompactionLogDir(String metadataDir,
       String compactionLogDirName) {
 
@@ -1035,6 +1025,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     pruneBackwardDag(backwardCompactionDAG, startNodes);
     Set<String> sstFilesPruned = pruneForwardDag(forwardCompactionDAG,
         startNodes);
+
+    // Remove SST file nodes from compactionNodeMap too,
+    // since those nodes won't be needed after clean up.
+    sstFilesPruned.forEach(compactionNodeMap::remove);
 
     LOG.info("Pruned SST nodes from DAG: {}.", sstFilesPruned);
   }
