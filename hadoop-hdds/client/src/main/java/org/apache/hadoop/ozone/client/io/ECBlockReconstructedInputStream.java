@@ -149,7 +149,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  public synchronized long getPos() throws IOException {
+  public synchronized long getPos() {
     return position;
   }
 
