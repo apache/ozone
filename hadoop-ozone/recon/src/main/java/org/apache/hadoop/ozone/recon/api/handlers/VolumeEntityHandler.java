@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -116,16 +117,21 @@ public class VolumeEntityHandler extends EntityHandler {
   public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-    RootEntityHandler rootEntityHandler = new RootEntityHandler(
-        getReconNamespaceSummaryManager(),
-        getOmMetadataManager(),
-        getReconSCM(),
-        "/"
-    );
-    QuotaUsageResponse rootQuotaUsageResponse = 
-        rootEntityHandler.getQuotaResponse();
-    quotaUsageResponse.setQuota(rootQuotaUsageResponse.getQuota());
-    quotaUsageResponse.setQuotaUsed(rootQuotaUsageResponse.getQuotaUsed());
+    String[] names = getNames();
+    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    String volKey = getOmMetadataManager().getVolumeKey(names[0]);
+    OmVolumeArgs volumeArgs =
+            getOmMetadataManager().getVolumeTable().getSkipCache(volKey);
+    long quotaInBytes = volumeArgs.getQuotaInBytes();
+    long quotaUsedInBytes = 0L;
+
+    // Get the total data size used by all buckets
+    for (OmBucketInfo bucketInfo: buckets) {
+      long bucketObjectId = bucketInfo.getObjectID();
+      quotaUsedInBytes += getTotalSize(bucketObjectId);
+    }
+    quotaUsageResponse.setQuota(quotaInBytes);
+    quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;
   }
 

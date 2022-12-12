@@ -659,20 +659,20 @@ public class TestNSSummaryEndpointWithFSO {
     // volume level quota usage
     Response volResponse = nsSummaryEndpoint.getQuotaUsage(VOL_PATH);
     QuotaUsageResponse quVolRes = (QuotaUsageResponse) volResponse.getEntity();
-    Assert.assertEquals(ROOT_QUOTA, quVolRes.getQuota());
-    Assert.assertEquals(ROOT_DATA_SIZE, quVolRes.getQuotaUsed());
+    Assert.assertEquals(VOL_QUOTA, quVolRes.getQuota());
+    Assert.assertEquals(VOL_DATA_SIZE, quVolRes.getQuotaUsed());
 
     // bucket level quota usage
     Response bucketRes = nsSummaryEndpoint.getQuotaUsage(BUCKET_ONE_PATH);
     QuotaUsageResponse quBucketRes = (QuotaUsageResponse) bucketRes.getEntity();
-    Assert.assertEquals(ROOT_QUOTA, quBucketRes.getQuota());
-    Assert.assertEquals(ROOT_DATA_SIZE, quBucketRes.getQuotaUsed());
+    Assert.assertEquals(BUCKET_ONE_QUOTA, quBucketRes.getQuota());
+    Assert.assertEquals(BUCKET_ONE_DATA_SIZE, quBucketRes.getQuotaUsed());
 
     Response bucketRes2 = nsSummaryEndpoint.getQuotaUsage(BUCKET_TWO_PATH);
     QuotaUsageResponse quBucketRes2 =
             (QuotaUsageResponse) bucketRes2.getEntity();
-    Assert.assertEquals(ROOT_QUOTA, quBucketRes2.getQuota());
-    Assert.assertEquals(ROOT_DATA_SIZE, quBucketRes2.getQuotaUsed());
+    Assert.assertEquals(BUCKET_TWO_QUOTA, quBucketRes2.getQuota());
+    Assert.assertEquals(BUCKET_TWO_DATA_SIZE, quBucketRes2.getQuotaUsed());
 
     // other level not applicable
     Response naResponse1 = nsSummaryEndpoint.getQuotaUsage(DIR_ONE_PATH);

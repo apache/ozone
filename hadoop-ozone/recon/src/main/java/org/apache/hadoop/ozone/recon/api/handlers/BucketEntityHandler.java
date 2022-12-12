@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -125,17 +126,15 @@ public class BucketEntityHandler extends EntityHandler {
   public QuotaUsageResponse getQuotaResponse()
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-    RootEntityHandler rootEntityHandler = new RootEntityHandler(
-        getReconNamespaceSummaryManager(),
-        getOmMetadataManager(),
-        getReconSCM(),
-        "/"
-    );
-    QuotaUsageResponse rootQuotaUsageResponse = 
-        rootEntityHandler.getQuotaResponse();
-
-    quotaUsageResponse.setQuota(rootQuotaUsageResponse.getQuota());
-    quotaUsageResponse.setQuotaUsed(rootQuotaUsageResponse.getQuotaUsed());
+    String[] names = getNames();
+    String bucketKey = getOmMetadataManager().getBucketKey(names[0], names[1]);
+    OmBucketInfo bucketInfo = getOmMetadataManager()
+            .getBucketTable().getSkipCache(bucketKey);
+    long bucketObjectId = bucketInfo.getObjectID();
+    long quotaInBytes = bucketInfo.getQuotaInBytes();
+    long quotaUsedInBytes = getTotalSize(bucketObjectId);
+    quotaUsageResponse.setQuota(quotaInBytes);
+    quotaUsageResponse.setQuotaUsed(quotaUsedInBytes);
     return quotaUsageResponse;
   }
 
