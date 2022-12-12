@@ -37,17 +37,15 @@ public class ECReconstructionCommandInfo {
   private List<DatanodeDetails> targetDatanodes;
   private long deadlineMsSinceEpoch = 0;
 
-  public ECReconstructionCommandInfo(long containerID,
-      ECReplicationConfig ecReplicationConfig, byte[] missingContainerIndexes,
-      List<DatanodeDetailsAndReplicaIndex> sources,
-      List<DatanodeDetails> targetDatanodes, long deadlineMsSinceEpoch) {
-    this.containerID = containerID;
-    this.ecReplicationConfig = ecReplicationConfig;
+  public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
+    this.containerID = cmd.getContainerID();
+    this.ecReplicationConfig = cmd.getEcReplicationConfig();
     this.missingContainerIndexes =
-        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
-    this.sources = sources;
-    this.targetDatanodes = targetDatanodes;
-    this.deadlineMsSinceEpoch = deadlineMsSinceEpoch;
+        Arrays.copyOf(cmd.getMissingContainerIndexes(),
+            cmd.getMissingContainerIndexes().length);
+    this.sources = cmd.getSources();
+    this.targetDatanodes = cmd.getTargetDatanodes();
+    this.deadlineMsSinceEpoch = cmd.getDeadline();
   }
 
   public long getDeadline() {

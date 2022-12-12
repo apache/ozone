@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
@@ -78,9 +79,10 @@ public class TestECReconstructionSupervisor {
               }
             }, clock) {
         };
-    supervisor.addTask(
-        new ECReconstructionCommandInfo(1, new ECReplicationConfig(3, 2),
-            new byte[0], ImmutableList.of(), ImmutableList.of(), 0));
+    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
+        1L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    supervisor.addTask(new ECReconstructionCommandInfo(command));
     runnableInvoked.await();
     Assertions.assertEquals(1, supervisor.getInFlightReplications());
     holdProcessing.countDown();
@@ -96,15 +98,25 @@ public class TestECReconstructionSupervisor {
         new ECReconstructionSupervisor(null, null,
             newDirectExecutorService(), coordinator, clock);
 
-    ECReconstructionCommandInfo task1 = new ECReconstructionCommandInfo(1L,
-        new ECReplicationConfig(3, 2), new byte[0], ImmutableList.of(),
-        ImmutableList.of(), 0);
-    ECReconstructionCommandInfo task2 = new ECReconstructionCommandInfo(2L,
-        new ECReplicationConfig(3, 2), new byte[0], ImmutableList.of(),
-        ImmutableList.of(), clock.millis() + 10000);
-    ECReconstructionCommandInfo task3 = new ECReconstructionCommandInfo(3L,
-        new ECReplicationConfig(3, 2), new byte[0], ImmutableList.of(),
-        ImmutableList.of(), clock.millis() + 20000);
+    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
+        1L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    ECReconstructionCommandInfo task1 =
+        new ECReconstructionCommandInfo(command);
+
+    command = new ReconstructECContainersCommand(
+        2L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    command.setDeadline(clock.millis() + 10000);
+    ECReconstructionCommandInfo task2 =
+        new ECReconstructionCommandInfo(command);
+
+    command = new ReconstructECContainersCommand(
+        3L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    command.setDeadline(clock.millis() + 20000);
+    ECReconstructionCommandInfo task3 =
+        new ECReconstructionCommandInfo(command);
 
     clock.fastForward(15000);
     supervisor.addTask(task1);
