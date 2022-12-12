@@ -470,19 +470,29 @@ public final class ContainerTestHelper {
    * Returns a close container request.
    * @param pipeline - pipeline
    * @param containerID - ID of the container.
+   * @param token - container token
    * @return ContainerCommandRequestProto.
    */
   public static ContainerCommandRequestProto getCloseContainer(
-      Pipeline pipeline, long containerID) throws IOException {
-    return ContainerCommandRequestProto.newBuilder()
+      Pipeline pipeline, long containerID, Token<?> token) throws IOException {
+    Builder builder = ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.CloseContainer)
         .setContainerID(containerID)
         .setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
-        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
-        .build();
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString());
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    return builder.build();
   }
 
+  public static ContainerCommandRequestProto getCloseContainer(
+      Pipeline pipeline, long containerID) throws IOException {
+    return getCloseContainer(pipeline, containerID, null);
+  }
   /**
    * Returns a simple request without traceId.
    * @param pipeline - pipeline
