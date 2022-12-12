@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -68,27 +66,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
-  private boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy =
       HddsClientUtils.createRetryPolicy(3, TimeUnit.SECONDS.toMillis(1));
   private int retries;
-
-  // List of ChunkInputStreams, one for each chunk in the block
-  private List<ChunkInputStream> chunkStreams;
-
-  // chunkOffsets[i] stores the index of the first data byte in
-  // chunkStream i w.r.t the block data.
-  // Let’s say we have chunk size as 40 bytes. And let's say the parent
-  // block stores data from index 200 and has length 400.
-  // The first 40 bytes of this block will be stored in chunk[0], next 40 in
-  // chunk[1] and so on. But since the chunkOffsets are w.r.t the block only
-  // and not the key, the values in chunkOffsets will be [0, 40, 80,....].
-  private long[] chunkOffsets = null;
-
-  // Index of the chunkStream corresponding to the current position of the
-  // BlockInputStream i.e offset of the data to be read next from this block
-  private int chunkIndex;
 
   // Position of the BlockInputStream is maintained by this variable till
   // the stream is initialized. This position is w.r.t to the block only and
@@ -97,13 +78,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
   // initialized, then value of blockPosition will be set to 40.
   // Once, the stream is initialized, the position of the stream
   // will be determined by the current chunkStream and its position.
-  private long blockPosition = 0;
-
-  // Tracks the chunkIndex corresponding to the last blockPosition so that it
-  // can be reset if a new position is seeked.
-  private int chunkIndexOfPrevPosition;
+  private long blockPosition;
 
   private final Function<BlockID, Pipeline> refreshPipelineFunction;
+
+  private MultiBlockInputStream delegateStream;
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
@@ -126,17 +105,35 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this(blockId, blockLen, pipeline, token, verifyChecksum,
         xceiverClientFactory, null);
   }
+
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from
    * the Container and create the ChunkInputStreams for each Chunk in the Block.
    */
   public synchronized void initialize() throws IOException {
-
-    // Pre-check that the stream has not been intialized already
-    if (initialized) {
+    // Pre-check that the stream has not been initialized already
+    if (isInitialized()) {
       return;
     }
+    List<ChunkInfo> chunks = retrieveChunksWithRetries();
+    List<ChunkInputStream> chunkStreams = new ArrayList<>(chunks.size());
+    for (ChunkInfo chunk : chunks) {
+      // Append another ChunkInputStream to the end of the list. Note that the
+      // ChunkInputStream is only created here. The chunk will be read from the
+      // Datanode only when a read operation is performed on for that chunk.
+      chunkStreams.add(createChunkInputStream(chunk));
+    }
 
+    this.delegateStream = new MultiBlockInputStream(blockID, chunkStreams);
+
+    if (blockPosition > 0) {
+      // Stream was seeked to blockPosition before initialization. Seek to the
+      // blockPosition now.
+      seek(blockPosition);
+    }
+  }
+
+  private List<ChunkInfo> retrieveChunksWithRetries() throws IOException {
     List<ChunkInfo> chunks = null;
     IOException catchEx = null;
     do {
@@ -163,33 +160,17 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
     if (chunks == null) {
       throw catchEx;
+    } else if (chunks.isEmpty()) {
+      throw new IOException("Empty list of chunks " + blockID);
     } else {
       // Reset retry count if we get chunks successfully.
       retries = 0;
     }
+    return chunks;
+  }
 
-    if (!chunks.isEmpty()) {
-      // For each chunk in the block, create a ChunkInputStream and compute
-      // its chunkOffset
-      this.chunkOffsets = new long[chunks.size()];
-      long tempOffset = 0;
-
-      this.chunkStreams = new ArrayList<>(chunks.size());
-      for (int i = 0; i < chunks.size(); i++) {
-        addStream(chunks.get(i));
-        chunkOffsets[i] = tempOffset;
-        tempOffset += chunks.get(i).getLen();
-      }
-
-      initialized = true;
-      this.chunkIndex = 0;
-
-      if (blockPosition > 0) {
-        // Stream was seeked to blockPosition before initialization. Seek to the
-        // blockPosition now.
-        seek(blockPosition);
-      }
-    }
+  private boolean isInitialized() {
+    return delegateStream != null;
   }
 
   /**
@@ -212,6 +193,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   /**
    * Send RPC call to get the block info from the container.
+   *
    * @return List of chunks in this block.
    */
   protected List<ChunkInfo> getChunkInfos() throws IOException {
@@ -261,15 +243,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
   }
 
-  /**
-   * Append another ChunkInputStream to the end of the list. Note that the
-   * ChunkInputStream is only created here. The chunk will be read from the
-   * Datanode only when a read operation is performed on for that chunk.
-   */
-  protected synchronized void addStream(ChunkInfo chunkInfo) {
-    chunkStreams.add(createChunkInputStream(chunkInfo));
-  }
-
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     return new ChunkInputStream(chunkInfo, blockID,
         xceiverClientFactory, () -> pipeline, verifyChecksum, token);
@@ -279,139 +252,38 @@ public class BlockInputStream extends BlockExtendedInputStream {
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
     Preconditions.checkArgument(strategy != null);
-    if (!initialized) {
+    if (!isInitialized()) {
       initialize();
     }
-
-    checkOpen();
-    int totalReadLen = 0;
-    int len = strategy.getTargetLength();
-    while (len > 0) {
-      // if we are at the last chunk and have read the entire chunk, return
-      if (chunkStreams.size() == 0 ||
-          (chunkStreams.size() - 1 <= chunkIndex &&
-              chunkStreams.get(chunkIndex)
-                  .getRemaining() == 0)) {
-        return totalReadLen == 0 ? EOF : totalReadLen;
-      }
-
-      // Get the current chunkStream and read data from it
-      ChunkInputStream current = chunkStreams.get(chunkIndex);
-      int numBytesToRead = Math.min(len, (int)current.getRemaining());
-      int numBytesRead;
-      try {
-        numBytesRead = strategy.readFromBlock(current, numBytesToRead);
-        retries = 0;
-        // If we get a StorageContainerException or an IOException due to
-        // datanodes are not reachable, refresh to get the latest pipeline
-        // info and retry.
-        // Otherwise, just retry according to the retry policy.
-      } catch (SCMSecurityException ex) {
-        throw ex;
-      } catch (StorageContainerException e) {
-        if (shouldRetryRead(e)) {
-          handleReadError(e);
-          continue;
-        } else {
-          throw e;
-        }
-      } catch (IOException ex) {
-        if (shouldRetryRead(ex)) {
-          if (isConnectivityIssue(ex)) {
-            handleReadError(ex);
-          } else {
-            current.releaseClient();
-          }
-          continue;
-        } else {
-          throw ex;
-        }
-      }
-
-      if (numBytesRead != numBytesToRead) {
-        // This implies that there is either data loss or corruption in the
-        // chunk entries. Even EOF in the current stream would be covered in
-        // this case.
-        throw new IOException(String.format(
-            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
-                "numBytesRead=%d", current.getChunkName(), current.getLength(),
-            numBytesToRead, numBytesRead));
-      }
-      totalReadLen += numBytesRead;
-      len -= numBytesRead;
-      if (current.getRemaining() <= 0 &&
-          ((chunkIndex + 1) < chunkStreams.size())) {
-        chunkIndex += 1;
-      }
-    }
-    return totalReadLen;
+    return delegateStream.readWithStrategy(strategy);
   }
 
   /**
    * Seeks the BlockInputStream to the specified position. If the stream is
    * not initialized, save the seeked position via blockPosition. Otherwise,
    * update the position in 2 steps:
-   *    1. Updating the chunkIndex to the chunkStream corresponding to the
-   *    seeked position.
-   *    2. Seek the corresponding chunkStream to the adjusted position.
-   *
+   * 1. Updating the chunkIndex to the chunkStream corresponding to the
+   * seeked position.
+   * 2. Seek the corresponding chunkStream to the adjusted position.
+   * <p>
    * Let’s say we have chunk size as 40 bytes. And let's say the parent block
    * stores data from index 200 and has length 400. If the key was seeked to
    * position 90, then this block will be seeked to position 90.
    * When seek(90) is called on this blockStream, then
-   *    1. chunkIndex will be set to 2 (as indices 80 - 120 reside in chunk[2]).
-   *    2. chunkStream[2] will be seeked to position 10
-   *       (= 90 - chunkOffset[2] (= 80)).
+   * 1. chunkIndex will be set to 2 (as indices 80 - 120 reside in chunk[2]).
+   * 2. chunkStream[2] will be seeked to position 10
+   * (= 90 - chunkOffset[2] (= 80)).
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (!initialized) {
+    if (!isInitialized()) {
       // Stream has not been initialized yet. Save the position so that it
       // can be seeked when the stream is initialized.
       blockPosition = pos;
       return;
     }
 
-    checkOpen();
-    if (pos < 0 || pos > length) {
-      if (pos == 0) {
-        // It is possible for length and pos to be zero in which case
-        // seek should return instead of throwing exception
-        return;
-      }
-      throw new EOFException(
-          "EOF encountered at pos: " + pos + " for block: " + blockID);
-    }
-
-    if (chunkIndex >= chunkStreams.size()) {
-      chunkIndex = Arrays.binarySearch(chunkOffsets, pos);
-    } else if (pos < chunkOffsets[chunkIndex]) {
-      chunkIndex =
-          Arrays.binarySearch(chunkOffsets, 0, chunkIndex, pos);
-    } else if (pos >= chunkOffsets[chunkIndex] + chunkStreams
-        .get(chunkIndex).getLength()) {
-      chunkIndex = Arrays.binarySearch(chunkOffsets,
-          chunkIndex + 1, chunkStreams.size(), pos);
-    }
-    if (chunkIndex < 0) {
-      // Binary search returns -insertionPoint - 1  if element is not present
-      // in the array. insertionPoint is the point at which element would be
-      // inserted in the sorted array. We need to adjust the chunkIndex
-      // accordingly so that chunkIndex = insertionPoint - 1
-      chunkIndex = -chunkIndex - 2;
-    }
-
-    // Reset the previous chunkStream's position
-    chunkStreams.get(chunkIndexOfPrevPosition).resetPosition();
-
-    // Reset all the chunkStreams above the chunkIndex. We do this to reset
-    // any previous reads which might have updated the chunkPosition.
-    for (int index =  chunkIndex + 1; index < chunkStreams.size(); index++) {
-      chunkStreams.get(index).seek(0);
-    }
-    // seek to the proper offset in the ChunkInputStream
-    chunkStreams.get(chunkIndex).seek(pos - chunkOffsets[chunkIndex]);
-    chunkIndexOfPrevPosition = chunkIndex;
+    delegateStream.seek(pos);
   }
 
   @Override
@@ -420,29 +292,21 @@ public class BlockInputStream extends BlockExtendedInputStream {
       return 0;
     }
 
-    if (!initialized) {
+    if (!isInitialized()) {
       // The stream is not initialized yet. Return the blockPosition
       return blockPosition;
     } else {
-      return chunkOffsets[chunkIndex] + chunkStreams.get(chunkIndex).getPos();
+      return delegateStream.getPos();
     }
   }
 
   @Override
-  public boolean seekToNewSource(long targetPos) throws IOException {
-    return false;
-  }
-
-  @Override
-  public synchronized void close() {
+  public synchronized void close() throws IOException {
     releaseClient();
     xceiverClientFactory = null;
 
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
-    if (inputStreams != null) {
-      for (ChunkInputStream is : inputStreams) {
-        is.close();
-      }
+    if (isInitialized()) {
+      delegateStream.close();
     }
   }
 
@@ -458,7 +322,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
    *
    * @throws IOException if stream is closed
    */
-  protected synchronized void checkOpen() throws IOException {
+  protected synchronized void checkClientOpen() throws IOException {
     if (xceiverClientFactory == null) {
       throw new IOException("BlockInputStream has been closed.");
     }
@@ -476,7 +340,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @VisibleForTesting
   synchronized int getChunkIndex() {
-    return chunkIndex;
+    return isInitialized() ? delegateStream.getCurrentStreamIndex() : 0;
   }
 
   @VisibleForTesting
@@ -489,11 +353,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     storePosition();
     releaseClient();
 
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
-    if (inputStreams != null) {
-      for (ChunkInputStream is : inputStreams) {
-        is.unbuffer();
-      }
+    if (isInitialized()) {
+      delegateStream.unbuffer();
     }
   }
 
@@ -515,23 +376,109 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private void handleReadError(IOException cause) throws IOException {
     releaseClient();
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
-    if (inputStreams != null) {
-      for (ChunkInputStream is : inputStreams) {
-        is.releaseClient();
-      }
+    if (isInitialized()) {
+      delegateStream.releaseClient();
     }
-
     refreshPipeline(cause);
   }
 
   @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
-    return chunkStreams;
+    return delegateStream.getPartStreams();
   }
 
   @VisibleForTesting
   public static Logger getLog() {
     return LOG;
+  }
+
+  private class MultiBlockInputStream extends MultipartInputStream {
+
+    MultiBlockInputStream(BlockID blockID,
+                          List<ChunkInputStream> inputStreams) {
+      super(" Block: " + blockID, inputStreams);
+    }
+
+    @Override
+    protected int readWithStrategy(ByteReaderStrategy strategy,
+                                   InputStream current,
+                                   int numBytesToRead)
+        throws IOException, RetriableIOException {
+      int numBytesRead;
+      try {
+        numBytesRead =
+            super.readWithStrategy(strategy, current, numBytesToRead);
+        retries = 0;
+        // If we get a StorageContainerException or an IOException due to
+        // datanodes are not reachable, refresh to get the latest pipeline
+        // info and retry.
+        // Otherwise, just retry according to the retry policy.
+      } catch (SCMSecurityException ex) {
+        throw ex;
+      } catch (StorageContainerException e) {
+        if (shouldRetryRead(e)) {
+          handleReadError(e);
+          throw new RetriableIOException(e);
+        } else {
+          throw e;
+        }
+      } catch (IOException ex) {
+        if (shouldRetryRead(ex)) {
+          if (isConnectivityIssue(ex)) {
+            handleReadError(ex);
+          } else {
+            ((ChunkInputStream) current).releaseClient();
+          }
+          throw new RetriableIOException(ex);
+        } else {
+          throw ex;
+        }
+      }
+      return numBytesRead;
+    }
+
+    @Override
+    protected void checkPartBytesRead(
+        int numBytesToRead,
+        int numBytesRead,
+        PartInputStream stream) throws IOException {
+      if (numBytesRead != numBytesToRead) {
+        // This implies that there is either data loss or corruption in the
+        // chunk entries. Even EOF in the current stream would be covered in
+        // this case.
+        throw new IOException(String.format(
+            "Inconsistent read for chunkName=%s length=%d position=%d " +
+                "numBytesToRead= %d numBytesRead=%d",
+            ((ChunkInputStream) stream).getChunkName(), stream.getLength(),
+            stream.getPos(), numBytesToRead, numBytesRead));
+      }
+    }
+
+    @Override
+    public synchronized long getPos() {
+      try {
+        return super.getPos();
+      } catch (IOException e) {
+        //Should never happen, ChunkInputStream does not throw IOException
+        return 0;
+      }
+    }
+
+    @Override
+    protected void checkOpen() throws IOException {
+      super.checkOpen();
+      checkClientOpen();
+    }
+
+    public void releaseClient() {
+      for (ChunkInputStream is : getPartStreams()) {
+        is.releaseClient();
+      }
+    }
+
+    @Override
+    public List<ChunkInputStream> getPartStreams() {
+      return (List<ChunkInputStream>) super.getPartStreams();
+    }
   }
 }

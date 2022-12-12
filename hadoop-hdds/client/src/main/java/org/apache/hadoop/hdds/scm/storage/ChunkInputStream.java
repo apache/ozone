@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * instances.
  */
 public class ChunkInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
+    implements Seekable, CanUnbuffer, ByteBufferReadable, PartInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkInputStream.class);
@@ -69,7 +69,7 @@ public class ChunkInputStream extends InputStream
   private XceiverClientSpi xceiverClient;
   private final Supplier<Pipeline> pipelineSupplier;
   private boolean verifyChecksum;
-  private boolean allocated = false;
+  private boolean allocated;
   // Buffers to store the chunk data read from the DN container
   private ByteBuffer[] buffers;
 
@@ -82,14 +82,14 @@ public class ChunkInputStream extends InputStream
   // in buffers. BufferOffset for the 2nd buffer would be 40 as bytes 0-39
   // would be stored in buffer 0. Hence, bufferOffsets[0] = 0,
   // bufferOffsets[1] = 40, bufferOffsets[2] = 80, etc.
-  private long[] bufferOffsets = null;
+  private long[] bufferOffsets;
 
   // The offset of the current data residing in the buffers w.r.t the start
   // of chunk data
   private long bufferOffsetWrtChunkData;
 
   // Index of the first buffer which has not been released
-  private int firstUnreleasedBufferIndex = 0;
+  private int firstUnreleasedBufferIndex;
 
   // The number of bytes of chunk data residing in the buffers currently
   private long buffersSize;
@@ -117,6 +117,7 @@ public class ChunkInputStream extends InputStream
     this.token = token;
   }
 
+  @Override
   public synchronized long getRemaining() {
     return length - getPos();
   }
@@ -444,7 +445,7 @@ public class ChunkInputStream extends InputStream
     }
   }
 
-  private CheckedBiFunction<ContainerCommandRequestProto,
+  private final CheckedBiFunction<ContainerCommandRequestProto,
       ContainerCommandResponseProto, IOException> validator =
           (request, response) -> {
             final ChunkInfo reqChunkInfo =
@@ -518,9 +519,9 @@ public class ChunkInputStream extends InputStream
     // index of the last byte to be read from chunk, inclusively.
     final long endByteIndex = startByteIndex + dataLen - 1;
 
-    long adjustedChunkOffset =  (startByteIndex / bytesPerChecksum)
+    long adjustedChunkOffset =  startByteIndex / bytesPerChecksum
         * bytesPerChecksum; // inclusive
-    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
+    final long endIndex = (endByteIndex / bytesPerChecksum + 1)
         * bytesPerChecksum; // exclusive
     long adjustedChunkLen = Math.min(endIndex, length) - adjustedChunkOffset;
     return Pair.of(adjustedChunkOffset, adjustedChunkLen);
@@ -582,7 +583,7 @@ public class ChunkInputStream extends InputStream
     boolean hasData = false;
 
     if (buffersAllocated()) {
-      while (bufferIndex < (buffers.length)) {
+      while (bufferIndex < buffers.length) {
         if (buffers[bufferIndex] != null &&
             buffers[bufferIndex].hasRemaining()) {
           // current buffer has data
@@ -605,7 +606,7 @@ public class ChunkInputStream extends InputStream
   }
 
   private boolean buffersRemaining() {
-    return (bufferIndex < (buffers.length - 1));
+    return bufferIndex < buffers.length - 1;
   }
 
   /**
@@ -648,10 +649,7 @@ public class ChunkInputStream extends InputStream
       return false;
     }
 
-    if (!buffers[bufferIndex].hasRemaining()) {
-      return true;
-    }
-    return false;
+    return !buffers[bufferIndex].hasRemaining();
   }
 
   /**
@@ -672,7 +670,6 @@ public class ChunkInputStream extends InputStream
       return true;
     }
   }
-
 
   /**
    * Release the buffers upto the given index.
@@ -725,7 +722,8 @@ public class ChunkInputStream extends InputStream
     return chunkInfo.getChunkName();
   }
 
-  protected long getLength() {
+  @Override
+  public long getLength() {
     return length;
   }
 

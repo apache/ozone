@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -52,7 +51,7 @@ public class KeyInputStream extends MultipartInputStream {
 
   public KeyInputStream(String keyName,
                         List<? extends BlockExtendedInputStream> inputStreams) {
-    super(keyName, inputStreams);
+    super(" Key: " + keyName, inputStreams);
   }
 
   private static List<BlockExtendedInputStream> createStreams(
@@ -126,7 +125,7 @@ public class KeyInputStream extends MultipartInputStream {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientFactory xceiverClientFactory,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      boolean verifyChecksum, Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
 
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
@@ -157,12 +156,6 @@ public class KeyInputStream extends MultipartInputStream {
           verifyChecksum, retryFunction, blockStreamFactory, locationInfo));
     }
     return lengthInputStreams;
-  }
-
-  @Override
-  protected int getNumBytesToRead(ByteReaderStrategy strategy,
-                                  PartInputStream current) throws IOException {
-    return (int) Math.min(strategy.getTargetLength(), current.getRemaining());
   }
 
   @Override

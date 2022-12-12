@@ -26,6 +26,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -33,7 +34,7 @@ import java.util.List;
  */
 public class MultipartInputStream extends ExtendedInputStream {
 
-  private final String key;
+  private final String tag;
   private final long length;
 
   // List of PartInputStream, one for each part of the key
@@ -56,12 +57,12 @@ public class MultipartInputStream extends ExtendedInputStream {
   // can be reset if a new position is seeked.
   private int prevPartIndex;
 
-  public MultipartInputStream(String keyName,
+  public MultipartInputStream(String streamTag,
                               List<? extends PartInputStream> inputStreams) {
 
     Preconditions.checkNotNull(inputStreams);
 
-    this.key = keyName;
+    this.tag = streamTag;
     this.partStreams = inputStreams;
 
     // Calculate and update the partOffsets
@@ -92,8 +93,13 @@ public class MultipartInputStream extends ExtendedInputStream {
       // Get the current partStream and read data from it
       PartInputStream current = partStreams.get(partIndex);
       int numBytesToRead = getNumBytesToRead(strategy, current);
-      int numBytesRead = strategy
-          .readFromBlock((InputStream) current, numBytesToRead);
+      int numBytesRead;
+      try {
+        numBytesRead =
+            readWithStrategy(strategy, (InputStream) current, numBytesToRead);
+      } catch (RetriableIOException e) {
+        continue;
+      }    
       checkPartBytesRead(numBytesToRead, numBytesRead, current);
       totalReadLen += numBytesRead;
 
@@ -105,9 +111,16 @@ public class MultipartInputStream extends ExtendedInputStream {
     return totalReadLen;
   }
 
+  protected int readWithStrategy(ByteReaderStrategy strategy,
+                                 InputStream current,
+                                 int numBytesToRead)
+      throws IOException, RetriableIOException {
+    return strategy.readFromBlock(current, numBytesToRead);
+  }
+
   protected int getNumBytesToRead(ByteReaderStrategy strategy,
                                   PartInputStream current) throws IOException {
-    return strategy.getTargetLength();
+    return (int) Math.min(strategy.getTargetLength(), current.getRemaining());
   }
 
   protected void checkPartBytesRead(int numBytesToRead, int numBytesRead,
@@ -137,7 +150,7 @@ public class MultipartInputStream extends ExtendedInputStream {
     }
     if (pos < 0 || pos > length) {
       throw new EOFException(
-          "EOF encountered at pos: " + pos + " for key: " + key);
+          "EOF encountered at pos: " + pos + tag);
     }
 
     // 1. Update the partIndex
@@ -218,10 +231,10 @@ public class MultipartInputStream extends ExtendedInputStream {
    *
    * @throws IOException if the connection is closed.
    */
-  private void checkOpen() throws IOException {
+  protected void checkOpen() throws IOException {
     if (closed) {
       throw new IOException(
-          ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: " + key);
+          ": " + FSExceptionMessages.STREAM_IS_CLOSED + tag);
     }
   }
 
@@ -241,6 +254,6 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   @VisibleForTesting
   public List<? extends PartInputStream> getPartStreams() {
-    return partStreams;
+    return Collections.unmodifiableList(partStreams);
   }
 }
