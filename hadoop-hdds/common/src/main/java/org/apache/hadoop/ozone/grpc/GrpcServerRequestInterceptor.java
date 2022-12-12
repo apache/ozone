@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.grpc;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import io.grpc.Metadata;
@@ -25,12 +24,7 @@ import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
-import java.io.InputStream;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Interceptor to gather metrics based on grpc server request.
@@ -66,27 +60,11 @@ public class GrpcServerRequestInterceptor implements ServerInterceptor {
         // start time
         startTime = System.nanoTime();
 
-        ByteArrayOutputStream byteArrayOutputStream =
-            new ByteArrayOutputStream();
-        try {
-          ObjectOutputStream outputStream =
-              new ObjectOutputStream(byteArrayOutputStream);
-          outputStream.writeObject(message);
-          outputStream.flush();
-          outputStream.close();
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+        final byte[] messageBytes =
+            message.toString().getBytes(StandardCharsets.UTF_8);
 
-        InputStream inputStream = new ByteArrayInputStream(
-            byteArrayOutputStream.toByteArray());
-        ByteBuffer buffer;
-        try {
-          buffer = ByteBuffer.wrap(IOUtils.toByteArray(inputStream));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-        bytesReceived += buffer.remaining();
+        bytesReceived += messageBytes.length;
+
         if (bytesReceived > 0) {
           grpcMetrics.setReceivedBytes(bytesReceived);
         }
