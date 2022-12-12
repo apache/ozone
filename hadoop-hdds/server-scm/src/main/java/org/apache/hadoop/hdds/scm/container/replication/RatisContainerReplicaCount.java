@@ -70,7 +70,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
-      } else if (cr.getState() != State.UNHEALTHY){
+      } else if (LegacyReplicationManager.compareState(container.getState(),
+          cr.getState())) {
         healthyCount++;
       }
     }
