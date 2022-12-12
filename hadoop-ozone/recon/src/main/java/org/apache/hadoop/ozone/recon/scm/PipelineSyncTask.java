@@ -72,12 +72,7 @@ public class PipelineSyncTask extends ReconScmTask {
   public void run() {
     try {
       while (canRun()) {
-        try {
-          lock.writeLock().lock();
-          triggerPipelineSyncTask();
-        } finally {
-          lock.writeLock().unlock();
-        }
+        triggerPipelineSyncTask();
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
