@@ -2799,8 +2799,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
+  public List<SnapshotInfo> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException {
     if (isAclEnabled) {
       omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
           ACLType.LIST, volumeName, bucketName, null);
@@ -2810,7 +2811,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucketName);
     try {
       metrics.incNumSnapshotLists();
-      return metadataManager.listSnapshot(volumeName, bucketName);
+      return metadataManager.listSnapshot(volumeName, bucketName, prevSnapshot,
+          prevSnapshot, maxListResult);
     } catch (Exception ex) {
       metrics.incNumSnapshotListFails();
       auditSuccess = false;

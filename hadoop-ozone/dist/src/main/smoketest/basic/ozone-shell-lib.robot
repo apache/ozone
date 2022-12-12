@@ -59,6 +59,11 @@ Test ozone shell
     ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '.[] | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
                     Run Keyword         Test key handling       ${protocol}       ${server}       ${volume}
+                    Execute             ozone sh snapshot create ${protocol}${server}/${volume}/bb1 snapshot1
+    ${result} =     Execute             ozone sh snapshot list ${protocol}${server}/${volume}/bb1 | jq -r '.[] | select(.name=="snapshot1") | .snapshotPath'
+                    Should Be Equal     ${result}       ${volume}/bb1
+    ${result} =     Execute             ozone sh snapshot list ${protocol}${server}/${volume}/bb1 | jq -r '.[] | select(.name=="snapshot1") | .snapshotStatus'
+                    Should Be Equal     ${result}       SNAPSHOT_ACTIVE
                     Execute             ozone sh volume clrquota --space-quota ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       -1
