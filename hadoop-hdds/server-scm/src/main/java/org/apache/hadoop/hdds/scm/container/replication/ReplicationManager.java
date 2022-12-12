@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -788,10 +789,6 @@ public class ReplicationManager implements SCMService {
     }
 
     public void setCommandDeadlineFactor(double val) {
-      if (!(val > 0) || (val > 1)) {
-        throw new IllegalArgumentException(val
-            + " must be greater than 0 and less than equal to 1");
-      }
       commandDeadlineFactor = val;
     }
 
@@ -840,6 +837,15 @@ public class ReplicationManager implements SCMService {
             " is seamless to the client, but will affect read performance."
     )
     private int maintenanceRemainingRedundancy = 1;
+
+    @PostConstruct
+    public void validate() {
+      if (!(commandDeadlineFactor > 0) || (commandDeadlineFactor > 1)) {
+        throw new IllegalArgumentException("command.deadline.factor is set to "
+            + commandDeadlineFactor
+            + " and must be greater than 0 and less than equal to 1");
+      }
+    }
 
     public void setMaintenanceRemainingRedundancy(int redundancy) {
       this.maintenanceRemainingRedundancy = redundancy;

@@ -120,10 +120,7 @@ public abstract class SCMCommand<T extends Message> implements
    *         set deadline has expired.
    */
   public boolean hasExpired(long currentEpochMs) {
-    if (deadlineMsSinceEpoch > 0 &&
-        currentEpochMs > deadlineMsSinceEpoch) {
-      return true;
-    }
-    return false;
+    return deadlineMsSinceEpoch > 0 &&
+        currentEpochMs > deadlineMsSinceEpoch;
   }
 }

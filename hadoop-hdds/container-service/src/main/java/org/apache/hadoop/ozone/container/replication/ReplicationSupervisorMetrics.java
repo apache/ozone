@@ -68,7 +68,7 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
         .addGauge(Interns.info("numTimeoutReplications",
-            "Number of timeout replications in queue"),
+            "Number of replication requests timed out before being processed"),
             supervisor.getReplicationTimeoutCount());
   }
 }
