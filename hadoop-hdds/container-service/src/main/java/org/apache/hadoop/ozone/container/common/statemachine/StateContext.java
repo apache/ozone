@@ -737,8 +737,18 @@ public class StateContext {
     final long currentTerm = termOfLeaderSCM.getAsLong();
     final long newTerm = command.getTerm();
     if (currentTerm < newTerm) {
-      termOfLeaderSCM = OptionalLong.of(newTerm);
+      setTermOfLeaderSCM(newTerm);
     }
+  }
+
+  @VisibleForTesting
+  void setTermOfLeaderSCM(long term) {
+    termOfLeaderSCM = OptionalLong.of(term);
+  }
+
+  @VisibleForTesting
+  OptionalLong getTermOfLeaderSCM() {
+    return termOfLeaderSCM;
   }
 
   /**
