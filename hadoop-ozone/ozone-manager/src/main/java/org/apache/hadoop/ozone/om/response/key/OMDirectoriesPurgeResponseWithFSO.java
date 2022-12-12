@@ -85,8 +85,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
         String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
                 bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
+        String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+            key.getObjectID(), ozoneDbKey);
         omMetadataManager.getDeletedDirTable().putWithBatch(batchOperation,
-                ozoneDbKey, keyInfo);
+            ozoneDeleteKey, keyInfo);
 
         omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
                 ozoneDbKey);
