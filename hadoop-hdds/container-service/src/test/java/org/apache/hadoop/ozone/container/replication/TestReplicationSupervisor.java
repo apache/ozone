@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.After;
@@ -266,11 +267,16 @@ public class TestReplicationSupervisor {
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
 
-    ReplicationTask task1 = new ReplicationTask(1L, emptyList());
-    task1.setDeadline(clock.millis() + 10000);
-    ReplicationTask task2 = new ReplicationTask(2L, emptyList());
-    task2.setDeadline(clock.millis() + 20000);
-    ReplicationTask task3 = new ReplicationTask(3L, emptyList());
+    ReplicateContainerCommand cmd = new ReplicateContainerCommand(1L,
+        emptyList());
+    cmd.setDeadline(clock.millis() + 10000);
+    ReplicationTask task1 = new ReplicationTask(cmd);
+    cmd = new ReplicateContainerCommand(2L, emptyList());
+    cmd.setDeadline(clock.millis() + 20000);
+    ReplicationTask task2 = new ReplicationTask(cmd);
+    cmd = new ReplicateContainerCommand(3L, emptyList());
+    // No deadline set
+    ReplicationTask task3 = new ReplicationTask(cmd);
     // no deadline set
 
     clock.fastForward(15000);

@@ -72,8 +72,7 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
         "Replication command is received for container %s "
             + "without source datanodes.", containerID);
 
-    ReplicationTask task = new ReplicationTask(containerID, sourceDatanodes);
-    task.setDeadline(deadline);
+    ReplicationTask task = new ReplicationTask(replicateCommand);
     supervisor.addTask(task);
   }
 
