@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.Ignore;
@@ -2123,20 +2122,25 @@ public class TestLegacyReplicationManager {
 
       replicationManager.processAll();
       eventQueue.processAll(1000);
-      // The unhealthy replica should be removed, but not the other replica
-      // as each time we test with 3 replicas, Mockito ensures it returns
-      // mis-replicated
-      Assertions.assertEquals(currentDeleteCommandCount + 1,
+      // TODO the new (non-legacy) RM needs a separate handler for
+      //  topology status to make progress in this case by:
+      //  1. Deleting the closed replica to restore proper replica count.
+      //  2. Deleting the unhealthy replica since there are adequate healthy
+      //  replicas.
+      //  3. Fixing topology issues left by the previous cleanup tasks.
+      // Current legacy RM implementation will take no action in this case
+      // because deletion would compromise topology.
+      Assertions.assertEquals(currentDeleteCommandCount,
               datanodeCommandHandler.getInvocationCount(
                   SCMCommandProto.Type.deleteContainerCommand));
-      Assertions.assertEquals(currentDeleteCommandCount + 1,
+      Assertions.assertEquals(currentDeleteCommandCount,
               replicationManager.getMetrics().getNumDeletionCmdsSent());
 
-      Assertions.assertTrue(datanodeCommandHandler.received(
+      Assertions.assertFalse(datanodeCommandHandler.received(
               SCMCommandProto.Type.deleteContainerCommand,
               replicaFive.getDatanodeDetails()));
-      Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
-      Assertions.assertEquals(1, replicationManager.getMetrics()
+      Assertions.assertEquals(0, getInflightCount(InflightType.DELETION));
+      Assertions.assertEquals(0, replicationManager.getMetrics()
               .getInflightDeletion());
       assertOverReplicatedCount(1);
     }
@@ -2217,19 +2221,46 @@ public class TestLegacyReplicationManager {
       )).thenAnswer(
               invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
 
-      final int currentDeleteCommandCount = datanodeCommandHandler
+      int currentDeleteCommandCount = datanodeCommandHandler
               .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
 
+      // On the first run, RM will delete one of the extra closed replicas.
       replicationManager.processAll();
       eventQueue.processAll(1000);
-      Assertions.assertEquals(currentDeleteCommandCount + 2,
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
               datanodeCommandHandler.getInvocationCount(
                   SCMCommandProto.Type.deleteContainerCommand));
-      Assertions.assertEquals(currentDeleteCommandCount + 2,
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
               replicationManager.getMetrics().getNumDeletionCmdsSent());
       Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
       Assertions.assertEquals(1, replicationManager.getMetrics()
               .getInflightDeletion());
+
+      assertAnyDeleteTargets(
+          replicaOne.getDatanodeDetails(),
+          replicaTwo.getDatanodeDetails(),
+          replicaThree.getDatanodeDetails(),
+          replicaFour.getDatanodeDetails()
+      );
+
+      currentDeleteCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+      // One the second run, the container is now properly replicated when
+      // counting in flight deletes. This allows the quasi closed container to
+      // be deleted by the unhealthy container handler.
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.deleteContainerCommand));
+      Assertions.assertEquals(currentDeleteCommandCount + 1,
+          replicationManager.getMetrics().getNumDeletionCmdsSent());
+      Assertions.assertEquals(1, getInflightCount(InflightType.DELETION));
+      Assertions.assertEquals(1, replicationManager.getMetrics()
+          .getInflightDeletion());
+
+      assertDeleteTargetsContain(replicaFive.getDatanodeDetails());
     }
   }
 
@@ -2253,26 +2284,87 @@ public class TestLegacyReplicationManager {
     createReplicationManager(0, 0);
   }
 
-  private void assertReplicaSources(ContainerReplica... validReplicas) {
-    List<CommandForDatanode> replicateCommands = datanodeCommandHandler
-            .getReceivedCommands().stream()
-            .filter(c -> c.getCommand().getType() ==
-                    SCMCommandProto.Type.replicateContainerCommand)
-            .collect(Collectors.toList());
-    Set<UUID> validReplicaIDs = Arrays.stream(validReplicas).map(r
-        -> r.getDatanodeDetails().getUuid()).collect(Collectors.toSet());
-    for (CommandForDatanode<?> command: replicateCommands) {
-      if (command.getCommand().getType() ==
-          SCMCommandProto.Type.replicateContainerCommand) {
-        ReplicateContainerCommand replicateCommand =
-                (ReplicateContainerCommand) command.getCommand();
-        Set<UUID> chosenSources = replicateCommand.getSourceDatanodes().stream()
-                .map(DatanodeDetails::getUuid)
-                .collect(Collectors.toSet());
-        Assertions.assertEquals(validReplicaIDs, chosenSources);
-      }
-    }
+  private void assertAllDeleteTargets(DatanodeDetails... targetDNs) {
+    List<CommandForDatanode> deleteCommands = datanodeCommandHandler
+        .getReceivedCommands().stream()
+        .filter(c -> c.getCommand().getType() ==
+            SCMCommandProto.Type.deleteContainerCommand)
+        .collect(Collectors.toList());
+
+    Assertions.assertEquals(targetDNs.length, deleteCommands.size());
+
+    Set<UUID> targetDNIDs = Arrays.stream(targetDNs)
+        .map(DatanodeDetails::getUuid)
+        .collect(Collectors.toSet());
+    Set<UUID> chosenDNIDs = deleteCommands.stream()
+        .map(CommandForDatanode::getDatanodeId)
+        .collect(Collectors.toSet());
+
+    Assertions.assertEquals(targetDNIDs, chosenDNIDs);
   }
+
+  /**
+   * Checks if the set of nodes with deletions scheduled were taken from the
+   * provided set of DNs.
+   */
+  private void assertAnyDeleteTargets(DatanodeDetails... validDeleteDNs) {
+    List<CommandForDatanode> deleteCommands = datanodeCommandHandler
+        .getReceivedCommands().stream()
+        .filter(c -> c.getCommand().getType() ==
+            SCMCommandProto.Type.deleteContainerCommand)
+        .collect(Collectors.toList());
+
+    Set<UUID> deleteCandidateIDs = Arrays.stream(validDeleteDNs)
+        .map(DatanodeDetails::getUuid)
+        .collect(Collectors.toSet());
+    Set<UUID> chosenDNIDs = deleteCommands.stream()
+        .map(CommandForDatanode::getDatanodeId)
+        .collect(Collectors.toSet());
+
+    Assertions.assertTrue(deleteCandidateIDs.containsAll(chosenDNIDs));
+  }
+
+  /**
+   * Checks if the set of nodes with deletions scheduled contains all of the
+   * provided DNs.
+   */
+  private void assertDeleteTargetsContain(DatanodeDetails... deleteDN) {
+    List<CommandForDatanode> deleteCommands = datanodeCommandHandler
+        .getReceivedCommands().stream()
+        .filter(c -> c.getCommand().getType() ==
+            SCMCommandProto.Type.deleteContainerCommand)
+        .collect(Collectors.toList());
+
+    Set<UUID> deleteDNIDs = Arrays.stream(deleteDN)
+        .map(DatanodeDetails::getUuid)
+        .collect(Collectors.toSet());
+    Set<UUID> chosenDNIDs = deleteCommands.stream()
+        .map(CommandForDatanode::getDatanodeId)
+        .collect(Collectors.toSet());
+
+    Assertions.assertTrue(chosenDNIDs.containsAll(deleteDNIDs));
+  }
+
+//  private void assertReplicaSources(ContainerReplica... validReplicas) {
+//    List<CommandForDatanode> replicateCommands = datanodeCommandHandler
+//            .getReceivedCommands().stream()
+//            .filter(c -> c.getCommand().getType() ==
+//                    SCMCommandProto.Type.replicateContainerCommand)
+//            .collect(Collectors.toList());
+//    Set<UUID> validReplicaIDs = Arrays.stream(validReplicas).map(r
+//        -> r.getDatanodeDetails().getUuid()).collect(Collectors.toSet());
+//    for (CommandForDatanode<?> command: replicateCommands) {
+//      if (command.getCommand().getType() ==
+//          SCMCommandProto.Type.replicateContainerCommand) {
+//        ReplicateContainerCommand replicateCommand =
+//                (ReplicateContainerCommand) command.getCommand();
+//        Set<UUID> chosenSources = replicateCommand.getSourceDatanodes().stream()
+//                .map(DatanodeDetails::getUuid)
+//                .collect(Collectors.toSet());
+//        Assertions.assertEquals(validReplicaIDs, chosenSources);
+//      }
+//    }
+//  }
 
   private ContainerInfo createContainer(LifeCycleState containerState)
       throws IOException, TimeoutException {
