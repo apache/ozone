@@ -522,24 +522,29 @@ public class LegacyReplicationManager {
         boolean sufficientlyReplicated = replicaSet.isSufficientlyReplicated();
         boolean placementSatisfied = placementStatus.isPolicySatisfied();
         if (!sufficientlyReplicated || !placementSatisfied) {
-          if (!sufficientlyReplicated) {
-            report.incrementAndSample(
-                HealthState.UNDER_REPLICATED, container.containerID());
-            if (replicaSet.isUnrecoverable()) {
-              report.incrementAndSample(HealthState.MISSING,
-                  container.containerID());
-            } else if (replicaSet.getHealthyCount() == 0) {
-              handleAllReplicasUnhealthy(container, replicaSet, placementStatus);
-            }
+          // Increment report stats.
+          if (!sufficientlyReplicated && replicaSet.isUnrecoverable()) {
+            report.incrementAndSample(HealthState.MISSING,
+                container.containerID());
           }
           if (!placementSatisfied) {
             report.incrementAndSample(HealthState.MIS_REPLICATED,
                 container.containerID());
 
           }
+          // Replicate container if needed.
           if (!inflightReplication.isFull() || !inflightDeletion.isFull()) {
-            handleUnderReplicatedHealthy(container,
-                replicaSet, placementStatus);
+            if (!replicaSet.isUnrecoverable()) {
+              if (replicaSet.getHealthyCount() == 0) {
+                handleAllReplicasUnhealthy(container, replicaSet,
+                    placementStatus, report);
+              } else {
+                report.incrementAndSample(
+                    HealthState.UNDER_REPLICATED, container.containerID());
+                handleUnderReplicatedHealthy(container,
+                    replicaSet, placementStatus);
+              }
+            }
           }
           return;
         }
@@ -562,6 +567,8 @@ public class LegacyReplicationManager {
        */
         if (!replicaSet.isHealthy()) {
           report.incrementAndSample(HealthState.UNHEALTHY,
+              container.containerID());
+          report.incrementAndSample(HealthState.OVER_REPLICATED,
               container.containerID());
           handleOverReplicatedExcessUnhealthy(container, replicaSet);
         }
@@ -1207,7 +1214,8 @@ public class LegacyReplicationManager {
 
   private void handleAllReplicasUnhealthy(ContainerInfo container,
       RatisContainerReplicaCount replicaSet,
-      ContainerPlacementStatus placementStatus) {
+      ContainerPlacementStatus placementStatus,
+      ReplicationManagerReport report) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas().stream()
         .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
@@ -1222,9 +1230,13 @@ public class LegacyReplicationManager {
     if (missingReplicas > 0) {
       handleUnderReplicatedAllUnhealthy(container, replicas,
           placementStatus, missingReplicas);
+      report.incrementAndSample(
+          HealthState.UNDER_REPLICATED, container.containerID());
     } else if (excessReplicas > 0) {
       handleOverReplicatedAllUnhealthy(container, replicas,
           excessReplicas);
+      report.incrementAndSample(
+          HealthState.OVER_REPLICATED, container.containerID());
     }
   }
 
@@ -1946,12 +1958,9 @@ public class LegacyReplicationManager {
     // Replica which are maintenance or decommissioned are not eligible to
     // be removed, as they do not count toward over-replication and they
     // also may not be available
-    // Remove unhealthy replicas from processing. They will be handled by
-    // handleUnstableContainer on following replication manager runs.
     deleteCandidates.removeIf(r ->
         r.getDatanodeDetails().getPersistedOpState() !=
-            NodeOperationalState.IN_SERVICE ||
-            !compareState(container.getState(), r.getState()));
+            NodeOperationalState.IN_SERVICE);
 
     deleteCandidates.stream().limit(excess).forEach(r ->
         sendDeleteCommand(container, r.getDatanodeDetails(), true));
