@@ -400,5 +400,6 @@ public interface CertificateClient extends Closeable {
    */
   KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
 
-  default void reloadKeyAndCertificate(String newCertId) {}
+  default void reloadKeyAndCertificate(String newCertId) {
+  }
 }
