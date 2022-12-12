@@ -150,7 +150,7 @@ public final class RatisPipelineUtils {
 
       for (int cnt = 0; cnt < numOfNodes; cnt++) {
         DatanodeDetails node = dataNodes.get(cnt);
-        String role = node.getHostName() == leaderNode ? "Leader" : "Follower";
+        String role = node.getHostName().equals(leaderNode) ? "Leader" : "Follower";
         info[cnt] =
             "{ HostName : " + node.getHostName() + " | Role : " + role + " }";
       }
