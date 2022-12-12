@@ -51,7 +51,8 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
             ecContainersCommand.getEcReplicationConfig(),
             ecContainersCommand.getMissingContainerIndexes(),
             ecContainersCommand.getSources(),
-            ecContainersCommand.getTargetDatanodes());
+            ecContainersCommand.getTargetDatanodes(),
+            ecContainersCommand.getDeadline());
     this.supervisor.addTask(reconstructionCommandInfo);
   }
 

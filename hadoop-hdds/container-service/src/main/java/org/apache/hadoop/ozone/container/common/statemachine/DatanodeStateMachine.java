@@ -197,7 +197,7 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
             replicationConfig.getReplicationMaxStreams(),
-            ecReconstructionCoordinator);
+            ecReconstructionCoordinator, clock);
 
 
     // When we add new handlers just adding a new handler here should do the
