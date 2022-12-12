@@ -18,7 +18,10 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -117,4 +120,43 @@ public final class RatisPipelineUtils {
                 p.sameDatanodes(pipeline)))
         .collect(Collectors.toList());
   }
+
+  /**
+   * Returns a map containing pipeline information which includes
+   * pipeline-id & the corresponding roles of all datanodes
+   * part of the pipeline.
+   *
+   * @param pipelines input pipeline
+   * @return map containing pipeline details
+   */
+  public static Map<String, String[]> pipelineLeaderFormat(
+      List<Pipeline> pipelines) {
+    final Map<String, String[]> pipelineInfo = new HashMap<>();
+
+    pipelines.forEach(pipeline -> {
+      String leaderNode = "";
+      List<DatanodeDetails> dataNodes = pipeline.getNodes();
+      UUID pipelineId = pipeline.getId().getId();
+
+      try {
+        leaderNode = pipeline.getLeaderNode().getHostName();
+      } catch (IOException ioEx) {
+        LOG.warn("Cannot get leader node for pipeline {}",
+            pipelineId, ioEx);
+      }
+
+      int numOfNodes = dataNodes.size();
+      String[] info = new String[numOfNodes];
+
+      for (int cnt = 0; cnt < numOfNodes; cnt++) {
+        DatanodeDetails node = dataNodes.get(cnt);
+        String role = node.getHostName() == leaderNode ? "Leader" : "Follower";
+        info[cnt] =
+            "{ HostName : " + node.getHostName() + " | Role : " + role + " }";
+      }
+      pipelineInfo.put(pipelineId.toString(), info);
+    });
+    return pipelineInfo;
+  }
+
 }

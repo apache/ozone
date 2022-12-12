@@ -61,12 +61,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.scm.pipeline.RatisPipelineUtils.pipelineLeaderFormat;
+
 
 /**
  * SCM Pipeline Manager implementation.
@@ -700,24 +702,8 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public Map<String, String[]> getPipelineLeaders() throws NotLeaderException {
-    final Map<String, String[]> pipelineInfo = new HashMap<>();
     List<Pipeline> pipelines = getPipelines();
-    pipelines.forEach(pipeline -> {
-      String leaderNode = "";
-      UUID pipelineId = pipeline.getId().getId();
-
-      try {
-        leaderNode = pipeline.getLeaderNode().getHostName();
-      } catch (IOException ioEx) {
-        LOG.warn("Cannot get leader node for pipeline {}",
-            pipelineId, ioEx);
-      }
-      String[] info = {pipeline.getReplicationConfig().toString(), leaderNode};
-
-      pipelineInfo.put(pipelineId.toString(), info);
-    });
-
-    return pipelineInfo;
+    return pipelineLeaderFormat(pipelines);
   }
 
   /**
