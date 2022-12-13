@@ -236,7 +236,6 @@ public final class SCMContainerPlacementRackScatter
     if (excludedNodes != null) {
       mutableFavoredNodes.removeAll(excludedNodes);
     }
-
     if (usedNodes == null) {
       usedNodes = Collections.emptyList();
     }
