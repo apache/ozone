@@ -136,15 +136,17 @@ public abstract class RDBSnapshotProvider implements Closeable {
     if (last != null) {
       if (!last.equals(currentLeader)) {
         LOG.info("Last leader for install snapshot is {}, but current leader " +
-            "is {}", last, currentLeader);
+            "is {}. ", last, currentLeader);
         initialize();
+        lastLeader.set(currentLeader);
       }
       return;
     }
 
     List<String> files = HAUtils.getExistingSstFiles(candidateDir);
     if (!files.isEmpty()) {
-      LOG.warn("Candidate DB directory {} is not empty.", candidateDir);
+      LOG.warn("Candidate DB directory {} is not empty when last leader is " +
+          "null.", candidateDir);
       initialize();
     }
     lastLeader.set(currentLeader);
