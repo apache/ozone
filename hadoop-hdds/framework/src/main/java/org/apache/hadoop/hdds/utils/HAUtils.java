@@ -260,7 +260,7 @@ public final class HAUtils {
       throws IOException {
 
     try (DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
-        dbName, definition)) {
+        dbName, definition, true)) {
 
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
@@ -321,7 +321,8 @@ public final class HAUtils {
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, DBDefinition definition) throws IOException {
+      String dbName, DBDefinition definition, boolean openReadOnly)
+      throws IOException {
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder =
@@ -338,6 +339,7 @@ public final class HAUtils {
       dbStoreBuilder
           .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
+    dbStoreBuilder.setOpenReadOnly(openReadOnly);
     return dbStoreBuilder.build();
   }
 
