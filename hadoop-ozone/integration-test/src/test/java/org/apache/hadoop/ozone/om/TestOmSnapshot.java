@@ -66,8 +66,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SNAPSHOT_EXISTS;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.junit.Assert.assertEquals;
@@ -420,7 +420,7 @@ public class TestOmSnapshot {
     deleteKeys(bucketWithoutSnapshot);
     OMException omException = Assertions.assertThrows(OMException.class,
         () -> volume.deleteBucket(bucket1));
-    Assertions.assertEquals(SNAPSHOT_EXISTS, omException.getResult());
+    Assertions.assertEquals(CONTAINS_SNAPSHOT, omException.getResult());
     // TODO: Delete snapshot then delete bucket1 when deletion is implemented
     // no exception for bucket without snapshot
     volume.deleteBucket(bucket2);

@@ -64,7 +64,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SNAPSHOT_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -150,7 +150,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
             bucketName);
         throw new OMException(
             "Bucket " + bucketName + " can't be deleted when it has snapshots",
-            SNAPSHOT_EXISTS);
+            CONTAINS_SNAPSHOT);
       }
 
       if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {

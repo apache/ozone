@@ -261,6 +261,6 @@ public class OMException extends IOException {
 
     INVALID_SNAPSHOT_ERROR,
 
-    SNAPSHOT_EXISTS,
+    CONTAINS_SNAPSHOT,
   }
 }

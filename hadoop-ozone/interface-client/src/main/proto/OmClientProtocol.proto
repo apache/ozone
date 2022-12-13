@@ -458,7 +458,7 @@ enum Status {
 
     INVALID_SNAPSHOT_ERROR = 87;
 
-    BUCKET_SNAPSHOT_EXISTS = 88;
+    CONTAINS_SNAPSHOT = 88;
 }
 
 /**
