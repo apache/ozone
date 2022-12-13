@@ -18,17 +18,25 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableConfig;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TestRDBStore;
-
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.RocksDB;
+import org.rocksdb.Statistics;
+import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +44,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -49,24 +61,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test Common RocksDB's snapshot provider service.
  */
-public class TestRDBSnapshotProvider extends TestRDBStore {
+public class TestRDBSnapshotProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       TestRDBSnapshotProvider.class);
 
+  private final List<String> families =
+      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+          "First", "Second", "Third");
+
   private RDBStore rdbStore = null;
-  private String leaderId = "leaderNode-1";
+  private ManagedDBOptions options = null;
+  private Set<TableConfig> configSet;
   private RDBSnapshotProvider rdbSnapshotProvider;
   private File testDir;
-  private AtomicReference<DBCheckpoint> latestCK = new AtomicReference<>(null);
-  private int numUsedCF;
+  private final int numUsedCF = 3;
+  private final String leaderId = "leaderNode-1";
+  private final AtomicReference<DBCheckpoint> latestCK =
+      new AtomicReference<>(null);
 
   @BeforeEach
   public void init(@TempDir File tempDir) throws Exception {
-    setUp(tempDir);
+    options = getNewDBOptions();
+    configSet = new HashSet<>();
+    for (String name : families) {
+      TableConfig newConfig = new TableConfig(name,
+          new ManagedColumnFamilyOptions());
+      configSet.add(newConfig);
+    }
     testDir = tempDir;
-    rdbStore = getRdbStore();
-    numUsedCF = 3;
+    rdbStore = new RDBStore(tempDir, options, configSet);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
       public void close() throws IOException {
@@ -98,7 +122,9 @@ public class TestRDBSnapshotProvider extends TestRDBStore {
 
   @AfterEach
   public void down() throws Exception {
-    tearDown();
+    if (rdbStore != null) {
+      rdbStore.close();
+    }
     if (testDir.exists()) {
       FileUtil.fullyDelete(testDir);
     }
@@ -149,18 +175,18 @@ public class TestRDBSnapshotProvider extends TestRDBStore {
   public void compareDB(File db1, File db2, int columnFamilyUsed)
       throws Exception {
     try (RDBStore rdbStore1 = new RDBStore(db1, getNewDBOptions(),
-             getConfigSet());
+             configSet);
          RDBStore rdbStore2 = new RDBStore(db2, getNewDBOptions(),
-             getConfigSet())) {
+             configSet)) {
       // all entries should be same from two DB
       for (int i = 0; i < columnFamilyUsed; i++) {
         try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator
-                 = rdbStore1.getTable(getFamilies().get(i)).iterator()) {
+                 = rdbStore1.getTable(families.get(i)).iterator()) {
           while (iterator.hasNext()) {
             KeyValue<byte[], byte[]> keyValue = iterator.next();
             byte[] key = keyValue.getKey();
             byte[] value1 = keyValue.getValue();
-            byte[] value2 = rdbStore2.getTable(getFamilies().get(i))
+            byte[] value2 = rdbStore2.getTable(families.get(i))
                 .getIfExist(key);
             assertArrayEquals(value1, value2);
           }
@@ -172,6 +198,34 @@ public class TestRDBSnapshotProvider extends TestRDBStore {
   private void insertDataToDB(int columnFamilyUsed) throws IOException {
     for (int i = 0; i < columnFamilyUsed; i++) {
       insertRandomData(rdbStore, i);
+    }
+  }
+
+  public ManagedDBOptions getNewDBOptions() {
+    ManagedDBOptions managedOptions = new ManagedDBOptions();
+    managedOptions.setCreateIfMissing(true);
+    managedOptions.setCreateMissingColumnFamilies(true);
+
+    Statistics statistics = new Statistics();
+    statistics.setStatsLevel(StatsLevel.ALL);
+    managedOptions.setStatistics(statistics);
+    return managedOptions;
+  }
+
+  public void insertRandomData(RDBStore dbStore, int familyIndex)
+      throws IOException {
+    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
+        get(familyIndex))) {
+      Assertions.assertNotNull(firstTable, "Table cannot be null");
+      for (int x = 0; x < 100; x++) {
+        byte[] key =
+            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        byte[] value =
+            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        firstTable.put(key, value);
+      }
+    } catch (Exception e) {
+      throw new IOException(e);
     }
   }
 }

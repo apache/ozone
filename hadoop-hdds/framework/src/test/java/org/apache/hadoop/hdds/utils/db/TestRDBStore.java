@@ -433,20 +433,4 @@ public class TestRDBStore {
       }
     }
   }
-
-  public List<String> getFamilies() {
-    return families;
-  }
-
-  public ManagedDBOptions getOptions() {
-    return options;
-  }
-
-  public Set<TableConfig> getConfigSet() {
-    return configSet;
-  }
-
-  public RDBStore getRdbStore() {
-    return rdbStore;
-  }
 }

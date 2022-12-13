@@ -112,11 +112,12 @@ public class TestSCMInstallSnapshot {
     SCMDBSnapshotProvider provider =
         scm.getScmHAManager().getSCMSnapshotProvider();
     provider.setPeerNodesMap(peerMap);
+    long preDownloaded = provider.getNumDownloaded();
     DBCheckpoint dbCheckpoint = provider.downloadDBSnapshotFromLeader(
         scmNodeDetails.getNodeId());
     assertFalse(HAUtils.getExistingSstFiles(provider.getCandidateDir())
         .isEmpty());
-    assertEquals(1, provider.getNumDownloaded());
+    assertEquals(preDownloaded + 1, provider.getNumDownloaded());
     return dbCheckpoint;
   }
 
@@ -128,7 +129,7 @@ public class TestSCMInstallSnapshot {
     DBStore db = HAUtils
         .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
             checkpoint.getCheckpointLocation().getFileName().toString(),
-            new SCMDBDefinition());
+            new SCMDBDefinition(), false);
     // Hack the transaction index in the checkpoint to ensure the
     // checkpoint transaction index is higher than when it was downloaded
     // from.
