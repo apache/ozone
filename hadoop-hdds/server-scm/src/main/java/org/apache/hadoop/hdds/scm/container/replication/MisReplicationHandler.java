@@ -73,14 +73,14 @@ public abstract class MisReplicationHandler implements
       throws IOException;
 
   private List<DatanodeDetails> getTargetDatanodes(
-          List<DatanodeDetails> usedNodes, ContainerInfo container,
-          int requiredNodes) throws IOException {
+          List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+          ContainerInfo container, int requiredNodes) throws IOException {
     final long dataSizeRequired =
             Math.max(container.getUsedBytes(), currentContainerSize);
     while (requiredNodes > 0) {
       try {
-        return containerPlacement.chooseDatanodes(usedNodes, null, null,
-                requiredNodes, 0, dataSizeRequired);
+        return containerPlacement.chooseDatanodes(usedNodes, excludedNodes,
+                null, requiredNodes, 0, dataSizeRequired);
       } catch (IOException e) {
         requiredNodes -= 1;
       }
@@ -186,8 +186,11 @@ public abstract class MisReplicationHandler implements
     usedDns = replicas.stream().filter(r -> !replicasToBeReplicated.contains(r))
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
+    List<DatanodeDetails> excludedDns = replicasToBeReplicated.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .collect(Collectors.toList());
     List<DatanodeDetails> targetDatanodes = getTargetDatanodes(usedDns,
-            container, replicasToBeReplicated.size());
+           excludedDns, container, replicasToBeReplicated.size());
     if (targetDatanodes.size() < replicasToBeReplicated.size()) {
       LOG.warn("Placement Policy {} found only {} nodes for Container: {}," +
                " number of required nodes: {}, usedNodes : {}",
