@@ -196,6 +196,7 @@ public class TestOzoneContainerWithTLS {
   }
 
   @Test
+  @org.junit.Ignore("HDDS-7628")
   public void testContainerDownload() throws Exception {
     DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
         UUID.randomUUID().toString(), "localhost", "0.0.0.0",

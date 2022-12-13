@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
@@ -139,6 +142,7 @@ public class DatanodeStateMachine implements Closeable {
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
 
+    Clock clock = new MonotonicClock(ZoneId.systemDefault());
     // Expected to be initialized already.
     layoutStorage = new DatanodeLayoutStorage(conf,
         datanodeDetails.getUuidString());
@@ -180,7 +184,7 @@ public class DatanodeStateMachine implements Closeable {
         conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, replicationConfig);
+            replicatorMetrics, replicationConfig, clock);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -193,7 +197,7 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
             replicationConfig.getReplicationMaxStreams(),
-            ecReconstructionCoordinator);
+            ecReconstructionCoordinator, clock);
 
 
     // When we add new handlers just adding a new handler here should do the
@@ -207,7 +211,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new ReconstructECContainersCommandHandler(conf,
             ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getContainerDeleteThreads()))
+            dnConf.getContainerDeleteThreads(), clock))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))

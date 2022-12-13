@@ -220,7 +220,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   @Override
-  public synchronized long getPos() throws IOException {
+  public synchronized long getPos() {
     return blockReader != null ? blockReader.getPos() : 0;
   }
 
