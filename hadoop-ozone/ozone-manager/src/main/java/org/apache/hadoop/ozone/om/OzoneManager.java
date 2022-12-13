@@ -2079,7 +2079,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omSnapshotProvider != null) {
         omSnapshotProvider.stop();
       }
-      if (snapshotChainManager != null){
+      if (snapshotChainManager != null) {
         snapshotChainManager.stop();
       }
       OMPerformanceMetrics.unregister();

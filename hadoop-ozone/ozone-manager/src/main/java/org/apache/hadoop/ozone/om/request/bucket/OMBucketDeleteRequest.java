@@ -87,7 +87,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketDeletes();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    SnapshotChainManager snapshotChainManager = ozoneManager.getSnapshotChainManager();
+    SnapshotChainManager snapshotChainManager = ozoneManager
+        .getSnapshotChainManager();
 
     OMRequest omRequest = getOmRequest();
     DeleteBucketRequest deleteBucketRequest =
@@ -220,6 +221,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       String bucketKey) throws IOException {
     // check first in the in-memory snapshot chain which is initialized on every
     // OM restart.
+    // TODO: HDDS-6857 : during snapshot deletion the snapshotChainManager needs
+    //  to be refreshed/reloaded upon every delete snapshot op else the check
+    //  below would be inconsistent.
     if (snapshotChainManager.getLatestPathSnapshot(bucketKey) != null) {
       return true;
     }
