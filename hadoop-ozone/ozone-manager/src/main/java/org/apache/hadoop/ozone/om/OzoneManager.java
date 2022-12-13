@@ -1559,6 +1559,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
+      exitManager.exitSystem(0, "Bootstrapped Successfully", LOG);
     }
 
     omState = State.RUNNING;
@@ -1776,8 +1777,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         // Decommissioning Node should not receive the configuration change
         // request. Shut it down.
         String errorMsg = "Shutting down as OM has been decommissioned.";
-        LOG.error("Fatal Error: {}", errorMsg);
-        exitManager.forceExit(1, errorMsg, LOG);
+        LOG.warn("Fatal Error: {}", errorMsg);
       } else {
         // Remove decommissioned node from peer list (which internally
         // removed from Ratis peer list too)
