@@ -69,7 +69,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.pipeline.RatisPipelineUtils.pipelineLeaderFormat;
 
-
 /**
  * SCM Pipeline Manager implementation.
  * All the write operations for pipelines must come via PipelineManager.
