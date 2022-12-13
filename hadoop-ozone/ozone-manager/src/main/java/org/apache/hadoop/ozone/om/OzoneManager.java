@@ -433,6 +433,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmMetadataReader omMetadataReader;
   private OmSnapshotManager omSnapshotManager;
 
+  // in-memory object to track snapshots
+  private SnapshotChainManager snapshotChainManager;
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -727,6 +730,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
     omSnapshotManager = new OmSnapshotManager(this);
+    snapshotChainManager = new SnapshotChainManager(metadataManager);
 
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
@@ -1373,6 +1377,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public OzoneManagerSnapshotProvider getOmSnapshotProvider() {
     return omSnapshotProvider;
+  }
+
+  @VisibleForTesting
+  public SnapshotChainManager getSnapshotChainManager() {
+    return snapshotChainManager;
   }
 
   @VisibleForTesting
@@ -2069,6 +2078,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       if (omSnapshotProvider != null) {
         omSnapshotProvider.stop();
+      }
+      if (snapshotChainManager != null){
+        snapshotChainManager.stop();
       }
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
