@@ -37,7 +37,9 @@ public class ReplicationTask {
 
   private final Instant queued = Instant.now();
 
-  private long deadlineMsSinceEpoch = 0;
+  private final long deadlineMsSinceEpoch;
+
+  private final long term;
 
   /**
    * Counter for the transferred bytes.
@@ -48,6 +50,7 @@ public class ReplicationTask {
     this.containerId = cmd.getContainerID();
     this.sources = cmd.getSourceDatanodes();
     this.deadlineMsSinceEpoch = cmd.getDeadline();
+    this.term = cmd.getTerm();
   }
 
   /**
@@ -121,6 +124,10 @@ public class ReplicationTask {
 
   public void setTransferredBytes(long transferredBytes) {
     this.transferredBytes = transferredBytes;
+  }
+
+  long getTerm() {
+    return term;
   }
 
   /**
