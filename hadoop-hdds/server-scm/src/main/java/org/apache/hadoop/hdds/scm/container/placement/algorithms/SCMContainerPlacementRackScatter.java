@@ -298,9 +298,8 @@ public final class SCMContainerPlacementRackScatter
               .size() + ", but required nodes to choose from Unique Racks: "
               + additionalRacksRequired + " do not match.";
       LOG.warn("Placement policy could not choose the enough nodes from " +
-                      "available racks."
-                      + " {} Available racks count: {}," +
-                      " Excluded nodes count: {}",
+                      "available racks. {} Available racks count: {},"
+                      + " Excluded nodes count: {}",
               reason, racks.size(), excludedNodesCount);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
@@ -315,9 +314,7 @@ public final class SCMContainerPlacementRackScatter
               Pair.of(metadataSizeRequired, dataSizeRequired),
               Integer.MAX_VALUE, Pair.of(usedRacksCntMap, maxReplicasPerRack)));
     }
-
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
-
     if (nodesRequiredToChoose != chosenNodes.size()) {
       String reason = "Chosen nodes size: " + chosenNodes
               .size() + ", but required nodes to choose: "
@@ -328,17 +325,14 @@ public final class SCMContainerPlacementRackScatter
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
-
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(
-                Stream.of(usedNodes, result)
-                      .flatMap(List::stream).collect(Collectors.toList()),
+        validateContainerPlacement(Stream.of(usedNodes, result)
+                .flatMap(List::stream).collect(Collectors.toList()),
                 requiredReplicationFactor);
     if (!placementStatus.isPolicySatisfied()) {
       ContainerPlacementStatus initialPlacementStatus =
-              validateContainerPlacement(
-                      Stream.of(usedNodes)
-                      .flatMap(List::stream).collect(Collectors.toList()),
+              validateContainerPlacement(Stream.of(usedNodes).flatMap(
+                      List::stream).collect(Collectors.toList()),
                       requiredReplicationFactor);
       if (initialPlacementStatus.misReplicationCount()
               < placementStatus.misReplicationCount()) {
