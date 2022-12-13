@@ -474,11 +474,20 @@ message GetSmallFileResponseProto {
   required ReadChunkResponseProto data = 1;
 }
 
+enum CopyContainerCompressProto {
+  NO_COMPRESSION = 0;
+  GZIP = 1;
+  LZ4 = 2;
+  SNAPPY = 3;
+  ZSTD = 4;
+}
+
 message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
   optional uint64 len = 3;
   optional uint32 version = 4;
+  optional CopyContainerCompressProto compression = 5;
 }
 
 message CopyContainerResponseProto {

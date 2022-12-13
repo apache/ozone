@@ -60,6 +60,42 @@ public class TarContainerPacker
 
   private static final String CONTAINER_FILE_NAME = "container.yaml";
 
+  private final String compression;
+
+  private static final String NO_COMPRESSION = "no_compression";
+
+  public TarContainerPacker() {
+    this.compression = NO_COMPRESSION;
+  }
+
+  public TarContainerPacker(String compression) {
+    this.compression = compression;
+  }
+
+  private ArchiveInputStream getArchiveInputStream(InputStream input)
+      throws CompressorException {
+    ArchiveInputStream archiveInput;
+    if (compression == NO_COMPRESSION) {
+      archiveInput = untar(input);
+    } else {
+      InputStream decompressed = decompress(input);
+      archiveInput = untar(decompressed);
+    }
+    return archiveInput;
+  }
+
+  private ArchiveOutputStream getArchiveOutputStream(OutputStream output)
+      throws CompressorException {
+    ArchiveOutputStream archiveOutput;
+    if (compression == NO_COMPRESSION) {
+      archiveOutput = tar(output);
+    } else {
+      OutputStream compressed = compress(output);
+      archiveOutput = tar(compressed);
+    }
+    return archiveOutput;
+  }
+
   /**
    * Given an input stream (tar file) extract the data to the specified
    * directories.
@@ -76,8 +112,7 @@ public class TarContainerPacker
     Path dbRoot = getDbPath(containerData);
     Path chunksRoot = Paths.get(containerData.getChunksPath());
 
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = getArchiveInputStream(input)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -158,8 +193,7 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream compressed = compress(output);
-         ArchiveOutputStream archiveOutput = tar(compressed)) {
+    try (ArchiveOutputStream archiveOutput = getArchiveOutputStream(output)) {
 
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
@@ -179,8 +213,7 @@ public class TarContainerPacker
   @Override
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = getArchiveInputStream(input)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -259,16 +292,16 @@ public class TarContainerPacker
     return new TarArchiveOutputStream(output);
   }
 
-  private static InputStream decompress(InputStream input)
+  private InputStream decompress(InputStream input)
       throws CompressorException {
     return new CompressorStreamFactory()
-        .createCompressorInputStream(CompressorStreamFactory.GZIP, input);
+        .createCompressorInputStream(compression, input);
   }
 
-  private static OutputStream compress(OutputStream output)
+  private OutputStream compress(OutputStream output)
       throws CompressorException {
     return new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP, output);
+        .createCompressorOutputStream(compression, output);
   }
 
 }

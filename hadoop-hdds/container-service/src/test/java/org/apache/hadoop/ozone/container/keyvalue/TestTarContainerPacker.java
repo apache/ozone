@@ -26,6 +26,7 @@ import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,9 @@ import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.LZ4_FRAMED;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.SNAPPY_FRAMED;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.ZSTANDARD;
 
 /**
  * Test the tar/untar for a given container.
@@ -73,8 +77,7 @@ public class TestTarContainerPacker {
 
   private static final String TEST_DESCRIPTOR_FILE_CONTENT = "descriptor";
 
-  private final ContainerPacker<KeyValueContainerData> packer
-      = new TarContainerPacker();
+  private ContainerPacker<KeyValueContainerData> packer;
 
   private static final Path SOURCE_CONTAINER_ROOT =
       Paths.get("target/test/data/packer-source-dir");
@@ -90,17 +93,32 @@ public class TestTarContainerPacker {
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
   private OzoneConfiguration conf;
+  private String compression;
 
-  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo) {
+
+  public TestTarContainerPacker(
+      ContainerTestVersionInfo versionInfo, String compression) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    this.compression = compression;
+    packer = new TarContainerPacker(compression);
+
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
+    List<ContainerTestVersionInfo> layoutList =
+        ContainerTestVersionInfo.getLayoutList();
+    List<Object[]> parameterList = new ArrayList<>();
+    for (ContainerTestVersionInfo containerTestVersionInfo : layoutList) {
+      parameterList.add(new Object[]{containerTestVersionInfo, GZIP});
+      parameterList.add(new Object[]{containerTestVersionInfo, LZ4_FRAMED});
+      parameterList.add(new Object[]{containerTestVersionInfo, SNAPPY_FRAMED});
+      parameterList.add(new Object[]{containerTestVersionInfo, ZSTANDARD});
+    }
+    return parameterList;
   }
 
   @BeforeClass
@@ -175,7 +193,7 @@ public class TestTarContainerPacker {
     TarArchiveInputStream tarStream = null;
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       CompressorInputStream uncompressed = new CompressorStreamFactory()
-          .createCompressorInputStream(GZIP, input);
+          .createCompressorInputStream(compression, input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
       TarArchiveEntry entry;
@@ -354,7 +372,7 @@ public class TestTarContainerPacker {
     File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
          CompressorOutputStream gzipped = new CompressorStreamFactory()
-             .createCompressorOutputStream(GZIP, output);
+             .createCompressorOutputStream(compression, output);
          ArchiveOutputStream archive = new TarArchiveOutputStream(gzipped)) {
       TarContainerPacker.includeFile(file, entryName, archive);
     }

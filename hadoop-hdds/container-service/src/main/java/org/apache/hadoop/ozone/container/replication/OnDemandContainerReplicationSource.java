@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -26,6 +28,10 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.LZ4_FRAMED;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.SNAPPY_FRAMED;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.ZSTANDARD;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
@@ -37,11 +43,16 @@ public class OnDemandContainerReplicationSource
 
   private final ContainerController controller;
 
-  private final TarContainerPacker packer = new TarContainerPacker();
+  private Map<String, TarContainerPacker> packer = new HashMap<>();
 
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
     this.controller = controller;
+    this.packer.put("NO_COMPRESSION", new TarContainerPacker("no_compression"));
+    this.packer.put("GZIP", new TarContainerPacker(GZIP));
+    this.packer.put("LZ4", new TarContainerPacker(LZ4_FRAMED));
+    this.packer.put("SNAPPY", new TarContainerPacker(SNAPPY_FRAMED));
+    this.packer.put("ZSTD", new TarContainerPacker(ZSTANDARD));
   }
 
   @Override
@@ -50,7 +61,8 @@ public class OnDemandContainerReplicationSource
   }
 
   @Override
-  public void copyData(long containerId, OutputStream destination)
+  public void copyData(long containerId, OutputStream destination,
+                       String compression)
       throws IOException {
 
     Container container = controller.getContainer(containerId);
@@ -61,7 +73,8 @@ public class OnDemandContainerReplicationSource
     }
 
     controller.exportContainer(
-        container.getContainerType(), containerId, destination, packer);
+        container.getContainerType(), containerId, destination,
+        packer.get(compression));
 
   }
 }
