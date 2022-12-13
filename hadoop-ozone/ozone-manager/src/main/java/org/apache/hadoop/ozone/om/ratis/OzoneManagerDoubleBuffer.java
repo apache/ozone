@@ -264,6 +264,7 @@ public final class OzoneManagerDoubleBuffer {
    */
   private void flushTransactions() {
     while (isRunning.get()) {
+      AtomicReference<OMResponse> omResponse = new AtomicReference<>();
       try {
         if (canFlush()) {
           Map<String, List<Long>> cleanupEpochs = new HashMap<>();
@@ -276,9 +277,9 @@ public final class OzoneManagerDoubleBuffer {
             AtomicReference<String> lastTraceId = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                OMResponse omResponse = entry.getResponse().getOMResponse();
-                lastTraceId.set(omResponse.getTraceID());
-                addToBatchWithTrace(omResponse,
+                omResponse.set(entry.getResponse().getOMResponse());
+                lastTraceId.set(omResponse.get().getTraceID());
+                addToBatchWithTrace(omResponse.get(),
                     (SupplierWithIOException<Void>) () -> {
                       entry.getResponse().checkAndUpdateDB(omMetadataManager,
                           batchOperation);
@@ -290,7 +291,7 @@ public final class OzoneManagerDoubleBuffer {
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
-                terminate(ex);
+                terminate(ex, omResponse.get());
               }
             });
 
@@ -386,10 +387,11 @@ public final class OzoneManagerDoubleBuffer {
               + "exit.", Thread.currentThread().getName());
         }
       } catch (IOException ex) {
-        terminate(ex);
+        terminate(ex, omResponse.get());
       } catch (Throwable t) {
         final String s = "OMDoubleBuffer flush thread " +
-            Thread.currentThread().getName() + " encountered Throwable error";
+            Thread.currentThread().getName() + " encountered Throwable error" +
+            " when handling OMRequest: " + omResponse.get();
         ExitUtils.terminate(2, s, t, LOG);
       }
     }
@@ -480,9 +482,10 @@ public final class OzoneManagerDoubleBuffer {
 
   }
 
-  private void terminate(IOException ex) {
+  private void terminate(IOException ex, OMResponse omResponse) {
     String message = "During flush to DB encountered error in " +
-        "OMDoubleBuffer flush thread " + Thread.currentThread().getName();
+        "OMDoubleBuffer flush thread " + Thread.currentThread().getName() +
+        " when handling OMRequest: " + omResponse;
     ExitUtils.terminate(1, message, ex, LOG);
   }
 
