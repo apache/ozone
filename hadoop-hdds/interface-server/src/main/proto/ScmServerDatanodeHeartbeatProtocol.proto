@@ -343,6 +343,7 @@ message SCMCommandProto {
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;
   optional string encodedToken = 16;
+  optional int64 deadlineMsSinceEpoch = 17;
 }
 
 /**

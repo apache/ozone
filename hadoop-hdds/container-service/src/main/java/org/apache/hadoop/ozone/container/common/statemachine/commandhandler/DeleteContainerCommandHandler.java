@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -48,15 +49,22 @@ public class DeleteContainerCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(DeleteContainerCommandHandler.class);
 
   private final AtomicInteger invocationCount = new AtomicInteger(0);
+  private final AtomicInteger timeoutCount = new AtomicInteger(0);
   private final AtomicLong totalTime = new AtomicLong(0);
   private final ExecutorService executor;
+  private final Clock clock;
 
-  public DeleteContainerCommandHandler(int threadPoolSize) {
-    this.executor = Executors.newFixedThreadPool(
+  public DeleteContainerCommandHandler(int threadPoolSize, Clock clock) {
+    this(clock, Executors.newFixedThreadPool(
         threadPoolSize, new ThreadFactoryBuilder()
-            .setNameFormat("DeleteContainerThread-%d").build());
+            .setNameFormat("DeleteContainerThread-%d").build()));
   }
 
+  protected DeleteContainerCommandHandler(Clock clock,
+      ExecutorService executor) {
+    this.executor = executor;
+    this.clock = clock;
+  }
   @Override
   public void handle(final SCMCommand command,
                      final OzoneContainer ozoneContainer,
@@ -69,6 +77,14 @@ public class DeleteContainerCommandHandler implements CommandHandler {
       final long startTime = Time.monotonicNow();
       invocationCount.incrementAndGet();
       try {
+        if (command.hasExpired(clock.millis())) {
+          LOG.info("Not processing the delete container command for " +
+              "container {} as the current time {}ms is after the command " +
+              "deadline {}ms", deleteContainerCommand.getContainerID(),
+              clock.millis(), command.getDeadline());
+          timeoutCount.incrementAndGet();
+          return;
+        }
         controller.deleteContainer(deleteContainerCommand.getContainerID(),
             deleteContainerCommand.isForce());
       } catch (IOException e) {
@@ -92,6 +108,10 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   @Override
   public int getInvocationCount() {
     return this.invocationCount.get();
+  }
+
+  public int getTimeoutCount() {
+    return this.timeoutCount.get();
   }
 
   @Override
