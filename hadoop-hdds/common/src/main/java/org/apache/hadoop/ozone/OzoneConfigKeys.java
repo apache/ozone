@@ -534,6 +534,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
       "ozone.om.snapshot.cache.max.size";
   public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
+
+  public static final String OZONE_SNAPSHOT_MAX_HISTORY =
+      "ozone.om.snapshot.history.max.count";
+
+  public static final int OZONE_SNAPSHOT_MAX_HISTORY_DEFAULT = 10;
   /**
    * There is no need to instantiate this class.
    */
