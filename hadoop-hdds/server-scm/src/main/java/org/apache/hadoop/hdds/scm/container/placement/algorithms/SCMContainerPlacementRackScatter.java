@@ -335,9 +335,22 @@ public final class SCMContainerPlacementRackScatter
                       .flatMap(List::stream).collect(Collectors.toList()),
                 requiredReplicationFactor);
     if (!placementStatus.isPolicySatisfied()) {
-      String errorMsg = "ContainerPlacementPolicy not met. Misreplication" +
-              " Reason: " + placementStatus.misReplicatedReason();
-      throw new SCMException(errorMsg, null);
+      ContainerPlacementStatus initialPlacementStatus =
+              validateContainerPlacement(
+                      Stream.of(usedNodes)
+                      .flatMap(List::stream).collect(Collectors.toList()),
+                      requiredReplicationFactor);
+      if (initialPlacementStatus.misReplicationCount()
+              < placementStatus.misReplicationCount()) {
+        String errorMsg = "ContainerPlacementPolicy not met. Misreplication" +
+                " Reason: " + placementStatus.misReplicatedReason() +
+                " Initial Used nodes mis-replication Count: " +
+                initialPlacementStatus.misReplicationCount() +
+                " Used nodes + Chosen nodes mis-replication Count: " +
+                placementStatus.misReplicationCount();
+        throw new SCMException(errorMsg, null);
+      }
+
     }
     return result;
   }

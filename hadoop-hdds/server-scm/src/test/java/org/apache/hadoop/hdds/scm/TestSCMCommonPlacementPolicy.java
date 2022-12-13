@@ -88,8 +88,7 @@ public class TestSCMCommonPlacementPolicy {
           Map<ContainerReplica, Boolean> replicas,
           DummyPlacementPolicy placementPolicy,
           int expectedNumberOfReplicasToCopy,
-          Map<Node, Integer> expectedNumberOfCopyOperationFromRack)
-          throws IOException {
+          Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
     Set<ContainerReplica> replicasToCopy = placementPolicy
             .replicasToCopyToFixMisreplication(replicas);
     Assertions.assertEquals(expectedNumberOfReplicasToCopy,

@@ -459,7 +459,7 @@ public abstract class SCMCommonPlacementPolicy implements
    */
   @Override
   public Set<ContainerReplica> replicasToCopyToFixMisreplication(
-         Map<ContainerReplica, Boolean> replicas) throws IOException {
+         Map<ContainerReplica, Boolean> replicas) {
     Map<Node, List<ContainerReplica>> placementGroupReplicaIdMap
             = replicas.keySet().stream()
             .collect(Collectors.groupingBy(replica ->
@@ -491,12 +491,11 @@ public abstract class SCMCommonPlacementPolicy implements
                   replicaList.stream().findAny()
                   .map(ContainerReplica::getDatanodeDetails)
                   .orElse(null));
-          throw new IOException(String.format(
-                  "Not enough copyable replicas available in rack %s. " +
-                  "Required number of Replicas to be copied: %d." +
-                  " Available Replicas to be copied: %d",
+          LOG.warn("Not enough copyable replicas available in rack {}. " +
+                  "Required number of Replicas to be copied: {}." +
+                  " Available Replicas to be copied: {}",
                   rack.toString(), numberOfReplicasToBeCopied,
-                  replicasToBeCopied.size()));
+                  replicasToBeCopied.size());
         }
         copyReplicaSet.addAll(replicasToBeCopied);
       }

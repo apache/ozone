@@ -76,5 +76,5 @@ public interface PlacementPolicy<Replica> {
    *                  replica can be copied
    */
   Set<Replica> replicasToCopyToFixMisreplication(
-          Map<Replica, Boolean> replicas) throws IOException;
+          Map<Replica, Boolean> replicas);
 }

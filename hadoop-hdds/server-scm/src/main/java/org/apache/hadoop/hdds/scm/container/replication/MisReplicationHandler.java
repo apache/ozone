@@ -21,6 +21,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -76,17 +77,19 @@ public abstract class MisReplicationHandler implements
           int requiredNodes) throws IOException {
     final long dataSizeRequired =
             Math.max(container.getUsedBytes(), currentContainerSize);
-    List<DatanodeDetails> targetDns = containerPlacement
-            .chooseDatanodes(usedNodes, null, requiredNodes,
-                    0, dataSizeRequired);
-    if (targetDns.size() != requiredNodes) {
-      throw new SCMException(String.format("Placement Policy: %s did not return"
-                      + " correct number of nodes. Number of required "
-                      + "Nodes %d, Number of Chosen nodes: %d",
-              containerPlacement.getClass(), requiredNodes, targetDns.size()),
-              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    while (requiredNodes > 0) {
+      try {
+        return containerPlacement.chooseDatanodes(usedNodes, null, null,
+                requiredNodes, 0, dataSizeRequired);
+      } catch (IOException e) {
+        requiredNodes -= 1;
+      }
     }
-    return targetDns;
+    throw new SCMException(String.format("Placement Policy: %s did not return"
+                    + " any number of nodes. Number of required "
+                    + "Nodes %d, Datasize Required: %d",
+            containerPlacement.getClass(), requiredNodes, dataSizeRequired),
+            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
   private Set<ContainerReplica> filterSources(
@@ -99,6 +102,8 @@ public abstract class MisReplicationHandler implements
             .filter(r -> ReplicationManager
                     .getNodeStatus(r.getDatanodeDetails(), nodeManager)
                     .isHealthy())
+            .filter(r -> r.getDatanodeDetails().getPersistedOpState()
+                    == HddsProtos.NodeOperationalState.IN_SERVICE)
             .collect(Collectors.toSet());
   }
 
@@ -112,6 +117,9 @@ public abstract class MisReplicationHandler implements
     Map<DatanodeDetails, SCMCommand<?>> commandMap = Maps.newHashMap();
     int datanodeIdx = 0;
     for (ContainerReplica replica : replicasToBeReplicated) {
+      if (datanodeIdx == targetDns.size()) {
+        break;
+      }
       commandMap.put(targetDns.get(datanodeIdx),
               getReplicateCommand(containerInfo, replica));
       datanodeIdx += 1;
@@ -129,13 +137,13 @@ public abstract class MisReplicationHandler implements
             replicas, pendingOps, remainingMaintenanceRedundancy);
 
     if (!replicaCount.isSufficientlyReplicated() ||
-            !replicaCount.isOverReplicated()) {
+            replicaCount.isOverReplicated()) {
       LOG.info("Container {} state should be neither under replicated " +
               "nor over replicated before resolving misreplication." +
               "Container UnderReplication status: {}," +
               "Container OverReplication status: {}",
               container.getContainerID(),
-              replicaCount.isSufficientlyReplicated(),
+              !replicaCount.isSufficientlyReplicated(),
               replicaCount.isOverReplicated());
       return Collections.emptyMap();
     }
@@ -180,6 +188,13 @@ public abstract class MisReplicationHandler implements
             .collect(Collectors.toList());
     List<DatanodeDetails> targetDatanodes = getTargetDatanodes(usedDns,
             container, replicasToBeReplicated.size());
+    if (targetDatanodes.size() < replicasToBeReplicated.size()) {
+      LOG.warn("Placement Policy {} found only {} nodes for Container: {}," +
+               " number of required nodes: {}, usedNodes : {}",
+              containerPlacement.getClass(), targetDatanodes.size(),
+              container.getContainerID(), replicasToBeReplicated.size(),
+              usedDns);
+    }
     return getReplicateCommands(container, replicasToBeReplicated,
             targetDatanodes);
   }
