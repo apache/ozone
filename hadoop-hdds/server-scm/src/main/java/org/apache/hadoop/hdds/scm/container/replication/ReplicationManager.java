@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -417,6 +418,8 @@ public class ReplicationManager implements SCMService {
     LOG.info("Sending command of type {} for container {} to {}",
         command.getType(), containerInfo, target);
     command.setTerm(getScmTerm());
+    command.setDeadline(clock.millis() +
+        Math.round(rmConf.eventTimeout * rmConf.commandDeadlineFactor));
     final CommandForDatanode<?> datanodeCommand =
         new CommandForDatanode<>(target.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
@@ -766,6 +769,30 @@ public class ReplicationManager implements SCMService {
     }
 
     /**
+     * Deadline which should be set on commands sent from ReplicationManager
+     * to the datanodes, as a percentage of the event.timeout. If the command
+     * has not been processed on the datanode by this time, it will be dropped
+     * by the datanode and Replication Manager will need to resend it.
+     */
+    @Config(key = "command.deadline.factor",
+        type = ConfigType.DOUBLE,
+        defaultValue = "0.9",
+        tags = {SCM, OZONE},
+        description = "Fraction of the hdds.scm.replication.event.timeout "
+            + "from the current time which should be set as a deadline for "
+            + "commands sent from ReplicationManager to datanodes. "
+            + "Commands which are not processed before this deadline will be "
+            + "dropped by the datanodes. Should be a value > 0 and <= 1.")
+    private double commandDeadlineFactor = 0.9;
+    public double getCommandDeadlineFactor() {
+      return commandDeadlineFactor;
+    }
+
+    public void setCommandDeadlineFactor(double val) {
+      commandDeadlineFactor = val;
+    }
+
+    /**
      * The number of container replica which must be available for a node to
      * enter maintenance.
      */
@@ -810,6 +837,15 @@ public class ReplicationManager implements SCMService {
             " is seamless to the client, but will affect read performance."
     )
     private int maintenanceRemainingRedundancy = 1;
+
+    @PostConstruct
+    public void validate() {
+      if (!(commandDeadlineFactor > 0) || (commandDeadlineFactor > 1)) {
+        throw new IllegalArgumentException("command.deadline.factor is set to "
+            + commandDeadlineFactor
+            + " and must be greater than 0 and less than equal to 1");
+      }
+    }
 
     public void setMaintenanceRemainingRedundancy(int redundancy) {
       this.maintenanceRemainingRedundancy = redundancy;

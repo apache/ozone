@@ -477,6 +477,15 @@ public class TestReplicationManager {
 
     replicationManager.sendDatanodeCommand(command, containerInfo, target);
 
+    // Ensure that the command deadline is set to current time
+    // + evenTime * factor
+    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    long expectedDeadline = clock.millis() +
+        Math.round(rmConf.getEventTimeout() *
+            rmConf.getCommandDeadlineFactor());
+    Assert.assertEquals(expectedDeadline, command.getDeadline());
+
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
     Mockito.verify(eventPublisher).fireEvent(any(), any());
