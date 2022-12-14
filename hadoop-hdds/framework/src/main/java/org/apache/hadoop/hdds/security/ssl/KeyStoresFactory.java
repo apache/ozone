@@ -33,6 +33,9 @@ import java.security.GeneralSecurityException;
 @InterfaceStability.Evolving
 public interface KeyStoresFactory {
 
+  /**
+   * Factory mode.
+   */
   enum Mode { CLIENT, SERVER }
 
   /**
