@@ -81,7 +81,7 @@ public class ContainerPlacementStatusDefault
     }
     return Math.max(requiredRacks - currentRacks,
             rackReplicaCnts.stream().mapToInt(
-                    cnt -> Math.max(maxReplicasPerRack - cnt, 0)).sum());
+                    cnt -> Math.max(cnt - maxReplicasPerRack, 0)).sum());
   }
 
   @Override
