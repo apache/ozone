@@ -161,21 +161,22 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         final long bucketId = omMetadataManager
                 .getBucketId(volumeName, bucketName);
 
-        // prepare leafNode dir
-        OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
-                omPathInfo.getLeafNodeName(),
-                keyArgs, omPathInfo.getLeafNodeObjectId(),
-                omPathInfo.getLastKnownParentId(), trxnLogIndex,
-                OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
-        OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-                volumeId, bucketId, trxnLogIndex,
-                Optional.of(missingParentInfos), Optional.of(dirInfo));
-
         // total number of keys created.
         numKeysCreated = missingParentInfos.size() + 1;
         OmBucketInfo omBucketInfo =
             getBucketInfo(omMetadataManager, volumeName, bucketName);
+        checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated);
         omBucketInfo.incrUsedNamespace(numKeysCreated);
+
+        // prepare leafNode dir
+        OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
+            omPathInfo.getLeafNodeName(),
+            keyArgs, omPathInfo.getLeafNodeObjectId(),
+            omPathInfo.getLastKnownParentId(), trxnLogIndex,
+            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+        OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+            volumeId, bucketId, trxnLogIndex,
+            Optional.of(missingParentInfos), Optional.of(dirInfo));
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
