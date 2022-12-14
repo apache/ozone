@@ -430,7 +430,7 @@ public class TestRocksDBCheckpointDiffer {
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
-    differ.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber,
+    differ.appendSnapshotToCompactionLog(dbLatestSequenceNumber,
         snapshotId,
         cpPath,
         System.currentTimeMillis());

@@ -156,7 +156,7 @@ public final class OmSnapshotManager {
         snapshotInfo.getCheckpointDir();
     // Write snapshot generation (latest sequence number) to compaction log.
     // This will be used for DAG reconstruction as snapshotGeneration.
-    dbCpDiffer.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber,
+    dbCpDiffer.appendSnapshotToCompactionLog(dbLatestSequenceNumber,
         snapshotInfo.getSnapshotID(),
         snapshotCheckpointDir,
         snapshotInfo.getCreationTime());

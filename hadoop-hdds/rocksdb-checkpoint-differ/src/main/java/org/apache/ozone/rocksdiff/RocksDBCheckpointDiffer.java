@@ -351,10 +351,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * Append a sequence number to the compaction log (roughly) when an Ozone
    * snapshot (RDB checkpoint) is taken.
    */
-  public void appendSequenceNumberToCompactionLog(long sequenceNum,
-                                                  String snapshotID,
-                                                  String snapshotDir,
-                                                  long creationTime) {
+  public void appendSnapshotToCompactionLog(long sequenceNum,
+                                            String snapshotID,
+                                            String snapshotDir,
+                                            long creationTime) {
     final String line = COMPACTION_LOG_SEQNUM_LINE_PREFIX + sequenceNum +
         " " + snapshotID + " " + snapshotDir + " " + creationTime + "\n";
     appendToCurrentCompactionLog(line);
