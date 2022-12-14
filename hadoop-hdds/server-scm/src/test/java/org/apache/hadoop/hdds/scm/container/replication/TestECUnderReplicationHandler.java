@@ -68,6 +68,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.times;
 
 /**
@@ -475,6 +476,53 @@ public class TestECUnderReplicationHandler {
       Assertions.assertEquals(
           IN_SERVICE, s.getDnDetails().getPersistedOpState());
     }
+  }
+
+  /**
+   * Create 3 replicas with 1 pending ADD. This means that 1 replica needs to
+   * be reconstructed. The target DN selected for reconstruction should not be
+   * the DN pending add.
+   */
+  @Test
+  public void testDatanodesPendingAddAreNotSelectedAsTargets()
+      throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3));
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, dn, 4));
+
+    /*
+    Mock the placement policy. If the list of nodes to be excluded does not
+    contain the DN pending ADD, then chooseDatanodes will return a list
+    containing that DN. Ensures the test will fail if excludeNodes does not
+    contain the DN pending ADD.
+     */
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), Mockito.isNull(),
+            anyInt(), anyLong(), anyLong()))
+        .thenAnswer(invocationOnMock -> {
+          List<DatanodeDetails> excludeList = invocationOnMock.getArgument(0);
+          List<DatanodeDetails> targets = new ArrayList<>(1);
+          if (excludeList.contains(dn)) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          } else {
+            targets.add(dn);
+          }
+          return targets;
+        });
+
+    ContainerHealthResult.UnderReplicatedHealthResult result =
+        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
+    Mockito.when(result.getContainerInfo()).thenReturn(container);
+    ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
+        ecPlacementPolicy, conf, nodeManager, replicationManager);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands =
+        handler.processAndCreateCommands(availableReplicas, pendingOps, result,
+            1);
+    Assertions.assertEquals(1, commands.size());
+    Assertions.assertFalse(commands.containsKey(dn));
   }
 
   public Map<DatanodeDetails, SCMCommand<?>>
