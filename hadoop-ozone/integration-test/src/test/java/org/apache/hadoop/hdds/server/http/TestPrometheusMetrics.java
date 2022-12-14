@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -169,8 +169,8 @@ public class TestPrometheusMetrics {
   /**
    * Make sure Prometheus metrics start fresh after each flush.
    * Publish the metrics and flush them,
-   * then unregister one of them,
-   * publish and flush the metrics again
+   * then unregister one of them and register another.
+   * Publish and flush the metrics again
    * and then check that the unregistered metric is not present.
    */
   @Test
@@ -178,11 +178,10 @@ public class TestPrometheusMetrics {
       throws InterruptedException, TimeoutException {
     // GIVEN
     metrics.register("StaleMetric", "staleMetric",
-        (MetricsSource) (collector, all) -> {
-          collector.addRecord("StaleMetric")
-              .add(new MetricsTag(PORT_INFO, "1234"))
-              .addGauge(COUNTER_INFO, COUNTER_1).endRecord();
-        });
+        (MetricsSource) (collector, all) ->
+            collector.addRecord("StaleMetric")
+                .add(new MetricsTag(PORT_INFO, "1234"))
+                .addGauge(COUNTER_INFO, COUNTER_1).endRecord());
 
     waitForMetricsToPublish("stale_metric_counter");
 
@@ -190,11 +189,10 @@ public class TestPrometheusMetrics {
     metrics.unregisterSource("StaleMetric");
 
     metrics.register("SomeMetric", "someMetric",
-        (MetricsSource) (collector, all) -> {
-          collector.addRecord("SomeMetric")
-              .add(new MetricsTag(PORT_INFO, "4321"))
-              .addGauge(COUNTER_INFO, COUNTER_2).endRecord();
-        });
+        (MetricsSource) (collector, all) ->
+            collector.addRecord("SomeMetric")
+                .add(new MetricsTag(PORT_INFO, "4321"))
+                .addGauge(COUNTER_INFO, COUNTER_2).endRecord());
 
     String writtenMetrics = waitForMetricsToPublish("some_metric_counter");
 
@@ -221,6 +219,16 @@ public class TestPrometheusMetrics {
     return stream.toString(UTF_8.name());
   }
 
+  /**
+   * metrics.publishMetricsNow() might not finish in a reasonable
+   * amount of time leading to a full queue and any further attempt
+   * for publishing to fail. Wrapping the call with
+   * GenericTestUtils.waitFor() to retry until the queue has been
+   * cleared and publish is a success.
+   *
+   * @param registeredMetric to check if it's published
+   * @return all published metrics
+   */
   private String waitForMetricsToPublish(String registeredMetric)
       throws InterruptedException, TimeoutException {
 
