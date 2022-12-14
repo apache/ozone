@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -32,6 +33,10 @@ import org.slf4j.LoggerFactory;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 
 /**
  * Class that scans the list of containers and keeps track if
@@ -47,31 +52,41 @@ public class ReconSafeModeMgrTask {
   private ReconSafeModeManager safeModeManager;
   private List<DatanodeDetails> allNodes;
   private List<ContainerInfo> containers;
+  private OzoneConfiguration ozoneConfiguration;
   private final long interval;
+  private final long dnHBInterval;
 
   public ReconSafeModeMgrTask(
       ContainerManager containerManager,
       ReconNodeManager nodeManager,
       ReconSafeModeManager safeModeManager,
-      ReconTaskConfig reconTaskConfig) {
+      ReconTaskConfig reconTaskConfig,
+      OzoneConfiguration ozoneConfiguration) {
     this.safeModeManager = safeModeManager;
     this.containerManager = containerManager;
     this.nodeManager = nodeManager;
     this.allNodes = nodeManager.getAllNodes();
     this.containers = containerManager.getContainers();
+    this.ozoneConfiguration = ozoneConfiguration;
     interval = reconTaskConfig.getSafeModeWaitThreshold().toMillis();
+    dnHBInterval = ozoneConfiguration.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
+        HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   public synchronized void start() {
+    long timeElapsed = 0L;
     try {
       checkForReconToEmitSafeNode();
-      if (safeModeManager.getInSafeMode()) {
-        wait(interval);
+      while (safeModeManager.getInSafeMode() && timeElapsed <= interval) {
+        wait(dnHBInterval);
+        timeElapsed += dnHBInterval;
         allNodes = nodeManager.getAllNodes();
         containers = containerManager.getContainers();
         checkForReconToEmitSafeNode();
       }
-      safeModeManager.setInSafeMode(false);
+      if (safeModeManager.getInSafeMode()) {
+        safeModeManager.setInSafeMode(false);
+      }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
       if (t instanceof InterruptedException) {

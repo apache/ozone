@@ -288,7 +288,8 @@ public class ReconStorageContainerManagerFacade
         containerManager,
         nodeManager,
         safeModeManager,
-        reconTaskConfig);
+        reconTaskConfig,
+        ozoneConfiguration);
   }
 
   /**
