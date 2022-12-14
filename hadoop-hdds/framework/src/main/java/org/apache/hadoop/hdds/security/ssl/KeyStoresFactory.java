@@ -17,9 +17,8 @@
 */
 package org.apache.hadoop.hdds.security.ssl;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.TrustManager;
@@ -34,6 +33,8 @@ import java.security.GeneralSecurityException;
 @InterfaceStability.Evolving
 public interface KeyStoresFactory {
 
+  enum Mode { CLIENT, SERVER }
+
   /**
    * Initializes the keystores of the factory.
    *
@@ -45,8 +46,8 @@ public interface KeyStoresFactory {
    * @throws GeneralSecurityException thrown if the keystores could not be
    * initialized due to an security error.
    */
-  void init(SSLFactory.Mode mode, boolean requireClientAuth)
-      throws IOException, GeneralSecurityException;
+  void init(Mode mode, boolean requireClientAuth) throws IOException,
+      GeneralSecurityException;
 
   /**
    * Releases any resources being used.
