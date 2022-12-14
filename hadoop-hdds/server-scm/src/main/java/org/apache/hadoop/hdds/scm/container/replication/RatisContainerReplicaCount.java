@@ -18,11 +18,14 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -39,6 +42,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   private int healthyCount;
+  private int unhealthyCount;
   private int decommissionCount;
   private int maintenanceCount;
   private final int inFlightAdd;
@@ -46,24 +50,32 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   private final int repFactor;
   private final int minHealthyForMaintenance;
   private final ContainerInfo container;
-  private final Set<ContainerReplica> replica;
+  private final List<ContainerReplica> replicas;
 
   public RatisContainerReplicaCount(ContainerInfo container,
-                               Set<ContainerReplica> replica, int inFlightAdd,
+                               Set<ContainerReplica> replicas,
+                                    int inFlightAdd,
                                int inFlightDelete, int replicationFactor,
                                int minHealthyForMaintenance) {
     this.healthyCount = 0;
+    this.unhealthyCount = 0;
     this.decommissionCount = 0;
     this.maintenanceCount = 0;
     this.inFlightAdd = inFlightAdd;
     this.inFlightDel = inFlightDelete;
     this.repFactor = replicationFactor;
-    this.replica = replica;
+    // Iterate replicas in deterministic order to avoid potential data loss
+    // on delete.
+    // See https://issues.apache.org/jira/browse/HDDS-4589.
+    // N.B., sort replicas by (containerID, datanodeDetails).
+    this.replicas = replicas.stream()
+        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
+        .collect(Collectors.toList());
     this.minHealthyForMaintenance
         = Math.min(this.repFactor, minHealthyForMaintenance);
     this.container = container;
 
-    for (ContainerReplica cr : this.replica) {
+    for (ContainerReplica cr : this.replicas) {
       HddsProtos.NodeOperationalState state =
           cr.getDatanodeDetails().getPersistedOpState();
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
@@ -72,6 +84,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         maintenanceCount++;
       } else if (LegacyReplicationManager.compareState(container.getState(),
           cr.getState())) {
+        unhealthyCount++;
+      } else {
         healthyCount++;
       }
     }
@@ -79,6 +93,10 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   public int getHealthyCount() {
     return healthyCount;
+  }
+
+  public int getUnhealthyCount() {
+    return unhealthyCount;
   }
 
   @Override
@@ -101,15 +119,16 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   @Override
-  public Set<ContainerReplica> getReplicas() {
-    return replica;
+  public List<ContainerReplica> getReplicas() {
+    return replicas;
   }
 
   @Override
   public String toString() {
     return "Container State: " + container.getState() +
-        " Replica Count: " + replica.size() +
+        " Replica Count: " + replicas.size() +
         " Healthy Count: " + healthyCount +
+        " unhealthy Count: " + unhealthyCount +
         " Decommission Count: " + decommissionCount +
         " Maintenance Count: " + maintenanceCount +
         " inFlightAdd Count: " + inFlightAdd +

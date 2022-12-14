@@ -72,6 +72,7 @@ import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -1145,20 +1146,9 @@ public class LegacyReplicationManager {
           container.getContainerID(), replicaSet);
       return;
     }
-    final List<DatanodeDetails> deletionInFlight
-        = inflightDeletion.getDatanodeDetails(container.containerID());
-    Set<ContainerReplica> sourceReplicas = replicaSet.getReplicas().stream()
-        .filter(r ->
-            r.getState() == State.QUASI_CLOSED ||
-                r.getState() == State.CLOSED)
-        // Exclude stale and dead nodes. This is particularly important for
-        // maintenance nodes, as the replicas will remain present in the
-        // container manager, even when they go dead.
-        .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy())
-        .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-        .collect(Collectors.toSet());
-
-    replicateAnyWithTopology(container, sourceReplicas,
+    List<ContainerReplica> replicationSources = getReplicationSources(container,
+        replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
+    replicateAnyWithTopology(container, replicationSources,
         placementStatus, replicaSet.additionalReplicaNeeded());
   }
 
@@ -1174,7 +1164,6 @@ public class LegacyReplicationManager {
   private void handleOverReplicatedHealthy(final ContainerInfo container,
       final RatisContainerReplicaCount replicaSet) {
 
-    final Set<ContainerReplica> replicas = replicaSet.getReplicas();
     final ContainerID id = container.containerID();
     final int replicationFactor =
         container.getReplicationConfig().getRequiredNodes();
@@ -1186,12 +1175,9 @@ public class LegacyReplicationManager {
 
       // The list of replicas that we can potentially delete to fix the over
       // replicated state. This method is only concerned with healthy replicas.
-      // Iterate replicas in deterministic order to avoid potential data loss.
-      // See https://issues.apache.org/jira/browse/HDDS-4589.
-      // N.B., sort replicas by (containerID, datanodeDetails).
-      final List<ContainerReplica> healthyReplicas = replicas.stream()
+      final List<ContainerReplica> healthyReplicas = replicaSet.getReplicas()
+          .stream()
           .filter(r -> compareState(container.getState(), r.getState()))
-          .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
           .collect(Collectors.toList());
 
       if (container.getState() == LifeCycleState.CLOSED) {
@@ -1257,10 +1243,9 @@ public class LegacyReplicationManager {
     //   2. Either we have adequate healthy replicas with extra unhealthy
     //   replicas.
 
-    Set<ContainerReplica> replicas = replicaSet.getReplicas();
+    List<ContainerReplica> replicas = replicaSet.getReplicas();
     List<ContainerReplica> unhealthyReplicas = replicas.stream()
         .filter(r -> !compareState(container.getState(), r.getState()))
-        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
         .collect(Collectors.toList());
 
     closeReplicasIfPossible(container, unhealthyReplicas);
@@ -1271,28 +1256,37 @@ public class LegacyReplicationManager {
 
     int excessReplicas = replicas.size() -
         container.getReplicationConfig().getRequiredNodes();
-
-    if (replicas.size() > unhealthyReplicas.size()) {
-      // We have a mix of healthy and unhealthy replicas. Since under and
-      // over replication handlers run before the unstable handler, there
-      // should be enough healthy replicas.
+    if (container.getState() == LifeCycleState.CLOSED) {
+      // The container is already closed. The unhealthy replicas are extras
+      // and unnecessary.
+      deleteExcess(container, unhealthyReplicas, excessReplicas);
+    } else {
+      // Container is not yet closed.
+      // We only need to save the unhealthy replicas if they
+      // represent unique origin node IDs. If recovering these replicas is
+      // possible in the future they could be used to close the container.
       Set<UUID> originNodeIDs = replicas.stream()
           .map(ContainerReplica::getOriginDatanodeId)
           .collect(Collectors.toSet());
-
-      if (container.getState() == LifeCycleState.CLOSED) {
-        // The container is already closed. The unhealthy replicas are extras
-        // and unnecessary.
-        deleteExcess(container, unhealthyReplicas, excessReplicas);
-      } else {
-        // Container is not yet closed.
-        // We only need to save the unhealthy replicas if they
-        // represent unique origin node IDs. If recovering these replicas is
-        // possible in the future they could be used to close the container.
-        deleteExcessWithNonUniqueOriginNodeIDs(container,
-            originNodeIDs, unhealthyReplicas, excessReplicas);
-      }
+      deleteExcessWithNonUniqueOriginNodeIDs(container,
+          originNodeIDs, unhealthyReplicas, excessReplicas);
     }
+  }
+
+  private List<ContainerReplica> getReplicationSources(ContainerInfo container,
+      List<ContainerReplica> replicas, State... validReplicaStates) {
+    final List<DatanodeDetails> deletionInFlight
+        = inflightDeletion.getDatanodeDetails(container.containerID());
+    final Set<State> validReplicaStateSet = Arrays.stream(validReplicaStates)
+        .collect(Collectors.toSet());
+    return replicas.stream()
+        // Exclude stale and dead nodes. This is particularly important for
+        // maintenance nodes, as the replicas will remain present in the
+        // container manager, even when they go dead.
+        .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
+            && !deletionInFlight.contains(r.getDatanodeDetails())
+            && validReplicaStateSet.contains(r.getState()))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -1918,17 +1912,8 @@ public class LegacyReplicationManager {
       int additionalReplicasNeeded) {
     // TODO Datanodes currently shuffle sources, so we cannot prioritize
     //  some replicas based on BCSID or origin node ID.
-    final List<DatanodeDetails> deletionInFlight
-        = inflightDeletion.getDatanodeDetails(container.containerID());
-    Set<ContainerReplica> sourceReplicas = replicas.stream()
-        // Exclude stale and dead nodes. This is particularly important for
-        // maintenance nodes, as the replicas will remain present in the
-        // container manager, even when they go dead.
-        .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy())
-        .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-        .collect(Collectors.toSet());
-
-    replicateAnyWithTopology(container, sourceReplicas, placementStatus,
+    replicateAnyWithTopology(container,
+        getReplicationSources(container, replicas), placementStatus,
         additionalReplicasNeeded);
   }
 
@@ -2041,7 +2026,7 @@ public class LegacyReplicationManager {
   }
 
   private void replicateAnyWithTopology(ContainerInfo container,
-      Set<ContainerReplica> replicas,
+      List<ContainerReplica> replicas,
       ContainerPlacementStatus placementStatus, int additionalReplicasNeeded) {
     try {
       final ContainerID id = container.containerID();
