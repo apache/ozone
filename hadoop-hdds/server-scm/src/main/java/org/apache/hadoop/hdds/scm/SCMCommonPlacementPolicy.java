@@ -486,14 +486,12 @@ public abstract class SCMCommonPlacementPolicy implements
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
         if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
-          Node rack = this.getPlacementGroup(
-                  replicaList.stream().findAny()
-                  .map(ContainerReplica::getDatanodeDetails)
-                  .orElse(null));
+          Node rack = replicaList.size() > 0 ? this.getPlacementGroup(
+                  replicaList.get(0).getDatanodeDetails()) : null;
           LOG.warn("Not enough copyable replicas available in rack {}. " +
                   "Required number of Replicas to be copied: {}." +
                   " Available Replicas to be copied: {}",
-                  rack.toString(), numberOfReplicasToBeCopied,
+                  rack, numberOfReplicasToBeCopied,
                   replicasToBeCopied.size());
         }
         copyReplicaSet.addAll(replicasToBeCopied);

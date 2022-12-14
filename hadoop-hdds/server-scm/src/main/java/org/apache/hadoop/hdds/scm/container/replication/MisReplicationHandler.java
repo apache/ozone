@@ -174,8 +174,8 @@ public abstract class MisReplicationHandler implements
             .collect(Collectors.toList());
     if (containerPlacement.validateContainerPlacement(dnsWithPendingOps,
             usedDns.size()).isPolicySatisfied()) {
-      LOG.info("Container {} is currently misreplicated currently" +
-               " but will not be misreplicated after pending ops executed",
+      LOG.info("Container {} is currently misreplicated but will not be " +
+               "misreplicated after pending ops executed",
               container.getContainerID());
       return Collections.emptyMap();
     }
