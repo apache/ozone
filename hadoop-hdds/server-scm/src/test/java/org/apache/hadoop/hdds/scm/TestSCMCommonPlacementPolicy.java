@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -35,8 +36,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -72,19 +71,18 @@ public class TestSCMCommonPlacementPolicy {
     Assertions.assertNotEquals(1, resultSet.size());
   }
 
-  private void testReplicasToFixMisreplication(
+  private Set<ContainerReplica> testReplicasToFixMisreplication(
           List<ContainerReplica> replicas,
           DummyPlacementPolicy placementPolicy,
           int expectedNumberOfReplicasToCopy,
-          Map<Node, Integer> expectedNumberOfCopyOperationFromRack)
-          throws IOException {
-    testReplicasToFixMisreplication(replicas.stream().distinct().collect(
+          Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
+    return testReplicasToFixMisreplication(replicas.stream().distinct().collect(
             Collectors.toMap(Function.identity(), r -> true)), placementPolicy,
             expectedNumberOfReplicasToCopy,
             expectedNumberOfCopyOperationFromRack);
   }
 
-  private void testReplicasToFixMisreplication(
+  private Set<ContainerReplica> testReplicasToFixMisreplication(
           Map<ContainerReplica, Boolean> replicas,
           DummyPlacementPolicy placementPolicy,
           int expectedNumberOfReplicasToCopy,
@@ -107,11 +105,11 @@ public class TestSCMCommonPlacementPolicy {
               expectedNumberOfCopyOperationFromRack.getOrDefault(rack, 0),
               rackCopyMap.getOrDefault(rack, 0L).intValue());
     }
+    return replicasToCopy;
   }
 
   @Test
-  public void testReplicasToFixMisreplicationWithOneMisreplication()
-          throws IOException {
+  public void testReplicasToFixMisreplicationWithOneMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<Node> racks = dummyPlacementPolicy.racks;
@@ -126,8 +124,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationWithTwoMisreplication()
-          throws IOException {
+  public void testReplicasToFixMisreplicationWithTwoMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -148,8 +145,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationWithThreeMisreplication()
-          throws IOException {
+  public void testReplicasToFixMisreplicationWithThreeMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -171,8 +167,7 @@ public class TestSCMCommonPlacementPolicy {
 
   @Test
   public void
-      testReplicasToFixMisreplicationWithThreeMisreplicationOnDifferentRack()
-          throws IOException {
+      testReplicasToFixMisreplicationWithThreeMisreplicationOnDifferentRack() {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -195,7 +190,7 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void
       testReplicasToFixMisreplicationWithReplicationFactorLessThanNumberOfRack(
-  ) throws IOException {
+  ) {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -218,7 +213,7 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void
       testReplicasToFixMisreplicationWithReplicationFactorMoreThanNumberOfRack(
-  ) throws IOException {
+  ) {
     DummyPlacementPolicy dummyPlacementPolicy = new DummyPlacementPolicy(
             nodeManager, conf,
             GenericTestUtils.getReverseMap(
@@ -239,8 +234,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToFixMisreplicationMaxReplicaPerRack()
-          throws IOException {
+  public void testReplicasToFixMisreplicationMaxReplicaPerRack() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 2);
     List<Node> racks = dummyPlacementPolicy.racks;
@@ -255,7 +249,28 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasWithoutMisreplication() throws IOException {
+  public void
+      testReplicasToFixMisreplicationMaxReplicaPerRackWithUncopyableReplicas() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 2);
+    List<Node> racks = dummyPlacementPolicy.racks;
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> replicaDns = Stream.of(0, 2, 4, 6, 8)
+            .map(list::get).collect(Collectors.toList());
+    List<ContainerReplica> replicas =
+            HddsTestUtils.getReplicasWithReplicaIndex(new ContainerID(1),
+                    CLOSED, 0, 0, 0, replicaDns);
+    Map<ContainerReplica, Boolean> replicaMap = replicas.stream().distinct()
+            .collect(Collectors.toMap(Function.identity(), r -> false));
+    replicaMap.put(replicas.get(0), true);
+    Assertions.assertEquals(testReplicasToFixMisreplication(replicaMap,
+            dummyPlacementPolicy, 1,
+            ImmutableMap.of(racks.get(0), 1)),
+            Sets.newHashSet(replicas.get(0)));
+  }
+
+  @Test
+  public void testReplicasWithoutMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list = nodeManager.getAllNodes();

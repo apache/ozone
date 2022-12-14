@@ -43,6 +43,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+
 /**
  * Container placement policy that scatter datanodes on different racks
  * , together with the space to satisfy the size constraints.
@@ -220,7 +222,7 @@ public final class SCMContainerPlacementRackScatter
           " AvailableNode = " + availableNodes.size() +
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+          FAILED_TO_FIND_SUITABLE_NODE);
     }
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
     if (favoredNodes != null) {
@@ -259,7 +261,7 @@ public final class SCMContainerPlacementRackScatter
               reason, numberOfRacksRequired, usedRacksCntMap.size(),
               nodesRequired);
       throw new SCMException(reason,
-              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+              FAILED_TO_FIND_SUITABLE_NODE);
     }
     int maxReplicasPerRack = getMaxReplicasPerRack(requiredReplicationFactor,
             numberOfRacksRequired);
@@ -284,7 +286,7 @@ public final class SCMContainerPlacementRackScatter
               reason, numberOfRacksRequired, usedRacksCntMap.size(),
               nodesRequired);
       throw new SCMException(reason,
-              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+              FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
@@ -341,9 +343,8 @@ public final class SCMContainerPlacementRackScatter
                 initialPlacementStatus.misReplicationCount() +
                 " Used nodes + Chosen nodes mis-replication Count: " +
                 placementStatus.misReplicationCount();
-        throw new SCMException(errorMsg, null);
+        throw new SCMException(errorMsg, FAILED_TO_FIND_SUITABLE_NODE);
       }
-
     }
     return result;
   }
