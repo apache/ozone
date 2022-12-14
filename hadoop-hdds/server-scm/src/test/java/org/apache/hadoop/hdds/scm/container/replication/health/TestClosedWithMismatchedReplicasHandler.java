@@ -99,7 +99,7 @@ public class TestClosedWithMismatchedReplicasHandler {
   }
 
   @Test
-  public void testClosedMissMatchContainerReturnsTrue() {
+  public void testCloseCommandSentForMismatchedReplicas() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ecReplicationConfig, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
@@ -126,7 +126,10 @@ public class TestClosedWithMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(handler.handle(request));
+
+    // this handler always returns false so other handlers can fix issues
+    // such as under replication
+    Assertions.assertFalse(handler.handle(request));
 
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
@@ -134,6 +137,7 @@ public class TestClosedWithMismatchedReplicasHandler {
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
             containerInfo, mismatch2.getDatanodeDetails(), true);
+    // close command should not be sent for unhealthy replica
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(
             containerInfo, mismatch3.getDatanodeDetails(), true);
@@ -177,7 +181,7 @@ public class TestClosedWithMismatchedReplicasHandler {
   }
 
   @Test
-  public void testClosedMissMatchRatisContainerReturnsTrue() {
+  public void testCloseCommandSentForMismatchedRatisReplicas() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, CLOSED);
     ContainerReplica mismatch1 = ReplicationTestUtil.createContainerReplica(
@@ -202,7 +206,10 @@ public class TestClosedWithMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(handler.handle(request));
+
+    // this handler always returns false so other handlers can fix issues
+    // such as under replication
+    Assertions.assertFalse(handler.handle(request));
 
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
@@ -210,6 +217,7 @@ public class TestClosedWithMismatchedReplicasHandler {
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
             containerInfo, mismatch2.getDatanodeDetails(), true);
+    // close command should not be sent for unhealthy replica
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(
             containerInfo, mismatch3.getDatanodeDetails(), true);
