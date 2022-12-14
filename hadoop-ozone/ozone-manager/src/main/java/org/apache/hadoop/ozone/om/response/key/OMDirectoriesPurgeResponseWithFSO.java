@@ -133,11 +133,9 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
       // update bucket usedBytes.
       for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
-        if (null != omBucketInfo) {
-          omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-              omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-                  omBucketInfo.getBucketName()), omBucketInfo);
-        }
+        omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+            omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+                omBucketInfo.getBucketName()), omBucketInfo);
       }
     }
   }

@@ -121,9 +121,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               e.getValue()));
       for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
           volBucketInfoMap.entrySet()) {
-        if (null != entry.getValue()) {
-          entry.setValue(entry.getValue().copyObject());
-        }
+        entry.setValue(entry.getValue().copyObject());
       }
     }
 
