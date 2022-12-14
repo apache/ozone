@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 /**
  * The task to download a container from the sources.
@@ -32,21 +33,39 @@ public class ReplicationTask {
 
   private final long containerId;
 
-  private List<DatanodeDetails> sources;
+  private final List<DatanodeDetails> sources;
 
   private final Instant queued = Instant.now();
+
+  private long deadlineMsSinceEpoch = 0;
 
   /**
    * Counter for the transferred bytes.
    */
   private long transferredBytes;
 
-  public ReplicationTask(
+  public ReplicationTask(ReplicateContainerCommand cmd) {
+    this.containerId = cmd.getContainerID();
+    this.sources = cmd.getSourceDatanodes();
+    this.deadlineMsSinceEpoch = cmd.getDeadline();
+  }
+
+  /**
+   * Intended to only be used in tests.
+   */
+  protected ReplicationTask(
       long containerId,
       List<DatanodeDetails> sources
   ) {
-    this.containerId = containerId;
-    this.sources = sources;
+    this(new ReplicateContainerCommand(containerId, sources));
+  }
+
+  /**
+   * Returns any deadline set on this task, in milliseconds since the epoch.
+   * A returned value of zero indicates no deadline.
+   */
+  public long getDeadline() {
+    return deadlineMsSinceEpoch;
   }
 
   @Override

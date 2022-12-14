@@ -426,6 +426,7 @@ public class HeartbeatEndpointTask
    * Common processing for SCM commands.
    *  - set term
    *  - set encoded token
+   *  - any deadline which is relevant to the command
    *  - add to context's queue
    */
   private void processCommonCommand(
@@ -435,6 +436,9 @@ public class HeartbeatEndpointTask
     }
     if (response.hasEncodedToken()) {
       cmd.setEncodedToken(response.getEncodedToken());
+    }
+    if (response.hasDeadlineMsSinceEpoch()) {
+      cmd.setDeadline(response.getDeadlineMsSinceEpoch());
     }
     context.addCommand(cmd);
   }

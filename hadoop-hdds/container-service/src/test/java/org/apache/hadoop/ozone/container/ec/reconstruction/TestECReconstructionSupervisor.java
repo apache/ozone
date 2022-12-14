@@ -21,19 +21,38 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.SortedMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
+
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 
 /**
  * Tests the ECReconstructionSupervisor.
  */
 public class TestECReconstructionSupervisor {
+
+  private TestClock clock;
+
+  @BeforeEach
+  public void setup() {
+    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+  }
+
 
   @Test
   public void testAddTaskShouldExecuteTheGivenTask()
@@ -58,15 +77,61 @@ public class TestECReconstructionSupervisor {
                 super.reconstructECContainerGroup(containerID, repConfig,
                     sourceNodeMap, targetNodeMap);
               }
-            }) {
+            }, clock) {
         };
-    supervisor.addTask(
-        new ECReconstructionCommandInfo(1, new ECReplicationConfig(3, 2),
-            new byte[0], ImmutableList.of(), ImmutableList.of()));
+    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
+        1L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    supervisor.addTask(new ECReconstructionCommandInfo(command));
     runnableInvoked.await();
     Assertions.assertEquals(1, supervisor.getInFlightReplications());
     holdProcessing.countDown();
     GenericTestUtils
         .waitFor(() -> supervisor.getInFlightReplications() == 0, 100, 15000);
   }
+
+  @Test
+  public void testTasksWithDeadlineExceededAreNotRun() throws IOException {
+    ECReconstructionCoordinator coordinator =
+        Mockito.mock(ECReconstructionCoordinator.class);
+    ECReconstructionSupervisor supervisor =
+        new ECReconstructionSupervisor(null, null,
+            newDirectExecutorService(), coordinator, clock);
+
+    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
+        1L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    ECReconstructionCommandInfo task1 =
+        new ECReconstructionCommandInfo(command);
+
+    command = new ReconstructECContainersCommand(
+        2L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    command.setDeadline(clock.millis() + 10000);
+    ECReconstructionCommandInfo task2 =
+        new ECReconstructionCommandInfo(command);
+
+    command = new ReconstructECContainersCommand(
+        3L, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
+    command.setDeadline(clock.millis() + 20000);
+    ECReconstructionCommandInfo task3 =
+        new ECReconstructionCommandInfo(command);
+
+    clock.fastForward(15000);
+    supervisor.addTask(task1);
+    supervisor.addTask(task2);
+    supervisor.addTask(task3);
+
+    // No deadline for container 1, it should run.
+    Mockito.verify(coordinator, times(1))
+        .reconstructECContainerGroup(eq(1L), any(), any(), any());
+    // Deadline passed for container 2, it should not run.
+    Mockito.verify(coordinator, times(0))
+        .reconstructECContainerGroup(eq(2L), any(), any(), any());
+    // Deadline not passed for container 3, it should run.
+    Mockito.verify(coordinator, times(1))
+        .reconstructECContainerGroup(eq(3L), any(), any(), any());
+  }
+
 }

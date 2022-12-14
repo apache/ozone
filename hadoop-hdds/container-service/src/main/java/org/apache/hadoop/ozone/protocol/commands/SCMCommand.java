@@ -38,6 +38,8 @@ public abstract class SCMCommand<T extends Message> implements
 
   private String encodedToken = "";
 
+  private long deadlineMsSinceEpoch = 0;
+
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();
   }
@@ -87,5 +89,38 @@ public abstract class SCMCommand<T extends Message> implements
 
   public void setEncodedToken(String encodedToken) {
     this.encodedToken = encodedToken;
+  }
+
+  /**
+   * Allows a deadline to be set on the command. The deadline is set as the
+   * milliseconds since the epoch when the command must have been completed by.
+   * It is up to the code processing the command to enforce the deadline by
+   * calling the hasExpired() method, and the code sending the command to set
+   * the deadline. The default deadline is zero, which means no deadline.
+   * @param deadlineMs The ms since epoch when the command must have completed
+   *                   by.
+   */
+  public void setDeadline(long deadlineMs) {
+    this.deadlineMsSinceEpoch = deadlineMs;
+  }
+
+  /**
+   * @return The deadline set for this command, or zero if no command has been
+   *         set.
+   */
+  public long getDeadline() {
+    return deadlineMsSinceEpoch;
+  }
+
+  /**
+   * If a deadline has been set to a non zero value, test if the current time
+   * passed is beyond the deadline or not.
+   * @param currentEpochMs current time in milliseconds since the epoch.
+   * @return false if there is no deadline, or it has not expired. True if the
+   *         set deadline has expired.
+   */
+  public boolean hasExpired(long currentEpochMs) {
+    return deadlineMsSinceEpoch > 0 &&
+        currentEpochMs > deadlineMsSinceEpoch;
   }
 }

@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
@@ -42,7 +44,9 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -80,6 +84,7 @@ public class TestReplicationSupervisor {
   private ContainerSet set;
 
   private final ContainerLayoutVersion layout;
+  private TestClock clock;
 
   public TestReplicationSupervisor(ContainerLayoutVersion layout) {
     this.layout = layout;
@@ -92,6 +97,7 @@ public class TestReplicationSupervisor {
 
   @Before
   public void setUp() throws Exception {
+    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
   }
 
@@ -235,7 +241,7 @@ public class TestReplicationSupervisor {
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
         new ReplicationSupervisor(set, null, mutableReplicator,
-            newDirectExecutorService());
+            newDirectExecutorService(), clock);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
@@ -269,6 +275,39 @@ public class TestReplicationSupervisor {
         .contains("Container 1 replication was unsuccessful."));
   }
 
+  @Test
+  public void testTaskBeyondDeadline() {
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+
+    ReplicateContainerCommand cmd = new ReplicateContainerCommand(1L,
+        emptyList());
+    cmd.setDeadline(clock.millis() + 10000);
+    ReplicationTask task1 = new ReplicationTask(cmd);
+    cmd = new ReplicateContainerCommand(2L, emptyList());
+    cmd.setDeadline(clock.millis() + 20000);
+    ReplicationTask task2 = new ReplicationTask(cmd);
+    cmd = new ReplicateContainerCommand(3L, emptyList());
+    // No deadline set
+    ReplicationTask task3 = new ReplicationTask(cmd);
+    // no deadline set
+
+    clock.fastForward(15000);
+
+    supervisor.addTask(task1);
+    supervisor.addTask(task2);
+    supervisor.addTask(task3);
+
+    Assert.assertEquals(3, supervisor.getReplicationRequestCount());
+    Assert.assertEquals(2, supervisor.getReplicationSuccessCount());
+    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assert.assertEquals(0, supervisor.getInFlightReplications());
+    Assert.assertEquals(0, supervisor.getQueueSize());
+    Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
+    Assert.assertEquals(2, set.containerCount());
+
+  }
+
   private ReplicationSupervisor supervisorWithReplicator(
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory) {
     return supervisorWith(replicatorFactory, newDirectExecutorService());
@@ -278,7 +317,8 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, null, mutableReplicator, executor);
+        new ReplicationSupervisor(set, null, mutableReplicator, executor,
+            clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }

@@ -272,7 +272,7 @@ public class SCMDatanodeProtocolServer implements
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
-      cmdResponses.add(getCommandResponse(cmd));
+      cmdResponses.add(getCommandResponse(cmd, scm));
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
@@ -305,14 +305,17 @@ public class SCMDatanodeProtocolServer implements
    * @throws IOException
    */
   @VisibleForTesting
-  public SCMCommandProto getCommandResponse(SCMCommand cmd)
-      throws IOException, TimeoutException {
+  public static SCMCommandProto getCommandResponse(SCMCommand cmd,
+      OzoneStorageContainerManager scm) throws IOException, TimeoutException {
     SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
         .setEncodedToken(cmd.getEncodedToken());
 
     // In HA mode, it is the term of current leader SCM.
     // In non-HA mode, it is the default value 0.
     builder.setTerm(cmd.getTerm());
+    // The default deadline is 0, which means no deadline. Individual commands
+    // may have a deadline set.
+    builder.setDeadlineMsSinceEpoch(cmd.getDeadline());
 
     switch (cmd.getType()) {
     case reregisterCommand:
