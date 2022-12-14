@@ -536,7 +536,8 @@ public class LegacyReplicationManager {
           // Replicate container if needed.
           if (!inflightReplication.isFull() || !inflightDeletion.isFull()) {
             if (!replicaSet.isUnrecoverable()) {
-              if (replicaSet.getHealthyCount() == 0) {
+              if (replicaSet.getHealthyReplicaCount() == 0 &&
+                  replicaSet.getUnhealthyReplicaCount() != 0) {
                 handleAllReplicasUnhealthy(container, replicaSet,
                     placementStatus, report);
               } else {
@@ -1175,25 +1176,23 @@ public class LegacyReplicationManager {
 
       // The list of replicas that we can potentially delete to fix the over
       // replicated state. This method is only concerned with healthy replicas.
-      final List<ContainerReplica> healthyReplicas = replicaSet.getReplicas()
-          .stream()
-          .filter(r -> compareState(container.getState(), r.getState()))
-          .collect(Collectors.toList());
+      final List<ContainerReplica> deleteCandidates =
+          getHealthyDeletionCandidates(container, replicaSet.getReplicas());
 
       if (container.getState() == LifeCycleState.CLOSED) {
         // Container is closed, so all healthy replicas are equal.
         // We can choose which ones to delete based on topology.
         // TODO Legacy RM implementation can only handle topology when all
         //  container replicas are closed and equal.
-        deleteExcessWithTopology(excess, container, healthyReplicas);
+        deleteExcessWithTopology(excess, container, deleteCandidates);
       } else {
         // Container is not yet closed. Choose which healthy replicas to
         // delete so that we do not lose any origin node IDs.
-        Set<UUID> originNodeIDs = healthyReplicas.stream()
+        Set<UUID> originNodeIDs = deleteCandidates.stream()
             .map(ContainerReplica::getOriginDatanodeId)
             .collect(Collectors.toSet());
         deleteExcessWithNonUniqueOriginNodeIDs(container, originNodeIDs,
-            healthyReplicas, excess);
+            deleteCandidates, excess);
       }
     }
   }
@@ -1203,9 +1202,7 @@ public class LegacyReplicationManager {
       ContainerPlacementStatus placementStatus,
       ReplicationManagerReport report) {
 
-    List<ContainerReplica> replicas = replicaSet.getReplicas().stream()
-        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
-        .collect(Collectors.toList());
+    List<ContainerReplica> replicas = replicaSet.getReplicas();
     // This method will remove closable replicas from the replicas list.
     closeReplicasIfPossible(container, replicas);
 
@@ -1244,9 +1241,8 @@ public class LegacyReplicationManager {
     //   replicas.
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
-    List<ContainerReplica> unhealthyReplicas = replicas.stream()
-        .filter(r -> !compareState(container.getState(), r.getState()))
-        .collect(Collectors.toList());
+    List<ContainerReplica> unhealthyReplicas =
+        getUnhealthyDeletionCandidates(container, replicas);
 
     closeReplicasIfPossible(container, unhealthyReplicas);
 
@@ -1286,6 +1282,24 @@ public class LegacyReplicationManager {
         .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
             && !deletionInFlight.contains(r.getDatanodeDetails())
             && validReplicaStateSet.contains(r.getState()))
+        .collect(Collectors.toList());
+  }
+
+  private List<ContainerReplica> getHealthyDeletionCandidates(
+      ContainerInfo container, List<ContainerReplica> replicas) {
+    return getDeletionCandidates(container, replicas, true);
+  }
+
+  private List<ContainerReplica> getUnhealthyDeletionCandidates(
+      ContainerInfo container, List<ContainerReplica> replicas) {
+    return getDeletionCandidates(container, replicas, false);
+  }
+
+  private List<ContainerReplica> getDeletionCandidates(ContainerInfo container,
+      List<ContainerReplica> replicas, boolean healthy) {
+     return replicas.stream()
+        .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
+            && compareState(container.getState(), r.getState()) == healthy)
         .collect(Collectors.toList());
   }
 
@@ -1891,6 +1905,8 @@ public class LegacyReplicationManager {
 
   private void handleOverReplicatedAllUnhealthy(ContainerInfo container,
      List<ContainerReplica> replicas, int excess) {
+    List<ContainerReplica> deleteCandidates =
+        getUnhealthyDeletionCandidates(container, replicas);
     if (container.getState() == LifeCycleState.CLOSED) {
       // Prefer to delete unhealthy replicas with lower BCS IDs.
       deleteExcessLowestBcsIDs(container, replicas, excess);

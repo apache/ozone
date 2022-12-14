@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -41,8 +42,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  */
 public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
-  private int healthyCount;
-  private int unhealthyCount;
+  private int healthyReplicaCount;
+  private int unhealthyReplicaCount;
   private int decommissionCount;
   private int maintenanceCount;
   private final int inFlightAdd;
@@ -57,8 +58,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
                                     int inFlightAdd,
                                int inFlightDelete, int replicationFactor,
                                int minHealthyForMaintenance) {
-    this.healthyCount = 0;
-    this.unhealthyCount = 0;
+    this.unhealthyReplicaCount = 0;
+    this.healthyReplicaCount = 0;
     this.decommissionCount = 0;
     this.maintenanceCount = 0;
     this.inFlightAdd = inFlightAdd;
@@ -82,21 +83,23 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
-      } else if (LegacyReplicationManager.compareState(container.getState(),
-          cr.getState())) {
-        unhealthyCount++;
       } else {
-        healthyCount++;
+        if (LegacyReplicationManager.compareState(container.getState(),
+            cr.getState())) {
+          healthyReplicaCount++;
+        } else {
+          unhealthyReplicaCount++;
+        }
       }
     }
   }
 
-  public int getHealthyCount() {
-    return healthyCount;
+  public int getHealthyReplicaCount() {
+    return healthyReplicaCount;
   }
 
-  public int getUnhealthyCount() {
-    return unhealthyCount;
+  public int getUnhealthyReplicaCount() {
+    return unhealthyReplicaCount;
   }
 
   @Override
@@ -120,15 +123,15 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   @Override
   public List<ContainerReplica> getReplicas() {
-    return replicas;
+    return new ArrayList<>(replicas);
   }
 
   @Override
   public String toString() {
     return "Container State: " + container.getState() +
         " Replica Count: " + replicas.size() +
-        " Healthy Count: " + healthyCount +
-        " unhealthy Count: " + unhealthyCount +
+        " Healthy Count: " + healthyReplicaCount +
+        " Unhealthy Count: " + unhealthyReplicaCount +
         " Decommission Count: " + decommissionCount +
         " Maintenance Count: " + maintenanceCount +
         " inFlightAdd Count: " + inFlightAdd +
@@ -231,7 +234,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    *         for under replicated and a negative value for over replicated.
    */
   private int missingReplicas() {
-    int delta = repFactor - healthyCount;
+    int delta = repFactor - healthyReplicaCount;
 
     if (delta < 0) {
       // Over replicated, so may need to remove a container.
@@ -240,7 +243,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       // May be under-replicated, depending on maintenance.
       delta = Math.max(0, delta - maintenanceCount);
       int neededHealthy =
-          Math.max(0, minHealthyForMaintenance - healthyCount);
+          Math.max(0, minHealthyForMaintenance - healthyReplicaCount);
       delta = Math.max(neededHealthy, delta);
       return delta;
     } else { // delta == 0
@@ -355,7 +358,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    */
   public int getRemainingRedundancy() {
     return Math.max(0,
-        healthyCount + decommissionCount + maintenanceCount - inFlightDel - 1);
+        healthyReplicaCount + decommissionCount + maintenanceCount
+            - inFlightDel - 1);
   }
 
   /**
