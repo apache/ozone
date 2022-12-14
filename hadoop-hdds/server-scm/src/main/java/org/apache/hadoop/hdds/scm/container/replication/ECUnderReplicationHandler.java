@@ -147,6 +147,14 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     List<DatanodeDetails> excludedNodes = replicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
+    // DNs that are already waiting to receive replicas cannot be targets
+    excludedNodes.addAll(
+        pendingOps.stream()
+        .filter(containerReplicaOp -> containerReplicaOp.getOpType() ==
+            ContainerReplicaOp.PendingOpType.ADD)
+        .map(ContainerReplicaOp::getTarget)
+        .collect(Collectors.toList()));
+
     final ContainerID id = container.containerID();
     final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
     try {
