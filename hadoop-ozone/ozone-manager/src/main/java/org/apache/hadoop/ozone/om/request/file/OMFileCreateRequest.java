@@ -279,9 +279,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       numMissingParents = missingParentInfos.size();
       checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
-      if (numMissingParents > 0) {
-        omBucketInfo.incrUsedNamespace(numMissingParents);
-      }
+      omBucketInfo.incrUsedNamespace(numMissingParents);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if

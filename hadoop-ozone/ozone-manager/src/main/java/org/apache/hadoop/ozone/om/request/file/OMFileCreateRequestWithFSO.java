@@ -201,9 +201,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               .getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      if (numKeysCreated > 0) {
-        omBucketInfo.incrUsedNamespace(numKeysCreated);
-      }
+      omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
