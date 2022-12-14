@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -134,7 +135,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneBlockTokenSecretManager secretManager,
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String omID) throws IOException {
+      boolean grpcBlockTokenEnabled, String omID, OMMetrics omMetrics)
+      throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     int numBlocks = (int) Math.min(preallocateBlocksMax,
@@ -148,6 +150,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
               excludeList);
     } catch (SCMException ex) {
+      omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
         throw new OMException(ex.getMessage(),
