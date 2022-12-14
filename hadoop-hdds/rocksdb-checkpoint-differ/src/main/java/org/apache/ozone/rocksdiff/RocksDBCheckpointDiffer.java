@@ -1015,7 +1015,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     for (String sstFile : snapshotSstFiles) {
       CompactionNode infileNode = compactionNodeMap.get(sstFile);
       if (infileNode == null) {
-        LOG.error("Compaction node doesn't exist for sstFile: {}.", sstFile);
+        LOG.warn("Compaction node doesn't exist for sstFile: {}.", sstFile);
         continue;
       }
 

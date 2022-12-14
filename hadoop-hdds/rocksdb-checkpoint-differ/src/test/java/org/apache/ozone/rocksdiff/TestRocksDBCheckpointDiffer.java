@@ -367,8 +367,7 @@ public class TestRocksDBCheckpointDiffer {
         asList("000024", "000028", "000026", "000021"),
         asList("000024", "000028", "000026"),
         asList("000028", "000026"),
-        Collections.singletonList("000028"),
-        Collections.emptyList()
+        Collections.singletonList("000028")
     );
 
     File clDir = new File(clDirStr);

@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -148,11 +149,16 @@ public final class OmSnapshotManager {
     final DBCheckpoint dbCheckpoint = store.getSnapshot(
         snapshotInfo.getCheckpointDirName());
 
+    // Currently, SnapshotInfo doesn't return correct checkpointing dir.
+    // TODO: Remove OM_DB_NAME prefix append, once SnapshotInfo starts
+    //  returning correct checkpointing dir.
+    String snapshotCheckpointDir = OM_DB_NAME +
+        snapshotInfo.getCheckpointDir();
     // Write snapshot generation (latest sequence number) to compaction log.
     // This will be used for DAG reconstruction as snapshotGeneration.
     dbCpDiffer.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber,
         snapshotInfo.getSnapshotID(),
-        snapshotInfo.getCheckpointDir(),
+        snapshotCheckpointDir,
         snapshotInfo.getCreationTime());
 
     // Set compaction log filename to the latest DB sequence number
