@@ -154,7 +154,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   private boolean skipGetSSTFileSummary = false;
 
   /**
-   * A queue which keeps the snapshot in shorted order of their creations time.
+   * A queue which keeps the snapshots in sorted order by their creation time.
    * It is used by DAG pruning daemon to remove snapshots older than allowed
    * time in compaction DAG.
    */
@@ -217,7 +217,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     this.sstBackupDir = null;
     this.activeDBLocationStr = null;
     this.executor = null;
-    this.maxAllowedTimeInDag = 0;
+    this.maxAllowedTimeInDag = 0L;
   }
 
   private void setCompactionLogDir(String metadataDir,
@@ -1006,13 +1006,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   public void pruneSnapshotFileNodesFromDag(String snapshotDir) {
     Set<String> snapshotSstFiles = readRocksDBLiveFiles(snapshotDir);
     if (snapshotSstFiles.isEmpty()) {
-      LOG.info("Snapshot '{}' doesn't have any sst file to remove.",
+      LOG.error("Snapshot '{}' DB checkpoint doesn't have any SST file.",
           snapshotDir);
       return;
     }
 
     Set<CompactionNode> startNodes = new HashSet<>();
-    for (String sstFile: snapshotSstFiles) {
+    for (String sstFile : snapshotSstFiles) {
       CompactionNode infileNode = compactionNodeMap.get(sstFile);
       if (infileNode == null) {
         LOG.error("Compaction node doesn't exist for sstFile: {}.", sstFile);
