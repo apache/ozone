@@ -761,7 +761,6 @@ public class TestLegacyReplicationManager {
      * Iteration 3: The unhealthy replica is deleted.
      */
     @Test
-    @Ignore("WIP")
     public void testQuasiClosedContainerWithUniqueUnhealthyReplica()
         throws Exception {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
@@ -774,9 +773,11 @@ public class TestLegacyReplicationManager {
       // close the container.
       addReplicaToDn(container, randomDatanodeDetails(), UNHEALTHY, 900L);
 
+      // First RM iteration.
       // Since the unhealthy replica has a unique origin node ID, it should
       // not be deleted.
       assertDeleteScheduled(0);
+      // TODO container should be under replicated
       assertUnderReplicatedCount(0);
 
       // Even though we have 3 unique origin node IDs, the container should
@@ -784,6 +785,8 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.closeContainerCommand));
+
+      Assertions.fail("WIP");
     }
 
 
@@ -1094,9 +1097,7 @@ public class TestLegacyReplicationManager {
       containerStateManager.updateContainerReplica(id, replicaThree);
       containerStateManager.updateContainerReplica(id, replicaFour);
 
-      // TODO RM intermittently deletes the incorrect replica.
       assertDeleteScheduled(1);
-//      System.err.println(datanodeCommandHandler.getReceivedCommands().stream().map(c -> c.));
       Assertions.assertTrue(
           datanodeCommandHandler.getReceivedCommands().stream()
               .anyMatch(c -> c.getCommand().getType() ==
@@ -1108,10 +1109,9 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1, report.getStat(LifeCycleState.QUASI_CLOSED));
       Assertions.assertEquals(1, report.getStat(
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
-      // The unhealthy container should not count towards the container's over
-      // replicated status.
-      // TODO RM is reporting an over replication
-      Assertions.assertEquals(0, report.getStat(
+      // Container should have been considered over replicated including the
+      // unhealthy replica.
+      Assertions.assertEquals(1, report.getStat(
           ReplicationManagerReport.HealthState.OVER_REPLICATED));
 
       final long currentDeleteCommandCompleted = replicationManager.getMetrics()
@@ -1119,6 +1119,8 @@ public class TestLegacyReplicationManager {
       // Now we remove the replica to simulate deletion complete
       containerStateManager.removeContainerReplica(id, unhealthyReplica);
 
+      // On the next run, the over replicated status should be reconciled and
+      // the delete completed.
       replicationManager.processAll();
       eventQueue.processAll(1000);
 
@@ -1161,6 +1163,8 @@ public class TestLegacyReplicationManager {
       final long currentBytesToReplicate = replicationManager.getMetrics()
           .getNumReplicationBytesTotal();
 
+      // On the first iteration, one of the quasi closed replicas should be
+      // replicated.
       replicationManager.processAll();
       eventQueue.processAll(1000);
       Assertions.assertEquals(currentReplicateCommandCount + 1,
@@ -1191,10 +1195,11 @@ public class TestLegacyReplicationManager {
           replicationManager.getLegacyReplicationManager()
           .getFirstDatanode(InflightType.REPLICATION, id);
       final ContainerReplica replicatedReplicaThree = getReplicas(
-          id, State.CLOSED, 1000L, originNodeId, targetDn);
+          id, State.QUASI_CLOSED, 1000L, originNodeId, targetDn);
       containerStateManager.updateContainerReplica(
           id, replicatedReplicaThree);
 
+      // On the next run, no additional replications should be scheduled.
       replicationManager.processAll();
       eventQueue.processAll(1000);
 

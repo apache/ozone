@@ -1281,7 +1281,8 @@ public class LegacyReplicationManager {
         // container manager, even when they go dead.
         .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
             && !deletionInFlight.contains(r.getDatanodeDetails())
-            && validReplicaStateSet.contains(r.getState()))
+            && (validReplicaStateSet.isEmpty() ||
+              validReplicaStateSet.contains(r.getState())))
         .collect(Collectors.toList());
   }
 
