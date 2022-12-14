@@ -53,13 +53,6 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
    * Creates volume, bucket and key entries and adds to OM DB and then
    * deletes these keys to move them to deletedKeys table.
    */
-  @Before
-  public void cleanup() throws Exception {
-    String bucketKey = omMetadataManager.getBucketKey(volumeName,
-        bucketName);
-    omMetadataManager.getBucketTable().delete(bucketKey);
-  }
-  
   private List<OmKeyInfo> createAndDeleteKeys(Integer trxnIndex, String bucket)
       throws Exception {
     if (bucket == null) {
