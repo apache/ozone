@@ -120,7 +120,6 @@ public class TestReconTasks {
         .getContainers().size();
     Assert.assertNotEquals(scmContainersCount, reconContainersCount);
     reconScm.syncWithSCMContainerInfo();
-    scmContainersCount = scmContainerManager.getContainers().size();
     reconContainersCount = reconContainerManager
         .getContainers().size();
     Assert.assertEquals(scmContainersCount, reconContainersCount);
