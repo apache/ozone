@@ -36,6 +36,7 @@ public class ECReconstructionCommandInfo {
       sources;
   private List<DatanodeDetails> targetDatanodes;
   private long deadlineMsSinceEpoch = 0;
+  private final long term;
 
   public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
     this.containerID = cmd.getContainerID();
@@ -46,6 +47,7 @@ public class ECReconstructionCommandInfo {
     this.sources = cmd.getSources();
     this.targetDatanodes = cmd.getTargetDatanodes();
     this.deadlineMsSinceEpoch = cmd.getDeadline();
+    this.term = cmd.getTerm();
   }
 
   public long getDeadline() {
@@ -82,5 +84,9 @@ public class ECReconstructionCommandInfo {
         .toString(missingContainerIndexes)
         + ", sources=" + sources
         + ", targetDatanodes=" + targetDatanodes + '}';
+  }
+
+  public long getTerm() {
+    return term;
   }
 }
