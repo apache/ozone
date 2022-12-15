@@ -32,6 +32,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
@@ -40,6 +41,7 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests the ECReconstructionSupervisor.
@@ -62,7 +64,7 @@ public class TestECReconstructionSupervisor {
     ECReconstructionSupervisor supervisor =
         new ECReconstructionSupervisor(null, null, 5,
             new ECReconstructionCoordinator(new OzoneConfiguration(), null,
-                ECReconstructionMetrics.create()) {
+                null, ECReconstructionMetrics.create()) {
               @Override
               public void reconstructECContainerGroup(long containerID,
                   ECReplicationConfig repConfig,
@@ -79,9 +81,7 @@ public class TestECReconstructionSupervisor {
               }
             }, clock) {
         };
-    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
-        1L, ImmutableList.of(), ImmutableList.of(), new byte[0],
-        new ECReplicationConfig(3, 2));
+    ReconstructECContainersCommand command = createCommand(1L);
     supervisor.addTask(new ECReconstructionCommandInfo(command));
     runnableInvoked.await();
     Assertions.assertEquals(1, supervisor.getInFlightReplications());
@@ -98,22 +98,16 @@ public class TestECReconstructionSupervisor {
         new ECReconstructionSupervisor(null, null,
             newDirectExecutorService(), coordinator, clock);
 
-    ReconstructECContainersCommand command = new ReconstructECContainersCommand(
-        1L, ImmutableList.of(), ImmutableList.of(), new byte[0],
-        new ECReplicationConfig(3, 2));
+    ReconstructECContainersCommand command = createCommand(1);
     ECReconstructionCommandInfo task1 =
         new ECReconstructionCommandInfo(command);
 
-    command = new ReconstructECContainersCommand(
-        2L, ImmutableList.of(), ImmutableList.of(), new byte[0],
-        new ECReplicationConfig(3, 2));
+    command = createCommand(2);
     command.setDeadline(clock.millis() + 10000);
     ECReconstructionCommandInfo task2 =
         new ECReconstructionCommandInfo(command);
 
-    command = new ReconstructECContainersCommand(
-        3L, ImmutableList.of(), ImmutableList.of(), new byte[0],
-        new ECReplicationConfig(3, 2));
+    command = createCommand(3);
     command.setDeadline(clock.millis() + 20000);
     ECReconstructionCommandInfo task3 =
         new ECReconstructionCommandInfo(command);
@@ -132,6 +126,33 @@ public class TestECReconstructionSupervisor {
     // Deadline not passed for container 3, it should run.
     Mockito.verify(coordinator, times(1))
         .reconstructECContainerGroup(eq(3L), any(), any(), any());
+  }
+
+  @Test
+  void dropsTaskWithObsoleteTerm() throws IOException {
+    final long commandTerm = 1;
+    final long currentTerm = 2;
+    ECReconstructionCoordinator coordinator =
+        Mockito.mock(ECReconstructionCoordinator.class);
+    when(coordinator.getTermOfLeaderSCM())
+        .thenReturn(OptionalLong.of(currentTerm));
+    ECReconstructionSupervisor supervisor =
+        new ECReconstructionSupervisor(null, null,
+            newDirectExecutorService(), coordinator, clock);
+
+    ReconstructECContainersCommand command = createCommand(1);
+    command.setTerm(commandTerm);
+    supervisor.addTask(new ECReconstructionCommandInfo(command));
+
+    Mockito.verify(coordinator, times(0))
+        .reconstructECContainerGroup(eq(1L), any(), any(), any());
+  }
+
+  private static ReconstructECContainersCommand createCommand(
+      long containerID) {
+    return new ReconstructECContainersCommand(
+        containerID, ImmutableList.of(), ImmutableList.of(), new byte[0],
+        new ECReplicationConfig(3, 2));
   }
 
 }
