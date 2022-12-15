@@ -252,7 +252,9 @@ public class DirectoryDeletingService extends BackgroundService {
     for (OmKeyInfo dirInfo : subDirs) {
       String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
           bucketId, dirInfo.getParentObjectID(), dirInfo.getFileName());
-      subDirList.add(Pair.of(ozoneDbKey, dirInfo));
+      String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+          dirInfo.getObjectID(), ozoneDbKey);
+      subDirList.add(Pair.of(ozoneDeleteKey, dirInfo));
       LOG.debug("Moved sub dir name: {}", dirInfo.getKeyName());
     }
 
