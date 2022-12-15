@@ -85,8 +85,8 @@ public class PipelineSyncTask extends ReconScmTask {
 
   public void triggerPipelineSyncTask()
       throws IOException, TimeoutException, NodeNotFoundException {
+    lock.writeLock().lock();
     try {
-      lock.writeLock().lock();
       long start = Time.monotonicNow();
       List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
       reconPipelineManager.initializePipelines(pipelinesFromScm);

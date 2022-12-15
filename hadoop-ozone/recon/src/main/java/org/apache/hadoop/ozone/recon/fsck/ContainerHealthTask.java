@@ -98,8 +98,8 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   public void triggerContainerHealthCheck() {
+    lock.writeLock().lock();
     try {
-      lock.writeLock().lock();
       long start = Time.monotonicNow();
       long currentTime = System.currentTimeMillis();
       long existingCount = processExistingDBRecords(currentTime);
