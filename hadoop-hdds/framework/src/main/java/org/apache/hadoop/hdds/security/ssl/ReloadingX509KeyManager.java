@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.hdds.security.ssl;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,7 +162,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
         privateKey, EMPTY_PASSWORD, new Certificate[]{cert});
 
     KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(
-        SSLFactory.SSLCERTIFICATE);
+        KeyManagerFactory.getDefaultAlgorithm());
     keyMgrFactory.init(keystore, EMPTY_PASSWORD);
     for (KeyManager candidate: keyMgrFactory.getKeyManagers()) {
       if (candidate instanceof X509ExtendedKeyManager) {
