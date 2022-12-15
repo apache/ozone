@@ -92,13 +92,10 @@ public abstract class MisReplicationHandler implements
             SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
-  private Set<ContainerReplica> filterSources(
-          Set<ContainerReplica> replicas,
-          Set<DatanodeDetails> deletionInFlight) {
+  private Set<ContainerReplica> filterSources(Set<ContainerReplica> replicas) {
     return replicas.stream().filter(r -> r
                     .getState() == StorageContainerDatanodeProtocolProtos
                     .ContainerReplicaProto.State.CLOSED)
-            .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
             .filter(r -> ReplicationManager
                     .getNodeStatus(r.getDatanodeDetails(), nodeManager)
                     .isHealthy())
@@ -133,8 +130,14 @@ public abstract class MisReplicationHandler implements
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
       throws IOException {
     ContainerInfo container = result.getContainerInfo();
+    if (!pendingOps.isEmpty()) {
+      LOG.info("Skipping Mis-Replication for Container {}, " +
+               "as there are still some pending ops for the container: {}",
+              container, pendingOps);
+      return Collections.emptyMap();
+    }
     ContainerReplicaCount replicaCount = getContainerReplicaCount(container,
-            replicas, pendingOps, remainingMaintenanceRedundancy);
+            replicas, Collections.emptyList(), remainingMaintenanceRedundancy);
 
     if (!replicaCount.isSufficientlyReplicated() ||
             replicaCount.isOverReplicated()) {
@@ -147,16 +150,6 @@ public abstract class MisReplicationHandler implements
               replicaCount.isOverReplicated());
       return Collections.emptyMap();
     }
-    final Set<DatanodeDetails> deletionInFlight = new HashSet<>();
-    final Set<DatanodeDetails> addInFlight = new HashSet<>();
-
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        deletionInFlight.add(op.getTarget());
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        addInFlight.add(op.getTarget());
-      }
-    }
 
     List<DatanodeDetails> usedDns = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
@@ -167,19 +160,8 @@ public abstract class MisReplicationHandler implements
               container.getContainerID());
       return Collections.emptyMap();
     }
-    List<DatanodeDetails> dnsWithPendingOps =
-            Stream.concat(usedDns.stream(), addInFlight.stream())
-            .filter(dn -> !deletionInFlight.contains(dn))
-            .distinct()
-            .collect(Collectors.toList());
-    if (containerPlacement.validateContainerPlacement(dnsWithPendingOps,
-            usedDns.size()).isPolicySatisfied()) {
-      LOG.info("Container {} is currently misreplicated but will not be " +
-               "misreplicated after pending ops executed",
-              container.getContainerID());
-      return Collections.emptyMap();
-    }
-    Set<ContainerReplica> sources = filterSources(replicas, deletionInFlight);
+
+    Set<ContainerReplica> sources = filterSources(replicas);
     Set<ContainerReplica> replicasToBeReplicated = containerPlacement
             .replicasToCopyToFixMisreplication(replicas.stream()
             .collect(Collectors.toMap(Function.identity(), sources::contains)));
