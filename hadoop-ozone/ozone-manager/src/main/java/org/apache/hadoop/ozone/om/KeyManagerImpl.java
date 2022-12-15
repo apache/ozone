@@ -1318,17 +1318,20 @@ public class KeyManagerImpl implements KeyManager {
     OmKeyInfo fakeDirKeyInfo = null;
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
-    Table.KeyValue<String, OmKeyInfo> keyValue =
-            metadataManager.getKeyTable(layout).iterator()
-                .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
+      Table.KeyValue<String, OmKeyInfo> keyValue =
+          keyTblItr
+              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
 
-    if (keyValue != null) {
-      Path fullPath = Paths.get(keyValue.getValue().getKeyName());
-      Path subPath = Paths.get(dirKey);
-      OmKeyInfo omKeyInfo = keyValue.getValue();
-      if (fullPath.startsWith(subPath)) {
-        // create fake directory
-        fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+      if (keyValue != null) {
+        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+        Path subPath = Paths.get(dirKey);
+        OmKeyInfo omKeyInfo = keyValue.getValue();
+        if (fullPath.startsWith(subPath)) {
+          // create fake directory
+          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+        }
       }
     }
 
