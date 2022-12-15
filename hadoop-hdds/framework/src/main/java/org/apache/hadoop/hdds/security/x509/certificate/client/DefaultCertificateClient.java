@@ -225,7 +225,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           rootCaCertId = Long.toString(latestRootCaCertSerialId);
         }
 
-        if (getCertificate() != null) {
+        if (x509Certificate != null) {
           if (executorService == null) {
             startCertificateMonitor();
           }
@@ -293,13 +293,18 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   @Override
   public synchronized X509Certificate getCertificate() {
+    if (x509Certificate != null) {
+      return x509Certificate;
+    }
+
     if (certSerialId == null) {
       getLogger().error("Default certificate serial id is not set. Can't " +
           "locate the default certificate for this client.");
       return null;
     }
-
-    if (x509Certificate == null) {
+    // Refresh the cache from file system.
+    loadAllCertificates();
+    if (certificateMap.containsKey(certSerialId)) {
       x509Certificate = certificateMap.get(certSerialId);
     }
     return x509Certificate;
@@ -1346,7 +1351,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Schedule task to refresh certificate before it expires
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     long timeBeforeGracePeriod =
-        timeBeforeExpiryGracePeriod(getCertificate()).toMillis();
+        timeBeforeExpiryGracePeriod(x509Certificate).toMillis();
     // At least three chances to renew the certificate before it expires
     long interval =
         Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));
