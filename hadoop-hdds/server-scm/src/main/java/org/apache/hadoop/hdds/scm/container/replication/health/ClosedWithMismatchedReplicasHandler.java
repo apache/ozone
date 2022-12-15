@@ -34,6 +34,7 @@ import java.util.Set;
  * mis-matched replica to close it.
  */
 public class ClosedWithMismatchedReplicasHandler extends AbstractCheck {
+
   public static final Logger LOG =
       LoggerFactory.getLogger(ClosedWithMismatchedReplicasHandler.class);
 
@@ -59,6 +60,8 @@ public class ClosedWithMismatchedReplicasHandler extends AbstractCheck {
       // Handler is only relevant for CLOSED containers.
       return false;
     }
+    LOG.debug("Checking container {} in ClosedWithMismatchedReplicasHandler",
+        containerInfo);
 
     // close replica if its state is OPEN or CLOSING
     for (ContainerReplica replica : replicas) {
