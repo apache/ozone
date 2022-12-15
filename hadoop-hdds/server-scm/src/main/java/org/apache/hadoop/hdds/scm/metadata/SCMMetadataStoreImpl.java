@@ -65,6 +65,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A RocksDB based implementation of SCM Metadata Store.
+ *
  */
 public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
