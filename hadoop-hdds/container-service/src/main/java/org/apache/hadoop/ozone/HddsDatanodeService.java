@@ -339,6 +339,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     LOG.info("Initializing secure Datanode.");
 
     CertificateClient.InitResponse response = dnCertClient.init();
+    if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      LOG.info("Re-initialize certificate client.");
+      dnCertClient = new DNCertificateClient(new SecurityConfig(conf));
+      response = dnCertClient.init();
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:
@@ -597,6 +602,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         } catch (Throwable t) {
           LOG.warn("ServicePlugin {} could not be closed", plugin, t);
         }
+      }
+    }
+
+    if (dnCertClient != null) {
+      try {
+        dnCertClient.close();
+      } catch (IOException e) {
+        LOG.warn("Certificate client could not be closed", e);
       }
     }
   }

@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,17 +37,21 @@ public class ECReconstructionCoordinatorTask implements Runnable {
   static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
-  private ECReconstructionCoordinator reconstructionCoordinator;
-  private ECReconstructionCommandInfo reconstructionCommandInfo;
+  private final ECReconstructionCoordinator reconstructionCoordinator;
+  private final ECReconstructionCommandInfo reconstructionCommandInfo;
+  private long deadlineMsSinceEpoch = 0;
+  private final Clock clock;
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
       ECReconstructionCommandInfo reconstructionCommandInfo,
       ConcurrentHashMap.KeySetView<Object, Boolean>
-          inprogressReconstructionCoordinatorCounter) {
+          inprogressReconstructionCoordinatorCounter,
+      Clock clock) {
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
     this.inprogressCounter = inprogressReconstructionCoordinatorCounter;
+    this.clock = clock;
   }
 
   @Override
@@ -69,6 +74,15 @@ public class ECReconstructionCoordinatorTask implements Runnable {
           containerID);
     }
     try {
+      if (reconstructionCommandInfo.getDeadline() > 0
+          && clock.millis() > reconstructionCommandInfo.getDeadline()) {
+        LOG.info("Ignoring this reconstruct container command for container" +
+                " {} since the current time {}ms is past the deadline {}ms",
+            containerID, clock.millis(),
+            reconstructionCommandInfo.getDeadline());
+        return;
+      }
+
       SortedMap<Integer, DatanodeDetails> sourceNodeMap =
           reconstructionCommandInfo.getSources().stream().collect(Collectors
               .toMap(DatanodeDetailsAndReplicaIndex::getReplicaIndex,

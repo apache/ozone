@@ -119,6 +119,13 @@ public final class OzoneConfigKeys {
       "ozone.client.max.ec.stripe.write.retries";
   public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
       "10";
+  public static final String OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED =
+      "ozone.client.ec.grpc.retries.enabled";
+  public static final boolean OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT
+      = true;
+  public static final String OZONE_CLIENT_EC_GRPC_RETRIES_MAX =
+      "ozone.client.ec.grpc.retries.max";
+  public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
 
   /**
    * Ozone administrator users delimited by comma.

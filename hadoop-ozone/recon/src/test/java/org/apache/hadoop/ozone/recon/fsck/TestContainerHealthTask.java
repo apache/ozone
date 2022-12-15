@@ -343,7 +343,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
    * of a datanode via setMisRepWhenDnPresent. If a DN with that UUID is passed
    * to validateContainerPlacement, then it will return an invalid placement.
    */
-  private static class MockPlacementPolicy implements PlacementPolicy {
+  private static class MockPlacementPolicy implements
+          PlacementPolicy<ContainerReplica> {
 
     private UUID misRepWhenDnPresent = null;
 
@@ -369,6 +370,13 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         return new ContainerPlacementStatusDefault(1, 1, 1);
       }
     }
+
+    @Override
+    public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+            Set<ContainerReplica> replicas) {
+      return Collections.emptySet();
+    }
+
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
       for (DatanodeDetails dn : dns) {

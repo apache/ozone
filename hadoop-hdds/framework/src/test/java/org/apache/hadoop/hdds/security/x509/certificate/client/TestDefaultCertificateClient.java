@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -35,6 +36,9 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
@@ -48,18 +52,25 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.slf4j.Logger;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Test class for {@link DefaultCertificateClient}.
@@ -474,4 +485,45 @@ public class TestDefaultCertificateClient {
     omClientLog.clearOutput();
   }
 
+  @Test
+  public void testCertificateExpirationHandlingInInit() throws Exception {
+    String certId = "1L";
+    String compName = "TEST";
+
+    Logger mockLogger = mock(Logger.class);
+
+    SecurityConfig config = mock(SecurityConfig.class);
+    Path nonexistent = Paths.get("nonexistent");
+    when(config.getCertificateLocation(anyString())).thenReturn(nonexistent);
+    when(config.getKeyLocation(anyString())).thenReturn(nonexistent);
+    when(config.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
+
+    Calendar cal = Calendar.getInstance();
+    cal.add(Calendar.DAY_OF_YEAR, 2);
+    Date expiration = cal.getTime();
+    X509Certificate mockCert = mock(X509Certificate.class);
+    when(mockCert.getNotAfter()).thenReturn(expiration);
+
+    DefaultCertificateClient client =
+        new DefaultCertificateClient(config, mockLogger, certId, compName) {
+          @Override
+          public PrivateKey getPrivateKey() {
+            return mock(PrivateKey.class);
+          }
+
+          @Override
+          public PublicKey getPublicKey() {
+            return mock(PublicKey.class);
+          }
+
+          @Override
+          public X509Certificate getCertificate() {
+            return mockCert;
+          }
+        };
+
+    InitResponse resp = client.init();
+    verify(mockLogger, atLeastOnce()).info(anyString());
+    assertEquals(resp, REINIT);
+  }
 }

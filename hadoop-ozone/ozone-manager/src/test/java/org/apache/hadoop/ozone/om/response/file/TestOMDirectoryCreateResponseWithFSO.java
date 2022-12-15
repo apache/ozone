@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
+import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.Assert;
@@ -44,6 +46,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tests OMDirectoryCreateResponseWithFSO - prefix layout.
@@ -67,6 +70,8 @@ public class TestOMDirectoryCreateResponseWithFSO {
   @Test
   public void testAddToDBBatch() throws Exception {
 
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
     final String volume = "volume";
@@ -84,12 +89,18 @@ public class TestOMDirectoryCreateResponseWithFSO {
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
             .build();
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));
+    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+        volumeName, bucketName);
+    omBucketInfo = omBucketInfo.toBuilder()
+        .setUsedNamespace(usedNamespace).build();
 
     OMDirectoryCreateResponseWithFSO omDirectoryCreateResponseWithFSO =
         new OMDirectoryCreateResponseWithFSO(omResponse, volumeId, bucketId,
                 omDirInfo, new ArrayList<>(),
                 OMDirectoryCreateRequestWithFSO.Result.SUCCESS,
-                BucketLayout.FILE_SYSTEM_OPTIMIZED);
+                BucketLayout.FILE_SYSTEM_OPTIMIZED, omBucketInfo);
 
     omDirectoryCreateResponseWithFSO
         .addToDBBatch(omMetadataManager, batchOperation);
@@ -100,6 +111,12 @@ public class TestOMDirectoryCreateResponseWithFSO {
     Assert.assertNotNull(omMetadataManager.getDirectoryTable().get(
             omMetadataManager.getOzonePathKey(volumeId, bucketId,
                     parentID, keyName)));
+
+    Table.KeyValue<String, OmBucketInfo> keyValue =
+        omMetadataManager.getBucketTable().iterator().next();
+    Assert.assertEquals(omMetadataManager.getBucketKey(volumeName,
+        bucketName), keyValue.getKey());
+    Assert.assertEquals(usedNamespace, keyValue.getValue().getUsedNamespace());
   }
 
   private void addVolumeToDB(String volumeName) throws IOException {

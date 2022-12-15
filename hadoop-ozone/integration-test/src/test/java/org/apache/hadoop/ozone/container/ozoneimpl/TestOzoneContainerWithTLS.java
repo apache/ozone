@@ -23,8 +23,12 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +39,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -51,14 +56,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.security.cert.CertificateExpiredException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_LEN;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -80,12 +94,12 @@ public class TestOzoneContainerWithTLS {
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
   private OzoneConfiguration conf;
-  private OzoneBlockTokenSecretManager secretManager;
+  private ContainerTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
-  private boolean blockTokenEnabled;
+  private boolean containerTokenEnabled;
 
-  public TestOzoneContainerWithTLS(boolean blockTokenEnabled) {
-    this.blockTokenEnabled = blockTokenEnabled;
+  public TestOzoneContainerWithTLS(boolean enableToken) {
+    this.containerTokenEnabled = enableToken;
   }
 
   @Parameterized.Parameters
@@ -114,26 +128,37 @@ public class TestOzoneContainerWithTLS {
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_ENABLED, true);
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
+    conf.setInt(HDDS_KEY_LEN, 1024);
+    // certificate lives for 5s
+    conf.set(HDDS_X509_DEFAULT_DURATION, "PT5S");
+    conf.set(HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL, "1s");
+    conf.set(HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL, "1s");
 
     long expiryTime = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
+        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME, "1s",
         TimeUnit.MILLISECONDS);
 
     caClient = new CertificateClientTestImpl(conf, false);
-    secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        expiryTime, caClient.getCertificate().
-        getSerialNumber().toString());
+    secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
+        expiryTime, caClient.getCertificate().getSerialNumber().toString());
+  }
+
+  @Test(expected = CertificateExpiredException.class)
+  public void testCertificateLifetime() throws Exception {
+    // Sleep to wait for certificate expire
+    Thread.sleep(5000);
+    caClient.getCertificate().checkValidity();
   }
 
   @Test
+  @org.junit.Ignore("HDDS-7628")
   public void testCreateOzoneContainer() throws Exception {
-    LOG.info("testCreateOzoneContainer with TLS and blockToken enabled: {}",
-        blockTokenEnabled);
-    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
-        blockTokenEnabled);
+    LOG.info("testCreateOzoneContainer with TLS and containerToken enabled: {}",
+        containerTokenEnabled);
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
+        containerTokenEnabled);
 
-    long containerID = ContainerTestHelper.getTestContainerID();
+    long containerId = ContainerTestHelper.getTestContainerID();
     OzoneContainer container = null;
     System.out.println(System.getProperties().getProperty("java.library.path"));
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
@@ -153,13 +178,16 @@ public class TestOzoneContainerWithTLS {
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
           Collections.singletonList(caClient.getCACertificate()));
 
-      if (blockTokenEnabled) {
+      if (containerTokenEnabled) {
         secretManager.start(caClient);
         client.connect();
-        createSecureContainerForTesting(client, containerID, null);
+        createSecureContainer(client, containerId,
+            secretManager.generateToken(
+                UserGroupInformation.getCurrentUser().getUserName(),
+                ContainerID.valueOf(containerId)));
       } else {
-        createContainerForTesting(client, containerID);
         client.connect();
+        createContainer(client, containerId);
       }
     } finally {
       if (container != null) {
@@ -168,27 +196,171 @@ public class TestOzoneContainerWithTLS {
     }
   }
 
-  public static void createContainerForTesting(XceiverClientSpi client,
-      long containerID) throws Exception {
-    ContainerProtos.ContainerCommandRequestProto request =
-        ContainerTestHelper.getCreateContainerRequest(
-            containerID, client.getPipeline());
-    ContainerProtos.ContainerCommandResponseProto response =
-        client.sendCommand(request);
-    Assert.assertNotNull(response);
+  @Test
+  @org.junit.Ignore("HDDS-7628")
+  public void testContainerDownload() throws Exception {
+    DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
+        UUID.randomUUID().toString(), "localhost", "0.0.0.0",
+        "/default-rack");
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.newFolder().getPath());
+    conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+        pipeline.getFirstNode().getPort(DatanodeDetails.Port.Name.STANDALONE)
+            .getValue());
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
+
+    OzoneContainer container = null;
+    try {
+      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
+
+      // Set scmId and manually start ozone container.
+      container.start(UUID.randomUUID().toString());
+
+      if (containerTokenEnabled) {
+        secretManager.start(caClient);
+      }
+
+      // Create containers
+      long containerId = ContainerTestHelper.getTestContainerID();
+      int count = 5;
+      List<Long> containerIdList = new ArrayList<>();
+      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
+          Collections.singletonList(caClient.getCACertificate()));
+      client.connect();
+      for (int i = 0; i < count; i++, containerId++) {
+        if (containerTokenEnabled) {
+          Token<ContainerTokenIdentifier> token = secretManager.generateToken(
+              UserGroupInformation.getCurrentUser().getUserName(),
+              ContainerID.valueOf(containerId));
+          createSecureContainer(client, containerId, token);
+          closeSecureContainer(client, containerId, token);
+        } else {
+          createContainer(client, containerId);
+          closeContainer(client, containerId);
+        }
+        containerIdList.add(containerId);
+      }
+
+      // Wait certificate to expire
+      GenericTestUtils.waitFor(() ->
+              caClient.getCertificate().getNotAfter().before(new Date()),
+          500, 5000);
+
+      List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
+      sourceDatanodes.add(dn);
+      if (containerTokenEnabled) {
+        // old client still function well after certificate expired
+        Token<ContainerTokenIdentifier> token = secretManager.generateToken(
+            UserGroupInformation.getCurrentUser().getUserName(),
+            ContainerID.valueOf(containerId));
+        createSecureContainer(client, containerId, token);
+        closeSecureContainer(client, containerId++, token);
+      } else {
+        createContainer(client, containerId);
+        closeContainer(client, containerId++);
+      }
+
+      // Download newly created container will fail because of cert expired
+      GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+          .captureLogs(SimpleContainerDownloader.LOG);
+      SimpleContainerDownloader downloader =
+          new SimpleContainerDownloader(conf, caClient);
+      Path file = downloader.getContainerDataFromReplicas(
+          containerId, sourceDatanodes);
+      downloader.close();
+      Assert.assertNull(file);
+      Assert.assertTrue(logCapture.getOutput().contains(
+          "java.security.cert.CertificateExpiredException"));
+
+      // Renew the certificate
+      caClient.renewKey();
+
+      // old client still function well after certificate renewed
+      if (containerTokenEnabled) {
+        Token<ContainerTokenIdentifier> token = secretManager.generateToken(
+            UserGroupInformation.getCurrentUser().getUserName(),
+            ContainerID.valueOf(containerId));
+        createSecureContainer(client, containerId, token);
+        closeSecureContainer(client, containerId++, token);
+      }
+
+      // Wait keyManager and trustManager to reload
+      Thread.sleep(2000);
+
+      // old client still function well after certificate reload
+      if (containerTokenEnabled) {
+        Token<ContainerTokenIdentifier> token = secretManager.generateToken(
+            UserGroupInformation.getCurrentUser().getUserName(),
+            ContainerID.valueOf(containerId));
+        createSecureContainer(client, containerId, token);
+        closeSecureContainer(client, containerId++, token);
+      } else {
+        createContainer(client, containerId);
+        closeContainer(client, containerId++);
+      }
+
+      // Download container should succeed after key and cert renewed
+      for (Long cId : containerIdList) {
+        downloader = new SimpleContainerDownloader(conf, caClient);
+        try {
+          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes);
+          downloader.close();
+          Assert.assertNotNull(file);
+        } finally {
+          if (downloader != null) {
+            downloader.close();
+          }
+          client.close();
+        }
+      }
+    } finally {
+      if (container != null) {
+        container.stop();
+      }
+    }
   }
 
-  public static void createSecureContainerForTesting(XceiverClientSpi client,
-      long containerID, Token<OzoneBlockTokenIdentifier> token)
+  public static void createContainer(XceiverClientSpi client,
+      long containerID) throws Exception {
+    ContainerCommandRequestProto request = ContainerTestHelper
+        .getCreateContainerRequest(containerID, client.getPipeline());
+    ContainerCommandResponseProto response = client.sendCommand(request);
+    Assert.assertNotNull(response);
+    Assert.assertTrue(response.getResult() == ContainerProtos.Result.SUCCESS);
+  }
+
+  public static void createSecureContainer(XceiverClientSpi client,
+      long containerID, Token<ContainerTokenIdentifier> token)
       throws Exception {
-    ContainerProtos.ContainerCommandRequestProto request =
+    ContainerCommandRequestProto request =
         ContainerTestHelper.getCreateContainerSecureRequest(
             containerID, client.getPipeline(), token);
-    ContainerProtos.ContainerCommandResponseProto response =
+    ContainerCommandResponseProto response =
         client.sendCommand(request);
     Assert.assertNotNull(response);
+    Assert.assertTrue(response.getResult() == ContainerProtos.Result.SUCCESS);
   }
 
+  public static void closeContainer(XceiverClientSpi client,
+      long containerID) throws Exception {
+    ContainerCommandRequestProto request = ContainerTestHelper
+        .getCloseContainer(client.getPipeline(), containerID);
+    ContainerCommandResponseProto response = client.sendCommand(request);
+    Assert.assertNotNull(response);
+    Assert.assertTrue(response.getResult() == ContainerProtos.Result.SUCCESS);
+  }
+
+  public static void closeSecureContainer(XceiverClientSpi client,
+      long containerID, Token<ContainerTokenIdentifier> token)
+      throws Exception {
+    ContainerCommandRequestProto request =
+        ContainerTestHelper.getCloseContainer(client.getPipeline(),
+            containerID, token);
+    ContainerCommandResponseProto response =
+        client.sendCommand(request);
+    Assert.assertNotNull(response);
+    Assert.assertTrue(response.getResult() == ContainerProtos.Result.SUCCESS);
+  }
 
   private StateContext getContext(DatanodeDetails datanodeDetails) {
     DatanodeStateMachine stateMachine = Mockito.mock(

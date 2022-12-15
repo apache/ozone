@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -49,10 +50,12 @@ public class ReplicationSupervisor {
   private final ContainerReplicator replicator;
   private final ExecutorService executor;
   private final StateContext context;
+  private final Clock clock;
 
   private final AtomicLong requestCounter = new AtomicLong();
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
+  private final AtomicLong timeoutCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -64,35 +67,27 @@ public class ReplicationSupervisor {
   @VisibleForTesting
   ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ExecutorService executor) {
+      ContainerReplicator replicator, ExecutorService executor,
+      Clock clock) {
     this.containerSet = containerSet;
     this.replicator = replicator;
     this.containersInFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
+    this.clock = clock;
   }
 
   public ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ReplicationConfig replicationConfig) {
-    this(containerSet, context, replicator,
-        replicationConfig.getReplicationMaxStreams());
-  }
-
-  public ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, int poolSize) {
+      ContainerReplicator replicator, ReplicationConfig replicationConfig,
+      Clock clock) {
     this(containerSet, context, replicator, new ThreadPoolExecutor(
-        poolSize, poolSize, 60, TimeUnit.SECONDS,
+        replicationConfig.getReplicationMaxStreams(),
+        replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
-            .build()));
-  }
-
-  public ReplicationSupervisor(ContainerSet containerSet,
-      ContainerReplicator replicator, int poolSize) {
-    this(containerSet, null, replicator, poolSize);
+            .build()), clock);
   }
 
   /**
@@ -147,6 +142,14 @@ public class ReplicationSupervisor {
       final Long containerId = task.getContainerId();
       try {
         requestCounter.incrementAndGet();
+
+        if (task.getDeadline() > 0 && clock.millis() > task.getDeadline()) {
+          LOG.info("Ignoring this replicate container command for container" +
+              " {} since the current time {}ms is past the deadline {}ms",
+              containerId, clock.millis(), task.getDeadline());
+          timeoutCounter.incrementAndGet();
+          return;
+        }
 
         if (context != null) {
           DatanodeDetails dn = context.getParent().getDatanodeDetails();
@@ -206,4 +209,9 @@ public class ReplicationSupervisor {
   public long getReplicationFailureCount() {
     return failureCounter.get();
   }
+
+  public long getReplicationTimeoutCount() {
+    return timeoutCounter.get();
+  }
+
 }
