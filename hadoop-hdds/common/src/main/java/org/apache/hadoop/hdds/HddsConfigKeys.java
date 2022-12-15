@@ -195,19 +195,19 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
 
   public static final String HDDS_EXTERNAL_ROOT_CA_CERT_PATH =
-      "hdds.external.root.ca.cert";
+      "hdds.x509.rootca.certificate.file";
 
   public static final String HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT =
       "";
 
   public static final String HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH =
-      "hdds.external.root.ca.public.key";
+      "hdds.x509.rootca.public.key.file";
 
   public static final String HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH_DEFAULT =
       "";
 
   public static final String HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH =
-      "hdds.external.root.ca.private.key";
+      "hdds.x509.rootca.private.key.file";
 
   public static final String HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT =
       "";

@@ -43,6 +43,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_P
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
@@ -197,7 +198,7 @@ public class SecurityConfig {
         HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
     this.externalRootCaPublicKeyPath = this.configuration.get(
         HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH,
-        HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
+        HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH_DEFAULT);
     this.externalRootCaPrivateKeyPath = this.configuration.get(
         HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH,
         HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT);
