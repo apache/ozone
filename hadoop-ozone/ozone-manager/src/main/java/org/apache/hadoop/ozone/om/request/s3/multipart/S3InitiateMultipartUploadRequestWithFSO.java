@@ -193,6 +193,10 @@ public class S3InitiateMultipartUploadRequestWithFSO
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .build();
+      
+      // validate and update namespace for missing parent directory
+      checkBucketQuotaInNamespace(bucketInfo, missingParentInfos.size());
+      bucketInfo.incrUsedNamespace(missingParentInfos.size());
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
@@ -218,7 +222,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo, multipartKey,
-              missingParentInfos, getBucketLayout(), volumeId, bucketId);
+              missingParentInfos, getBucketLayout(), volumeId, bucketId,
+              bucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
