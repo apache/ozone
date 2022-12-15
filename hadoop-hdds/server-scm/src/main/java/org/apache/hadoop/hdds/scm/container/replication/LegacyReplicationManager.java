@@ -93,6 +93,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.MOVE;
 
 /**
@@ -1308,7 +1309,8 @@ public class LegacyReplicationManager {
       List<ContainerReplica> replicas, boolean healthy) {
     return replicas.stream()
         .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
-            && compareState(container.getState(), r.getState()) == healthy)
+            && compareState(container.getState(), r.getState()) == healthy
+            && r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
         .collect(Collectors.toList());
   }
 
