@@ -19,17 +19,15 @@
 
 package org.apache.hadoop.ozone.security;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
@@ -41,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 
@@ -49,19 +48,21 @@ import static org.apache.hadoop.hdds.security.x509.certificates.utils.Certificat
  */
 public class OMCertificateClient extends CommonCertificateClient {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMCertificateClient.class);
 
   public static final String COMPONENT_NAME = "om";
   private String scmID;
   private final String clusterID;
   private final HddsProtos.OzoneManagerDetailsProto omInfo;
-  private SCMSecurityProtocolClientSideTranslatorPB secureScmClient;
 
-  public OMCertificateClient(OzoneConfiguration ozoneConfig, String scmId,
+  @SuppressWarnings("parameternumber")
+  public OMCertificateClient(SecurityConfig secConfig, String scmId,
       String clusterId, HddsProtos.OzoneManagerDetailsProto omDetails,
-      String certSerialId, String localCrlId) {
-    super(ozoneConfig, LOG, certSerialId, COMPONENT_NAME);
+      String certSerialId, String localCrlId,
+      Consumer<String> persistCertIdCallback, Runnable shutdownCallback) {
+    super(secConfig, LOG, certSerialId, COMPONENT_NAME, persistCertIdCallback,
+        shutdownCallback);
     this.setLocalCrlId(localCrlId != null ?
         Long.parseLong(localCrlId) : 0);
     this.scmID = scmId;
@@ -69,22 +70,34 @@ public class OMCertificateClient extends CommonCertificateClient {
     this.omInfo = omDetails;
   }
 
-  public OMCertificateClient(OzoneConfiguration ozoneConfig, String scmId,
-      String clusterId, HddsProtos.OzoneManagerDetailsProto omDetails,
-      String certSerialId) {
-    this(ozoneConfig, scmId, clusterId, omDetails, certSerialId, null);
+  public OMCertificateClient(SecurityConfig secConfig,
+      OMStorage omStorage, String scmID, Consumer<String> saveCertIdCallback,
+      Runnable shutdownCallback) {
+    this(secConfig, scmID, omStorage.getClusterID(),
+        OzoneManager.getOmDetailsProto(
+            (OzoneConfiguration) secConfig.getConfiguration(),
+            omStorage.getOmId()),
+        omStorage.getOmCertSerialId(), null,
+        saveCertIdCallback, shutdownCallback);
   }
 
-  public OMCertificateClient(OzoneConfiguration ozoneConfig,
-      OMStorage omStorage, String scmID) {
-    this(ozoneConfig, scmID, omStorage.getClusterID(),
-        OzoneManager.getOmDetailsProto(ozoneConfig, omStorage.getOmId()),
-        omStorage.getOmCertSerialId(), null);
+  public OMCertificateClient(SecurityConfig secConfig, OMStorage omStorage,
+      String scmID) {
+    this(secConfig, scmID, omStorage.getClusterID(),
+        OzoneManager.getOmDetailsProto(
+            (OzoneConfiguration) secConfig.getConfiguration(),
+            omStorage.getOmId()),
+        omStorage.getOmCertSerialId(), null, null, null);
   }
 
-  public OMCertificateClient(OzoneConfiguration ozoneConfig) {
-    this(ozoneConfig, null, null, null, null, null);
+  public OMCertificateClient(SecurityConfig secConfig) {
+    this(secConfig, null, null, null, null, null, null, null);
   }
+
+  public OMCertificateClient(SecurityConfig secConfig, String certSerialId) {
+    this(secConfig, null, null, null, certSerialId, null, null, null);
+  }
+
   /**
    * Returns a CSR builder that can be used to create a Certificate signing
    * request.
@@ -147,15 +160,8 @@ public class OMCertificateClient extends CommonCertificateClient {
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
       Path certPath) throws CertificateException {
     try {
-      SCMGetCertResponseProto response;
-      synchronized (this) {
-        if (secureScmClient == null) {
-          secureScmClient =
-              HddsServerUtil.getScmSecurityClientWithFixedDuration(getConfig());
-        }
-        response = secureScmClient.getOMCertChain(omInfo,
-            getEncodedString(request));
-      }
+      SCMGetCertResponseProto response = getScmSecureClient()
+          .getOMCertChain(omInfo, getEncodedString(request));
 
       String pemEncodedCert = response.getX509Certificate();
       CertificateCodec certCodec = new CertificateCodec(
@@ -189,11 +195,5 @@ public class OMCertificateClient extends CommonCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
-  }
-
-  @VisibleForTesting
-  public synchronized void setSecureScmClient(
-      SCMSecurityProtocolClientSideTranslatorPB client) {
-    secureScmClient = client;
   }
 }

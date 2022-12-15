@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
@@ -62,7 +61,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -141,8 +139,8 @@ public class TestHddsSecureDatanodeInit {
         .getCertificateLocation(DN_COMPONENT).toString(),
         securityConfig.getCertificateFileName()).toFile());
     dnLogs.clearOutput();
-    client = new DNCertificateClient(conf, datanodeDetails,
-        certHolder.getSerialNumber().toString());
+    client = new DNCertificateClient(securityConfig, datanodeDetails,
+        certHolder.getSerialNumber().toString(), null, null);
     service.setCertificateClient(client);
   }
 
@@ -326,14 +324,13 @@ public class TestHddsSecureDatanodeInit {
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
-    service.startCertificateMonitor();
+    client.startCertificateMonitor();
 
     // check after renew, client will have the new cert ID
     GenericTestUtils.waitFor(() -> {
       String newCertId = client.getCertificate().getSerialNumber().toString();
       return newCertId.equals(certId);
     }, 1000, CERT_LIFETIME * 1000);
-    Assert.assertTrue(client.isCertificateRenewed());
     PrivateKey privateKey1 = client.getPrivateKey();
     PublicKey publicKey1 = client.getPublicKey();
     String caCertId1 = client.getCACertificate().getSerialNumber().toString();
@@ -366,7 +363,6 @@ public class TestHddsSecureDatanodeInit {
         .toString().equals(caCertId1));
     Assert.assertFalse(client.getRootCACertificate().getSerialNumber()
         .toString().equals(rootCaCertId1));
-    Assert.assertTrue(client.isCertificateRenewed());
   }
 
   /**
@@ -404,7 +400,7 @@ public class TestHddsSecureDatanodeInit {
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
-    service.startCertificateMonitor();
+    client.startCertificateMonitor();
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(CERT_LIFETIME * 1000);
@@ -434,32 +430,6 @@ public class TestHddsSecureDatanodeInit {
     GenericTestUtils.waitFor(() -> {
       String newCertId = client.getCertificate().getSerialNumber().toString();
       return newCertId.equals(certId2);
-    }, 1000, CERT_LIFETIME * 1000);
-  }
-
-  /**
-   * Test the directory rollback failure case.
-   */
-  @Test
-  @Disabled("Run it locally since it will terminate the process.")
-  public void testCertificateRotationUnRecoverableFailure() throws Exception {
-    DNCertificateClient mockClient = mock(DNCertificateClient.class);
-    when(mockClient.getCertificate()).thenReturn(
-        CertificateCodec.getX509Certificate(certHolder));
-    when(mockClient.timeBeforeExpiryGracePeriod(anyObject()))
-        .thenReturn(Duration.ZERO);
-    when(mockClient.renewAndStoreKeyAndCertificate(anyObject())).thenThrow(
-        new CertificateException("renewAndStoreKeyAndCert failed ",
-            CertificateException.ErrorCode.ROLLBACK_ERROR));
-
-    service.setCertificateClient(mockClient);
-    // start monitor task to renew key and cert
-    service.startCertificateMonitor();
-
-    // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals("");
     }, 1000, CERT_LIFETIME * 1000);
   }
 

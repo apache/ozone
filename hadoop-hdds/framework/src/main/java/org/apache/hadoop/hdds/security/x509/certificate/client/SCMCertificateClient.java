@@ -18,15 +18,18 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPair;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
@@ -47,18 +50,18 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       Paths.get(OzoneConsts.SCM_CA_CERT_STORAGE_DIR,
           OzoneConsts.SCM_SUB_CA_PATH).toString();
 
-  public SCMCertificateClient(OzoneConfiguration ozoneConfig,
+  public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId) {
-    super(ozoneConfig, LOG, certSerialId, COMPONENT_NAME);
+    super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
   }
 
-  public SCMCertificateClient(OzoneConfiguration ozoneConfig) {
-    super(ozoneConfig, LOG, null, COMPONENT_NAME);
+  public SCMCertificateClient(SecurityConfig securityConfig) {
+    super(securityConfig, LOG, null, COMPONENT_NAME, null, null);
   }
 
-  public SCMCertificateClient(OzoneConfiguration ozoneConfig,
+  public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId, String component) {
-    super(ozoneConfig, LOG, certSerialId, component);
+    super(securityConfig, LOG, certSerialId, component, null, null);
   }
 
   @Override
@@ -140,5 +143,17 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException {
+    return null;
+  }
+
+  @Override
+  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+      throws IOException {
+    return null;
   }
 }

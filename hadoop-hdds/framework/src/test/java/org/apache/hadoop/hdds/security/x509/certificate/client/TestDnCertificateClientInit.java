@@ -91,7 +91,8 @@ public class TestDnCertificateClientInit {
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
     certSerialId = x509Certificate.getSerialNumber().toString();
-    dnCertificateClient = new DNCertificateClient(config, null, certSerialId);
+    dnCertificateClient =
+        new DNCertificateClient(securityConfig, null, certSerialId, null, null);
     dnKeyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(DN_COMPONENT));

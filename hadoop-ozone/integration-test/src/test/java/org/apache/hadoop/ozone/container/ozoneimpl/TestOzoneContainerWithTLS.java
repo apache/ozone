@@ -58,6 +58,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Path;
 import java.security.cert.CertificateExpiredException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -97,6 +98,7 @@ public class TestOzoneContainerWithTLS {
   private ContainerTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
   private boolean containerTokenEnabled;
+  private int certLifetime = 10 * 1000; // 10s
 
   public TestOzoneContainerWithTLS(boolean enableToken) {
     this.containerTokenEnabled = enableToken;
@@ -129,8 +131,9 @@ public class TestOzoneContainerWithTLS {
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
     conf.setInt(HDDS_KEY_LEN, 1024);
-    // certificate lives for 5s
-    conf.set(HDDS_X509_DEFAULT_DURATION, "PT5S");
+    // certificate lives for 10s
+    conf.set(HDDS_X509_DEFAULT_DURATION,
+        Duration.ofMillis(certLifetime).toString());
     conf.set(HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL, "1s");
     conf.set(HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL, "1s");
 
@@ -146,7 +149,7 @@ public class TestOzoneContainerWithTLS {
   @Test(expected = CertificateExpiredException.class)
   public void testCertificateLifetime() throws Exception {
     // Sleep to wait for certificate expire
-    Thread.sleep(5000);
+    Thread.sleep(certLifetime);
     caClient.getCertificate().checkValidity();
   }
 
@@ -244,7 +247,7 @@ public class TestOzoneContainerWithTLS {
       // Wait certificate to expire
       GenericTestUtils.waitFor(() ->
               caClient.getCertificate().getNotAfter().before(new Date()),
-          500, 5000);
+          500, certLifetime);
 
       List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
       sourceDatanodes.add(dn);

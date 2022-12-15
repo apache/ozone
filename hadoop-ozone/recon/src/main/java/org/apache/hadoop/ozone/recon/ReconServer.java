@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -31,7 +30,6 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
@@ -53,15 +51,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.time.Duration;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -81,7 +76,6 @@ public class ReconServer extends GenericCli {
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
   private ReconTaskStatusMetrics reconTaskStatusMetrics;
-  private ScheduledExecutorService executorService;
 
   private volatile boolean isStarted = false;
 
@@ -101,8 +95,7 @@ public class ReconServer extends GenericCli {
     configuration = createOzoneConfiguration();
     ConfigurationProvider.setConfiguration(configuration);
 
-    injector =  Guice.createInjector(new
-        ReconControllerModule(),
+    injector = Guice.createInjector(new ReconControllerModule(),
         new ReconRestServletModule(configuration),
         new ReconSchemaGenerationModule());
 
@@ -122,9 +115,7 @@ public class ReconServer extends GenericCli {
           LOG.info("ReconStorageConfig initialized." +
               "Initializing certificate.");
           initializeCertificateClient(configuration);
-          startCertificateMonitor();
         }
-        reconStorage.persistCurrentState();
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
@@ -172,18 +163,18 @@ public class ReconServer extends GenericCli {
   private void initializeCertificateClient(OzoneConfiguration conf)
       throws IOException {
     LOG.info("Initializing secure Recon.");
-    certClient = new ReconCertificateClient(configuration,
+    certClient = new ReconCertificateClient(new SecurityConfig(configuration),
         reconStorage.getReconCertSerialId(), reconStorage.getClusterID(),
-        reconStorage.getReconId());
+        reconStorage.getReconId(), this::saveNewCertId, null);
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       LOG.info("Re-initialize certificate client.");
       reconStorage.unsetReconCertSerialId();
       reconStorage.persistCurrentState();
-      certClient = new ReconCertificateClient(configuration,
+      certClient = new ReconCertificateClient(new SecurityConfig(configuration),
           reconStorage.getReconCertSerialId(), reconStorage.getClusterID(),
-          reconStorage.getReconId());
+          reconStorage.getReconId(), this::saveNewCertId, this::terminateRecon);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -195,6 +186,9 @@ public class ReconServer extends GenericCli {
       String certId = certClient.signAndStoreCertificate(
           certClient.getCSRBuilder().build());
       reconStorage.setReconCertSerialId(certId);
+      reconStorage.persistCurrentState();
+      // set new certificate ID
+      certClient.setCertificateId(certId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
@@ -212,85 +206,25 @@ public class ReconServer extends GenericCli {
     }
   }
 
-  @VisibleForTesting
-  public void startCertificateMonitor() throws CertificateException {
-    // Schedule task to refresh certificate before it expires
-    Duration gracePeriod =
-        new SecurityConfig(configuration).getRenewalGracePeriod();
-    String certId = certClient.getCertificate().getSerialNumber().toString();
-    long timeBeforeGracePeriod =
-        certClient.timeBeforeExpiryGracePeriod(certId).toMillis();
-    // At least three chances to renew the certificate before it expires
-    long interval =
-        Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));
-
-    if (executorService == null) {
-      executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
-              .setDaemon(true).build());
+  public void saveNewCertId(String newCertId) {
+    try {
+      reconStorage.setReconCertSerialId(newCertId);
+      reconStorage.persistCurrentState();
+    } catch (IOException ex) {
+      // New cert ID cannot be persisted into VERSION file.
+      LOG.error("Failed to persist new cert ID {} to VERSION file." +
+          "Terminating OzoneManager...", newCertId, ex);
+      try {
+        stop();
+      } catch (Exception e) {
+        LOG.error("Error during stop Recon server", e);
+      }
     }
-    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
-        timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
-    LOG.info("CertificateLifetimeMonitor is started with first delay {} ms and"
-        + " interval {} ms.", timeBeforeGracePeriod, interval);
   }
 
-  /**
-   * Certificate lifetime monitor task.
-   */
-  public class CertificateLifetimeMonitor implements Runnable {
-    @Override
-    public void run() {
-      String certId = certClient.getCertificate().getSerialNumber().toString();
-      Duration timeLeft = Duration.ZERO;
-      try {
-        timeLeft = certClient.timeBeforeExpiryGracePeriod(certId);
-      } catch (CertificateException e) {
-        LOG.error("Failed to get cert {}. Keep on using existing certificates.",
-            certId, e);
-        return;
-      }
-
-      if (timeLeft.isZero()) {
-        String newCertId;
-        try {
-          LOG.info("Current certificate {} has entered the expiry grace " +
-                  "period {}. Start to renew and store new key and certs.",
-              certId, timeLeft,
-              new SecurityConfig(configuration).getRenewalGracePeriod());
-          newCertId = certClient.renewAndStoreKeyAndCertificate(false);
-        } catch (CertificateException e) {
-          LOG.error("Failed to renew and store key and cert." +
-              " Keep using existing certificates.", e);
-          if (e.errorCode() == CertificateException.ErrorCode.ROLLBACK_ERROR) {
-            try {
-              stop();
-            } catch (Exception ex) {
-              LOG.error("Error during stop Recon server", e);
-            }
-          }
-          return;
-        }
-
-        // Persist om cert serial id.
-        try {
-          reconStorage.setReconCertSerialId(newCertId);
-          reconStorage.persistCurrentState();
-        } catch (IOException ex) {
-          // New cert ID cannot be persisted into VERSION file.
-          LOG.error("Failed to persist new cert ID {} to VERSION file." +
-              "Terminating OzoneManager...", newCertId, ex);
-          try {
-            stop();
-          } catch (Exception e) {
-            LOG.error("Error during stop Recon server", e);
-          }
-        }
-
-        // reset and reload all certs
-        certClient.reloadKeyAndCertificate(newCertId);
-      }
-    }
+  public void terminateRecon() {
+    stop();
+    terminate(1);
   }
 
   /**
@@ -315,20 +249,26 @@ public class ReconServer extends GenericCli {
     }
   }
 
-  public void stop() throws Exception {
+  public void stop() {
     if (isStarted) {
       LOG.info("Stopping Recon server");
-      if (executorService != null) {
-        executorService.shutdown();
-      }
       if (httpServer != null) {
-        httpServer.stop();
+        try {
+          httpServer.stop();
+        } catch (Exception e) {
+          LOG.error("Stopping HttpServer is failed.", e);
+        }
       }
+
       if (reconStorageContainerManager != null) {
         reconStorageContainerManager.stop();
       }
       if (ozoneManagerServiceProvider != null) {
-        ozoneManagerServiceProvider.stop();
+        try {
+          ozoneManagerServiceProvider.stop();
+        } catch (Exception e) {
+          LOG.error("Stopping ozoneManagerServiceProvider is failed.", e);
+        }
       }
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.unregister();

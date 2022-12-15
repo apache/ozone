@@ -859,7 +859,7 @@ public final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     OMCertificateClient client =
-        new OMCertificateClient(conf, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId);
     client.init();
 
     // save first cert
@@ -870,7 +870,6 @@ public final class TestSecureOzoneCluster {
     String certId = certHolder.getSerialNumber().toString();
     certCodec.writeCertificate(certHolder);
     client.setCertificateId(certId);
-    client.loadAllCertificates();
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
 
@@ -927,7 +926,7 @@ public final class TestSecureOzoneCluster {
    */
   @Test
   public void testCertificateRotationRecoverableFailure() throws Exception {
-    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
+    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.LOG);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
@@ -936,7 +935,7 @@ public final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     OMCertificateClient client =
-        new OMCertificateClient(conf, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId);
     client.init();
 
     // save first cert
@@ -947,7 +946,6 @@ public final class TestSecureOzoneCluster {
     String certId = certHolder.getSerialNumber().toString();
     certCodec.writeCertificate(certHolder);
     client.setCertificateId(certId);
-    client.loadAllCertificates();
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
 
@@ -976,11 +974,6 @@ public final class TestSecureOzoneCluster {
     String certId1 = newCertHolder.getSerialNumber().toString();
     Assert.assertFalse(certId1.equals(
         client.getCertificate().getSerialNumber().toString()));
-
-    // create Ozone Manager instance, it will start the monitor task
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-    om = OzoneManager.createOm(conf);
-    om.setCertClient(client);
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(certificateLifetime * 1000);
@@ -1030,7 +1023,7 @@ public final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     OMCertificateClient client =
-        new OMCertificateClient(conf, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId);
     client.init();
 
     // save first cert

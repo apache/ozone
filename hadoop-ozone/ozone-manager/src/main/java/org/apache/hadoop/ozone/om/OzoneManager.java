@@ -31,7 +31,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -46,12 +45,9 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -86,7 +82,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -274,6 +269,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -442,7 +438,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final int MSECS_PER_MINUTE = 60 * 1000;
 
   private final boolean isSecurityEnabled;
-  private ScheduledExecutorService executorService;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -573,14 +568,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new RuntimeException("OzoneManager started in secure mode but " +
             "doesn't have SCM signed certificate.");
       }
-      certClient = new OMCertificateClient(conf, omStorage,
-          scmInfo == null ? null : scmInfo.getScmId());
-      if (certClient.getCertificate() != null) {
-        startCertificateMonitor();
-      } else {
-        Preconditions.checkArgument(testSecureOmFlag,
-            "Certificate should not be empty in production environment");
-      }
+      certClient = new OMCertificateClient(secConfig, omStorage,
+          scmInfo == null ? null : scmInfo.getScmId(), this::saveNewCertId,
+          this::terminateOM);
     }
     if (secConfig.isBlockTokenEnabled()) {
       blockTokenMgr = createBlockTokenSecretManager(configuration);
@@ -1292,13 +1282,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Initializing secure OzoneManager.");
 
     CertificateClient certClient =
-        new OMCertificateClient(conf, omStore, scmId);
+        new OMCertificateClient(new SecurityConfig(conf), omStore, scmId);
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       LOG.info("Re-initialize certificate client.");
       omStore.unsetOmCertSerialId();
       omStore.persistCurrentState();
-      certClient = new OMCertificateClient(conf);
+      certClient = new OMCertificateClient(
+          new SecurityConfig(conf), omStore, scmId);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -2052,9 +2043,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     try {
       omState = State.STOPPED;
-      if (executorService != null) {
-        executorService.shutdown();
-      }
       // Cancel the metrics timer and set to null.
       if (metricsTimer != null) {
         metricsTimer.cancel();
@@ -2108,6 +2096,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void shutDown(String message) {
     stop();
     ExitUtils.terminate(0, message, LOG);
+  }
+
+  public void terminateOM() {
+    stop();
+    terminate(1);
   }
 
   /**
@@ -4473,76 +4466,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return BucketLayout.DEFAULT;
   }
 
-  @VisibleForTesting
-  public void startCertificateMonitor() throws CertificateException {
-    // Schedule task to refresh certificate before it expires
-    Duration gracePeriod = secConfig.getRenewalGracePeriod();
-    String certId = certClient.getCertificate().getSerialNumber().toString();
-    long timeBeforeGracePeriod =
-        certClient.timeBeforeExpiryGracePeriod(certId).toMillis();
-    // At least three chances to renew the certificate before it expires
-    long interval =
-        Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));
-
-    if (executorService == null) {
-      executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
-              .setDaemon(true).build());
-    }
-    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
-        timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
-    LOG.info("CertificateLifetimeMonitor is started with first delay {} ms and"
-        + " interval {} ms.", timeBeforeGracePeriod, interval);
-  }
-
-  /**
-   * Certificate lifetime monitor task.
-   */
-  public class CertificateLifetimeMonitor implements Runnable {
-    @Override
-    public void run() {
-      String certId = certClient.getCertificate().getSerialNumber().toString();
-      Duration timeLeft = Duration.ZERO;
-      try {
-        timeLeft = certClient.timeBeforeExpiryGracePeriod(certId);
-      } catch (CertificateException e) {
-        LOG.error("Failed to get cert {}. Keep on using existing certificates.",
-            certId, e);
-        return;
-      }
-
-      if (timeLeft.isZero()) {
-        String newCertId;
-        try {
-          LOG.info("Current certificate {} has entered the expiry grace " +
-                  "period {}. Start to renew and store new key and certs.",
-              certId, timeLeft, secConfig.getRenewalGracePeriod());
-          newCertId = certClient.renewAndStoreKeyAndCertificate(false);
-        } catch (CertificateException e) {
-          LOG.error("Failed to renew and store key and cert." +
-              " Keep using existing certificates.", e);
-          if (e.errorCode() == CertificateException.ErrorCode.ROLLBACK_ERROR) {
-            shutDown(
-                "OzoneManage shutdown because certificate rollback failure.");
-          }
-          return;
-        }
-
-        // Persist om cert serial id.
-        try {
-          omStorage.setOmCertSerialId(newCertId);
-          omStorage.persistCurrentState();
-        } catch (IOException ex) {
-          // New cert ID cannot be persisted into VERSION file.
-          LOG.error("Failed to persist new cert ID {} to VERSION file." +
-              "Terminating OzoneManager...", newCertId, ex);
-          shutDown(
-              "OzoneManage shutdown because VERSION file persist failure.");
-        }
-
-        // reset and reload all certs
-        certClient.reloadKeyAndCertificate(newCertId);
-      }
+  void saveNewCertId(String certId) {
+    try {
+      omStorage.setOmCertSerialId(certId);
+      omStorage.persistCurrentState();
+    } catch (IOException ex) {
+      // New cert ID cannot be persisted into VERSION file.
+      LOG.error("Failed to persist new cert ID {} to VERSION file." +
+          "Terminating OzoneManager...", certId, ex);
+      shutDown("OzoneManage shutdown because VERSION file persist failure.");
     }
   }
 

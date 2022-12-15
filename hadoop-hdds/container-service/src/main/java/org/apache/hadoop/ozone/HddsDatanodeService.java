@@ -21,19 +21,14 @@ import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -49,7 +44,6 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -113,7 +107,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
-  private ScheduledExecutorService executorService;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -187,7 +180,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public void setConfiguration(OzoneConfiguration configuration) {
     this.conf = configuration;
-    this.secConf = new SecurityConfig(conf);
   }
 
   /**
@@ -239,8 +231,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         component = "dn-" + datanodeDetails.getUuidString();
 
         secConf = new SecurityConfig(conf);
-        dnCertClient = new DNCertificateClient(conf, datanodeDetails,
-            datanodeDetails.getCertSerialId());
+        dnCertClient = new DNCertificateClient(secConf, datanodeDetails,
+            datanodeDetails.getCertSerialId(), this::saveNewCertId,
+            this::terminateDatanode);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
             UserGroupInformation.AuthenticationMethod.KERBEROS)) {
@@ -276,7 +269,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         dnCertClient = initializeCertificateClient(dnCertClient);
-        startCertificateMonitor();
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
           dnCertClient, this::terminateDatanode, dnCRLStore);
@@ -343,7 +335,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       LOG.info("Re-initialize certificate client.");
-      certClient = new DNCertificateClient(conf, datanodeDetails, null);
+      certClient = new DNCertificateClient(secConf, datanodeDetails, null,
+          this::saveNewCertId, this::terminateDatanode);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -358,9 +351,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // persist cert ID to VERSION file
       datanodeDetails.setCertSerialId(dnCertSerialId);
       persistDatanodeDetails(datanodeDetails);
-      // reload certificates
+      // set new certificate ID
       certClient.setCertificateId(dnCertSerialId);
-      certClient.loadAllCertificates();
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
@@ -582,75 +574,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     LOG.error("Exception in HddsDatanodeService.", error);
   }
 
-  @VisibleForTesting
-  public void startCertificateMonitor() throws CertificateException {
-    // Schedule task to refresh certificate before it expires
-    Duration gracePeriod = new SecurityConfig(conf).getRenewalGracePeriod();
-    String certId = dnCertClient.getCertificate().getSerialNumber().toString();
-    long timeBeforeGracePeriod =
-        dnCertClient.timeBeforeExpiryGracePeriod(certId).toMillis();
-    // At least three chances to renew the certificate before it expires
-    long interval =
-        Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));
-
-    if (executorService == null) {
-      executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
-              .setDaemon(true).build());
-    }
-    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
-        timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
-    LOG.info("CertificateLifetimeMonitor is started with first delay {} ms and"
-        + " interval {} ms.", timeBeforeGracePeriod, interval);
-  }
-
-  /**
-   * Certificate lifetime monitor task.
-   */
-  public class CertificateLifetimeMonitor implements Runnable {
-    @Override
-    public void run() {
-      String certId =
-          dnCertClient.getCertificate().getSerialNumber().toString();
-      Duration timeLeft = Duration.ZERO;
-      try {
-        timeLeft = dnCertClient.timeBeforeExpiryGracePeriod(certId);
-      } catch (CertificateException e) {
-        LOG.error("Failed to get cert {}. Keep on using existing certificates.",
-            certId, e);
-        return;
-      }
-
-      if (timeLeft.isZero()) {
-        String newCertId;
-        try {
-          LOG.info("Current certificate {} has entered the expiry grace " +
-              "period {}. Start to renew and store new key and certs.", certId,
-              timeLeft, secConf.getRenewalGracePeriod());
-          newCertId = dnCertClient.renewAndStoreKeyAndCertificate(false);
-        } catch (CertificateException e) {
-          LOG.error("Failed to renew and store key and cert." +
-              " Keep using existing certificates.", e);
-          if (e.errorCode() == CertificateException.ErrorCode.ROLLBACK_ERROR) {
-            terminateDatanode();
-          }
-          return;
-        }
-
-        // save new certificate Id to VERSION file
-        datanodeDetails.setCertSerialId(newCertId);
-        try {
-          persistDatanodeDetails(datanodeDetails);
-        } catch (IOException ex) {
-          // New cert ID cannot be persisted into VERSION file.
-          LOG.error("Failed to persist new cert ID {} to VERSION file." +
-              "Terminating datanode...", newCertId, ex);
-          terminateDatanode();
-        }
-
-        // reset and reload all certs
-        dnCertClient.reloadKeyAndCertificate(newCertId);
-      }
+  public void saveNewCertId(String newCertId) {
+    // save new certificate Id to VERSION file
+    datanodeDetails.setCertSerialId(newCertId);
+    try {
+      persistDatanodeDetails(datanodeDetails);
+    } catch (IOException ex) {
+      // New cert ID cannot be persisted into VERSION file.
+      String msg = "Failed to persist new cert ID " + newCertId +
+          "to VERSION file. Terminating datanode...";
+      LOG.error(msg, ex);
+      terminateDatanode();
     }
   }
 }

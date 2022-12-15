@@ -24,7 +24,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
@@ -46,7 +45,6 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 public class CertificateClientTest implements CertificateClient {
   private KeyPair keyPair;
   private X509Certificate x509Certificate;
-  private boolean isKeyRenewed;
   private SecurityConfig secConfig;
 
   public CertificateClientTest(OzoneConfiguration conf)
@@ -92,16 +90,6 @@ public class CertificateClientTest implements CertificateClient {
   @Override
   public boolean verifyCertificate(X509Certificate certificate) {
     return true;
-  }
-
-  @Override
-  public Duration timeBeforeExpiryGracePeriod(String certSerialId)
-      throws CertificateException {
-    return null;
-  }
-
-  @Override
-  public void loadAllCertificates() {
   }
 
   @Override
@@ -265,11 +253,6 @@ public class CertificateClientTest implements CertificateClient {
     return null;
   }
 
-  @Override
-  public boolean isCertificateRenewed() {
-    return isKeyRenewed;
-  }
-
   public void renewKey() throws Exception {
     KeyPair newKeyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     X509Certificate newCert = KeyStoreTestUtil.generateCertificate(
@@ -277,7 +260,6 @@ public class CertificateClientTest implements CertificateClient {
 
     keyPair = newKeyPair;
     x509Certificate = newCert;
-    isKeyRenewed = true;
   }
 
   @Override

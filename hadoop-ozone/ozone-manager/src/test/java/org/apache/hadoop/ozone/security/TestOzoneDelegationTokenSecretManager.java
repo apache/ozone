@@ -138,7 +138,7 @@ public class TestOzoneDelegationTokenSecretManager {
     X509Certificate cert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
 
-    return new OMCertificateClient(conf) {
+    return new OMCertificateClient(securityConfig) {
       @Override
       public X509Certificate getCertificate() {
         return cert;

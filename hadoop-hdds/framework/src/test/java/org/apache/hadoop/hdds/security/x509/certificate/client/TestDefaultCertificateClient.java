@@ -24,9 +24,11 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,7 +88,6 @@ public class TestDefaultCertificateClient {
 
   private String certSerialId;
   private X509Certificate x509Certificate;
-  private OzoneConfiguration config;
   private DNCertificateClient dnCertClient;
   private HDDSKeyGenerator keyGenerator;
   private Path dnMetaDirPath;
@@ -96,7 +97,7 @@ public class TestDefaultCertificateClient {
 
   @BeforeEach
   public void setUp() throws Exception {
-    config = new OzoneConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
     config.setStrings(OZONE_SCM_NAMES, "localhost");
     config.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
     final String dnPath = GenericTestUtils
@@ -116,8 +117,9 @@ public class TestDefaultCertificateClient {
   }
 
   private void getCertClient() {
-    dnCertClient = new DNCertificateClient(config,
-        MockDatanodeDetails.randomDatanodeDetails(), certSerialId);
+    dnCertClient = new DNCertificateClient(dnSecurityConfig,
+        MockDatanodeDetails.randomDatanodeDetails(), certSerialId, null,
+        () -> System.exit(1));
   }
 
   @AfterEach
@@ -312,7 +314,8 @@ public class TestDefaultCertificateClient {
         getPEMEncodedString(cert3), true);
 
     // Re instantiate DN client which will load certificates from filesystem.
-    dnCertClient = new DNCertificateClient(config, null, certSerialId);
+    dnCertClient = new DNCertificateClient(dnSecurityConfig, null,
+        certSerialId, null, null);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
         .toString()));
@@ -415,11 +418,11 @@ public class TestDefaultCertificateClient {
 
     Logger mockLogger = mock(Logger.class);
 
-    SecurityConfig secConfig = mock(SecurityConfig.class);
+    SecurityConfig config = mock(SecurityConfig.class);
     Path nonexistent = Paths.get("nonexistent");
-    when(secConfig.getCertificateLocation(anyString())).thenReturn(nonexistent);
-    when(secConfig.getKeyLocation(anyString())).thenReturn(nonexistent);
-    when(secConfig.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
+    when(config.getCertificateLocation(anyString())).thenReturn(nonexistent);
+    when(config.getKeyLocation(anyString())).thenReturn(nonexistent);
+    when(config.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
 
     Calendar cal = Calendar.getInstance();
     cal.add(Calendar.DAY_OF_YEAR, 2);
@@ -428,7 +431,8 @@ public class TestDefaultCertificateClient {
     when(mockCert.getNotAfter()).thenReturn(expiration);
 
     DefaultCertificateClient client =
-        new DefaultCertificateClient(config, mockLogger, certId, compName) {
+        new DefaultCertificateClient(config, mockLogger, certId, compName,
+            null, null) {
           @Override
           public PrivateKey getPrivateKey() {
             return mock(PrivateKey.class);
@@ -442,6 +446,19 @@ public class TestDefaultCertificateClient {
           @Override
           public X509Certificate getCertificate() {
             return mockCert;
+          }
+
+          @Override
+          public String signAndStoreCertificate(
+              PKCS10CertificationRequest request, Path certPath)
+              throws CertificateException {
+            return null;
+          }
+
+          @Override
+          public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+              throws IOException {
+            return null;
           }
         };
 
@@ -459,16 +476,14 @@ public class TestDefaultCertificateClient {
         keyPair, (int)(gracePeriod.toDays()),
         dnSecurityConfig.getSignatureAlgo());
     dnCertClient.storeCertificate(getPEMEncodedString(cert), true);
-    Duration duration = dnCertClient.timeBeforeExpiryGracePeriod(
-        cert.getSerialNumber().toString());
+    Duration duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.isZero());
 
     cert = KeyStoreTestUtil.generateCertificate("CN=Test",
         keyPair, (int)(gracePeriod.toDays() + 1),
         dnSecurityConfig.getSignatureAlgo());
     dnCertClient.storeCertificate(getPEMEncodedString(cert), true);
-    duration = dnCertClient.timeBeforeExpiryGracePeriod(
-        cert.getSerialNumber().toString());
+    duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
         duration.toMillis() > Duration.ofHours(23).plusMinutes(59).toMillis());
   }
@@ -523,7 +538,9 @@ public class TestDefaultCertificateClient {
     Assert.assertFalse(newKeyDir.exists());
     Assert.assertFalse(newCertDir.exists());
 
-    // auto cleanup new and backup key and cert dir
+    // cleanup backup key and cert dir
+    dnCertClient.cleanBackupDir();
+
     Files.createDirectories(newKeyDir.toPath());
     Files.createDirectories(newCertDir.toPath());
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");

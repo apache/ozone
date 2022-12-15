@@ -70,7 +70,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   private DefaultApprover approver;
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
-  private boolean isKeyRenewed = false;
 
   public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
     this(conf, true);
@@ -169,16 +168,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public boolean verifyCertificate(X509Certificate certificate) {
     return true;
-  }
-
-  @Override
-  public Duration timeBeforeExpiryGracePeriod(String certSerialId)
-      throws CertificateException {
-    return null;
-  }
-
-  @Override
-  public void loadAllCertificates() {
   }
 
   @Override
@@ -331,10 +320,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     return false;
   }
 
-  public boolean isCertificateRenewed() {
-    return isKeyRenewed;
-  }
-
   public void renewKey() throws Exception {
     KeyPair newKeyPair = keyGen.generateKey();
     CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
@@ -361,7 +346,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     // Save certificate and private key to keyStore
     keyPair = newKeyPair;
     x509Certificate = newX509Certificate;
-    isKeyRenewed = true;
     System.out.println(new Date() + " certificated is renewed");
   }
 

@@ -19,15 +19,12 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -37,6 +34,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
@@ -52,11 +50,12 @@ public class DNCertificateClient extends DefaultCertificateClient {
 
   public static final String COMPONENT_NAME = "dn";
   private final DatanodeDetails dn;
-  private SCMSecurityProtocolClientSideTranslatorPB secureScmClient;
 
-  public DNCertificateClient(OzoneConfiguration ozoneConfig,
-      DatanodeDetails datanodeDetails, String certSerialId) {
-    super(ozoneConfig, LOG, certSerialId, COMPONENT_NAME);
+  public DNCertificateClient(SecurityConfig securityConfig,
+      DatanodeDetails datanodeDetails, String certSerialId,
+      Consumer<String> saveCertId, Runnable shutdown) {
+    super(securityConfig, LOG, certSerialId, COMPONENT_NAME,
+        saveCertId, shutdown);
     this.dn = datanodeDetails;
   }
 
@@ -109,16 +108,10 @@ public class DNCertificateClient extends DefaultCertificateClient {
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
       Path certPath) throws CertificateException {
     try {
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
-      synchronized (this) {
-        if (secureScmClient == null) {
-          // TODO: For SCM CA we should fetch certificate from multiple SCMs.
-          secureScmClient =
-              HddsServerUtil.getScmSecurityClientWithMaxRetry(getConfig());
-        }
-        response = secureScmClient.getDataNodeCertificateChain(
-            dn.getProtoBufMessage(), getEncodedString(csr));
-      }
+      // TODO: For SCM CA we should fetch certificate from multiple SCMs.
+      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
+          getScmSecureClient().getDataNodeCertificateChain(
+              dn.getProtoBufMessage(), getEncodedString(csr));
 
       // Persist certificates.
       if (response.hasX509CACertificate()) {
@@ -153,11 +146,5 @@ public class DNCertificateClient extends DefaultCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
-  }
-
-  @VisibleForTesting
-  public synchronized void setSecureScmClient(
-      SCMSecurityProtocolClientSideTranslatorPB client) {
-    secureScmClient = client;
   }
 }

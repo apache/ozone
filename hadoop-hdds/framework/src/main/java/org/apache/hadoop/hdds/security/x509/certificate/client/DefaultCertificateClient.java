@@ -50,11 +50,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -85,7 +92,6 @@ import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateExcepti
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.RENEW_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.ROLLBACK_ERROR;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -107,7 +113,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private static final String ROOT_CA_CERT_PREFIX = "ROOTCA-";
   private static final int ROOT_CA_PREFIX_LEN = 7;
   private final Logger logger;
-  private final OzoneConfiguration config;
   private final SecurityConfig securityConfig;
   private final KeyCodec keyCodec;
   private PrivateKey privateKey;
@@ -122,19 +127,25 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private List<String> pemEncodedCACerts = null;
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
-  private AtomicBoolean isRenewing = new AtomicBoolean(false);
-  private AtomicBoolean isRenewed = new AtomicBoolean(false);
+  // Prevent concurrent multiple renew case
+  private Lock renewLock = new ReentrantLock();;
+  private ScheduledExecutorService executorService;
+  private Consumer<String> certIdSaveCallback;
+  private Runnable shutdownCallback;
+  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient;
 
-  DefaultCertificateClient(OzoneConfiguration conf, Logger log,
-      String certSerialId, String component) {
-    Objects.requireNonNull(conf);
-    this.config = conf;
-    this.securityConfig = new SecurityConfig(conf);
+  DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
+      String certSerialId, String component,
+      Consumer<String> saveCertId, Runnable shutdown) {
+    Objects.requireNonNull(securityConfig);
+    this.securityConfig = securityConfig;
     keyCodec = new KeyCodec(securityConfig, component);
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
     this.certSerialId = certSerialId;
     this.component = component;
+    this.certIdSaveCallback = saveCertId;
+    this.shutdownCallback = shutdown;
 
     loadAllCertificates();
   }
@@ -143,12 +154,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     Preconditions.checkArgument(certSerialId == null,
         "certSerialId should only be set once if not renew");
     this.certSerialId = certId;
+    // reload all new certs
+    loadAllCertificates();
   }
 
   /**
    * Load all certificates from configured location.
    * */
-  public synchronized void loadAllCertificates() {
+  private synchronized void loadAllCertificates() {
     // See if certs directory exists in file system.
     Path certPath = securityConfig.getCertificateLocation(component);
     if (Files.exists(certPath) && Files.isDirectory(certPath)) {
@@ -211,6 +224,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         if (latestRootCaCertSerialId != -1) {
           rootCaCertId = Long.toString(latestRootCaCertSerialId);
         }
+
+        if (getCertificate() != null) {
+          if (executorService == null) {
+            startCertificateMonitor();
+          }
+        } else {
+          getLogger().warn("CertificateLifetimeMonitor is not started this " +
+              "time because certificate is empty.");
+        }
       }
     }
   }
@@ -271,18 +293,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   @Override
   public synchronized X509Certificate getCertificate() {
-    if (x509Certificate != null) {
-      return x509Certificate;
-    }
-
     if (certSerialId == null) {
       getLogger().error("Default certificate serial id is not set. Can't " +
           "locate the default certificate for this client.");
       return null;
     }
-    // Refresh the cache from file system.
-    loadAllCertificates();
-    if (certificateMap.containsKey(certSerialId)) {
+
+    if (x509Certificate == null) {
       x509Certificate = certificateMap.get(certSerialId);
     }
     return x509Certificate;
@@ -321,9 +338,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
     try {
-      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
-          securityConfig.getConfiguration());
-      return scmSecurityProtocolClient.getCrls(crlIds);
+      return getScmSecureClient().getCrls(crlIds);
     } catch (Exception e) {
       getLogger().error("Error while getting CRL with " +
           "CRL ids:{} from scm.", crlIds, e);
@@ -335,9 +350,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public long getLatestCrlId() throws IOException {
     try {
-      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
-          securityConfig.getConfiguration());
-      return scmSecurityProtocolClient.getLatestCrlId();
+      return getScmSecureClient().getLatestCrlId();
     } catch (Exception e) {
       getLogger().error("Error while getting latest CRL id from scm.", e);
       throw new CertificateException("Error while getting latest CRL id from" +
@@ -356,11 +369,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Getting certificate with certSerialId:{}.",
         certId);
     try {
-      SCMSecurityProtocol scmSecurityProtocolClient =
-          getScmSecurityClientWithMaxRetry(
-          (OzoneConfiguration) securityConfig.getConfiguration());
-      String pemEncodedCert =
-          scmSecurityProtocolClient.getCertificate(certId);
+      String pemEncodedCert = getScmSecureClient().getCertificate(certId);
       this.storeCertificate(pemEncodedCert, true);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception e) {
@@ -989,11 +998,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public synchronized List<String> updateCAList() throws IOException {
     try {
-      SCMSecurityProtocol scmSecurityProtocolClient =
-          getScmSecurityClientWithMaxRetry(
-              (OzoneConfiguration) securityConfig.getConfiguration());
-      pemEncodedCACerts =
-          scmSecurityProtocolClient.listCACertificate();
+      pemEncodedCACerts = getScmSecureClient().listCACertificate();
       return pemEncodedCACerts;
     } catch (Exception e) {
       getLogger().error("Error during updating CA list", e);
@@ -1081,6 +1086,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   @Override
   public synchronized void close() throws IOException {
+    if (executorService != null) {
+      executorService.shutdown();
+    }
+
     if (serverKeyStoresFactory != null) {
       serverKeyStoresFactory.destroy();
     }
@@ -1095,11 +1104,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return Duration, time before certificate enters the grace
    *                   period defined by "hdds.x509.renew.grace.duration"
    */
-  public Duration timeBeforeExpiryGracePeriod(String certId)
-      throws CertificateException {
-    X509Certificate cert = getCertificate(certId);
+  public Duration timeBeforeExpiryGracePeriod(X509Certificate certificate) {
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
-    Date expireDate = cert.getNotAfter();
+    Date expireDate = certificate.getNotAfter();
     LocalDateTime gracePeriodStart = expireDate.toInstant()
         .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
     LocalDateTime currentTime = LocalDateTime.now();
@@ -1111,155 +1118,124 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  /**
+   * Renew keys and certificate. Save the keys are certificate to disk in new
+   * directories, swap the current key directory and certs directory with the
+   * new directories.
+   * @param force, check certificate expiry time again if force is false.
+   * @return String, new certificate ID
+   * */
   public String renewAndStoreKeyAndCertificate(boolean force)
       throws CertificateException {
-    if (isRenewing.compareAndSet(false, true)) {
-      try {
-        if (!force) {
-          synchronized (this) {
-            Preconditions.checkArgument(
-                timeBeforeExpiryGracePeriod(certSerialId).isZero());
-          }
-        }
-        String newKeyPath = securityConfig.getKeyLocation(component)
-            .toString() + HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
-        String newCertPath = securityConfig.getCertificateLocation(component)
-            .toString() + HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
-        File newKeyDir = new File(newKeyPath);
-        File newCertDir = new File(newCertPath);
-
-        try {
-          FileUtils.deleteDirectory(newKeyDir);
-          FileUtils.deleteDirectory(newCertDir);
-        } catch (IOException e) {
-          throw new CertificateException("Error while deleting " + newKeyPath +
-              " or " + newCertPath + " directories to cleanup certificate " +
-              " storage. ", e, RENEW_ERROR);
-        }
-
-        try {
-          Files.createDirectories(newKeyDir.toPath());
-          Files.createDirectories(newCertDir.toPath());
-        } catch (IOException e) {
-          throw new CertificateException("Error while creating " + newKeyPath +
-              " or " + newCertPath + " directories for certificate storage.",
-              e, RENEW_ERROR);
-        }
-
-        // cleanup backup directory
-        cleanBackupDir();
-
-        // Generate key
-        KeyCodec newKeyCodec = new KeyCodec(securityConfig, newKeyDir.toPath());
-        KeyPair newKeyPair;
-        try {
-          newKeyPair = createKeyPair(newKeyCodec);
-        } catch (CertificateException e) {
-          throw new CertificateException("Error while creating new key pair.",
-              e, RENEW_ERROR);
-        }
-
-        // Get certificate signed
-        String dnCertSerialId;
-        try {
-          CertificateSignRequest.Builder csrBuilder = getCSRBuilder(newKeyPair);
-          dnCertSerialId = signAndStoreCertificate(csrBuilder.build(),
-              Paths.get(newCertPath));
-        } catch (Exception e) {
-          throw new CertificateException("Error while signing and storing new" +
-              " certificates.", e, RENEW_ERROR);
-        }
-
-        // switch Key and Certs directory on disk
-        File currentKeyDir = new File(
-            securityConfig.getKeyLocation(component).toString());
-        File currentCertDir = new File(
-            securityConfig.getCertificateLocation(component).toString());
-        File backupKeyDir = new File(
-            securityConfig.getKeyLocation(component).toString() +
-                HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
-        File backupCertDir = new File(
-            securityConfig.getCertificateLocation(component).toString() +
-                HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
-
-        if (!currentKeyDir.renameTo(backupKeyDir)) {
-          // Cannot rename current key dir to the backup dir
-          throw new CertificateException("Failed to rename " +
-              currentKeyDir.getAbsolutePath() +
-              " to " + backupKeyDir.getAbsolutePath() + " during " +
-              "certificate renew.", RENEW_ERROR);
-        }
-        if (!currentCertDir.renameTo(backupCertDir)) {
-          // Cannot rename current cert dir to the backup dir
-          rollbackDir(currentKeyDir, currentCertDir, newKeyDir, newCertDir,
-              backupKeyDir, backupCertDir, "step-1");
-          throw new CertificateException("Failed to rename " +
-              currentCertDir.getAbsolutePath() +
-              " to " + backupCertDir.getAbsolutePath() + " during " +
-              "certificate renew.", RENEW_ERROR);
-        }
-
-        if (!newKeyDir.renameTo(currentKeyDir)) {
-          // Cannot rename new dir as the current dir
-          String msg = "Failed to rename " + newKeyDir.getAbsolutePath() +
-              " to " + currentKeyDir.getAbsolutePath() +
-              " during certificate renew.";
-          // rollback
-          rollbackDir(currentKeyDir, currentCertDir, newKeyDir, newCertDir,
-              backupKeyDir, backupCertDir, "step-2");
-          throw new CertificateException(msg, RENEW_ERROR);
-        }
-
-        if (!newCertDir.renameTo(currentCertDir)) {
-          // Cannot rename new dir as the current dir
-          String msg = "Failed to rename " + newCertDir.getAbsolutePath() +
-              " to " + currentCertDir.getAbsolutePath() +
-              " during certificate renew.";
-          // rollback
-          rollbackDir(currentKeyDir, currentCertDir, newKeyDir, newCertDir,
-              backupKeyDir, backupCertDir, "step-2");
-          throw new CertificateException(msg, RENEW_ERROR);
-        }
-
-        // Delete backup dir on next DN startup
-        getLogger().info("Successful renew key and certificate." +
-            " New certificate {}.", dnCertSerialId);
-        return dnCertSerialId;
-      } finally {
-        isRenewing.set(false);
+    if (!force) {
+      synchronized (this) {
+        Preconditions.checkArgument(
+            timeBeforeExpiryGracePeriod(x509Certificate).isZero());
       }
     }
 
-    throw new CertificateException("A renewAndStoreKeyAndCert process" +
-        " is running already.", RENEW_ERROR);
+    String newKeyPath = securityConfig.getKeyLocation(component)
+        .toString() + HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
+    String newCertPath = securityConfig.getCertificateLocation(component)
+        .toString() + HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
+    File newKeyDir = new File(newKeyPath);
+    File newCertDir = new File(newCertPath);
+    try {
+      FileUtils.deleteDirectory(newKeyDir);
+      FileUtils.deleteDirectory(newCertDir);
+      Files.createDirectories(newKeyDir.toPath());
+      Files.createDirectories(newCertDir.toPath());
+    } catch (IOException e) {
+      throw new CertificateException("Error while deleting/creating " +
+          newKeyPath + " or " + newCertPath + " directories to cleanup " +
+          " certificate storage. ", e, RENEW_ERROR);
+    }
+
+    // Generate key
+    KeyCodec newKeyCodec = new KeyCodec(securityConfig, newKeyDir.toPath());
+    KeyPair newKeyPair;
+    try {
+      newKeyPair = createKeyPair(newKeyCodec);
+    } catch (CertificateException e) {
+      throw new CertificateException("Error while creating new key pair.",
+          e, RENEW_ERROR);
+    }
+
+    // Get certificate signed
+    String newCertSerialId;
+    try {
+      CertificateSignRequest.Builder csrBuilder = getCSRBuilder(newKeyPair);
+      newCertSerialId = signAndStoreCertificate(csrBuilder.build(),
+          Paths.get(newCertPath));
+    } catch (Exception e) {
+      throw new CertificateException("Error while signing and storing new" +
+          " certificates.", e, RENEW_ERROR);
+    }
+
+    // switch Key and Certs directory on disk
+    File currentKeyDir = new File(
+        securityConfig.getKeyLocation(component).toString());
+    File currentCertDir = new File(
+        securityConfig.getCertificateLocation(component).toString());
+    File backupKeyDir = new File(
+        securityConfig.getKeyLocation(component).toString() +
+            HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
+    File backupCertDir = new File(
+        securityConfig.getCertificateLocation(component).toString() +
+            HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
+
+    if (!currentKeyDir.renameTo(backupKeyDir)) {
+      // Cannot rename current key dir to the backup dir
+      throw new CertificateException("Failed to rename " +
+          currentKeyDir.getAbsolutePath() +
+          " to " + backupKeyDir.getAbsolutePath() + " during " +
+          "certificate renew.", RENEW_ERROR);
+    }
+    if (!currentCertDir.renameTo(backupCertDir)) {
+      // Cannot rename current cert dir to the backup dir
+      rollbackBackupDir(currentKeyDir, currentCertDir, backupKeyDir,
+          backupCertDir);
+      throw new CertificateException("Failed to rename " +
+          currentCertDir.getAbsolutePath() +
+          " to " + backupCertDir.getAbsolutePath() + " during " +
+          "certificate renew.", RENEW_ERROR);
+    }
+
+    if (!newKeyDir.renameTo(currentKeyDir)) {
+      // Cannot rename new dir as the current dir
+      String msg = "Failed to rename " + newKeyDir.getAbsolutePath() +
+          " to " + currentKeyDir.getAbsolutePath() +
+          " during certificate renew.";
+      // rollback
+      rollbackBackupDir(currentKeyDir, currentCertDir, backupKeyDir,
+          backupCertDir);
+      throw new CertificateException(msg, RENEW_ERROR);
+    }
+
+    if (!newCertDir.renameTo(currentCertDir)) {
+      // Cannot rename new dir as the current dir
+      String msg = "Failed to rename " + newCertDir.getAbsolutePath() +
+          " to " + currentCertDir.getAbsolutePath() +
+          " during certificate renew.";
+      // delete new key directory
+      try {
+        Files.createDirectories(currentKeyDir.toPath());
+      } catch (IOException e) {
+        throw new CertificateException(msg, RENEW_ERROR);
+      }
+      // rollback
+      rollbackBackupDir(currentKeyDir, currentCertDir, backupKeyDir,
+          backupCertDir);
+      throw new CertificateException(msg, RENEW_ERROR);
+    }
+
+    getLogger().info("Successful renew key and certificate." +
+        " New certificate {}.", newCertSerialId);
+    return newCertSerialId;
   }
 
-  private void rollbackDir(File currentKeyDir, File currentCertDir,
-      File newKeyDir, File newCertDir, File backupKeyDir, File backupCertDir,
-      String step) throws CertificateException {
-
-    if (step.equals("step-2")) {
-      // move current dir back as new dir
-      if (currentKeyDir.exists() && !newKeyDir.exists()) {
-        if (!currentKeyDir.renameTo(newKeyDir)) {
-          String msg = "Failed to rename " + currentKeyDir.getAbsolutePath() +
-              " back to " + newKeyDir.getAbsolutePath() +
-              " during rollback.";
-          // Need a manual recover process.
-          throw new CertificateException(msg, ROLLBACK_ERROR);
-        }
-      }
-      if (currentCertDir.exists() && !newCertDir.exists()) {
-        if (!currentCertDir.renameTo(newCertDir)) {
-          String msg = "Failed to rename " + currentCertDir.getAbsolutePath() +
-              " back to " + newCertDir.getAbsolutePath() +
-              " during rollback.";
-          // Need a manual recover process.
-          throw new CertificateException(msg, ROLLBACK_ERROR);
-        }
-      }
-    }
-
+  private void rollbackBackupDir(File currentKeyDir, File currentCertDir,
+      File backupKeyDir, File backupCertDir) throws CertificateException {
     // move backup dir back as current dir
     if (!currentKeyDir.exists() && backupKeyDir.exists()) {
       if (!backupKeyDir.renameTo(currentKeyDir)) {
@@ -1287,7 +1263,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    * Delete old backup key and cert directory.
    */
-  private void cleanBackupDir() {
+  public void cleanBackupDir() {
     File backupKeyDir = new File(
         securityConfig.getKeyLocation(component).toString() +
             HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
@@ -1312,11 +1288,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  public boolean isCertificateRenewed() {
-    return isRenewed.get();
-  }
-
-  public synchronized void reloadKeyAndCertificate(String newCertId) {
+  synchronized void reloadKeyAndCertificate(String newCertId) {
     // reset current value
     privateKey = null;
     publicKey = null;
@@ -1326,9 +1298,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     rootCaCertId = null;
 
     setCertificateId(newCertId);
-    // reload all new certs
-    loadAllCertificates();
-    isRenewed.set(true);
     getLogger().info("Reset and reload key and all certificates.");
   }
 
@@ -1337,15 +1306,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   public OzoneConfiguration getConfig() {
-    return config;
+    return (OzoneConfiguration)securityConfig.getConfiguration();
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
-    throw new UnsupportedOperationException(
-        "Each child class should have its own implementation");
-  }
+  public abstract String signAndStoreCertificate(
+      PKCS10CertificationRequest request, Path certPath)
+      throws CertificateException;
 
   public String signAndStoreCertificate(PKCS10CertificationRequest request)
       throws CertificateException {
@@ -1354,9 +1321,91 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+  public abstract CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+      throws IOException;
+
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
       throws IOException {
-    throw new UnsupportedOperationException(
-        "Each child class should have its own implementation");
+    if (scmSecurityProtocolClient == null) {
+      scmSecurityProtocolClient =
+          getScmSecurityClientWithMaxRetry(
+              (OzoneConfiguration) securityConfig.getConfiguration());
+    }
+    return scmSecurityProtocolClient;
+  }
+
+  @VisibleForTesting
+  public void setSecureScmClient(
+      SCMSecurityProtocolClientSideTranslatorPB client) {
+    scmSecurityProtocolClient = client;
+  }
+
+  public synchronized void startCertificateMonitor() {
+    Preconditions.checkNotNull(getCertificate(),
+        "Component certificate should not be empty");
+    // Schedule task to refresh certificate before it expires
+    Duration gracePeriod = securityConfig.getRenewalGracePeriod();
+    long timeBeforeGracePeriod =
+        timeBeforeExpiryGracePeriod(getCertificate()).toMillis();
+    // At least three chances to renew the certificate before it expires
+    long interval =
+        Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));
+
+    if (executorService == null) {
+      executorService = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
+              .setDaemon(true).build());
+    }
+    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
+        timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
+    getLogger().info("CertificateLifetimeMonitor is started with first delay" +
+        " {} ms and interval {} ms.", timeBeforeGracePeriod, interval);
+  }
+
+  /**
+   *  Task to monitor the certificate lifetime.
+   */
+  public class CertificateLifetimeMonitor implements Runnable {
+    @Override
+    public void run() {
+      Duration timeLeft = timeBeforeExpiryGracePeriod(getCertificate());
+      if (timeLeft.isZero()) {
+        String newCertId;
+
+        renewLock.lock();
+        try {
+          try {
+            getLogger().info("Current certificate has entered the expiry" +
+                    " grace period {}. Starting renew key and certs.",
+                timeLeft, securityConfig.getRenewalGracePeriod());
+            newCertId = renewAndStoreKeyAndCertificate(false);
+          } catch (CertificateException e) {
+            if (e.errorCode() ==
+                CertificateException.ErrorCode.ROLLBACK_ERROR) {
+              if (shutdownCallback != null) {
+                getLogger().error("Failed to rollback key and cert after an " +
+                    " unsuccessful renew try.", e);
+                shutdownCallback.run();
+              }
+            }
+            getLogger().error("Failed to renew and store key and cert." +
+                " Keep using existing certificates.", e);
+            return;
+          }
+
+          // Persist new cert serial id in component VERSION file
+          if (certIdSaveCallback != null) {
+            certIdSaveCallback.accept(newCertId);
+          }
+
+          // reset and reload all certs
+          reloadKeyAndCertificate(newCertId);
+          // cleanup backup directory
+          cleanBackupDir();
+        } finally {
+          renewLock.unlock();
+        }
+      }
+    }
   }
 }

@@ -93,8 +93,7 @@ public class TestOmCertificateClientInit {
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
     certSerialId = x509Certificate.getSerialNumber().toString();
-    omCertificateClient = new OMCertificateClient(config,
-        null, null, null, certSerialId);
+    omCertificateClient = new OMCertificateClient(securityConfig, certSerialId);
     omKeyCodec = new KeyCodec(securityConfig, OM_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(OM_COMPONENT));

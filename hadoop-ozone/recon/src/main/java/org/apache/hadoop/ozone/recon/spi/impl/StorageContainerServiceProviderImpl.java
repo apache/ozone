@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -199,7 +200,7 @@ public class StorageContainerServiceProviderImpl
 
             try (SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
                 hostAddress, grpcPort, configuration,
-                new ReconCertificateClient(configuration,
+                new ReconCertificateClient(new SecurityConfig(configuration),
                     reconStorage.getReconCertSerialId(),
                     reconStorage.getClusterID(), reconStorage.getReconId()))) {
               downloadClient.download(targetFile.toPath()).get();

@@ -17,15 +17,12 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -35,9 +32,11 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * Certificate client for Recon.
@@ -49,37 +48,50 @@ public class ReconCertificateClient  extends CommonCertificateClient {
   public static final String COMPONENT_NAME = "recon";
   private final String clusterID;
   private final String reconID;
-  private SCMSecurityProtocolClientSideTranslatorPB secureScmClient;
 
-  public ReconCertificateClient(OzoneConfiguration ozoneConfig,
+  public ReconCertificateClient(SecurityConfig securityConfig,
+      String certSerialId, String clusterId, String reconId,
+      Consumer<String> saveCertIdCallback, Runnable shutdownCallback) {
+    super(securityConfig, LOG, certSerialId, COMPONENT_NAME,
+        saveCertIdCallback, shutdownCallback);
+    this.clusterID = clusterId;
+    this.reconID = reconId;
+  }
+
+  public ReconCertificateClient(SecurityConfig securityConfig,
       String certSerialId, String clusterId, String reconId) {
-    super(ozoneConfig, LOG, certSerialId, COMPONENT_NAME);
+    super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
     this.clusterID = clusterId;
     this.reconID = reconId;
   }
 
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException {
+      throws CertificateException {
     return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
   @Override
   public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws IOException {
+      throws CertificateException {
     LOG.info("Creating CSR for Recon.");
-    CertificateSignRequest.Builder builder = super.getCSRBuilder();
+    try {
+      CertificateSignRequest.Builder builder = super.getCSRBuilder();
+      String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+      String subject = UserGroupInformation.getCurrentUser()
+          .getShortUserName() + "@" + hostname;
 
-    String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
+      builder.setCA(false)
+          .setKey(keyPair)
+          .setConfiguration(getConfig())
+          .setSubject(subject);
 
-    builder.setCA(false)
-        .setKey(keyPair)
-        .setConfiguration(getConfig())
-        .setSubject(subject);
-
-    return builder;
+      return builder;
+    } catch (Exception e) {
+      LOG.error("Failed to get hostname or current user", e);
+      throw new CertificateException("Failed to get hostname or current user",
+          e, CSR_ERROR);
+    }
   }
 
   @Override
@@ -87,22 +99,15 @@ public class ReconCertificateClient  extends CommonCertificateClient {
       Path certPath) throws CertificateException {
     try {
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
-      synchronized (this) {
-        if (secureScmClient == null) {
-          // TODO: For SCM CA we should fetch certificate from multiple SCMs.
-          secureScmClient =
-              HddsServerUtil.getScmSecurityClientWithMaxRetry(getConfig());
-        }
-
-        HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
-            HddsProtos.NodeDetailsProto.newBuilder()
-                .setHostName(InetAddress.getLocalHost().getHostName())
-                .setClusterId(clusterID)
-                .setUuid(reconID)
-                .setNodeType(HddsProtos.NodeType.RECON);
-        response = secureScmClient.getCertificateChain(
-            reconDetailsProtoBuilder.build(), getEncodedString(csr));
-      }
+      HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
+          HddsProtos.NodeDetailsProto.newBuilder()
+              .setHostName(InetAddress.getLocalHost().getHostName())
+              .setClusterId(clusterID)
+              .setUuid(reconID)
+              .setNodeType(HddsProtos.NodeType.RECON);
+      // TODO: For SCM CA we should fetch certificate from multiple SCMs.
+      response = getScmSecureClient().getCertificateChain(
+          reconDetailsProtoBuilder.build(), getEncodedString(csr));
 
       // Persist certificates.
       if (response.hasX509CACertificate()) {
@@ -133,11 +138,5 @@ public class ReconCertificateClient  extends CommonCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
-  }
-
-  @VisibleForTesting
-  public synchronized void setSecureScmClient(
-      SCMSecurityProtocolClientSideTranslatorPB client) {
-    secureScmClient = client;
   }
 }
