@@ -81,7 +81,7 @@ public class PrometheusMetricsSink implements MetricsSink {
             + metrics.type().toString().toLowerCase();
 
         metricLines.computeIfAbsent(metricKey,
-            any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+                any -> Collections.synchronizedSortedMap(new TreeMap<>()))
             .put(prometheusMetricKeyAsString, String.valueOf(metrics.value()));
       }
     }
@@ -99,6 +99,8 @@ public class PrometheusMetricsSink implements MetricsSink {
     // metric tags and a username tag.
     List<MetricsTag> metricTagList = DecayRpcSchedulerUtil
         .tagListWithUsernameIfNeeded(metricsRecord, username);
+
+    PrometheusMetricsSinkHelper.addServerNameTag(key, metricTagList);
 
     //add tags
     for (MetricsTag tag : metricTagList) {
@@ -154,14 +156,17 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   }
 
-  public void writeMetrics(Writer writer) throws IOException {
-    for (Map.Entry<String, Map<String, String>> metricsEntry
+  public void writeMetrics(Writer writer, int serverPort) throws IOException {
+    for (Map.Entry<String, Map<String, String>> metricEntry
         : metricLines.entrySet()) {
-      writer.write(metricsEntry.getKey() + "\n");
+      writer.write(metricEntry.getKey() + "\n");
 
-      for (Map.Entry<String, String> metrics
-          : metricsEntry.getValue().entrySet()) {
-        writer.write(metrics.getKey() + " " + metrics.getValue() + "\n");
+      for (Map.Entry<String, String> metric
+          : metricEntry.getValue().entrySet()) {
+        String metricKey =
+            PrometheusMetricsSinkHelper.replaceServerNameTagValue(
+                metricEntry.getKey(), metric.getKey(), serverPort);
+        writer.write(metricKey + " " + metric.getValue() + "\n");
       }
     }
   }

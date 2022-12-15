@@ -202,7 +202,8 @@ public class TestPrometheusMetricsSink {
     ByteArrayOutputStream stream = new ByteArrayOutputStream();
     OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
 
-    sink.writeMetrics(writer);
+    final int serverPort = 0;
+    sink.writeMetrics(writer, serverPort);
     writer.flush();
 
     return stream.toString(UTF_8.name());
