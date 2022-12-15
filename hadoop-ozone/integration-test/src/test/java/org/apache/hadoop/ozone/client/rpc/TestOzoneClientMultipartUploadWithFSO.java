@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.util.HashMap;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -26,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -129,7 +133,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(3)
+            .setNumDatanodes(5)
             .setTotalPipelineNumLimit(10)
             .setScmId(scmId)
             .build();
@@ -311,6 +315,117 @@ public class TestOzoneClientMultipartUploadWithFSO {
         commitUploadPartInfo.getPartName());
   }
 
+  @Test
+  public void testUploadTwiceWithEC() throws IOException {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String sampleData = "sample Value";
+    for (int i = 0; i < 4096; ++i) {
+      sampleData += "01234567890123456789";
+    }
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    OzoneBucket bucket = getOzoneECBucket(volumeName, bucketName);
+
+    // perform upload and complete
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+        bucket.getReplicationConfig());
+
+    String uploadID = multipartInfo.getUploadID();
+    int partNumber = 1;
+
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        sampleData.length(), partNumber, uploadID);
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.close();
+
+    OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
+        .getCommitUploadPartInfo();
+
+    String partName = commitUploadPartInfo.getPartName();
+    Map<Integer, String> partsMap = new HashMap<>();
+    partsMap.put(partNumber, partName);
+    bucket.completeMultipartUpload(keyName, uploadID, partsMap);
+
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
+
+    //upload same key again
+    multipartInfo = bucket.initiateMultipartUpload(keyName,
+        bucket.getReplicationConfig());
+
+    uploadID = multipartInfo.getUploadID();
+
+    ozoneOutputStream = bucket.createMultipartKey(keyName,
+        sampleData.length(), partNumber, uploadID);
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.close();
+
+    commitUploadPartInfo = ozoneOutputStream
+        .getCommitUploadPartInfo();
+
+    partName = commitUploadPartInfo.getPartName();
+    partsMap = new HashMap<>();
+    partsMap.put(partNumber, partName);
+    bucket.completeMultipartUpload(keyName, uploadID, partsMap);
+
+    // used sized should remain same, overwrite previous upload
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
+  }
+
+  @Test
+  public void testUploadAbortWithEC() throws IOException {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String sampleData = "sample Value";
+    for (int i = 0; i < 4096; ++i) {
+      sampleData += "01234567890123456789";
+    }
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    OzoneBucket bucket = getOzoneECBucket(volumeName, bucketName);
+
+    // perform upload and complete
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
+        bucket.getReplicationConfig());
+
+    String uploadID = multipartInfo.getUploadID();
+    int partNumber = 1;
+
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        sampleData.length(), partNumber, uploadID);
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
+    ozoneOutputStream.close();
+
+    OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
+        .getCommitUploadPartInfo();
+
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
+
+    bucket.abortMultipartUpload(keyName, uploadID);
+
+    // used sized should remain same, overwrite previous upload
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 0);
+  }
+
+  private OzoneBucket getOzoneECBucket(String volumeName, String myBucket)
+      throws IOException {
+    OzoneVolume volume = store.getVolume(volumeName);
+    final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
+    bucketArgs.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(ReplicationType.EC,
+            new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+                1024)));
+
+    volume.createBucket(myBucket, bucketArgs.build());
+    return volume.getBucket(myBucket);
+  }
+  
   @Test
   public void testMultipartUploadWithPartsLessThanMinSize() throws Exception {
     String volumeName = UUID.randomUUID().toString();
