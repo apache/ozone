@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test prometheus Metrics.
  */
-public class TestPrometheusMetrics {
+public class TestPrometheusMetricsIntegration {
 
   private MetricsSystem metrics;
   private PrometheusMetricsSink sink;
