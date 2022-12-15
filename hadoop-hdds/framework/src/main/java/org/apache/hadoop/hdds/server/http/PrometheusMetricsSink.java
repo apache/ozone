@@ -17,18 +17,15 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import static org.apache.hadoop.hdds.utils.RocksDBStoreMBean.ROCKSDB_CONTEXT_PREFIX;
-
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.List;
-import java.util.regex.Pattern;
 import org.apache.commons.configuration2.SubsetConfiguration;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.DecayRpcSchedulerUtil;
+import org.apache.hadoop.hdds.utils.PrometheusMetricsSinkUtil;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
 import org.apache.hadoop.metrics2.MetricsRecord;
@@ -48,12 +45,6 @@ public class PrometheusMetricsSink implements MetricsSink {
   private final Map<String, Map<String, String>> metricLines =
       Collections.synchronizedSortedMap(new TreeMap<>());
 
-  private static final Pattern SPLIT_PATTERN =
-      Pattern.compile("(?<!(^|[A-Z_]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
-
-  private static final Pattern REPLACE_PATTERN =
-      Pattern.compile("[^a-zA-Z0-9]+");
-
   public PrometheusMetricsSink() {
   }
 
@@ -69,7 +60,7 @@ public class PrometheusMetricsSink implements MetricsSink {
         String username = DecayRpcSchedulerUtil
             .checkMetricNameForUsername(metricsRecord.name(), metrics.name());
 
-        String key = prometheusName(
+        String key = PrometheusMetricsSinkUtil.prometheusName(
             metricsRecord.name(), metricName);
 
         String prometheusMetricKeyAsString =
@@ -81,7 +72,7 @@ public class PrometheusMetricsSink implements MetricsSink {
             + metrics.type().toString().toLowerCase();
 
         metricLines.computeIfAbsent(metricKey,
-                any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+            any -> Collections.synchronizedSortedMap(new TreeMap<>()))
             .put(prometheusMetricKeyAsString, String.valueOf(metrics.value()));
       }
     }
@@ -94,56 +85,28 @@ public class PrometheusMetricsSink implements MetricsSink {
         .append("{");
     String sep = "";
 
-    // tagListWithUsernameIfNeeded() checks if username is null.
-    // If it's not then it returns a list with the existing
-    // metric tags and a username tag.
-    List<MetricsTag> metricTagList = DecayRpcSchedulerUtil
-        .tagListWithUsernameIfNeeded(metricsRecord, username);
-
-    PrometheusMetricsSinkHelper.addServerNameTag(key, metricTagList);
+    List<MetricsTag> metricTags =
+        PrometheusMetricsSinkUtil.addTags(key, username, metricsRecord.tags());
 
     //add tags
-    for (MetricsTag tag : metricTagList) {
+    for (MetricsTag tag : metricTags) {
       String tagName = tag.name().toLowerCase();
 
       //ignore specific tag which includes sub-hierarchy
-      if (!tagName.equals("numopenconnectionsperuser")) {
-        prometheusMetricKey.append(sep)
-            .append(tagName)
-            .append("=\"")
-            .append(tag.value())
-            .append("\"");
-        sep = ",";
+      if (tagName.equals("numopenconnectionsperuser")) {
+        continue;
       }
+
+      prometheusMetricKey.append(sep)
+          .append(tagName)
+          .append("=\"")
+          .append(tag.value())
+          .append("\"");
+      sep = ",";
     }
     prometheusMetricKey.append("}");
 
     return prometheusMetricKey.toString();
-  }
-
-  /**
-   * Convert CamelCase based names to lower-case names where the separator
-   * is the underscore, to follow prometheus naming conventions.
-   */
-  public String prometheusName(String recordName,
-      String metricName) {
-
-    // RocksDB metric names already have underscores as delimiters,
-    // but record name is from DB file name and '.' (as in 'om.db') is invalid
-    if (StringUtils.isNotEmpty(recordName) &&
-        recordName.startsWith(ROCKSDB_CONTEXT_PREFIX)) {
-      return normalizeName(recordName) + "_" + metricName.toLowerCase();
-    }
-
-    String baseName = StringUtils.capitalize(recordName)
-        + StringUtils.capitalize(metricName);
-    return normalizeName(baseName);
-  }
-
-  public static String normalizeName(String baseName) {
-    String[] parts = SPLIT_PATTERN.split(baseName);
-    String result = String.join("_", parts).toLowerCase();
-    return REPLACE_PATTERN.matcher(result).replaceAll("_");
   }
 
   @Override
@@ -164,7 +127,7 @@ public class PrometheusMetricsSink implements MetricsSink {
       for (Map.Entry<String, String> metric
           : metricEntry.getValue().entrySet()) {
         String metricKey =
-            PrometheusMetricsSinkHelper.replaceServerNameTagValue(
+            PrometheusMetricsSinkUtil.replaceServerNameTagValue(
                 metricEntry.getKey(), metric.getKey(), serverPort);
         writer.write(metricKey + " " + metric.getValue() + "\n");
       }

@@ -17,14 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.base.Strings;
-import org.apache.hadoop.metrics2.MetricsInfo;
-import org.apache.hadoop.metrics2.MetricsRecord;
-import org.apache.hadoop.metrics2.MetricsTag;
-
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Helper functions for DecayRpcScheduler
  * metrics for Prometheus.
@@ -33,18 +25,6 @@ public final class DecayRpcSchedulerUtil {
 
   private DecayRpcSchedulerUtil() {
   }
-
-  private static final MetricsInfo USERNAME_INFO = new MetricsInfo() {
-    @Override
-    public String name() {
-      return "username";
-    }
-
-    @Override
-    public String description() {
-      return "caller username";
-    }
-  };
 
   /**
    * For Decay_Rpc_Scheduler, the metric name is in format
@@ -102,20 +82,4 @@ public final class DecayRpcSchedulerUtil {
     return null;
   }
 
-  /**
-   * MetricRecord.tags() is an unmodifiable collection of tags.
-   * Store it in a list, to modify it and add a username tag.
-   * @param metricsRecord
-   * @return the new list with the metric tags and the username tag
-   */
-  public static List<MetricsTag> tagListWithUsernameIfNeeded(
-      MetricsRecord metricsRecord, String username) {
-    List<MetricsTag> list = new ArrayList<>(metricsRecord.tags());
-
-    if (!Strings.isNullOrEmpty(username)) {
-      MetricsTag tag = new MetricsTag(USERNAME_INFO, username);
-      list.add(tag);
-    }
-    return list;
-  }
 }

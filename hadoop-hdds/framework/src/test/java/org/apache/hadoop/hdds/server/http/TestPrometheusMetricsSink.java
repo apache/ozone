@@ -148,54 +148,6 @@ public class TestPrometheusMetricsSink {
         "# TYPE same_name_counter"));
   }
 
-  @Test
-  public void testNamingCamelCase() {
-    //THEN
-    Assertions.assertEquals("rpc_time_some_metrics",
-        sink.prometheusName("RpcTime", "SomeMetrics"));
-
-    Assertions.assertEquals("om_rpc_time_om_info_keys",
-        sink.prometheusName("OMRpcTime", "OMInfoKeys"));
-
-    Assertions.assertEquals("rpc_time_small",
-        sink.prometheusName("RpcTime", "small"));
-  }
-
-  @Test
-  public void testNamingRocksDB() {
-    //RocksDB metrics are handled differently.
-    // THEN
-    Assertions.assertEquals("rocksdb_om_db_num_open_connections",
-        sink.prometheusName("Rocksdb_om.db", "num_open_connections"));
-  }
-
-  @Test
-  public void testNamingPipeline() {
-    // GIVEN
-    String recordName = "SCMPipelineMetrics";
-    String metricName = "NumBlocksAllocated-"
-        + "RATIS-THREE-47659e3d-40c9-43b3-9792-4982fc279aba";
-
-    // THEN
-    Assertions.assertEquals(
-        "scm_pipeline_metrics_"
-            + "num_blocks_allocated_"
-            + "ratis_three_47659e3d_40c9_43b3_9792_4982fc279aba",
-        sink.prometheusName(recordName, metricName));
-  }
-
-  @Test
-  public void testNamingSpaces() {
-    //GIVEN
-    String recordName = "JvmMetrics";
-    String metricName = "GcTimeMillisG1 Young Generation";
-
-    // THEN
-    Assertions.assertEquals(
-        "jvm_metrics_gc_time_millis_g1_young_generation",
-        sink.prometheusName(recordName, metricName));
-  }
-
   private String publishMetricsAndGetOutput() throws IOException {
     metrics.publishMetricsNow();
 
