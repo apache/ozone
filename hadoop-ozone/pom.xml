@@ -280,32 +280,12 @@
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
-        <version>5.2.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-http</artifactId>
-        <version>9.4.49.v20220914</version>
+        <version>${java.dev.jna.version}</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna-platform</artifactId>
-        <version>5.2.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-io</artifactId>
-        <version>9.4.49.v20220914</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-client</artifactId>
-        <version>9.4.49.v20220914</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib-common</artifactId>
-        <version>1.6.21</version>
+        <version>${java.dev.jna.version}</version>
       </dependency>
       <dependency>
         <groupId>org.javassist</groupId>
@@ -328,44 +308,19 @@
         <version>2.10.6</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.ratis</groupId>
-        <artifactId>ratis-tools</artifactId>
-        <version>2.4.2-8b8bdda-20221130.230506-1</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ratis</groupId>
-        <artifactId>ratis-common</artifactId>
-        <version>2.4.2-8b8bdda-20221130.230506-1</version>
-      </dependency>
-      <dependency>
-        <groupId>jakarta.activation</groupId>
-        <artifactId>jakarta.activation-api</artifactId>
-        <version>1.2.2</version>
-      </dependency>
-      <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-mapper-asl</artifactId>
-        <version>1.9.13</version>
+        <version>${codehaus.jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-core-asl</artifactId>
-        <version>1.9.13</version>
+        <version>${codehaus.jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-jaxrs</artifactId>
-        <version>1.9.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-auth</artifactId>
-        <version>3.3.4</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-annotations</artifactId>
-        <version>3.3.4</version>
+        <version>${codehaus.jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-lang</groupId>
@@ -378,11 +333,6 @@
         <version>1.2.17</version>
       </dependency>
       <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-log4j12</artifactId>
-        <version>1.7.10</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>3.5.6</version>
@@ -390,12 +340,12 @@
       <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-framework</artifactId>
-        <version>4.2.0</version>
+        <version>${apache.curator}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-client</artifactId>
-        <version>4.2.0</version>
+        <version>${apache.curator}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.snappy</groupId>
