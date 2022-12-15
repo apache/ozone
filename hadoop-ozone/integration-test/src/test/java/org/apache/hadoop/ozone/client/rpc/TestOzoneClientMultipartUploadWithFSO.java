@@ -321,10 +321,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    String sampleData = "sample Value";
+    StringBuilder sb = new StringBuilder("sample Value");
     for (int i = 0; i < 4096; ++i) {
-      sampleData += "01234567890123456789";
+      sb.append("01234567890123456789");
     }
+    String sampleData = sb.toString();
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -381,10 +382,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    String sampleData = "sample Value";
+    StringBuilder sb = new StringBuilder("sample Value");
     for (int i = 0; i < 4096; ++i) {
-      sampleData += "01234567890123456789";
+      sb.append("01234567890123456789");
     }
+    String sampleData = sb.toString();
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -402,8 +404,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
-    OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
-        .getCommitUploadPartInfo();
+    ozoneOutputStream.getCommitUploadPartInfo();
 
     Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
 
