@@ -362,12 +362,12 @@ public class TestRocksDBCheckpointDiffer {
     String metadataDirStr = ".";
     String sstDirStr = "compaction-sst-backup";
     List<List<String>> expectedDiff = asList(
-        asList("000024", "000017", "000028", "000026", "000019", "000021"),
         asList("000024", "000028", "000026", "000019", "000021"),
         asList("000024", "000028", "000026", "000021"),
         asList("000024", "000028", "000026"),
         asList("000028", "000026"),
-        Collections.singletonList("000028")
+        Collections.singletonList("000028"),
+        Collections.emptyList()
     );
 
     File clDir = new File(clDirStr);
@@ -397,7 +397,7 @@ public class TestRocksDBCheckpointDiffer {
     for (int index = snapshotIndex + 1; index < snapshots.size(); index++) {
       DifferSnapshotInfo snap = snapshots.get(index);
       List<String> sstDiffList = differ.getSSTDiffList(src, snap);
-      assertEquals(expectedDiff.get(index), sstDiffList);
+      assertEquals(expectedDiff.get(index - 1), sstDiffList);
     }
 
     rocksDB.close();
