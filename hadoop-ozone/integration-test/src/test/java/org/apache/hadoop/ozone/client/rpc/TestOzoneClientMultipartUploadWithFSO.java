@@ -432,6 +432,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     Assert.assertNotNull(omMultipartInfo.getUploadID());
 
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedNamespace(), 4);
+
     String uploadID = omMultipartInfo.getUploadID();
 
     // upload part 1.
