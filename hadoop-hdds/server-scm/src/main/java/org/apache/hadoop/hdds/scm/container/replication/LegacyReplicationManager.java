@@ -1153,7 +1153,7 @@ public class LegacyReplicationManager {
     List<ContainerReplica> allReplicas = replicaSet.getReplicas();
     int numCloseCommandsSent = closeReplicasIfPossible(container, allReplicas);
     int replicasNeeded =
-      replicaSet.additionalReplicaNeeded() - numCloseCommandsSent;
+        replicaSet.additionalReplicaNeeded() - numCloseCommandsSent;
 
     List<ContainerReplica> replicationSources = getReplicationSources(container,
         replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
@@ -1238,7 +1238,8 @@ public class LegacyReplicationManager {
    * @param container ContainerInfo
    * @param replicaSet Set of ContainerReplicas
    */
-  private void handleOverReplicatedExcessUnhealthy(final ContainerInfo container,
+  private void handleOverReplicatedExcessUnhealthy(
+      final ContainerInfo container,
       final RatisContainerReplicaCount replicaSet) {
     // Note - ReplicationManager would reach here only if the
     // following conditions are met:
@@ -1305,7 +1306,7 @@ public class LegacyReplicationManager {
 
   private List<ContainerReplica> getDeletionCandidates(ContainerInfo container,
       List<ContainerReplica> replicas, boolean healthy) {
-     return replicas.stream()
+    return replicas.stream()
         .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
             && compareState(container.getState(), r.getState()) == healthy)
         .collect(Collectors.toList());
@@ -1912,7 +1913,7 @@ public class LegacyReplicationManager {
   /* HELPER METHODS FOR UNHEALTHY OVER AND UNDER REPLICATED CONTAINERS */
 
   private void handleOverReplicatedAllUnhealthy(ContainerInfo container,
-     List<ContainerReplica> replicas, int excess) {
+      List<ContainerReplica> replicas, int excess) {
     List<ContainerReplica> deleteCandidates =
         getUnhealthyDeletionCandidates(container, replicas);
 
@@ -2097,8 +2098,8 @@ public class LegacyReplicationManager {
             containerPlacement.validateContainerPlacement(
                 targetReplicas, replicationFactor);
         final int misRepDelta = inFlightplacementStatus.misReplicationCount();
-        final int replicasNeeded
-            = additionalReplicasNeeded < misRepDelta ? misRepDelta : additionalReplicasNeeded;
+        final int replicasNeeded =
+            Math.max(additionalReplicasNeeded, misRepDelta);
         if (replicasNeeded <= 0) {
           LOG.debug("Container {} meets replication requirement with " +
               "inflight replicas", id);
@@ -2142,8 +2143,8 @@ public class LegacyReplicationManager {
           }
         } else {
           LOG.warn("Container {} is mis-replicated, requiring {} additional " +
-                  "replicas. After selecting new nodes, mis-replication has not " +
-                  "improved. No additional replicas will be scheduled",
+                  "replicas. After selecting new nodes, mis-replication has" +
+                  "not improved. No additional replicas will be scheduled",
               id, misRepDelta);
         }
       } else {

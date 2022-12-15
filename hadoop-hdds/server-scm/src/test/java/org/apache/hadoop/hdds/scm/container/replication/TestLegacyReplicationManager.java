@@ -2312,27 +2312,6 @@ public class TestLegacyReplicationManager {
     Assertions.assertTrue(chosenDNIDs.containsAll(deleteDNIDs));
   }
 
-//  private void assertReplicaSources(ContainerReplica... validReplicas) {
-//    List<CommandForDatanode> replicateCommands = datanodeCommandHandler
-//            .getReceivedCommands().stream()
-//            .filter(c -> c.getCommand().getType() ==
-//                    SCMCommandProto.Type.replicateContainerCommand)
-//            .collect(Collectors.toList());
-//    Set<UUID> validReplicaIDs = Arrays.stream(validReplicas).map(r
-//        -> r.getDatanodeDetails().getUuid()).collect(Collectors.toSet());
-//    for (CommandForDatanode<?> command: replicateCommands) {
-//      if (command.getCommand().getType() ==
-//          SCMCommandProto.Type.replicateContainerCommand) {
-//        ReplicateContainerCommand replicateCommand =
-//                (ReplicateContainerCommand) command.getCommand();
-//        Set<UUID> chosenSources = replicateCommand.getSourceDatanodes().stream()
-//                .map(DatanodeDetails::getUuid)
-//                .collect(Collectors.toSet());
-//        Assertions.assertEquals(validReplicaIDs, chosenSources);
-//      }
-//    }
-//  }
-
   private ContainerInfo createContainer(LifeCycleState containerState)
       throws IOException, TimeoutException {
     return createContainer(containerState, CONTAINER_USED_BYTES_DEFAULT,
