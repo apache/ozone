@@ -48,6 +48,17 @@
     </tbody>
 </table>
 
+<h2>Pipeline Info</h2>
+
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr ng-repeat="PipelineInfo in $ctrl.pipelinemetrics.PipelineInfo">
+        <td class="col-md-4">{{PipelineInfo.key}}</td>
+        <td class="col-md-8">{{PipelineInfo.value}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Status</h2>
 <table class="table table-bordered table-striped" class="col-md-6">
     <tbody>
