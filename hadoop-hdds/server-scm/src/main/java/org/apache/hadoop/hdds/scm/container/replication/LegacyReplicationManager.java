@@ -527,6 +527,8 @@ public class LegacyReplicationManager {
           if (!sufficientlyReplicated && replicaSet.isUnrecoverable()) {
             report.incrementAndSample(HealthState.MISSING,
                 container.containerID());
+            report.incrementAndSample(
+                HealthState.UNDER_REPLICATED, container.containerID());
           }
           if (!placementSatisfied) {
             report.incrementAndSample(HealthState.MIS_REPLICATED,
@@ -1147,10 +1149,17 @@ public class LegacyReplicationManager {
           container.getContainerID(), replicaSet);
       return;
     }
+
+    List<ContainerReplica> allReplicas = replicaSet.getReplicas();
+    int numCloseCommandsSent = closeReplicasIfPossible(container, allReplicas);
+    int replicasNeeded =
+      replicaSet.additionalReplicaNeeded() - numCloseCommandsSent;
+
     List<ContainerReplica> replicationSources = getReplicationSources(container,
         replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
+    // This method will handle topology even if replicasNeeded <= 0.
     replicateAnyWithTopology(container, replicationSources,
-        placementStatus, replicaSet.additionalReplicaNeeded());
+        placementStatus, replicasNeeded);
   }
 
   /**
@@ -1203,9 +1212,6 @@ public class LegacyReplicationManager {
       ReplicationManagerReport report) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
-    // This method will remove closable replicas from the replicas list.
-    closeReplicasIfPossible(container, replicas);
-
     int excessReplicas = replicas.size() -
         container.getReplicationConfig().getRequiredNodes();
     int missingReplicas = excessReplicas * -1;
@@ -1244,18 +1250,19 @@ public class LegacyReplicationManager {
     List<ContainerReplica> unhealthyReplicas =
         getUnhealthyDeletionCandidates(container, replicas);
 
+    // Only unhealthy replicas which cannot be closed will remain eligible
+    // for deletion, since this method is deleting unhealthy containers only.
     closeReplicasIfPossible(container, unhealthyReplicas);
-
     if (unhealthyReplicas.isEmpty()) {
       return;
     }
 
-    int excessReplicas = replicas.size() -
+    int excessReplicaCount = replicas.size() -
         container.getReplicationConfig().getRequiredNodes();
     if (container.getState() == LifeCycleState.CLOSED) {
       // The container is already closed. The unhealthy replicas are extras
       // and unnecessary.
-      deleteExcess(container, unhealthyReplicas, excessReplicas);
+      deleteExcess(container, unhealthyReplicas, excessReplicaCount);
     } else {
       // Container is not yet closed.
       // We only need to save the unhealthy replicas if they
@@ -1265,7 +1272,7 @@ public class LegacyReplicationManager {
           .map(ContainerReplica::getOriginDatanodeId)
           .collect(Collectors.toSet());
       deleteExcessWithNonUniqueOriginNodeIDs(container,
-          originNodeIDs, unhealthyReplicas, excessReplicas);
+          originNodeIDs, unhealthyReplicas, excessReplicaCount);
     }
   }
 
@@ -1908,9 +1915,17 @@ public class LegacyReplicationManager {
      List<ContainerReplica> replicas, int excess) {
     List<ContainerReplica> deleteCandidates =
         getUnhealthyDeletionCandidates(container, replicas);
+
+    // Only unhealthy replicas which cannot be closed will remain eligible
+    // for deletion, since this method is deleting unhealthy containers only.
+    closeReplicasIfPossible(container, deleteCandidates);
+    if (deleteCandidates.isEmpty()) {
+      return;
+    }
+
     if (container.getState() == LifeCycleState.CLOSED) {
       // Prefer to delete unhealthy replicas with lower BCS IDs.
-      deleteExcessLowestBcsIDs(container, replicas, excess);
+      deleteExcessLowestBcsIDs(container, deleteCandidates, excess);
     } else {
       // Container is not yet closed.
       // We only need to save the unhealthy replicas if they
@@ -1920,37 +1935,50 @@ public class LegacyReplicationManager {
           .map(ContainerReplica::getOriginDatanodeId)
           .collect(Collectors.toSet());
       deleteExcessWithNonUniqueOriginNodeIDs(container,
-          originNodeIDs, replicas, excess);
+          originNodeIDs, deleteCandidates, excess);
     }
   }
 
   private void handleUnderReplicatedAllUnhealthy(ContainerInfo container,
       List<ContainerReplica> replicas, ContainerPlacementStatus placementStatus,
       int additionalReplicasNeeded) {
-    // TODO Datanodes currently shuffle sources, so we cannot prioritize
-    //  some replicas based on BCSID or origin node ID.
-    replicateAnyWithTopology(container,
-        getReplicationSources(container, replicas), placementStatus,
-        additionalReplicasNeeded);
+
+    int numCloseCmdsSent = closeReplicasIfPossible(container, replicas);
+    // Only replicate unhealthy containers if none of the unhealthy replicas
+    // could be closed. If we sent a close command to an unhealthy replica,
+    // we should wait for that to complete and replicate it when it becomes
+    // healthy on a future iteration.
+    if (numCloseCmdsSent == 0) {
+      // TODO Datanodes currently shuffle sources, so we cannot prioritize
+      //  some replicas based on BCSID or origin node ID.
+      replicateAnyWithTopology(container,
+          getReplicationSources(container, replicas), placementStatus,
+          additionalReplicasNeeded);
+    }
   }
 
-  private void closeReplicasIfPossible(ContainerInfo container,
+  private int closeReplicasIfPossible(ContainerInfo container,
       List<ContainerReplica> replicas) {
+    int numCloseCmdsSent = 0;
     Iterator<ContainerReplica> iterator = replicas.iterator();
     while (iterator.hasNext()) {
       final ContainerReplica replica = iterator.next();
       final State state = replica.getState();
       if (state == State.OPEN || state == State.CLOSING) {
         sendCloseCommand(container, replica.getDatanodeDetails(), false);
+        numCloseCmdsSent++;
         iterator.remove();
       } else if (state == State.QUASI_CLOSED) {
         // Send force close command if the BCSID matches
         if (container.getSequenceId() == replica.getSequenceId()) {
           sendCloseCommand(container, replica.getDatanodeDetails(), true);
+          numCloseCmdsSent++;
           iterator.remove();
         }
       }
     }
+
+    return numCloseCmdsSent;
   }
 
   /* HELPER METHODS FOR ALL OVER AND UNDER REPLICATED CONTAINERS */
@@ -2026,6 +2054,9 @@ public class LegacyReplicationManager {
     // by a healthy replica.
     // TODO topology handling must be improved to make an optimal
     //  choice as to which replica to keep.
+
+    // TODO if two candidates represent the smae origin node ID, one of them
+    //  should be saved, but this will save both of them.
     List<ContainerReplica> nonUniqueDeleteCandidates =
         deleteCandidates.stream().filter(r ->
             existingOriginNodeIDs.contains(r.getOriginDatanodeId()))

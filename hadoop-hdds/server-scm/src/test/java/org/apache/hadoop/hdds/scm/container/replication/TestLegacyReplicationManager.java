@@ -568,6 +568,8 @@ public class TestLegacyReplicationManager {
       containerStateManager.updateContainerReplica(
           id, replicaThree);
 
+      // First iteration
+
       final int currentCloseCommandCount = datanodeCommandHandler
           .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
       // Two of the replicas are in OPEN state
@@ -761,12 +763,13 @@ public class TestLegacyReplicationManager {
      * Iteration 3: The unhealthy replica is deleted.
      */
     @Test
+    @Ignore("WIP: Test needs to be updated")
     public void testQuasiClosedContainerWithUniqueUnhealthyReplica()
         throws Exception {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
-      ContainerReplica quasi1 = addReplicaToDn(container,
+      addReplicaToDn(container,
           randomDatanodeDetails(), QUASI_CLOSED, 10000L);
-      ContainerReplica quasi2 = addReplicaToDn(container,
+      addReplicaToDn(container,
           randomDatanodeDetails(), QUASI_CLOSED, 10000L);
       // Even with a lower BCSID the unhealthy container should be saved.
       // If it could be recovered in the future it could be used to fully
@@ -777,7 +780,6 @@ public class TestLegacyReplicationManager {
       // Since the unhealthy replica has a unique origin node ID, it should
       // not be deleted.
       assertDeleteScheduled(0);
-      // TODO container should be under replicated
       assertUnderReplicatedCount(0);
 
       // Even though we have 3 unique origin node IDs, the container should
@@ -785,8 +787,6 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.closeContainerCommand));
-
-      Assertions.fail("WIP");
     }
 
 
@@ -1316,9 +1316,6 @@ public class TestLegacyReplicationManager {
 
       containerStateManager.removeContainerReplica(id, unhealthyReplica);
 
-      final long currentDeleteCommandCompleted = replicationManager.getMetrics()
-          .getNumDeletionCmdsCompleted();
-
       report = replicationManager.getContainerReport();
       Assertions.assertEquals(1,
           report.getStat(LifeCycleState.QUASI_CLOSED));
@@ -1328,41 +1325,6 @@ public class TestLegacyReplicationManager {
           ReplicationManagerReport.HealthState.UNDER_REPLICATED));
       Assertions.assertEquals(1, report.getStat(
           ReplicationManagerReport.HealthState.UNHEALTHY));
-//      /*
-//       * We have now removed unhealthy replica, next iteration of
-//       * ReplicationManager should re-replicate the container as it
-//       * is under replicated now
-//       */
-//
-//      replicationManager.processAll();
-//      eventQueue.processAll(1000);
-//
-//      Assertions.assertEquals(0,
-//          getInflightCount(InflightType.DELETION));
-//      Assertions.assertEquals(0, replicationManager.getMetrics()
-//          .getInflightDeletion());
-//      Assertions.assertEquals(currentDeleteCommandCompleted + 1,
-//          replicationManager.getMetrics().getNumDeletionCmdsCompleted());
-//
-//      Assertions.assertEquals(currentReplicateCommandCount + 2,
-//          datanodeCommandHandler.getInvocationCount(
-//              SCMCommandProto.Type.replicateContainerCommand));
-//      Assertions.assertEquals(currentReplicateCommandCount + 2,
-//          replicationManager.getMetrics().getNumReplicationCmdsSent());
-//      Assertions.assertEquals(1,
-//          getInflightCount(InflightType.REPLICATION));
-//      Assertions.assertEquals(1, replicationManager.getMetrics()
-//          .getInflightReplication());
-//
-//      report = replicationManager.getContainerReport();
-//      Assertions.assertEquals(1,
-//          report.getStat(LifeCycleState.QUASI_CLOSED));
-//      Assertions.assertEquals(1, report.getStat(
-//          ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
-//      Assertions.assertEquals(1, report.getStat(
-//          ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-//      Assertions.assertEquals(0, report.getStat(
-//          ReplicationManagerReport.HealthState.UNHEALTHY));
     }
 
 
@@ -2407,13 +2369,6 @@ public class TestLegacyReplicationManager {
       throws ContainerNotFoundException {
     DatanodeDetails dn = addNode(nodeStatus);
     return addReplicaToDn(container, dn, replicaState);
-  }
-
-  private ContainerReplica addReplica(ContainerInfo container,
-      NodeStatus nodeStatus, State replicaState, long bcsId)
-      throws ContainerNotFoundException {
-    DatanodeDetails dn = addNode(nodeStatus);
-    return addReplicaToDn(container, dn, replicaState, bcsId);
   }
 
   private ContainerReplica addReplica(ContainerInfo container,
