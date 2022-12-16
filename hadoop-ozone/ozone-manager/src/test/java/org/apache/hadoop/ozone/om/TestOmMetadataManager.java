@@ -732,42 +732,4 @@ public class TestOmMetadataManager {
         arguments("vol1", "nonexistentBucket", BUCKET_NOT_FOUND)
     );
   }
-
-  @Test
-  public void testListSnapshotDoesNotListOtherBucketSnapshots() throws Exception {
-    String vol1 = "vol1";
-    String bucket1 = "bucket1";
-    String bucket2 = "bucket2";
-
-    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
-    addBucketsToCache(vol1, bucket1);
-    addBucketsToCache(vol1, bucket2);
-    String snapshotName1 = "snapshot1-";
-    String snapshotName2 = "snapshot2-";
-
-    for (int i = 1; i <= 2; i++) {
-      OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
-              snapshotName1 + i, omMetadataManager);
-    }
-
-    for (int i = 1; i <= 5; i++) {
-      OMRequestTestUtils.addSnapshotToTable(vol1, bucket2,
-              snapshotName2 + i, omMetadataManager);
-    }
-
-    //Test listing snapshots only lists snapshots of specified bucket
-    List<SnapshotInfo> snapshotInfos1 = omMetadataManager.listSnapshot(vol1,
-            bucket1);
-    assertEquals(2, snapshotInfos1.size());
-    for (SnapshotInfo snapshotInfo : snapshotInfos1) {
-      assertTrue(snapshotInfo.getName().startsWith(snapshotName1));
-    }
-
-    List<SnapshotInfo> snapshotInfos2 = omMetadataManager.listSnapshot(vol1,
-            bucket2);
-    assertEquals(5, snapshotInfos2.size());
-    for (SnapshotInfo snapshotInfo : snapshotInfos2) {
-      assertTrue(snapshotInfo.getName().startsWith(snapshotName2));
-    }
-  }
 }
