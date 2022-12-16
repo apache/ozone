@@ -65,7 +65,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
- * Tests the ECUnderReplicationHandling functionality.
+ * Tests the ECMisReplicationHandling functionality.
  */
 public class TestECMisReplicationHandler {
   private ECReplicationConfig repConfig;

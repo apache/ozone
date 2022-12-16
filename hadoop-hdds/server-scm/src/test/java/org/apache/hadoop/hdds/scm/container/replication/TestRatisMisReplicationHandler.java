@@ -67,7 +67,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
- * Tests the ECUnderReplicationHandling functionality.
+ * Tests the RatisReplicationHandling functionality.
  */
 public class TestRatisMisReplicationHandler {
   private RatisReplicationConfig repConfig;
