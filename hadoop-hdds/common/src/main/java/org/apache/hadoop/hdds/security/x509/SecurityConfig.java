@@ -38,12 +38,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_PATH;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
@@ -194,14 +194,14 @@ public class SecurityConfig {
     }
 
     this.externalRootCaCert = this.configuration.get(
-        HDDS_EXTERNAL_ROOT_CA_CERT_PATH,
-        HDDS_EXTERNAL_ROOT_CA_CERT_PATH_DEFAULT);
+        HDDS_X509_ROOTCA_CERTIFICATE_FILE,
+        HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT);
     this.externalRootCaPublicKeyPath = this.configuration.get(
-        HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH,
-        HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH_DEFAULT);
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT);
     this.externalRootCaPrivateKeyPath = this.configuration.get(
-        HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH,
-        HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH_DEFAULT);
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
 
     this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
         HDDS_X509_CRL_NAME_DEFAULT);

@@ -2122,13 +2122,13 @@
   <property>
     <name>hdds.x509.rootca.public.key.file</name>
     <value></value>
-    <description>Path to an external public key. This public key is later used
-      when initializing SCM to sign certificates as the root certificate
-      authority. When only the private key is specified
-      the public key is read from the external certificate.
-      Note that this is only used for Ozone's internal communication, and it
-      does not affect the HTTPS protocol at WebUIs as they can be configured
-      separately.
+    <description>Path to an external public key. The file format is expected
+      to be pem. This public key is later used when initializing SCM to sign
+      certificates as the root certificate authority.
+      When only the private key is specified the public key is read from the
+      external certificate. Note that this is only used for Ozone's internal
+      communication, and it does not affect the HTTPS protocol at WebUIs as
+      they can be configured separately.
     </description>
   </property>
   <property>

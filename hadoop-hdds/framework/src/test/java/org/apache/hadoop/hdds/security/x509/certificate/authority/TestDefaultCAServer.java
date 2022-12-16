@@ -391,11 +391,11 @@ public class TestDefaultCAServer {
     String publicKeyPath = Paths.get(tempDir.toString(),
         HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT).toString();
 
-    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_CERT_PATH,
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE,
         externalCaCertPart);
-    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PRIVATE_KEY_PATH,
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
         privateKeyPath);
-    conf.set(HddsConfigKeys.HDDS_EXTERNAL_ROOT_CA_PUBLIC_KEY_PATH,
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
         publicKeyPath);
   }
 
