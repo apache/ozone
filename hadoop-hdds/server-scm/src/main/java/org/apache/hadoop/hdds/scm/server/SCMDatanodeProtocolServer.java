@@ -311,11 +311,9 @@ public class SCMDatanodeProtocolServer implements
   }
 
   private OptionalLong getTermIfLeader() {
-    if (scmContext != null) {
+    if (scmContext != null && scmContext.isLeader()) {
       try {
-        if (scmContext.isLeader()) {
-          return OptionalLong.of(scmContext.getTermOfLeader());
-        }
+        return OptionalLong.of(scmContext.getTermOfLeader());
       } catch (NotLeaderException e) {
         // only leader should distribute current term
       }
