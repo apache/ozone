@@ -212,7 +212,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
-      <version>0.9.11</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -235,7 +234,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.codahale.metrics</groupId>
       <artifactId>metrics-core</artifactId>
-      <version>3.0.2</version>
       <scope>test</scope>
       <!-- Needed for mocking RaftServerImpl -->
     </dependency>
