@@ -152,6 +152,9 @@ message CommandQueueReportProto {
 message SCMHeartbeatResponseProto {
   required string datanodeUUID = 1;
   repeated SCMCommandProto commands = 2;
+
+  // Same as term in SCMCommandProto
+  optional int64 term = 3;
 }
 
 message SCMNodeAddressList {
