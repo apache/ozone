@@ -326,22 +326,6 @@ public class TestHeartbeatEndpointTask {
   }
 
   /**
-   * Creates HeartbeatEndpointTask for the given StorageContainerManager proxy.
-   *
-   * @param proxy StorageContainerDatanodeProtocolClientSideTranslatorPB
-   *
-   * @return HeartbeatEndpointTask
-   */
-  private HeartbeatEndpointTask getHeartbeatEndpointTask(
-      StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class));
-    return getHeartbeatEndpointTask(conf, context, proxy);
-
-  }
-
-  /**
    * Creates HeartbeatEndpointTask with the given conf, context and
    * StorageContainerManager client side proxy.
    *
