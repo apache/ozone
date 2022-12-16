@@ -45,6 +45,10 @@ import java.util.stream.Collectors;
 /**
  * Handles the Mis replication processing and forming the respective SCM
  * commands.
+ * Mis-replication: State of replicas where containers are neither
+ * under-replicated or over-replicated, but the existing placement
+ * of containers do not conform to the configured placement policy
+ * of the container.
  */
 public abstract class MisReplicationHandler implements
         UnhealthyReplicationHandler {
