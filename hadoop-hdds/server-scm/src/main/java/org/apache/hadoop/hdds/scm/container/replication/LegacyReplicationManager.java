@@ -589,7 +589,8 @@ public class LegacyReplicationManager {
           if (numUnhealthyReplicas > replicaSet.getReplicationFactor()) {
             report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
           } else if (numUnhealthyReplicas < replicaSet.getReplicationFactor()) {
-            report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
+            report.incrementAndSample(HealthState.UNDER_REPLICATED,
+                containerID);
           }
         }
       } else {
@@ -607,7 +608,7 @@ public class LegacyReplicationManager {
     }
   }
 
-    private void updateCompletedReplicationMetrics(ContainerInfo container,
+  private void updateCompletedReplicationMetrics(ContainerInfo container,
       InflightAction action) {
     metrics.incrNumReplicationCmdsCompleted();
     metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
@@ -2075,12 +2076,17 @@ public class LegacyReplicationManager {
     // TODO topology handling must be improved to make an optimal
     //  choice as to which replica to keep.
 
-    // TODO if two candidates represent the smae origin node ID, one of them
-    //  should be saved, but this will save both of them.
-    List<ContainerReplica> nonUniqueDeleteCandidates =
-        deleteCandidates.stream().filter(r ->
-            existingOriginNodeIDs.contains(r.getOriginDatanodeId()))
-            .collect(Collectors.toList());
+    List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
+    for (ContainerReplica replica: deleteCandidates) {
+      if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
+        nonUniqueDeleteCandidates.add(replica);
+      } else {
+        // Spare this replica with this new origin node ID from deletion.
+        // delete candidates seen later in the loop with this same origin
+        // node ID can be deleted.
+        existingOriginNodeIDs.add(replica.getOriginDatanodeId());
+      }
+    }
     deleteExcess(container, nonUniqueDeleteCandidates, excess);
   }
 
