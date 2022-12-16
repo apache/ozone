@@ -56,6 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -351,7 +352,10 @@ public class TestOzoneClientMultipartUploadWithFSO {
     partsMap.put(partNumber, partName);
     bucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
-    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
+    long replicatedSize = QuotaUtil.getReplicatedSize(sampleData.length(),
+        bucket.getReplicationConfig());
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(),
+        replicatedSize);
 
     //upload same key again
     multipartInfo = bucket.initiateMultipartUpload(keyName,
@@ -373,7 +377,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
     bucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
     // used sized should remain same, overwrite previous upload
-    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(),
+        replicatedSize);
   }
 
   @Test
@@ -392,7 +397,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = getOzoneECBucket(volumeName, bucketName);
 
-    // perform upload and complete
+    // perform upload and abort
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
         bucket.getReplicationConfig());
 
@@ -405,12 +410,14 @@ public class TestOzoneClientMultipartUploadWithFSO {
     ozoneOutputStream.close();
 
     ozoneOutputStream.getCommitUploadPartInfo();
-
-    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 137228);
+    long replicatedSize = QuotaUtil.getReplicatedSize(sampleData.length(),
+        bucket.getReplicationConfig());
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(),
+        replicatedSize);
 
     bucket.abortMultipartUpload(keyName, uploadID);
 
-    // used sized should remain same, overwrite previous upload
+    // used size should become zero after aport upload
     Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(), 0);
   }
 
