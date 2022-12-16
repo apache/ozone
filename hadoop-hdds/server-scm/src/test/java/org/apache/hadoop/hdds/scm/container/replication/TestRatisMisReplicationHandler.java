@@ -51,7 +51,8 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
   public void setup() {
-    RatisReplicationConfig repConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+    RatisReplicationConfig repConfig = RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE);
     setup(repConfig);
   }
 
@@ -157,7 +158,9 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
   }
 
   @Override
-  protected MisReplicationHandler getMisreplicationHandler(PlacementPolicy placementPolicy, OzoneConfiguration conf, NodeManager nodeManager) {
+  protected MisReplicationHandler getMisreplicationHandler(
+          PlacementPolicy placementPolicy, OzoneConfiguration conf,
+          NodeManager nodeManager) {
     return new RatisMisReplicationHandler(placementPolicy, conf, nodeManager);
   }
 }

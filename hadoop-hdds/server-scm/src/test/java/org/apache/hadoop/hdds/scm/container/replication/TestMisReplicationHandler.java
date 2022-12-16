@@ -65,10 +65,14 @@ public abstract class TestMisReplicationHandler {
     NodeSchemaManager.getInstance().init(schemas, true);
   }
 
-  protected abstract MisReplicationHandler getMisreplicationHandler(PlacementPolicy placementPolicy, OzoneConfiguration conf, NodeManager nodeManager);
+  protected abstract MisReplicationHandler getMisreplicationHandler(
+          PlacementPolicy placementPolicy, OzoneConfiguration configuration,
+          NodeManager nm);
   protected void testMisReplication(Set<ContainerReplica> availableReplicas,
-                                  List<ContainerReplicaOp> pendingOp, int maintenanceCnt,
-                                  int misreplicationCount, int expectedNumberOfNodes) throws IOException {
+                                  List<ContainerReplicaOp> pendingOp,
+                                  int maintenanceCnt, int misreplicationCount,
+                                    int expectedNumberOfNodes)
+          throws IOException {
     PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             Mockito.mock(ContainerPlacementStatus.class);
@@ -81,8 +85,10 @@ public abstract class TestMisReplicationHandler {
   }
 
   protected void testMisReplication(Set<ContainerReplica> availableReplicas,
-                                  PlacementPolicy mockedPlacementPolicy, List<ContainerReplicaOp> pendingOp,
-                                  int maintenanceCnt, int misreplicationCount, int expectedNumberOfNodes)
+                                  PlacementPolicy mockedPlacementPolicy,
+                                  List<ContainerReplicaOp> pendingOp,
+                                  int maintenanceCnt, int misreplicationCount,
+                                  int expectedNumberOfNodes)
           throws IOException {
     MisReplicationHandler misReplicationHandler =
             getMisreplicationHandler(mockedPlacementPolicy, conf, nodeManager);
@@ -97,8 +103,8 @@ public abstract class TestMisReplicationHandler {
                       if (r.getDatanodeDetails().getPersistedOpState()
                               == IN_SERVICE) {
                         try {
-                          return nodeManager.getNodeStatus(r.getDatanodeDetails())
-                                  .isHealthy();
+                          return nodeManager.getNodeStatus(
+                                  r.getDatanodeDetails()).isHealthy();
                         } catch (NodeNotFoundException e) {
                           throw new RuntimeException(e);
                         }
@@ -134,9 +140,9 @@ public abstract class TestMisReplicationHandler {
     Map<DatanodeDetails, Integer> copyReplicaIdxMap = copy.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap = misReplicationHandler
-            .processAndCreateCommands(availableReplicas, pendingOp,
-                    result, maintenanceCnt);
+    Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap =
+            misReplicationHandler.processAndCreateCommands(availableReplicas,
+                    pendingOp, result, maintenanceCnt);
     Assertions.assertEquals(expectedNumberOfNodes,
             datanodeDetailsSCMCommandMap.size());
     Assertions.assertTrue(datanodeDetailsSCMCommandMap.keySet()
