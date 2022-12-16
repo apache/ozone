@@ -159,6 +159,7 @@ public class ReplicationManager implements SCMService {
   private ReplicationQueue replicationQueue;
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
+  private final ECMisReplicationHandler ecMisReplicationHandler;
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
   private final int maintenanceRedundancy;
@@ -223,6 +224,8 @@ public class ReplicationManager implements SCMService {
         ecContainerPlacement, conf, nodeManager, this);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
+    ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
+        conf, nodeManager);
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, nodeManager);
     ratisOverReplicationHandler =
@@ -525,8 +528,18 @@ public class ReplicationManager implements SCMService {
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
     if (result.getContainerInfo().getReplicationType() == EC) {
-      return ecUnderReplicationHandler.processAndCreateCommands(replicas,
-          pendingOps, result, maintenanceRedundancy);
+      if (result.getHealthState()
+          == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+        return ecUnderReplicationHandler.processAndCreateCommands(replicas,
+            pendingOps, result, maintenanceRedundancy);
+      } else if (result.getHealthState()
+          == ContainerHealthResult.HealthState.MIS_REPLICATED) {
+        return ecMisReplicationHandler.processAndCreateCommands(replicas,
+            pendingOps, result, maintenanceRedundancy);
+      } else {
+        throw new IllegalArgumentException("Unexpected health state: "
+            + result.getHealthState());
+      }
     }
     return ratisUnderReplicationHandler.processAndCreateCommands(replicas,
         pendingOps, result, ratisMaintenanceMinReplicas);
