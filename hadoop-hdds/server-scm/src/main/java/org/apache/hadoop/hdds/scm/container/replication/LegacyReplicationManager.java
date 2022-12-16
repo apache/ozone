@@ -521,31 +521,19 @@ public class LegacyReplicationManager {
          * Check if the container is under replicated and take appropriate
          * action.
          */
+        updateReportReplicationStats(container.containerID(),
+            placementStatus, replicaSet, report);
         boolean sufficientlyReplicated = replicaSet.isSufficientlyReplicated();
         boolean placementSatisfied = placementStatus.isPolicySatisfied();
         if (!sufficientlyReplicated || !placementSatisfied) {
-          // Increment report stats.
-          if (!sufficientlyReplicated && replicaSet.isUnrecoverable()) {
-            report.incrementAndSample(HealthState.MISSING,
-                container.containerID());
-            report.incrementAndSample(
-                HealthState.UNDER_REPLICATED, container.containerID());
-          }
-          if (!placementSatisfied) {
-            report.incrementAndSample(HealthState.MIS_REPLICATED,
-                container.containerID());
-
-          }
           // Replicate container if needed.
           if (!inflightReplication.isFull() || !inflightDeletion.isFull()) {
             if (!replicaSet.isUnrecoverable()) {
               if (replicaSet.getHealthyReplicaCount() == 0 &&
                   replicaSet.getUnhealthyReplicaCount() != 0) {
                 handleAllReplicasUnhealthy(container, replicaSet,
-                    placementStatus, report);
+                    placementStatus);
               } else {
-                report.incrementAndSample(
-                    HealthState.UNDER_REPLICATED, container.containerID());
                 handleUnderReplicatedHealthy(container,
                     replicaSet, placementStatus);
               }
@@ -559,8 +547,6 @@ public class LegacyReplicationManager {
          * action.
          */
         if (replicaSet.isOverReplicated()) {
-          report.incrementAndSample(HealthState.OVER_REPLICATED,
-              container.containerID());
           handleOverReplicatedHealthy(container, replicaSet);
           return;
         }
@@ -585,7 +571,43 @@ public class LegacyReplicationManager {
     }
   }
 
-  private void updateCompletedReplicationMetrics(ContainerInfo container,
+  private void updateReportReplicationStats(ContainerID containerID,
+      ContainerPlacementStatus placementStatus,
+      RatisContainerReplicaCount replicaSet, ReplicationManagerReport report) {
+
+    if (!replicaSet.isSufficientlyReplicated()) {
+      if (replicaSet.getHealthyReplicaCount() == 0) {
+        if (replicaSet.isUnrecoverable()) {
+          // There are no healthy or unhealthy replicas.
+          report.incrementAndSample(HealthState.MISSING, containerID);
+          report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
+        } else {
+          // There are only unhealthy replicas.
+          // Over/under replicated status is determined by the number of
+          // unhealthy replicas.
+          int numUnhealthyReplicas = replicaSet.getUnhealthyReplicaCount();
+          if (numUnhealthyReplicas > replicaSet.getReplicationFactor()) {
+            report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
+          } else if (numUnhealthyReplicas < replicaSet.getReplicationFactor()) {
+            report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
+          }
+        }
+      } else {
+        // There is at least one healthy replica, so it is under replicated.
+        report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
+      }
+    }
+
+    if (!placementStatus.isPolicySatisfied()) {
+      report.incrementAndSample(HealthState.MIS_REPLICATED, containerID);
+    }
+
+    if (replicaSet.isOverReplicated()) {
+      report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
+    }
+  }
+
+    private void updateCompletedReplicationMetrics(ContainerInfo container,
       InflightAction action) {
     metrics.incrNumReplicationCmdsCompleted();
     metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
@@ -1209,8 +1231,7 @@ public class LegacyReplicationManager {
 
   private void handleAllReplicasUnhealthy(ContainerInfo container,
       RatisContainerReplicaCount replicaSet,
-      ContainerPlacementStatus placementStatus,
-      ReplicationManagerReport report) {
+      ContainerPlacementStatus placementStatus) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
     int excessReplicas = replicas.size() -
@@ -1220,13 +1241,9 @@ public class LegacyReplicationManager {
     if (missingReplicas > 0) {
       handleUnderReplicatedAllUnhealthy(container, replicas,
           placementStatus, missingReplicas);
-      report.incrementAndSample(
-          HealthState.UNDER_REPLICATED, container.containerID());
     } else if (excessReplicas > 0) {
       handleOverReplicatedAllUnhealthy(container, replicas,
           excessReplicas);
-      report.incrementAndSample(
-          HealthState.OVER_REPLICATED, container.containerID());
     }
   }
 
