@@ -19,6 +19,7 @@ package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import com.google.common.graph.GraphBuilder;
 import java.io.File;
 import java.io.FileWriter;
@@ -44,7 +45,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -67,8 +68,9 @@ import org.slf4j.event.Level;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test RocksDBCheckpointDiffer basic functionality.
@@ -89,10 +91,10 @@ public class TestRocksDBCheckpointDiffer {
    * RocksDB checkpoint path prefix.
    */
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
-  private final ArrayList<DifferSnapshotInfo> snapshots = new ArrayList<>();
+  private final List<DifferSnapshotInfo> snapshots = new ArrayList<>();
 
-  @BeforeAll
-  public static void init() {
+  @BeforeEach
+  public void init() {
     // Checkpoint differ log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(RocksDBCheckpointDiffer.getLog(), Level.INFO);
     // Test class log level. Set to DEBUG for verbose output
@@ -199,19 +201,18 @@ public class TestRocksDBCheckpointDiffer {
       Set<String> expectedDiffSstFiles,
       boolean expectingException) {
 
-    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+    RocksDBCheckpointDiffer differ =
+        new RocksDBCheckpointDiffer(null, null, null, 0L);
     boolean exceptionThrown = false;
     long createdTime = System.currentTimeMillis();
 
     String compactionLog = ""
         // Snapshot 0
-        + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 \\tmp " + createdTime
-        + " \n"
+        + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 " + createdTime + " \n"
         // Additional "compaction" to trigger and test early exit condition
         + "C 000001,000002:000062\n"
         // Snapshot 1
-        + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 \\tmp " + createdTime
-        + " \n"
+        + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 " + createdTime + " \n"
         // Regular compaction
         + "C 000068,000062:000069\n"
         // Trivial move
@@ -222,13 +223,11 @@ public class TestRocksDBCheckpointDiffer {
         // Deletion?
         + "C 000093,000090,000083:\n"
         // Snapshot 2
-        + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd \\tmp " + createdTime
-        + "\n"
+        + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd " + createdTime + "\n"
         + "C 000098,000096,000085,000078,000071,000064,000060,000052:000099\n"
         + "C 000105,000095,000088:000107\n"
         // Snapshot 3
-        + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea \\tmp " + createdTime
-        + "\n";
+        + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea " + createdTime + "\n";
 
     // Construct DAG from compaction log input
     Arrays.stream(compactionLog.split("\n")).forEach(
@@ -286,7 +285,7 @@ public class TestRocksDBCheckpointDiffer {
     RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(
         metadataDirStr, sstDirStr, clDirStr, dbLocation,
         TimeUnit.DAYS.toMillis(1),
-        TimeUnit.MINUTES.toMillis(5));
+        MINUTES.toMillis(5));
 
     // Empty the SST backup folder first for testing
     File sstDir = new File(sstDirStr);
@@ -355,54 +354,6 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 3, 4, 5})
-  public void testRemoveSnapshotFromDag(int snapshotIndex) throws Exception {
-    String clDirStr = "compaction-log";
-    String metadataDirStr = ".";
-    String sstDirStr = "compaction-sst-backup";
-    List<List<String>> expectedDiff = asList(
-        asList("000024", "000028", "000026", "000019", "000021"),
-        asList("000024", "000028", "000026", "000021"),
-        asList("000024", "000028", "000026"),
-        asList("000028", "000026"),
-        Collections.singletonList("000028"),
-        Collections.emptyList()
-    );
-
-    File clDir = new File(clDirStr);
-
-    if (clDir.exists()) {
-      deleteDirectory(clDir);
-    }
-
-    File dbLocation = new File(TEST_DB_PATH);
-    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(metadataDirStr,
-        sstDirStr,
-        clDirStr,
-        dbLocation,
-        TimeUnit.DAYS.toMillis(1),
-        TimeUnit.MINUTES.toMillis(5));
-
-    File sstDir = new File(sstDirStr);
-    deleteDirectory(sstDir);
-
-    RocksDB rocksDB = createRocksDBInstanceAndWriteKeys(TEST_DB_PATH, differ);
-    readRocksDBInstance(TEST_DB_PATH, rocksDB, null, differ);
-
-    DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
-    differ.pruneSnapshotFileNodesFromDag(
-        snapshots.get(snapshotIndex).getDbPath());
-
-    for (int index = snapshotIndex + 1; index < snapshots.size(); index++) {
-      DifferSnapshotInfo snap = snapshots.get(index);
-      List<String> sstDiffList = differ.getSSTDiffList(src, snap);
-      assertEquals(expectedDiff.get(index - 1), sstDiffList);
-    }
-
-    rocksDB.close();
-  }
-
   /**
    * Helper function that creates an RDB checkpoint (= Ozone snapshot).
    */
@@ -430,9 +381,8 @@ public class TestRocksDBCheckpointDiffer {
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
-    differ.appendSnapshotToCompactionLog(dbLatestSequenceNumber,
+    differ.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
         snapshotId,
-        cpPath,
         System.currentTimeMillis());
 
     differ.setCurrentCompactionLog(dbLatestSequenceNumber);
@@ -715,17 +665,15 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private static final List<List<String>> SST_FILES_BY_LEVEL = Arrays.asList(
-      Arrays.asList("000015.sst", "000013.sst", "000011.sst", "000009.sst"),
-      Arrays.asList("000018.sst", "000016.sst", "000017.sst", "000026.sst",
-          "000024.sst", "000022.sst", "000020.sst"),
-      Arrays.asList("000027.sst", "000030.sst", "000028.sst", "000029.sst",
-          "000031.sst", "000039.sst", "000037.sst", "000035.sst",
-          "000033.sst"),
-      Arrays.asList("000040.sst", "000044.sst", "000042.sst", "000043.sst",
-          "000045.sst", "000041.sst", "000046.sst", "000054.sst",
-          "000052.sst", "000050.sst", "000048.sst"),
-      Arrays.asList("000059.sst", "000055.sst", "000056.sst", "000060.sst",
-          "000057.sst", "000058.sst"));
+      Arrays.asList("000015", "000013", "000011", "000009"),
+      Arrays.asList("000018", "000016", "000017", "000026", "000024", "000022",
+          "000020"),
+      Arrays.asList("000027", "000030", "000028", "000029", "000031", "000039",
+          "000037", "000035", "000033"),
+      Arrays.asList("000040", "000044", "000042", "000043", "000045", "000041",
+          "000046", "000054", "000052", "000050", "000048"),
+      Arrays.asList("000059", "000055", "000056", "000060", "000057", "000058")
+  );
 
   private static final List<List<CompactionNode>> COMPACTION_NODES_BY_LEVEL =
       SST_FILES_BY_LEVEL.stream()
@@ -874,7 +822,8 @@ public class TestRocksDBCheckpointDiffer {
                                    MutableGraph<CompactionNode> expectedDag,
                                    Set<String> expectedFileNodesRemoved) {
 
-    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+    RocksDBCheckpointDiffer differ =
+        new RocksDBCheckpointDiffer(null, null, null, 0L);
     Set<String> actualFileNodesRemoved =
         differ.pruneBackwardDag(originalDag, levelToBeRemoved);
     Assertions.assertEquals(expectedDag, originalDag);
@@ -931,10 +880,139 @@ public class TestRocksDBCheckpointDiffer {
                                   MutableGraph<CompactionNode> expectedDag,
                                   Set<String> expectedFileNodesRemoved) {
 
-    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer();
+    RocksDBCheckpointDiffer differ =
+        new RocksDBCheckpointDiffer(null, null, null, 0L);
     Set<String> actualFileNodesRemoved =
         differ.pruneForwardDag(originalDag, levelToBeRemoved);
     Assertions.assertEquals(expectedDag, originalDag);
     Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+  }
+
+  /**
+   * End-to-end test for snapshot's compaction history pruning.
+   */
+  @Test
+  public void testPruneOlderSnapshotsWithCompactionHistory()
+      throws IOException {
+    String compactionLogDirName = "./test-compaction-log";
+    File compactionLogDir = new File(compactionLogDirName);
+    if (!compactionLogDir.exists() && !compactionLogDir.mkdirs()) {
+      fail("Error creating compaction log directory: " + compactionLogDirName);
+    }
+
+    String sstBackUpDirName = "./test-compaction-sst-backup";
+    File sstBackUpDir = new File(sstBackUpDirName);
+    if (!sstBackUpDir.exists() && !sstBackUpDir.mkdirs()) {
+      fail("Error creating SST backup directory: " + sstBackUpDir);
+    }
+
+    long currentTimeMillis = System.currentTimeMillis();
+
+    String compactionLog0 = "S 1000 snapshotId0 " +
+        (currentTimeMillis - MINUTES.toMillis(30)) + " \n";
+    String compactionLog1 = "C 000015,000013,000011,000009:000018,000016," +
+        "000017\n"
+        + "S 2000 snapshotId1 " +
+        (currentTimeMillis - MINUTES.toMillis(24)) + " \n";
+
+    String compactionLog2 = "C 000018,000016,000017,000026,000024,000022," +
+        "000020:000027,000030,000028,000031,000029\n"
+        + "S 3000 snapshotId2 " +
+        (currentTimeMillis - MINUTES.toMillis(18)) + " \n";
+
+    String compactionLog3 = "C 000027,000030,000028,000031,000029,000039," +
+        "000037,000035,000033:000040,000044,000042,000043,000046,000041," +
+        "000045\n"
+        + "S 3000 snapshotId3 " +
+        (currentTimeMillis - MINUTES.toMillis(12)) + " \n";
+
+    String compactionLog4 = "C 000040,000044,000042,000043,000046,000041," +
+        "000045,000054,000052,000050,000048:000059,000055,000056,000060," +
+        "000057,000058\n"
+        + "S 3000 snapshotId4 " +
+        (currentTimeMillis - MINUTES.toMillis(6)) + " \n";
+
+    List<String> compactionLogs = Arrays.asList(compactionLog0,
+        compactionLog1,
+        compactionLog2,
+        compactionLog3,
+        compactionLog4);
+
+    for (int i = 0; i < compactionLogs.size(); i++) {
+      String compactionFileName = compactionLogDirName + "/0000" + i + ".log";
+      File compactionFile = new File(compactionFileName);
+      Files.write(compactionFile.toPath(),
+          compactionLogs.get(i).getBytes(UTF_8));
+    }
+
+    RocksDBCheckpointDiffer differ =
+        new RocksDBCheckpointDiffer(sstBackUpDirName,
+            compactionLogDirName,
+            null,
+            MINUTES.toMillis(10));
+
+    differ.loadAllCompactionLogs();
+
+    differ.pruneOlderSnapshotsWithCompactionHistory();
+
+    Set<String> expectedNodes = new HashSet<>(
+        Arrays.asList("000054", "000052", "000050", "000048", "000059",
+            "000055", "000056", "000060", "000057", "000058")
+    );
+
+    Set<String> expectedArcs = new HashSet<>(
+        Arrays.asList(
+            "000059->000054",
+            "000055->000054",
+            "000056->000054",
+            "000060->000054",
+            "000057->000054",
+            "000058->000054",
+            "000059->000052",
+            "000055->000052",
+            "000056->000052",
+            "000060->000052",
+            "000057->000052",
+            "000058->000052",
+            "000059->000050",
+            "000055->000050",
+            "000056->000050",
+            "000060->000050",
+            "000057->000050",
+            "000058->000050",
+            "000059->000048",
+            "000055->000048",
+            "000056->000048",
+            "000060->000048",
+            "000057->000048",
+            "000058->000048")
+    );
+
+    Set<String> actualNodes = differ.getForwardCompactionDAG().nodes().stream()
+        .map(CompactionNode::getFileName)
+        .collect(Collectors.toSet());
+
+    Set<String> actualArcs = differ.getForwardCompactionDAG().edges().stream()
+        .map(e -> e.source().getFileName() + "->" + e.target().getFileName())
+        .collect(Collectors.toSet());
+
+
+    assertEquals(expectedNodes, actualNodes);
+    assertEquals(expectedArcs, actualArcs);
+
+    for (int i = 0; i < 4; i++) {
+      String compactionFileName = compactionLogDirName + "/0000" + i + ".log";
+      File compactionFile = new File(compactionFileName);
+      assertFalse(compactionFile.exists());
+    }
+
+    for (int i = 4; i < compactionLogs.size(); i++) {
+      String compactionFileName = compactionLogDirName + "/0000" + i + ".log";
+      File compactionFile = new File(compactionFileName);
+      assertTrue(compactionFile.exists());
+    }
+
+    deleteDirectory(compactionLogDir);
+    deleteDirectory(sstBackUpDir);
   }
 }
