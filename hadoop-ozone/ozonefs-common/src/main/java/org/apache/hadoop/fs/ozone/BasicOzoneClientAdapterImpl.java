@@ -244,7 +244,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
               this.clientConfiguredReplicationConfig,
               getReplicationConfigWithRefreshCheck(), config), overWrite,
           recursive);
-      return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
+      return new OzoneFSOutputStream(ozoneOutputStream);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
