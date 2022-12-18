@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.ozone.test.TestClock;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
@@ -28,23 +30,38 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.OptionalLong;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for the DeleteContainerCommandHandler.
  */
 public class TestDeleteContainerCommandHandler {
 
+  private TestClock clock;
+  private OzoneContainer ozoneContainer;
+  private ContainerController controller;
+  private StateContext context;
+
+  @Before
+  public void setup() {
+    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    ozoneContainer = mock(OzoneContainer.class);
+    controller = mock(ContainerController.class);
+    when(ozoneContainer.getController()).thenReturn(controller);
+    context = mock(StateContext.class);
+    when(context.getTermOfLeaderSCM())
+        .thenReturn(OptionalLong.of(0));
+  }
+
   @Test
   public void testExpiredCommandsAreNotProcessed() throws IOException {
-    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    DeleteContainerCommandHandler handler =
-        new DeleteContainerCommandHandler(clock, newDirectExecutorService());
-    OzoneContainer ozoneContainer = Mockito.mock(OzoneContainer.class);
-    ContainerController controller = Mockito.mock(ContainerController.class);
-    Mockito.when(ozoneContainer.getController()).thenReturn(controller);
+    DeleteContainerCommandHandler handler = createSubject(clock);
 
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
     command1.setDeadline(clock.millis() + 10000);
@@ -66,6 +83,53 @@ public class TestDeleteContainerCommandHandler {
         .deleteContainer(2L, false);
     Mockito.verify(controller, times(1))
         .deleteContainer(3L, false);
+  }
+
+  @Test
+  public void testCommandForCurrentTermIsExecuted() throws IOException {
+    // GIVEN
+    DeleteContainerCommand command = new DeleteContainerCommand(1L);
+    command.setTerm(1);
+
+    when(context.getTermOfLeaderSCM())
+        .thenReturn(OptionalLong.of(command.getTerm()));
+
+    DeleteContainerCommandHandler subject = createSubject();
+
+    // WHEN
+    subject.handle(command, ozoneContainer, context, null);
+
+    // THEN
+    Mockito.verify(controller, times(1))
+        .deleteContainer(1L, false);
+  }
+
+  @Test
+  public void testCommandForOldTermIsDropped() throws IOException {
+    // GIVEN
+    DeleteContainerCommand command = new DeleteContainerCommand(1L);
+    command.setTerm(1);
+
+    when(context.getTermOfLeaderSCM())
+        .thenReturn(OptionalLong.of(command.getTerm() + 1));
+
+    DeleteContainerCommandHandler subject = createSubject();
+
+    // WHEN
+    subject.handle(command, ozoneContainer, context, null);
+
+    // THEN
+    Mockito.verify(controller, never())
+        .deleteContainer(1L, false);
+  }
+
+  private static DeleteContainerCommandHandler createSubject() {
+    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    return createSubject(clock);
+  }
+
+  private static DeleteContainerCommandHandler createSubject(TestClock clock) {
+    return new DeleteContainerCommandHandler(clock, newDirectExecutorService());
   }
 
 }

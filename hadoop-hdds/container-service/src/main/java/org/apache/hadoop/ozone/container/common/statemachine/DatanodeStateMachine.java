@@ -192,7 +192,7 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionMetrics = ECReconstructionMetrics.create();
 
     ECReconstructionCoordinator ecReconstructionCoordinator =
-        new ECReconstructionCoordinator(conf, certClient,
+        new ECReconstructionCoordinator(conf, certClient, context,
             ecReconstructionMetrics);
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
