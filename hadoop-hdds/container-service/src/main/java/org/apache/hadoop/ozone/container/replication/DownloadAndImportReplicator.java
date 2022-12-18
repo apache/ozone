@@ -22,9 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -41,7 +39,6 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 
 import org.slf4j.Logger;
@@ -69,9 +66,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   private final ContainerDownloader downloader;
   private final TarContainerPacker packer;
   private final MutableVolumeSet volumeSet;
-  private VolumeChoosingPolicy volumeChoosingPolicy;
-  private long containerSize;
-  private Map<HddsVolume, ContainerReader> containerReaderMap;
+  private final VolumeChoosingPolicy volumeChoosingPolicy;
+  private final long containerSize;
 
   public DownloadAndImportReplicator(
       ConfigurationSource conf,
@@ -97,12 +93,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
-    this.containerReaderMap = new HashMap<>();
-    for (HddsVolume hddsVolume: getHddsVolumesList()) {
-      containerReaderMap.put(hddsVolume,
-          new ContainerReader(volumeSet, hddsVolume, containerSet, conf,
-              false));
-    }
   }
 
   public void importContainer(long containerID, Path tarFilePath,
@@ -157,7 +147,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =
           downloader.getContainerDataFromReplicas(containerID, sourceDatanodes,
-              getDownloadDirectory(targetVolume));
+              getUntarDirectory(targetVolume));
       if (tarFilePath == null) {
         task.setStatus(Status.FAILED);
         return;
@@ -181,11 +171,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
         containerSize * 2);
-  }
-
-  private Path getDownloadDirectory(HddsVolume hddsVolume) {
-    return Paths.get(hddsVolume.getVolumeRootDir())
-        .resolve(CONTAINER_COPY_TMP_DIR).resolve(CONTAINER_COPY_DIR);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

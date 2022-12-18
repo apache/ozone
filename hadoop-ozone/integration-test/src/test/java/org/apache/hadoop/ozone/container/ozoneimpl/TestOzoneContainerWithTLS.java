@@ -266,7 +266,7 @@ public class TestOzoneContainerWithTLS {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);
       Path file = downloader.getContainerDataFromReplicas(
-          containerId, sourceDatanodes);
+          containerId, sourceDatanodes, null);
       downloader.close();
       Assert.assertNull(file);
       Assert.assertTrue(logCapture.getOutput().contains(
@@ -303,7 +303,8 @@ public class TestOzoneContainerWithTLS {
       for (Long cId : containerIdList) {
         downloader = new SimpleContainerDownloader(conf, caClient);
         try {
-          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes);
+          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
+                  null);
           downloader.close();
           Assert.assertNotNull(file);
         } finally {

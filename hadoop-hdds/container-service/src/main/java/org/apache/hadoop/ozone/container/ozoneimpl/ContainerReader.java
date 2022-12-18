@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -202,26 +201,15 @@ public class ContainerReader implements Runnable {
    */
   public void verifyAndFixupContainerData(ContainerData containerData)
       throws IOException {
-    verifyAndFixupContainerData(containerData, false);
-  }
-
-  public void verifyAndFixupContainerData(ContainerData containerData,
-      boolean updateContainerFile) throws IOException {
     switch (containerData.getContainerType()) {
     case KeyValueContainer:
       if (containerData instanceof KeyValueContainerData) {
         KeyValueContainerData kvContainerData = (KeyValueContainerData)
             containerData;
         containerData.setVolume(hddsVolume);
-        boolean needUpdate = updateContainerFile &&
-            fixContainerPath(kvContainerData);
-        KeyValueContainerUtil.parseKVContainerData(kvContainerData, config,
-            needUpdate);
+        KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
             config);
-        if (needUpdate) {
-          kvContainer.update(kvContainerData.getMetadata(), true);
-        }
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
             kvContainer.delete();
@@ -243,38 +231,5 @@ public class ContainerReader implements Runnable {
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
     }
-  }
-
-  private boolean fixContainerPath(KeyValueContainerData kvContainerData) {
-    long containerID = kvContainerData.getContainerID();
-    boolean changed = false;
-
-    // Check metadata path
-    String metadataPath = KeyValueContainerLocationUtil
-        .getContainerMetaDataPath(
-            kvContainerData.getVolume().getHddsRootDir().getAbsolutePath(),
-            kvContainerData.getVolume().getClusterID(), containerID).getPath();
-    if (!kvContainerData.getMetadataPath().equals(metadataPath)) {
-      String originPath = kvContainerData.getMetadataPath();
-      kvContainerData.setMetadataPath(metadataPath);
-      changed = true;
-      LOG.warn("Detected metadata path inconsistency, updating metadata path " +
-          "old: {} -> new: {}", originPath, metadataPath);
-    }
-
-    // Check chunk path
-    String chunkPath = KeyValueContainerLocationUtil
-        .getChunksLocationPath(
-            kvContainerData.getVolume().getHddsRootDir().getAbsolutePath(),
-            kvContainerData.getVolume().getClusterID(), containerID).getPath();
-    if (!kvContainerData.getChunksPath().equals(chunkPath)) {
-      String originPath = kvContainerData.getChunksPath();
-      kvContainerData.setChunksPath(chunkPath);
-      changed = true;
-      LOG.warn("Detected chunk path inconsistency, updating chunk path " +
-          "old: {} -> new: {}", originPath, chunkPath);
-    }
-
-    return changed;
   }
 }

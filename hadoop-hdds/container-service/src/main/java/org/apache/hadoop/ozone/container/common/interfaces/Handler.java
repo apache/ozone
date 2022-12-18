@@ -121,7 +121,8 @@ public abstract class Handler {
    */
   public abstract Container importContainer(
       ContainerData containerData, InputStream rawContainerStream,
-      TarContainerPacker packer) throws IOException;
+      TarContainerPacker packer)
+      throws IOException;
 
   /**
    * Exports container to the output stream.

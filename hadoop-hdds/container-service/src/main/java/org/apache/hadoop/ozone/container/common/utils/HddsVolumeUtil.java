@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.slf4j.Logger;
@@ -31,11 +30,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
@@ -105,30 +102,6 @@ public final class HddsVolumeUtil {
         }
       }
     }
-  }
-
-  /**
-   * Get the HddsVolume according to the path.
-   * @param volumes volume list to match from
-   * @param pathStr path to match
-   */
-  public static HddsVolume matchHddsVolume(List<HddsVolume> volumes,
-      String pathStr) {
-    assert pathStr != null;
-    List<HddsVolume> resList = new ArrayList<>();
-    for (HddsVolume hddsVolume: volumes) {
-      if (pathStr.startsWith(hddsVolume.getVolumeRootDir())) {
-        resList.add(hddsVolume);
-      }
-    }
-    if (resList.size() == 1) {
-      return resList.get(0);
-    } else if (resList.size() > 1) {
-      LOG.warn("Get multi volumes {} matching path {}",
-          resList.stream().map(StorageVolume::getVolumeRootDir).collect(
-              Collectors.joining(",")), pathStr);
-    }
-    return null;
   }
 
   private static void mapDbVolumesToDataVolumesIfNeeded(

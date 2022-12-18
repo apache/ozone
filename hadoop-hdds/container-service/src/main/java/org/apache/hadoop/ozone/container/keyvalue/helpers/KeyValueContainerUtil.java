@@ -169,18 +169,10 @@ public final class KeyValueContainerUtil {
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
       ConfigurationSource config) throws IOException {
-    parseKVContainerData(kvContainerData, config, false);
-  }
-
-  public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-      ConfigurationSource config, boolean needUpdate) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
 
-    // Do not verify Checksum if need to update containerFile
-    if (!needUpdate) {
-      ContainerUtils.verifyChecksum(kvContainerData, config);
-    }
+    ContainerUtils.verifyChecksum(kvContainerData, config);
 
     if (kvContainerData.getSchemaVersion() == null) {
       // If this container has not specified a schema version, it is in the old

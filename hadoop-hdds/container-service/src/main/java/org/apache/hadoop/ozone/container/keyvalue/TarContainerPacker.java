@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.stream.Stream;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -88,9 +89,14 @@ public class TarContainerPacker
     if (!Files.exists(destContainerDir)) {
       Files.createDirectories(destContainerDir);
     }
-    Files.move(containerUntarDir, destContainerDir,
-        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-
+    if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
+      Files.move(containerUntarDir, destContainerDir,
+              StandardCopyOption.ATOMIC_MOVE,
+              StandardCopyOption.REPLACE_EXISTING);
+    } else {
+      throw new IOException("Unpack destination directory " + destContainerDir
+              + " is not empty.");
+    }
     return descriptorFileContent;
   }
 

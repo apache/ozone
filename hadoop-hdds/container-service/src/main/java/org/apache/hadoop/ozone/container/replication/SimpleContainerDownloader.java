@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -48,9 +49,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   public static final Logger LOG =
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
-  public static final String CONTAINER_COPY_DIR = "container-copy";
-  public static final String CONTAINER_COPY_TMP_DIR = "tmp";
-
   private ConfigurationSource conf;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
@@ -66,6 +64,11 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   public Path getContainerDataFromReplicas(
       long containerId, List<DatanodeDetails> sourceDatanodes,
       Path downloadDir) {
+
+    if (downloadDir == null) {
+      downloadDir = Paths.get(System.getProperty("java.io.tmpdir"))
+              .resolve("container-copy");
+    }
 
     final List<DatanodeDetails> shuffledDatanodes =
         shuffleDatanodes(sourceDatanodes);
