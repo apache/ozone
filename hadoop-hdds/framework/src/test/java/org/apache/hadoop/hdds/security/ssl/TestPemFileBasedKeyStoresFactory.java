@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.CertificateClientTest;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -84,7 +83,7 @@ public class TestPemFileBasedKeyStoresFactory {
     KeyStoresFactory keyStoresFactory = new PemFileBasedKeyStoresFactory(
         secConf, caClient);
     try {
-      keyStoresFactory.init(SSLFactory.Mode.CLIENT, clientAuth);
+      keyStoresFactory.init(KeyStoresFactory.Mode.CLIENT, clientAuth);
       if (clientAuth) {
         Assert.assertTrue(keyStoresFactory.getKeyManagers()[0]
             instanceof ReloadingX509KeyManager);
@@ -103,7 +102,7 @@ public class TestPemFileBasedKeyStoresFactory {
     KeyStoresFactory keyStoresFactory = new PemFileBasedKeyStoresFactory(
         secConf, caClient);
     try {
-      keyStoresFactory.init(SSLFactory.Mode.SERVER, clientAuth);
+      keyStoresFactory.init(KeyStoresFactory.Mode.SERVER, clientAuth);
       Assert.assertTrue(keyStoresFactory.getKeyManagers()[0]
           instanceof ReloadingX509KeyManager);
       Assert.assertTrue(keyStoresFactory.getTrustManagers()[0]
@@ -122,13 +121,13 @@ public class TestPemFileBasedKeyStoresFactory {
     try {
       // create server
       serverFactory = new PemFileBasedKeyStoresFactory(secConf, caClient);
-      serverFactory.init(SSLFactory.Mode.SERVER, true);
+      serverFactory.init(KeyStoresFactory.Mode.SERVER, true);
       server = setupServer(serverFactory);
       server.start();
 
       // create client
       clientFactory = new PemFileBasedKeyStoresFactory(secConf, caClient);
-      clientFactory.init(SSLFactory.Mode.CLIENT, true);
+      clientFactory.init(KeyStoresFactory.Mode.CLIENT, true);
       channel = setupClient(clientFactory, server.getPort());
       XceiverClientProtocolServiceStub asyncStub =
           XceiverClientProtocolServiceGrpc.newStub(channel);

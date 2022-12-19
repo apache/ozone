@@ -338,11 +338,6 @@ public final class ECStreamTestUtil {
     }
 
     @Override
-    public long getRemaining() {
-      return getLength() - getPos();
-    }
-
-    @Override
     public int read(byte[] b, int off, int len)
         throws IOException {
       return read(ByteBuffer.wrap(b, off, len));

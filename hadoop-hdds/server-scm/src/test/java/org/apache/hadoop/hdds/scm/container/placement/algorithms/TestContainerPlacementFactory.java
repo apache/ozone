@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -198,7 +199,7 @@ public class TestContainerPlacementFactory {
 
     @Override
     public Set<ContainerReplica> replicasToCopyToFixMisreplication(
-            Set<ContainerReplica> replicas) {
+            Map<ContainerReplica, Boolean> replicas) {
       return Collections.emptySet();
     }
   }
