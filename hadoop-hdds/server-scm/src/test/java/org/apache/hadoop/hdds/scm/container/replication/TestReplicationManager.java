@@ -390,6 +390,13 @@ public class TestReplicationManager {
 
   @Test
   public void testUnderReplicationQueuePopulated() {
+    // Make it always return mis-replicated. Only a perfectly replicated
+    // container should make it the mis-replicated state as under / over
+    // replicated take precedence.
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+
     ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(decomContainer, ContainerReplicaProto.State.CLOSED,
@@ -403,6 +410,10 @@ public class TestReplicationManager {
     ContainerInfo underRep0 = createContainerInfo(repConfig, 3,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(underRep0, ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+
+    ContainerInfo misRep = createContainerInfo(repConfig, 4,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(misRep, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
 
     enableProcessAll();
     replicationManager.processAll();
@@ -437,6 +448,10 @@ public class TestReplicationManager {
 
     res = replicationManager.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep0, res.getContainerInfo());
+
+    // Next is the mis-rep container, which has a remaining redundancy of 6.
+    res = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertEquals(misRep, res.getContainerInfo());
 
     res = replicationManager.dequeueUnderReplicatedContainer();
     Assert.assertNull(res);
