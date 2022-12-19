@@ -82,9 +82,11 @@ public class PrometheusMetricsSink implements MetricsSink {
             + " "
             + metric.type().toString().toLowerCase();
 
-        nextMetricLines.computeIfAbsent(metricKey,
-            any -> Collections.synchronizedSortedMap(new TreeMap<>()))
-            .put(prometheusMetricKeyAsString, String.valueOf(metric.value()));
+        synchronized (this) {
+          nextMetricLines.computeIfAbsent(metricKey,
+                  any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+              .put(prometheusMetricKeyAsString, String.valueOf(metric.value()));
+        }
       }
     }
   }
@@ -148,9 +150,11 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   @Override
   public void flush() {
-    metricLines = nextMetricLines;
-    nextMetricLines = Collections
-        .synchronizedSortedMap(new TreeMap<>());
+    synchronized (this) {
+      metricLines = nextMetricLines;
+      nextMetricLines = Collections
+          .synchronizedSortedMap(new TreeMap<>());
+    }
   }
 
   @Override
