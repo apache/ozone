@@ -307,6 +307,9 @@ public class HeartbeatEndpointTask
     Preconditions.checkState(response.getDatanodeUUID()
             .equalsIgnoreCase(datanodeDetails.getUuid()),
         "Unexpected datanode ID in the response.");
+    if (response.hasTerm()) {
+      context.updateTermOfLeaderSCM(response.getTerm());
+    }
     // Verify the response is indeed for this datanode.
     for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
       switch (commandResponseProto.getCommandType()) {
