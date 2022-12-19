@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
+import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
@@ -144,20 +145,27 @@ public class ReplicationSupervisor {
         requestCounter.incrementAndGet();
 
         if (task.getDeadline() > 0 && clock.millis() > task.getDeadline()) {
-          LOG.info("Ignoring this replicate container command for container" +
+          LOG.info("Ignoring" +
               " {} since the current time {}ms is past the deadline {}ms",
-              containerId, clock.millis(), task.getDeadline());
+              this, clock.millis(), task.getDeadline());
           timeoutCounter.incrementAndGet();
           return;
         }
 
         if (context != null) {
           DatanodeDetails dn = context.getParent().getDatanodeDetails();
-          if (dn.getPersistedOpState() !=
+          if (dn != null && dn.getPersistedOpState() !=
               HddsProtos.NodeOperationalState.IN_SERVICE) {
-            LOG.info("Dn is of {} state. Ignore this replicate container " +
-                "command for container {}", dn.getPersistedOpState(),
-                containerId);
+            LOG.info("Dn is of {} state. Ignore {}",
+                dn.getPersistedOpState(), this);
+            return;
+          }
+
+          final OptionalLong currentTerm = context.getTermOfLeaderSCM();
+          final long taskTerm = task.getTerm();
+          if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
+            LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
+                this, taskTerm, currentTerm.getAsLong());
             return;
           }
         }
@@ -187,6 +195,12 @@ public class ReplicationSupervisor {
       } finally {
         containersInFlight.remove(containerId);
       }
+    }
+
+    @Override
+    public String toString() {
+      return "replicate container command for container "
+          + task.getContainerId();
     }
   }
 

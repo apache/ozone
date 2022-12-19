@@ -409,6 +409,8 @@ public class ReplicationManager implements SCMService {
    */
   public void sendDeleteCommand(final ContainerInfo container, int replicaIndex,
       final DatanodeDetails datanode) throws NotLeaderException {
+    LOG.debug("Sending delete command for container {} and index {} on {}",
+        container, replicaIndex, datanode);
     final DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(container.containerID(), false);
     deleteCommand.setReplicaIndex(replicaIndex);

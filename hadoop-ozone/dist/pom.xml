@@ -271,7 +271,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-dependency-plugin</artifactId>
-            <version>3.1.1</version>
             <executions>
               <execution>
                 <id>copy-jacoco-files</id>
@@ -287,21 +286,21 @@
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
                       <artifactId>org.jacoco.agent</artifactId>
-                      <version>0.8.5</version>
+                      <version>${jacoco.version}</version>
                       <classifier>runtime</classifier>
                       <destFileName>jacoco-agent.jar</destFileName>
                     </artifactItem>
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
                       <artifactId>org.jacoco.cli</artifactId>
-                      <version>0.8.5</version>
+                      <version>${jacoco.version}</version>
                       <classifier>nodeps</classifier>
                       <destFileName>jacoco-cli.jar</destFileName>
                     </artifactItem>
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
                       <artifactId>org.jacoco.core</artifactId>
-                      <version>0.8.5</version>
+                      <version>${jacoco.version}</version>
                       <destFileName>jacoco-core.jar</destFileName>
                     </artifactItem>
                     <artifactItem>

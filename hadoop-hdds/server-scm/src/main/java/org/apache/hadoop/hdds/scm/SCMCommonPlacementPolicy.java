@@ -453,14 +453,16 @@ public abstract class SCMCommonPlacementPolicy implements
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas
+   * @param replicas: Map of replicas with value signifying if
+   *                  replica can be copied
    */
   @Override
   public Set<ContainerReplica> replicasToCopyToFixMisreplication(
-         Set<ContainerReplica> replicas) {
+         Map<ContainerReplica, Boolean> replicas) {
     Map<Node, List<ContainerReplica>> placementGroupReplicaIdMap
-            = replicas.stream().collect(Collectors.groupingBy(replica ->
-            this.getPlacementGroup(replica.getDatanodeDetails())));
+            = replicas.keySet().stream()
+            .collect(Collectors.groupingBy(replica ->
+                    getPlacementGroup(replica.getDatanodeDetails())));
 
     int totalNumberOfReplicas = replicas.size();
     int requiredNumberOfPlacementGroups =
@@ -480,8 +482,18 @@ public abstract class SCMCommonPlacementPolicy implements
       requiredNumberOfPlacementGroups -= 1;
       if (numberOfReplicasToBeCopied > 0) {
         List<ContainerReplica> replicasToBeCopied = replicaList.stream()
+                .filter(replicas::get)
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
+        if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
+          Node rack = replicaList.size() > 0 ? this.getPlacementGroup(
+                  replicaList.get(0).getDatanodeDetails()) : null;
+          LOG.warn("Not enough copyable replicas available in rack {}. " +
+                  "Required number of Replicas to be copied: {}." +
+                  " Available Replicas to be copied: {}",
+                  rack, numberOfReplicasToBeCopied,
+                  replicasToBeCopied.size());
+        }
         copyReplicaSet.addAll(replicasToBeCopied);
       }
     }

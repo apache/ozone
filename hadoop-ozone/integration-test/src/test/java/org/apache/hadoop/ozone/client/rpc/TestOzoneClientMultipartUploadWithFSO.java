@@ -253,6 +253,12 @@ public class TestOzoneClientMultipartUploadWithFSO {
     // comparing part names and large file uploads work using aws cp.
     Assert.assertEquals("Part names should be same", partName,
         partNameNew);
+
+    // old part bytes written needs discard and have only
+    // new part bytes in quota for this bucket
+    long byteWritten = "name".length() * 3; // data written with replication
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedBytes(),
+        byteWritten);
   }
 
   @Test

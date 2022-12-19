@@ -742,12 +742,11 @@ public class StateContext {
   }
 
   @VisibleForTesting
-  void setTermOfLeaderSCM(long term) {
+  public void setTermOfLeaderSCM(long term) {
     termOfLeaderSCM = OptionalLong.of(term);
   }
 
-  @VisibleForTesting
-  OptionalLong getTermOfLeaderSCM() {
+  public OptionalLong getTermOfLeaderSCM() {
     return termOfLeaderSCM;
   }
 
