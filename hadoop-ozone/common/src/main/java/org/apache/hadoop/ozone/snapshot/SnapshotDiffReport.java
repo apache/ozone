@@ -127,8 +127,8 @@ public class SnapshotDiffReport {
       if (other instanceof DiffReportEntry) {
         DiffReportEntry entry = (DiffReportEntry) other;
         return type.equals(entry.getType())
-            && sourcePath.equals(entry.sourcePath)
-            && targetPath.equals(entry.targetPath);
+            && sourcePath.equals(entry.sourcePath) && targetPath != null ?
+            targetPath.equals(entry.targetPath) : true;
       }
       return false;
     }

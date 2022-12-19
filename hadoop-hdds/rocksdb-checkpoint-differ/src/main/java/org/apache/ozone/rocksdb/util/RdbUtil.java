@@ -40,21 +40,20 @@ public final class RdbUtil {
 
   private RdbUtil() { }
 
-  public static Set<String> getKeyTableSSTFiles(final String dbLocation)
-      throws RocksDBException {
-    final List<ColumnFamilyHandle> columnFamilyHandles  = new ArrayList<>();
+  public static Set<String> getSSTFilesForComparison(final String dbLocation,
+      List<String> cfs) throws RocksDBException {
+    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
     final List<ColumnFamilyDescriptor> cfd = new ArrayList<>();
+    for (String columnFamily : cfs) {
+      cfd.add(new ColumnFamilyDescriptor(
+          columnFamily.getBytes(StandardCharsets.UTF_8)));
+    }
     cfd.add(
-        new ColumnFamilyDescriptor(
-            "keyTable".getBytes(StandardCharsets.UTF_8)));
-    cfd.add(
-        new ColumnFamilyDescriptor(
-            "default".getBytes(StandardCharsets.UTF_8)));
-    try (DBOptions options = new DBOptions();
-         RocksDB rocksDB = RocksDB.openReadOnly(options, dbLocation,
-             cfd, columnFamilyHandles)) {
-      return rocksDB.getLiveFilesMetaData().stream().map(lfm ->
-              new File(lfm.path(), lfm.fileName()).getPath())
+        new ColumnFamilyDescriptor("default".getBytes(StandardCharsets.UTF_8)));
+    try (DBOptions options = new DBOptions(); RocksDB rocksDB = RocksDB
+        .openReadOnly(options, dbLocation, cfd, columnFamilyHandles)) {
+      return rocksDB.getLiveFilesMetaData().stream()
+          .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
           .collect(Collectors.toCollection(HashSet::new));
     }
   }

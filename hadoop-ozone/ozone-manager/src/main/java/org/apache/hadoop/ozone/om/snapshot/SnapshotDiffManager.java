@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
@@ -54,10 +56,15 @@ public class SnapshotDiffManager {
     // TODO: Once RocksDBCheckpointDiffer exposes method to get list
     //  of delta SST files, plug it in here.
 
-    Set<String> fromSnapshotFiles = RdbUtil.getKeyTableSSTFiles(fromSnapshot
-        .getMetadataManager().getStore().getDbLocation().getPath());
-    Set<String> toSnapshotFiles = RdbUtil.getKeyTableSSTFiles(toSnapshot
-        .getMetadataManager().getStore().getDbLocation().getPath());
+    List<String> tablesToLookUp =
+        getTablesToLookupForSnapDiff(volume, bucket, fromSnapshot);
+
+    Set<String> fromSnapshotFiles = RdbUtil.getSSTFilesForComparison(
+        fromSnapshot.getMetadataManager().getStore().getDbLocation().getPath(),
+        tablesToLookUp);
+    Set<String> toSnapshotFiles = RdbUtil.getSSTFilesForComparison(
+        toSnapshot.getMetadataManager().getStore().getDbLocation().getPath(),
+        tablesToLookUp);
 
     final Set<String> deltaFiles = new HashSet<>();
     deltaFiles.addAll(fromSnapshotFiles);
@@ -114,6 +121,19 @@ public class SnapshotDiffManager {
     return new SnapshotDiffReport(volume, bucket, fromSnapshot.getName(),
         toSnapshot.getName(), generateDiffReport(objectIDsToCheck,
         oldObjIdToKeyMap, newObjIdToKeyMap));
+  }
+
+  private List<String> getTablesToLookupForSnapDiff(String volume,
+      String bucket, OmSnapshot snapshot) throws IOException {
+    OmBucketInfo bucketInfo = snapshot.getMetadataManager().getBucketTable()
+        .get(snapshot.getMetadataManager().getBucketKey(volume, bucket));
+    List<String> tablesToLookUp = new ArrayList<>();
+    if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+      tablesToLookUp.add(OmMetadataManagerImpl.FILE_TABLE);
+    } else {
+      tablesToLookUp.add(OmMetadataManagerImpl.KEY_TABLE);
+    }
+    return tablesToLookUp;
   }
 
   private List<DiffReportEntry> generateDiffReport(
