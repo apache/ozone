@@ -158,7 +158,8 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   }
 
-  public void writeMetrics(Writer writer) throws IOException {
+  public synchronized void writeMetrics(Writer writer)
+      throws IOException {
     for (Map.Entry<String, Map<String, String>> metricsEntry
         : metricLines.entrySet()) {
       writer.write(metricsEntry.getKey() + "\n");
