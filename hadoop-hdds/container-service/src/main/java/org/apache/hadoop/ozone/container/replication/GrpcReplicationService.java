@@ -49,7 +49,9 @@ public class GrpcReplicationService extends
   public void download(CopyContainerRequestProto request,
       StreamObserver<CopyContainerResponseProto> responseObserver) {
     long containerID = request.getContainerID();
-    String compression = request.getCompression().toString();
+    String compression = request.hasCompression() ?
+        request.getCompression().toString() : CopyContainerCompression
+        .getDefaultCompression().toString();
     LOG.info("Streaming container data ({}) to other datanode " +
         "with compression {}", containerID, compression);
     try {

@@ -38,8 +38,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPLICATION_COMPRESSION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPLICATION_COMPRESSION_DEFAULT;
 
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
@@ -71,8 +69,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     }
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
-    this.compression = conf.get(HDDS_CONTAINER_REPLICATION_COMPRESSION,
-        HDDS_CONTAINER_REPLICATION_COMPRESSION_DEFAULT);
+    this.compression = CopyContainerCompression.getConf(conf).toString();
   }
 
   @Override

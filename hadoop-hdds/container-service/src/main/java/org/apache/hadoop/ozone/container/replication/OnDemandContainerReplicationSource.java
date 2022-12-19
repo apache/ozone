@@ -28,10 +28,6 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.LZ4_FRAMED;
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.SNAPPY_FRAMED;
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.ZSTANDARD;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
@@ -48,11 +44,11 @@ public class OnDemandContainerReplicationSource
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
     this.controller = controller;
-    this.packer.put("NO_COMPRESSION", new TarContainerPacker("no_compression"));
-    this.packer.put("GZIP", new TarContainerPacker(GZIP));
-    this.packer.put("LZ4", new TarContainerPacker(LZ4_FRAMED));
-    this.packer.put("SNAPPY", new TarContainerPacker(SNAPPY_FRAMED));
-    this.packer.put("ZSTD", new TarContainerPacker(ZSTANDARD));
+    for (Map.Entry<CopyContainerCompression, String> entry :
+        CopyContainerCompression.getCompressionMapping().entrySet()) {
+      packer.put(
+          entry.getKey().toString(), new TarContainerPacker(entry.getValue()));
+    }
   }
 
   @Override

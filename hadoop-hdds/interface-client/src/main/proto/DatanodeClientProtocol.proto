@@ -475,11 +475,11 @@ message GetSmallFileResponseProto {
 }
 
 enum CopyContainerCompressProto {
-  NO_COMPRESSION = 0;
-  GZIP = 1;
-  LZ4 = 2;
-  SNAPPY = 3;
-  ZSTD = 4;
+  NO_COMPRESSION = 1;
+  GZIP = 2;
+  LZ4 = 3;
+  SNAPPY = 4;
+  ZSTD = 5;
 }
 
 message CopyContainerRequestProto {
