@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.exceptions;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -35,11 +33,6 @@ public class OMNotLeaderException extends IOException {
   private final String currentPeerId;
   private final String leaderPeerId;
   private final String leaderAddress;
-  private static final Pattern CURRENT_PEER_ID_PATTERN =
-      Pattern.compile("OM:(.*) is not the leader[.]+.*", Pattern.DOTALL);
-  private static final Pattern SUGGESTED_LEADER_PATTERN =
-      Pattern.compile(".*Suggested leader is OM:([^.]*)\\[(.*)\\]\\.",
-          Pattern.DOTALL);
 
   public OMNotLeaderException(RaftPeerId currentPeerId) {
     super("OM:" + currentPeerId + " is not the leader. Could not " +
@@ -61,29 +54,6 @@ public class OMNotLeaderException extends IOException {
     this.currentPeerId = currentPeerId.toString();
     this.leaderPeerId = suggestedLeaderPeerId.toString();
     this.leaderAddress = suggestedLeaderAddress;
-  }
-
-  public OMNotLeaderException(String message) {
-    super(message);
-
-    Matcher currentLeaderMatcher = CURRENT_PEER_ID_PATTERN.matcher(message);
-    if (currentLeaderMatcher.matches()) {
-      this.currentPeerId = currentLeaderMatcher.group(1);
-
-      Matcher suggestedLeaderMatcher =
-          SUGGESTED_LEADER_PATTERN.matcher(message);
-      if (suggestedLeaderMatcher.matches()) {
-        this.leaderPeerId = suggestedLeaderMatcher.group(1);
-        this.leaderAddress = suggestedLeaderMatcher.group(2);
-      } else {
-        this.leaderPeerId = null;
-        this.leaderAddress = null;
-      }
-    } else {
-      this.currentPeerId = null;
-      this.leaderPeerId = null;
-      this.leaderAddress = null;
-    }
   }
 
   public String getSuggestedLeaderNodeId() {
