@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 import java.util.List;
-
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -441,9 +440,26 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap4);
     SnapshotDiffReport diff3 = store.snapshotDiff(volume, bucket, snap3, snap4);
     Assert.assertEquals(1, diff3.getDiffList().size());
-    Assert.assertTrue(diff2.getDiffList().contains(
+    Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
             .of(SnapshotDiffReport.DiffType.RENAME, key2, key2Renamed)));
+
+
+    // Create a directory
+    String dir1 = "dir-1" +  RandomStringUtils.randomNumeric(5);
+    bucket1.createDirectory(dir1);
+    String snap5 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap5);
+    SnapshotDiffReport diff4 = store.snapshotDiff(volume, bucket, snap4, snap5);
+    Assert.assertEquals(1, diff4.getDiffList().size());
+    // for non-fso, directories are a special type of key with "/" appended
+    // at the end.
+    if (!bucket1.getBucketLayout().isFileSystemOptimized()) {
+      dir1 = dir1 + OM_KEY_PREFIX;
+    }
+    Assert.assertTrue(diff4.getDiffList().contains(
+        SnapshotDiffReport.DiffReportEntry
+            .of(SnapshotDiffReport.DiffType.CREATE, dir1)));
 
   }
 
