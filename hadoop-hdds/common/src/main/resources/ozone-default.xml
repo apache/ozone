@@ -2108,13 +2108,49 @@
     <description>Max time for which certificate issued by SCM CA are valid.
       This duration is used for self-signed root cert and scm sub-ca certs
       issued by root ca. The formats accepted are based on the ISO-8601
-      duration format PnDTnHnMn.nS</description>
+      duration format PnDTnHnMn.nS
+    </description>
   </property>
   <property>
     <name>hdds.x509.signature.algorithm</name>
     <value>SHA256withRSA</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>X509 signature certificate.</description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.certificate.file</name>
+    <value></value>
+    <description>Path to an external CA certificate. The file format is expected
+      to be pem. This certificate is used when initializing SCM to create
+      a root certificate authority. By default, a self-signed certificate is
+      generated instead. Note that this certificate is only used for Ozone's
+      internal communication, and it does not affect the certificates used for
+      HTTPS protocol at WebUIs as they can be configured separately.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.private.key.file</name>
+    <value></value>
+    <description>Path to an external private key. The file format is expected
+      to be pem. This private key is later used when initializing SCM to sign
+      certificates as the root certificate authority. When not specified a
+      private and public key is generated instead.
+      These keys are only used for Ozone's internal communication, and it does
+      not affect the HTTPS protocol at WebUIs as they can be configured
+      separately.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.public.key.file</name>
+    <value></value>
+    <description>Path to an external public key. The file format is expected
+      to be pem. This public key is later used when initializing SCM to sign
+      certificates as the root certificate authority.
+      When only the private key is specified the public key is read from the
+      external certificate. Note that this is only used for Ozone's internal
+      communication, and it does not affect the HTTPS protocol at WebUIs as
+      they can be configured separately.
+    </description>
   </property>
   <property>
     <name>ozone.scm.security.handler.count.key</name>
