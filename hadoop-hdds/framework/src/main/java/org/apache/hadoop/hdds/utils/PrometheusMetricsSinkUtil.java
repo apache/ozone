@@ -19,25 +19,19 @@ package org.apache.hadoop.hdds.utils;
 
 import static org.apache.hadoop.hdds.utils.RocksDBStoreMBean.ROCKSDB_CONTEXT_PREFIX;
 
-import com.google.common.base.Strings;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 /**
  * Util class for
  * {@link org.apache.hadoop.hdds.server.http.PrometheusMetricsSink}.
  */
 public final class PrometheusMetricsSinkUtil {
-
-  private static final String UGI_METRICS = "ugi_metrics";
-  private static final String SERVER_NAME = "unknown";
   private static final Pattern SPLIT_PATTERN =
       Pattern.compile("(?<!(^|[A-Z_]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
   private static final Pattern REPLACE_PATTERN =
@@ -52,124 +46,32 @@ public final class PrometheusMetricsSinkUtil {
   /**
    * Adds necessary tags.
    *
-   * @param key              metric entry key
+   * @param key              metrics entry key
    * @param username         caller username
-   * @param unmodifiableTags list of metric tags
-   * @return modifiable list of metric tags
+   * @param servername       servername
+   * @param unmodifiableTags list of metrics tags
+   * @return modifiable list of metrics tags
    */
   public static List<MetricsTag> addTags(String key, String username,
-      Collection<MetricsTag> unmodifiableTags) {
+      String servername, Collection<MetricsTag> unmodifiableTags) {
     List<MetricsTag> metricTags = new ArrayList<>(unmodifiableTags);
 
-    addUsernameTag(username, metricTags);
-    addServerNameTag(key, metricTags);
+    Stream.of(DecayRpcSchedulerUtil.createUsernameTag(username),
+            UgiMetricsUtil.createServernameTag(key, servername))
+        .forEach(
+            metricsTag -> metricsTag.ifPresent(mt -> addTag(mt, metricTags)));
 
     return metricTags;
   }
 
   /**
-   * Adds a <tt>servername</tt> metric tag.
-   *
-   * @param key        metrics entry key
-   * @param metricTags list of metric tags
+   * Adds metric tag to a metrics tags.
+   * @param metricsTag metrics tag to be added
+   * @param metricsTags metrics tags where metrics tag needs to be added
    */
-  private static void addServerNameTag(String key,
-      List<MetricsTag> metricTags) {
-    if (!key.contains(UGI_METRICS)) {
-      return;
-    }
-
-    final String name = "servername";
-    final String description = "name of the server";
-    addTag(name, description, SERVER_NAME, metricTags);
-  }
-
-  /**
-   * Adds a <tt>username</tt> metric tag.
-   *
-   * @param username   caller username
-   * @param metricTags list of metric tags
-   */
-  private static void addUsernameTag(String username,
-      List<MetricsTag> metricTags) {
-
-    if (Strings.isNullOrEmpty(username)) {
-      return;
-    }
-
-    final String name = "username";
-    final String description = "caller username";
-    addTag(name, description, username, metricTags);
-  }
-
-  /**
-   * Adds a tag.
-   *
-   * @param name        tag name
-   * @param description tag description
-   * @param value       tag value
-   * @param metricsTags list of metric tags
-   */
-  private static void addTag(String name, String description, String value,
+  private static void addTag(MetricsTag metricsTag,
       List<MetricsTag> metricsTags) {
-    MetricsInfo metricsInfo = createMetricsInfo(name, description);
-    MetricsTag metricTag = new MetricsTag(metricsInfo, value);
-    metricsTags.add(metricTag);
-  }
-
-  /**
-   * Creates MetricsInfo.
-   *
-   * @param name        metric name
-   * @param description metric description
-   * @return <tt>MetricsInfo</tt>
-   */
-  private static MetricsInfo createMetricsInfo(String name,
-      String description) {
-    return new MetricsInfo() {
-      @Override
-      public String name() {
-        return name;
-      }
-
-      @Override
-      public String description() {
-        return description;
-      }
-    };
-  }
-
-  /**
-   * Replaces default servername tag value with actual server name.
-   *
-   * @param metricEntryKey metric entry key
-   * @param metricKey      metric key
-   * @param serverPort     server port
-   * @return <tt>metricKey</tt> with replaced servername tag value.
-   */
-  public static String replaceServerNameTagValue(String metricEntryKey,
-      String metricKey, int serverPort) {
-    if (!metricEntryKey.contains(UGI_METRICS)) {
-      return metricKey;
-    }
-
-    String serverName = null;
-    switch (serverPort) {
-    case OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT:
-      serverName = "OM";
-      break;
-    case ScmConfigKeys.OZONE_SCM_HTTP_BIND_PORT_DEFAULT:
-      serverName = "SCM";
-      break;
-    default:
-      break;
-    }
-
-    if (serverName != null) {
-      metricKey = metricKey.replace(SERVER_NAME, serverName);
-    }
-
-    return metricKey;
+    metricsTags.add(metricsTag);
   }
 
   /**
@@ -191,10 +93,24 @@ public final class PrometheusMetricsSinkUtil {
     return normalizeName(baseName);
   }
 
+  /**
+   * Normalizes metrics tag key name.
+   * @param baseName
+   * @return normalized name.
+   */
   private static String normalizeName(String baseName) {
     String[] parts = SPLIT_PATTERN.split(baseName);
     String result = String.join("_", parts).toLowerCase();
     return REPLACE_PATTERN.matcher(result).replaceAll("_");
   }
 
+  public static String getMetricName(String recordName, String metricName) {
+    return DecayRpcSchedulerUtil.splitMetricNameIfNeeded(recordName,
+        metricName);
+  }
+
+  public static String getUsername(String recordName, String metricName) {
+    return DecayRpcSchedulerUtil.checkMetricNameForUsername(recordName,
+        metricName);
+  }
 }

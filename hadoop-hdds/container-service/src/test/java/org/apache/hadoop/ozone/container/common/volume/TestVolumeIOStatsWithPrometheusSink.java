@@ -42,7 +42,7 @@ public class TestVolumeIOStatsWithPrometheusSink {
   public void init() {
     metrics = DefaultMetricsSystem.instance();
     metrics.init("test");
-    sink = new PrometheusMetricsSink();
+    sink = new PrometheusMetricsSink("random");
     metrics.register("Prometheus", "Prometheus", sink);
   }
 
@@ -84,8 +84,7 @@ public class TestVolumeIOStatsWithPrometheusSink {
     ByteArrayOutputStream stream = new ByteArrayOutputStream();
     OutputStreamWriter writer = new OutputStreamWriter(stream, UTF_8);
 
-    final int serverPort = 0;
-    sink.writeMetrics(writer, serverPort);
+    sink.writeMetrics(writer);
     writer.flush();
 
     return stream.toString(UTF_8.name());

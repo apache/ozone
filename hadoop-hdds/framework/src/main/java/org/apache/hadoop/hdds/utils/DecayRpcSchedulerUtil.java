@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import com.google.common.base.Strings;
+import java.util.Optional;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsTag;
+
 /**
  * Helper functions for DecayRpcScheduler
  * metrics for Prometheus.
@@ -32,7 +37,7 @@ public final class DecayRpcSchedulerUtil {
    * or
    * "Caller(<callers_username>).Priority"
    * Split it and return the metric.
-   *
+   * <p>
    * If the recordName doesn't belong to Decay_Rpc_Scheduler,
    * then return the metricName as it is without making
    * any changes to it.
@@ -58,6 +63,7 @@ public final class DecayRpcSchedulerUtil {
    * For Decay_Rpc_Scheduler, split the metric name
    * and then get the part that is in the format "Caller(<callers_username>)"
    * and split it to return the username.
+   *
    * @param recordName
    * @param metricName
    * @return caller username or null if not present
@@ -80,6 +86,35 @@ public final class DecayRpcSchedulerUtil {
       return username;
     }
     return null;
+  }
+
+
+  /**
+   * Create a <tt>username</tt> metrics tag.
+   * @param username caller username
+   * @return empty optional if no metrics tag was created, otherwise
+   * optional of metrics tag.
+   */
+  public static Optional<MetricsTag> createUsernameTag(String username) {
+    if (Strings.isNullOrEmpty(username)) {
+      return Optional.empty();
+    }
+
+    final String name = "username";
+    final String description = "caller username";
+    final MetricsInfo metricsInfo = new MetricsInfo() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public String description() {
+        return description;
+      }
+    };
+    MetricsTag metricsTag = new MetricsTag(metricsInfo, username);
+    return Optional.of(metricsTag);
   }
 
 }

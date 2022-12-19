@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.configuration2.SubsetConfiguration;
-import org.apache.hadoop.hdds.utils.DecayRpcSchedulerUtil;
 import org.apache.hadoop.hdds.utils.PrometheusMetricsSinkUtil;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
@@ -44,8 +43,10 @@ public class PrometheusMetricsSink implements MetricsSink {
    */
   private final Map<String, Map<String, String>> metricLines =
       Collections.synchronizedSortedMap(new TreeMap<>());
+  private final String servername;
 
-  public PrometheusMetricsSink() {
+  public PrometheusMetricsSink(String servername) {
+    this.servername = servername;
   }
 
   @Override
@@ -54,11 +55,14 @@ public class PrometheusMetricsSink implements MetricsSink {
       if (metrics.type() == MetricType.COUNTER
           || metrics.type() == MetricType.GAUGE) {
 
-        String metricName = DecayRpcSchedulerUtil
-            .splitMetricNameIfNeeded(metricsRecord.name(), metrics.name());
+        String metricName =
+            PrometheusMetricsSinkUtil.getMetricName(metricsRecord.name(),
+                metrics.name());
+
         // If there is no username this should be null
-        String username = DecayRpcSchedulerUtil
-            .checkMetricNameForUsername(metricsRecord.name(), metrics.name());
+        String username =
+            PrometheusMetricsSinkUtil.getUsername(metricsRecord.name(),
+                metrics.name());
 
         String key = PrometheusMetricsSinkUtil.prometheusName(
             metricsRecord.name(), metricName);
@@ -72,7 +76,7 @@ public class PrometheusMetricsSink implements MetricsSink {
             + metrics.type().toString().toLowerCase();
 
         metricLines.computeIfAbsent(metricKey,
-            any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+                any -> Collections.synchronizedSortedMap(new TreeMap<>()))
             .put(prometheusMetricKeyAsString, String.valueOf(metrics.value()));
       }
     }
@@ -85,11 +89,12 @@ public class PrometheusMetricsSink implements MetricsSink {
         .append("{");
     String sep = "";
 
-    List<MetricsTag> metricTags =
-        PrometheusMetricsSinkUtil.addTags(key, username, metricsRecord.tags());
+    List<MetricsTag> metricsTags =
+        PrometheusMetricsSinkUtil.addTags(key, username, servername,
+            metricsRecord.tags());
 
     //add tags
-    for (MetricsTag tag : metricTags) {
+    for (MetricsTag tag : metricsTags) {
       String tagName = tag.name().toLowerCase();
 
       //ignore specific tag which includes sub-hierarchy
@@ -119,17 +124,14 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   }
 
-  public void writeMetrics(Writer writer, int serverPort) throws IOException {
+  public void writeMetrics(Writer writer) throws IOException {
     for (Map.Entry<String, Map<String, String>> metricEntry
         : metricLines.entrySet()) {
       writer.write(metricEntry.getKey() + "\n");
 
       for (Map.Entry<String, String> metric
           : metricEntry.getValue().entrySet()) {
-        String metricKey =
-            PrometheusMetricsSinkUtil.replaceServerNameTagValue(
-                metricEntry.getKey(), metric.getKey(), serverPort);
-        writer.write(metricKey + " " + metric.getValue() + "\n");
+        writer.write(metric.getKey() + " " + metric.getValue() + "\n");
       }
     }
   }

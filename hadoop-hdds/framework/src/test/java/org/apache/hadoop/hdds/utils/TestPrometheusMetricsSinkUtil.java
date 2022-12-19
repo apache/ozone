@@ -21,9 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -40,15 +38,15 @@ class TestPrometheusMetricsSinkUtil {
   @Test
   void testAddTagsAddUsernameTagWithNullUsername() {
     // GIVEN
-    String key = "key";
-    String username = null;
+    final String key = "key";
+    final String username = null;
+    final String servername = null;
     Collection<MetricsTag> unmodifiableMetricTags =
         Collections.unmodifiableList(new ArrayList<>());
 
     // WHEN
     List<MetricsTag> metricsTags = PrometheusMetricsSinkUtil.addTags(key,
-        username,
-        unmodifiableMetricTags);
+        username, servername, unmodifiableMetricTags);
 
     // THEN
     Assertions.assertFalse(metricsTags.stream()
@@ -59,15 +57,15 @@ class TestPrometheusMetricsSinkUtil {
   @Test
   void testAddTagsAddUsernameTagWithEmptyUsername() {
     // GIVEN
-    String key = "key";
-    String username = "";
+    final String key = "key";
+    final String username = "";
+    final String servername = null;
     Collection<MetricsTag> unmodifiableMetricTags =
         Collections.unmodifiableList(new ArrayList<>());
 
     // WHEN
     List<MetricsTag> metricsTags = PrometheusMetricsSinkUtil.addTags(key,
-        username,
-        unmodifiableMetricTags);
+        username, servername, unmodifiableMetricTags);
 
     // THEN
     Assertions.assertFalse(metricsTags.stream()
@@ -78,15 +76,15 @@ class TestPrometheusMetricsSinkUtil {
   @Test
   void testAddTagsAddUsernameTagWithUsername() {
     // GIVEN
-    String key = "key";
-    String username = "username";
+    final String key = "key";
+    final String username = "username";
+    final String servername = null;
     Collection<MetricsTag> unmodifiableMetricTags =
         Collections.unmodifiableList(new ArrayList<>());
 
     // WHEN
     List<MetricsTag> metricsTags = PrometheusMetricsSinkUtil.addTags(key,
-        username,
-        unmodifiableMetricTags);
+        username, servername, unmodifiableMetricTags);
 
     // THEN
     Assertions.assertTrue(metricsTags.stream()
@@ -97,15 +95,15 @@ class TestPrometheusMetricsSinkUtil {
   @Test
   void testAddTagsAddServernameTagWithNoUgiMetricsKey() {
     // GIVEN
-    String key = "key";
-    String username = null;
+    final String key = "key";
+    final String username = null;
+    final String servername = "SERVERNAME";
     Collection<MetricsTag> unmodifiableMetricTags =
         Collections.unmodifiableList(new ArrayList<>());
 
     // WHEN
     List<MetricsTag> metricsTags = PrometheusMetricsSinkUtil.addTags(key,
-        username,
-        unmodifiableMetricTags);
+        username, servername, unmodifiableMetricTags);
 
     // THEN
     Assertions.assertFalse(metricsTags.stream()
@@ -116,15 +114,15 @@ class TestPrometheusMetricsSinkUtil {
   @Test
   void testAddTagsAddServernameTagWithUgiMetricsKey() {
     // GIVEN
-    String key = "ugi_metrics";
-    String username = null;
+    final String key = "ugi_metrics";
+    final String username = null;
+    final String servername = "SERVERNAME";
     Collection<MetricsTag> unmodifiableMetricTags =
         Collections.unmodifiableList(new ArrayList<>());
 
     // WHEN
     List<MetricsTag> metricsTags = PrometheusMetricsSinkUtil.addTags(key,
-        username,
-        unmodifiableMetricTags);
+        username, servername, unmodifiableMetricTags);
 
     // THEN
     Assertions.assertTrue(metricsTags.stream()
@@ -135,15 +133,15 @@ class TestPrometheusMetricsSinkUtil {
   @Test
   void testAddTags() {
     // GIVEN
-    String key = "ugi_metrics";
-    String username = "username";
+    final String key = "ugi_metrics";
+    final String username = "username";
+    final String servername = "SERVERNAME";
     Collection<MetricsTag> unmodifiableMetricTags =
         Collections.unmodifiableList(new ArrayList<>());
 
     // WHEN
     List<MetricsTag> metricsTags = PrometheusMetricsSinkUtil.addTags(key,
-        username,
-        unmodifiableMetricTags);
+        username, servername, unmodifiableMetricTags);
 
     // THEN
     Assertions.assertTrue(metricsTags.stream()
@@ -153,71 +151,7 @@ class TestPrometheusMetricsSinkUtil {
   }
 
   @Test
-  void testReplaceServerNameTagValueWithNonUgiMetrics() {
-    // GIVEN
-    String key = "non_ugi";
-    String metricsKey = "{\"servername\"=\"unknown\"}";
-    int serverPort = 0;
-
-    // WHEN
-    String newMetricsKey =
-        PrometheusMetricsSinkUtil.replaceServerNameTagValue(key, metricsKey,
-            serverPort);
-
-    // THEN
-    Assertions.assertEquals(metricsKey, newMetricsKey);
-  }
-
-  @Test
-  void testReplaceServerNameTagValueWithUgiMetricsAndNonOMOrSCMPort() {
-    // GIVEN
-    String key = "ugi_metrics";
-    String metricsKey = "{\"servername\"=\"unknown\"}";
-    int serverPort = 0;
-
-    // WHEN
-    String newMetricsKey =
-        PrometheusMetricsSinkUtil.replaceServerNameTagValue(key, metricsKey,
-            serverPort);
-
-    // THEN
-    Assertions.assertEquals(metricsKey, newMetricsKey);
-  }
-
-  @Test
-  void testReplaceServerNameTagValueWithUgiMetricsAndOMPort() {
-    // GIVEN
-    String key = "ugi_metrics";
-    String metricsKey = "{\"servername\"=\"unknown\"}";
-    int serverPort = OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT;
-
-    // WHEN
-    String newMetricsKey =
-        PrometheusMetricsSinkUtil.replaceServerNameTagValue(key, metricsKey,
-            serverPort);
-
-    // THEN
-    Assertions.assertEquals("{\"servername\"=\"OM\"}", newMetricsKey);
-  }
-
-  @Test
-  void testReplaceServerNameTagValueWithUgiMetricsAndSCMPort() {
-    // GIVEN
-    String key = "ugi_metrics";
-    String metricsKey = "{\"servername\"=\"unknown\"}";
-    int serverPort = ScmConfigKeys.OZONE_SCM_HTTP_BIND_PORT_DEFAULT;
-
-    // WHEN
-    String newMetricsKey =
-        PrometheusMetricsSinkUtil.replaceServerNameTagValue(key, metricsKey,
-            serverPort);
-
-    // THEN
-    Assertions.assertEquals("{\"servername\"=\"SCM\"}", newMetricsKey);
-  }
-
-  @Test
-  public void testNamingCamelCase() {
+  void testNamingCamelCase() {
     //THEN
     Assertions.assertEquals("rpc_time_some_metrics",
         PrometheusMetricsSinkUtil.prometheusName("RpcTime", "SomeMetrics"));
@@ -230,7 +164,7 @@ class TestPrometheusMetricsSinkUtil {
   }
 
   @Test
-  public void testNamingRocksDB() {
+  void testNamingRocksDB() {
     //RocksDB metrics are handled differently.
     // THEN
     Assertions.assertEquals("rocksdb_om_db_num_open_connections",
@@ -239,7 +173,7 @@ class TestPrometheusMetricsSinkUtil {
   }
 
   @Test
-  public void testNamingPipeline() {
+  void testNamingPipeline() {
     // GIVEN
     String recordName = "SCMPipelineMetrics";
     String metricName = "NumBlocksAllocated-"
@@ -253,7 +187,7 @@ class TestPrometheusMetricsSinkUtil {
   }
 
   @Test
-  public void testNamingSpaces() {
+  void testNamingSpaces() {
     //GIVEN
     String recordName = "JvmMetrics";
     String metricName = "GcTimeMillisG1 Young Generation";
@@ -262,6 +196,34 @@ class TestPrometheusMetricsSinkUtil {
     Assertions.assertEquals(
         "jvm_metrics_gc_time_millis_g1_young_generation",
         PrometheusMetricsSinkUtil.prometheusName(recordName, metricName));
+  }
+
+  @Test
+  void testGetMetricName() {
+    // GIVEN
+    final String recordName = "record_name";
+    final String metricName = "metric_name";
+
+    // WHEN
+    String newMetricName = PrometheusMetricsSinkUtil.getMetricName(recordName,
+        metricName);
+
+    // THEN
+    Assertions.assertEquals(metricName, newMetricName);
+  }
+
+  @Test
+  void testGetUsername() {
+    // GIVEN
+    final String recordName = "record_name";
+    final String metricName = "metric_name";
+
+    // WHEN
+    String username = PrometheusMetricsSinkUtil.getUsername(recordName,
+        metricName);
+
+    // THEN
+    Assertions.assertNull(username);
   }
 
 }
