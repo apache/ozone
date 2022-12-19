@@ -284,8 +284,10 @@ public class DatanodeDetails extends NodeImpl implements
         return port;
       }
     }
-    // if no separate admin/server port, return single Ratis one for compat
-    if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER) {
+    // if no separate admin/server/datastream port, return single Ratis one for
+    // compat
+    if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER ||
+        name == Name.RATIS_DATASTREAM) {
       return getPort(Name.RATIS);
     }
     return null;
@@ -795,7 +797,8 @@ public class DatanodeDetails extends NodeImpl implements
      * Ports that are supported in DataNode.
      */
     public enum Name {
-      STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER;
+      STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
+      RATIS_DATASTREAM;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());

@@ -151,6 +151,7 @@ public class TestOzoneContainerWithTLS {
   }
 
   @Test
+  @org.junit.Ignore("HDDS-7628")
   public void testCreateOzoneContainer() throws Exception {
     LOG.info("testCreateOzoneContainer with TLS and containerToken enabled: {}",
         containerTokenEnabled);

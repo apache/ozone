@@ -44,6 +44,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+
 /**
  * Container placement policy that scatter datanodes on different racks
  * , together with the space to satisfy the size constraints.
@@ -236,7 +238,7 @@ public final class SCMContainerPlacementRackScatter
           " AvailableNode = " + availableNodes.size() +
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+          FAILED_TO_FIND_SUITABLE_NODE);
     }
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
     if (favoredNodes != null) {
@@ -252,7 +254,6 @@ public final class SCMContainerPlacementRackScatter
     if (excludedNodes != null) {
       mutableFavoredNodes.removeAll(excludedNodes);
     }
-
     if (usedNodes == null) {
       usedNodes = Collections.emptyList();
     }
@@ -276,7 +277,7 @@ public final class SCMContainerPlacementRackScatter
               reason, numberOfRacksRequired, usedRacksCntMap.size(),
               nodesRequired);
       throw new SCMException(reason,
-              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+              FAILED_TO_FIND_SUITABLE_NODE);
     }
     int maxReplicasPerRack = getMaxReplicasPerRack(requiredReplicationFactor,
             numberOfRacksRequired);
@@ -301,7 +302,7 @@ public final class SCMContainerPlacementRackScatter
               reason, numberOfRacksRequired, usedRacksCntMap.size(),
               nodesRequired);
       throw new SCMException(reason,
-              SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+              FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
@@ -314,9 +315,8 @@ public final class SCMContainerPlacementRackScatter
               .size() + ", but required nodes to choose from Unique Racks: "
               + additionalRacksRequired + " do not match.";
       LOG.warn("Placement policy could not choose the enough nodes from " +
-                      "available racks."
-                      + " {} Available racks count: {}," +
-                      " Excluded nodes count: {}",
+                      "available racks. {} Available racks count: {},"
+                      + " Excluded nodes count: {}",
               reason, racks.size(), excludedNodesCount);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
@@ -331,9 +331,7 @@ public final class SCMContainerPlacementRackScatter
               Pair.of(metadataSizeRequired, dataSizeRequired),
               Integer.MAX_VALUE, Pair.of(usedRacksCntMap, maxReplicasPerRack)));
     }
-
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
-
     if (nodesRequiredToChoose != chosenNodes.size()) {
       String reason = "Chosen nodes size: " + chosenNodes
               .size() + ", but required nodes to choose: "
@@ -344,16 +342,25 @@ public final class SCMContainerPlacementRackScatter
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
-
     ContainerPlacementStatus placementStatus =
-        validateContainerPlacement(
-                Stream.of(usedNodes, result)
-                      .flatMap(List::stream).collect(Collectors.toList()),
+        validateContainerPlacement(Stream.of(usedNodes, result)
+                .flatMap(List::stream).collect(Collectors.toList()),
                 requiredReplicationFactor);
     if (!placementStatus.isPolicySatisfied()) {
-      String errorMsg = "ContainerPlacementPolicy not met. Misreplication" +
-              " Reason: " + placementStatus.misReplicatedReason();
-      throw new SCMException(errorMsg, null);
+      ContainerPlacementStatus initialPlacementStatus =
+              validateContainerPlacement(Stream.of(usedNodes).flatMap(
+                      List::stream).collect(Collectors.toList()),
+                      requiredReplicationFactor);
+      if (initialPlacementStatus.misReplicationCount()
+              < placementStatus.misReplicationCount()) {
+        String errorMsg = "ContainerPlacementPolicy not met. Misreplication" +
+                " Reason: " + placementStatus.misReplicatedReason() +
+                " Initial Used nodes mis-replication Count: " +
+                initialPlacementStatus.misReplicationCount() +
+                " Used nodes + Chosen nodes mis-replication Count: " +
+                placementStatus.misReplicationCount();
+        throw new SCMException(errorMsg, FAILED_TO_FIND_SUITABLE_NODE);
+      }
     }
     return result;
   }

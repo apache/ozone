@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -382,6 +383,37 @@ public class BasicRootedOzoneClientAdapterImpl
               this.clientConfiguredReplicationConfig,
               bucket.getReplicationConfig(), config), overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
+          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+        throw new FileAlreadyExistsException(
+            ex.getResult().name() + ": " + ex.getMessage());
+      } else {
+        throw ex;
+      }
+    }
+  }
+
+  @Override
+  public OzoneFSDataStreamOutput createStreamFile(String pathStr,
+      short replication, boolean overWrite, boolean recursive)
+      throws IOException {
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
+    OFSPath ofsPath = new OFSPath(pathStr);
+    if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
+      throw new IOException("Cannot create file under root or volume.");
+    }
+    String key = ofsPath.getKeyName();
+    try {
+      // Hadoop CopyCommands class always sets recursive to true
+      final OzoneBucket bucket = getBucket(ofsPath, recursive);
+      final ReplicationConfig replicationConfig
+          = OzoneClientUtils.resolveClientSideReplicationConfig(
+          replication, clientConfiguredReplicationConfig,
+          bucket.getReplicationConfig(), config);
+      final OzoneDataStreamOutput out = bucket.createStreamFile(
+          key, 0, replicationConfig, overWrite, recursive);
+      return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {

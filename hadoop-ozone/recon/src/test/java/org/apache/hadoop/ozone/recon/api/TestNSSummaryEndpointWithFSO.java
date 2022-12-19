@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -1262,10 +1264,18 @@ public class TestNSSummaryEndpointWithFSO {
         .thenReturn(containerReplicas6);
 
     when(reconSCM.getContainerManager()).thenReturn(containerManager);
+    ReconNodeManager mockReconNodeManager = mock(ReconNodeManager.class);
+    when(mockReconNodeManager.getStats()).thenReturn(getMockSCMRootStat());
+    when(reconSCM.getScmNodeManager()).thenReturn(mockReconNodeManager);
     return reconSCM;
   }
 
   private static BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  private static SCMNodeStat getMockSCMRootStat() {
+    return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE, 
+        ROOT_QUOTA - ROOT_DATA_SIZE);
   }
 }
