@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoStreamUtils;
-import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * Keys in Encrypted Buckets.
  */
 public class OzoneCryptoInputStream extends CryptoInputStream
-    implements Seekable {
+    implements PartInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneCryptoInputStream.class);
@@ -66,16 +66,13 @@ public class OzoneCryptoInputStream extends CryptoInputStream
     this.partIndex = partIndex;
   }
 
+  @Override
   public long getLength() {
     return length;
   }
 
   public int getBufferSize() {
     return bufferSize;
-  }
-
-  public long getRemaining() throws IOException {
-    return length - getPos();
   }
 
   @Override

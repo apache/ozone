@@ -387,6 +387,18 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.ecReplicationCmdsTimeoutTotal.incr();
   }
 
+  public long getEcDeletionCmdsSentTotal() {
+    return ecDeletionCmdsSentTotal.value();
+  }
+
+  public long getEcReconstructionCmdsSentTotal() {
+    return ecReconstructionCmdsSentTotal.value();
+  }
+
+  public long getEcReplicationCmdsSentTotal() {
+    return ecReplicationCmdsSentTotal.value();
+  }
+
   public void incrEcDeletionCmdsTimeoutTotal() {
     this.ecDeletionCmdsTimeoutTotal.incr();
   }

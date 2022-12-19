@@ -717,6 +717,8 @@ public class SCMNodeManager implements NodeManager {
         datanodeInfo.setCommandCounts(commandQueueReportProto,
             commandsToBeSent);
         metrics.incNumNodeCommandQueueReportProcessed();
+        scmNodeEventPublisher.fireEvent(
+            SCMEvents.DATANODE_COMMAND_COUNT_UPDATED, datanodeDetails);
       }
     } catch (NodeNotFoundException e) {
       metrics.incNumNodeCommandQueueReportProcessingFailed();

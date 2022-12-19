@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Assert;
@@ -610,29 +611,29 @@ public class TestOzoneECClient {
 
   @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
-      throws IOException {
+      throws Exception {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2}, 3, 2);
   }
 
   @Test
   public void testWriteShouldSuccessIfLessThanParityNodesFail()
-      throws IOException {
+      throws Exception {
     testNodeFailuresWhileWriting(new int[] {0}, 2, 2);
   }
 
   @Test
-  public void testWriteShouldSuccessIf4NodesFailed() throws IOException {
+  public void testWriteShouldSuccessIf4NodesFailed() throws Exception {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2, 3}, 1, 2);
   }
 
   @Test
   public void testWriteShouldSuccessWithAdditional1BlockGroupAfterFailure()
-      throws IOException {
+      throws Exception {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2, 3}, 10, 3);
   }
 
   @Test
-  public void testStripeWriteRetriesOn2Failures() throws IOException {
+  public void testStripeWriteRetriesOn2Failures() throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
     // Cluster has 15 nodes. So, first we will create 3 block groups with
@@ -655,7 +656,7 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testStripeWriteRetriesOn3Failures() throws IOException {
+  public void testStripeWriteRetriesOn3Failures() throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
 
@@ -677,9 +678,9 @@ public class TestOzoneECClient {
   }
 
   // The mocked impl throws IllegalStateException when there are not enough
-  // nodes in allocateBlock request. But write() converts it to IOException.
-  @Test(expected = IOException.class)
-  public void testStripeWriteRetriesOnAllNodeFailures() throws IOException {
+  // nodes in allocateBlock request.
+  @Test(expected = IllegalStateException.class)
+  public void testStripeWriteRetriesOnAllNodeFailures() throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
 
@@ -697,7 +698,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testStripeWriteRetriesOn4FailuresWith3RetriesAllowed()
-      throws IOException {
+      throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
     con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
@@ -726,7 +727,7 @@ public class TestOzoneECClient {
   }
 
   public void testStripeWriteRetriesOnFailures(OzoneConfiguration con,
-      int clusterSize, int[] nodesIndexesToMarkFailure) throws IOException {
+      int clusterSize, int[] nodesIndexesToMarkFailure) throws Exception {
     close();
     MultiNodePipelineBlockAllocator blkAllocator =
         new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
@@ -744,6 +745,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
       Assert.assertTrue(
           ((MockXceiverClientFactory) factoryStub).getStorages().size() == 5);
       List<DatanodeDetails> failedDNs = new ArrayList<>();
@@ -787,7 +789,7 @@ public class TestOzoneECClient {
 
   public void testNodeFailuresWhileWriting(int[] nodesIndexesToMarkFailure,
       int numChunksToWriteAfterFailure, int numExpectedBlockGrps)
-      throws IOException {
+      throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -800,6 +802,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
@@ -841,22 +844,22 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testExcludeOnDNFailure() throws IOException {
+  public void testExcludeOnDNFailure() throws Exception {
     testExcludeFailedDN(IntStream.range(0, 5), IntStream.empty());
   }
 
   @Test
-  public void testExcludeOnDNClosed() throws IOException {
+  public void testExcludeOnDNClosed() throws Exception {
     testExcludeFailedDN(IntStream.empty(), IntStream.range(0, 5));
   }
 
   @Test
-  public void testExcludeOnDNMixed() throws IOException {
+  public void testExcludeOnDNMixed() throws Exception {
     testExcludeFailedDN(IntStream.range(0, 3), IntStream.range(3, 5));
   }
 
   private void testExcludeFailedDN(IntStream failedDNIndex,
-      IntStream closedDNIndex) throws IOException {
+      IntStream closedDNIndex) throws Exception {
     close();
     OzoneConfiguration con = new OzoneConfiguration();
     MultiNodePipelineBlockAllocator blkAllocator =
@@ -882,6 +885,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i % dataBlocks]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Then let's mark datanodes with closed container
       List<DatanodeDetails> closedDNs = closedDNIndex
@@ -899,6 +903,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i % dataBlocks]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Assert excludeList only includes failedDNs
       Assert.assertArrayEquals(failedDNs.toArray(new DatanodeDetails[0]),
@@ -909,7 +914,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testLargeWriteOfMultipleStripesWithStripeFailure()
-      throws IOException {
+      throws Exception {
     close();
     OzoneConfiguration con = new OzoneConfiguration();
     // block size of 3KB could hold 3 full stripes
@@ -943,6 +948,7 @@ public class TestOzoneECClient {
           out.write(inputChunks[i]);
         }
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
@@ -1055,7 +1061,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testDiscardPreAllocatedBlocksPreventRetryExceeds()
-      throws IOException {
+      throws Exception {
     close();
     OzoneConfiguration con = new OzoneConfiguration();
     int maxRetries = 3;
@@ -1114,6 +1120,7 @@ public class TestOzoneECClient {
           out.write(inputChunks[i]);
         }
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Make the writes fail to trigger retry
       List<DatanodeDetails> failedDNs = new ArrayList<>();
@@ -1220,5 +1227,13 @@ public class TestOzoneECClient {
       locationInfoList.add(info);
     }
     return locationInfoList;
+  }
+
+  private static void waitForFlushingThreadToFinish(
+      ECKeyOutputStream ecOut) throws Exception {
+    final long checkpoint = System.currentTimeMillis();
+    ecOut.insertFlushCheckpoint(checkpoint);
+    GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
+        100, 10000);
   }
 }

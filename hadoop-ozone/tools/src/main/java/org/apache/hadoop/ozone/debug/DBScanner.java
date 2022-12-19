@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -37,6 +38,9 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.FileOutputStream;
@@ -63,7 +67,10 @@ import java.util.concurrent.Callable;
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
-  @CommandLine.Option(names = {"--column-family", "--column_family"},
+  public static final Logger LOG =
+      LoggerFactory.getLogger(DBScanner.class);
+
+  @CommandLine.Option(names = {"--column_family"},
       required = true,
       description = "Table name. " + "Command line option --column_family " +
           "will be removed in later versions.")
@@ -99,6 +106,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           "Command line option -cid will be removed in later versions.",
       defaultValue = "-1")
   private static long containerId;
+
+  @CommandLine.Option(names = { "--show-count",
+      "-count" }, description = "Get estimated key count for a"
+      + " given column family in the db",
+      defaultValue = "false",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private static boolean showCount;
+
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -225,6 +240,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBScanner.withKey = withKey;
   }
 
+  public static void setShowCount(boolean showCount) {
+    DBScanner.showCount = showCount;
+  }
+
   private static ColumnFamilyHandle getColumnFamilyHandle(
             byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
@@ -250,8 +269,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
     for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
-      System.out.println("Added definition for table:" +
-          definition.getTableName());
+      LOG.info("Added definition for table: {}", definition.getTableName());
       this.columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
@@ -272,7 +290,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          ManagedRocksDB rocksDB, String dbPath) throws IOException {
+          ManagedRocksDB rocksDB, String dbPath)
+      throws IOException, RocksDBException {
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
               "List length should be a positive number. Only allowed negative" +
@@ -294,6 +313,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 columnFamilyHandleList);
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
+        }
+        if (showCount) {
+          long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
+              RocksDatabase.ESTIMATE_NUM_KEYS);
+          System.out.println(keyCount);
+          return;
         }
         ManagedRocksIterator iterator;
         if (containerId > 0 && dnDBSchemaVersion != null &&

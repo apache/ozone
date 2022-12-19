@@ -31,9 +31,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
@@ -60,10 +60,9 @@ public class GrpcReplicationClient implements AutoCloseable {
 
   private final Path workingDirectory;
 
-  public GrpcReplicationClient(
-      String host, int port, Path workingDir,
-      SecurityConfig secConfig, CertificateClient certClient
-  ) throws IOException {
+  public GrpcReplicationClient(String host, int port, Path workingDir,
+      SecurityConfig secConfig, CertificateClient certClient)
+      throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
@@ -74,12 +73,11 @@ public class GrpcReplicationClient implements AutoCloseable {
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (certClient != null) {
+        KeyStoresFactory factory = certClient.getClientKeyStoresFactory();
         sslContextBuilder
-            .trustManager(HAUtils.buildCAX509List(certClient,
-                secConfig.getConfiguration()))
+            .trustManager(factory.getTrustManagers()[0])
             .clientAuth(ClientAuth.REQUIRE)
-            .keyManager(certClient.getPrivateKey(),
-                certClient.getCertificate());
+            .keyManager(factory.getKeyManagers()[0]);
       }
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");

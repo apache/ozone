@@ -100,6 +100,9 @@ enum Type {
   GetSmallFile = 16;
   CloseContainer = 17;
   GetCommittedBlockLength = 18;
+
+  StreamInit = 19;
+  StreamWrite = 20;
 }
 
 
@@ -378,6 +381,7 @@ message ChunkInfo {
   required uint64 len = 3;
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
+  optional bytes stripeChecksum = 6;
 }
 
 message ChunkInfoList {
@@ -400,7 +404,7 @@ enum ChecksumType {
 
 message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
-  required ChunkInfo chunkData = 2;
+  optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
 }
 
