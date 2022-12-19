@@ -388,7 +388,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
-        eventQueue);
+        eventQueue, scmContext);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
 

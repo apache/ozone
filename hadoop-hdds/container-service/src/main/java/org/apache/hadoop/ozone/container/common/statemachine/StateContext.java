@@ -730,12 +730,15 @@ public class StateContext {
    * Always record the latest term that has seen.
    */
   private void updateTermOfLeaderSCM(SCMCommand<?> command) {
+    updateTermOfLeaderSCM(command.getTerm());
+  }
+
+  public void updateTermOfLeaderSCM(final long newTerm) {
     if (!termOfLeaderSCM.isPresent()) {
       return;
     }
 
     final long currentTerm = termOfLeaderSCM.getAsLong();
-    final long newTerm = command.getTerm();
     if (currentTerm < newTerm) {
       setTermOfLeaderSCM(newTerm);
     }

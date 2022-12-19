@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
@@ -80,6 +82,7 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -104,6 +107,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,9 +134,12 @@ public class SCMDatanodeProtocolServer implements
   private final EventPublisher eventPublisher;
   private ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics;
 
+  private final SCMContext scmContext;
+
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
                                    OzoneStorageContainerManager scm,
-                                   EventPublisher eventPublisher)
+                                   EventPublisher eventPublisher,
+                                   SCMContext scmContext)
       throws IOException {
 
     // This constructor has broken down to smaller methods so that Recon's
@@ -142,6 +149,7 @@ public class SCMDatanodeProtocolServer implements
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
@@ -274,14 +282,19 @@ public class SCMDatanodeProtocolServer implements
     for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
       cmdResponses.add(getCommandResponse(cmd, scm));
     }
+    final OptionalLong term = getTermIfLeader();
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeUUID", heartbeat.getDatanodeDetails().getUuid());
     auditMap.put("command", flatten(cmdResponses.toString()));
+    term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
     try {
-      return SCMHeartbeatResponseProto.newBuilder()
-          .setDatanodeUUID(heartbeat.getDatanodeDetails().getUuid())
-          .addAllCommands(cmdResponses).build();
+      SCMHeartbeatResponseProto.Builder builder =
+          SCMHeartbeatResponseProto.newBuilder()
+              .setDatanodeUUID(heartbeat.getDatanodeDetails().getUuid())
+              .addAllCommands(cmdResponses);
+      term.ifPresent(builder::setTerm);
+      return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
@@ -295,6 +308,17 @@ public class SCMDatanodeProtocolServer implements
         );
       }
     }
+  }
+
+  private OptionalLong getTermIfLeader() {
+    if (scmContext != null && scmContext.isLeader()) {
+      try {
+        return OptionalLong.of(scmContext.getTermOfLeader());
+      } catch (NotLeaderException e) {
+        // only leader should distribute current term
+      }
+    }
+    return OptionalLong.empty();
   }
 
   /**
