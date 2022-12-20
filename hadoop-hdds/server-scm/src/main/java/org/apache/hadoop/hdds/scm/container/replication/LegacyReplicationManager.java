@@ -1221,10 +1221,8 @@ public class LegacyReplicationManager {
       } else {
         // Container is not yet closed. Choose which healthy replicas to
         // delete so that we do not lose any origin node IDs.
-        Set<UUID> originNodeIDs = deleteCandidates.stream()
-            .map(ContainerReplica::getOriginDatanodeId)
-            .collect(Collectors.toSet());
-        deleteExcessWithNonUniqueOriginNodeIDs(container, originNodeIDs,
+        deleteExcessWithNonUniqueOriginNodeIDs(container,
+            replicaSet.getReplicas(),
             deleteCandidates, excess);
       }
     }
@@ -1245,6 +1243,10 @@ public class LegacyReplicationManager {
     } else if (excessReplicas > 0) {
       handleOverReplicatedAllUnhealthy(container, replicas,
           excessReplicas);
+    } else {
+      // We have the correct number of unhealthy replicas. See if any of them
+      // can be closed.
+      closeReplicasIfPossible(container, replicas);
     }
   }
 
@@ -1288,11 +1290,8 @@ public class LegacyReplicationManager {
       // We only need to save the unhealthy replicas if they
       // represent unique origin node IDs. If recovering these replicas is
       // possible in the future they could be used to close the container.
-      Set<UUID> originNodeIDs = replicas.stream()
-          .map(ContainerReplica::getOriginDatanodeId)
-          .collect(Collectors.toSet());
       deleteExcessWithNonUniqueOriginNodeIDs(container,
-          originNodeIDs, unhealthyReplicas, excessReplicaCount);
+          replicaSet.getReplicas(), unhealthyReplicas, excessReplicaCount);
     }
   }
 
@@ -1952,11 +1951,8 @@ public class LegacyReplicationManager {
       // We only need to save the unhealthy replicas if they
       // represent unique origin node IDs. If recovering these replicas is
       // possible in the future they could be used to close the container.
-      Set<UUID> originNodeIDs = replicas.stream()
-          .map(ContainerReplica::getOriginDatanodeId)
-          .collect(Collectors.toSet());
       deleteExcessWithNonUniqueOriginNodeIDs(container,
-          originNodeIDs, deleteCandidates, excess);
+          replicas, deleteCandidates, excess);
     }
   }
 
@@ -1980,6 +1976,11 @@ public class LegacyReplicationManager {
 
   private int closeReplicasIfPossible(ContainerInfo container,
       List<ContainerReplica> replicas) {
+    // This method should not be used on open containers.
+    if (container.getState() == LifeCycleState.OPEN) {
+      return 0;
+    }
+
     int numCloseCmdsSent = 0;
     Iterator<ContainerReplica> iterator = replicas.iterator();
     while (iterator.hasNext()) {
@@ -2069,12 +2070,19 @@ public class LegacyReplicationManager {
   }
 
   private void deleteExcessWithNonUniqueOriginNodeIDs(ContainerInfo container,
-      Set<UUID> existingOriginNodeIDs, List<ContainerReplica> deleteCandidates,
-      int excess) {
+      List<ContainerReplica> allReplicas,
+      List<ContainerReplica> deleteCandidates, int excess) {
     // Remove delete candidates whose origin node ID is not already covered
-    // by a healthy replica.
+    // by an existing replica.
     // TODO topology handling must be improved to make an optimal
     //  choice as to which replica to keep.
+
+    // Gather the origin node IDs of replicas which are not candidates for
+    // deletion.
+    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
+        .filter(r -> !deleteCandidates.contains(r))
+        .map(ContainerReplica::getOriginDatanodeId)
+        .collect(Collectors.toSet());
 
     List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
     for (ContainerReplica replica: deleteCandidates) {
