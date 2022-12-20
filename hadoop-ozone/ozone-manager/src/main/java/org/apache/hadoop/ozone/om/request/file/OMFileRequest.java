@@ -721,6 +721,7 @@ public final class OMFileRequest {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setParentObjectID(dirInfo.getParentObjectID());
     builder.setKeyName(keyName);
+    builder.setOwnerName(dirInfo.getOwner());
     builder.setAcls(dirInfo.getAcls());
     builder.addAllMetadata(dirInfo.getMetadata());
     builder.setVolumeName(volumeName);

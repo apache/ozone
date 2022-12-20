@@ -707,7 +707,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
             .addAllMetadata(KeyValueUtil.getFromProtobuf(
                     keyArgs.getMetadataList()))
-            .setUpdateID(transactionLogIndex);
+            .setUpdateID(transactionLogIndex)
+            .setOwnerName(keyArgs.getOwnerName());
     if (omPathInfo != null) {
       // FileTable metadata format
       objectID = omPathInfo.getLeafNodeObjectId();

@@ -108,6 +108,7 @@ public class TestOmBlockVersioning {
         .setDataSize(1000)
         .setAcls(new ArrayList<>())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
         .build();
 
     // 1st update, version 0

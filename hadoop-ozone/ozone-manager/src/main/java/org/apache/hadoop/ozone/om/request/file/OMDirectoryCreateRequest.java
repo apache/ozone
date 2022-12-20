@@ -375,6 +375,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             .setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
             .setKeyName(dirName)
+            .setOwnerName(keyArgs.getOwnerName())
             .setOmKeyLocationInfos(Collections.singletonList(
                 new OmKeyLocationInfoGroup(0, new ArrayList<>())))
             .setCreationTime(keyArgs.getModificationTime())

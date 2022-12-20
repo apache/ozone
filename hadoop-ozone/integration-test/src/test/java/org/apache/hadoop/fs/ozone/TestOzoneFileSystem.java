@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -603,6 +604,100 @@ public class TestOzoneFileSystem {
   }
 
   @Test
+  public void testObjectOwner() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1 create file /file1
+      // user2 create directory /dir1
+      // user3 create file /dir1/file2
+      UserGroupInformation user1 = UserGroupInformation
+          .createUserForTesting("user1", new String[] {"user1"});
+      UserGroupInformation user2 = UserGroupInformation
+          .createUserForTesting("user2", new String[] {"user2"});
+      UserGroupInformation user3 = UserGroupInformation
+          .createUserForTesting("user3", new String[] {"user3"});
+      Path root = new Path("/");
+      Path file1 = new Path(root, "file1");
+      Path dir1 = new Path(root, "dir1");
+      Path file2 = new Path(dir1, "file2");
+      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      Assert.assertEquals(0, fileStatuses.length);
+
+      UserGroupInformation.setLoginUser(user1);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file1);
+      UserGroupInformation.setLoginUser(user2);
+      fs = FileSystem.get(cluster.getConf());
+      fs.mkdirs(dir1);
+      UserGroupInformation.setLoginUser(user3);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file2);
+
+      Assert.assertEquals(2, o3fs.listStatus(root).length);
+      Assert.assertEquals(1, o3fs.listStatus(dir1).length);
+      Assert.assertEquals(user1.getShortUserName(),
+          fs.getFileStatus(file1).getOwner());
+      Assert.assertEquals(user2.getShortUserName(),
+          fs.getFileStatus(dir1).getOwner());
+      Assert.assertEquals(user3.getShortUserName(),
+          fs.getFileStatus(file2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      fs = FileSystem.get(cluster.getConf());
+    }
+  }
+
+  @Test
+  public void testObjectProxyUser() throws Exception {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1ProxyUser create file /file1
+      // user2ProxyUser create directory /dir1
+      // user3ProxyUser create file /dir1/file2
+      String proxyUserName = "proxyuser";
+      UserGroupInformation proxyuser = UserGroupInformation
+          .createUserForTesting(proxyUserName, new String[] {"user1"});
+      Path root = new Path("/");
+      Path file1 = new Path(root, "file1");
+      Path dir1 = new Path(root, "dir1");
+      Path file2 = new Path(dir1, "file2");
+
+      UserGroupInformation user1ProxyUser =
+          UserGroupInformation.createProxyUser("user1", proxyuser);
+      UserGroupInformation user2ProxyUser =
+          UserGroupInformation.createProxyUser("user2", proxyuser);
+      UserGroupInformation user3ProxyUser =
+          UserGroupInformation.createProxyUser("user3", proxyuser);
+      FileStatus[] fileStatuses = o3fs.listStatus(root);
+      Assert.assertEquals(0, fileStatuses.length);
+
+      UserGroupInformation.setLoginUser(user1ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file1);
+      UserGroupInformation.setLoginUser(user2ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      fs.mkdirs(dir1);
+      UserGroupInformation.setLoginUser(user3ProxyUser);
+      fs = FileSystem.get(cluster.getConf());
+      ContractTestUtils.touch(fs, file2);
+
+      Assert.assertEquals(2, o3fs.listStatus(root).length);
+      Assert.assertEquals(1, o3fs.listStatus(dir1).length);
+      Assert.assertEquals(user1ProxyUser.getShortUserName(),
+          fs.getFileStatus(file1).getOwner());
+      Assert.assertEquals(user2ProxyUser.getShortUserName(),
+          fs.getFileStatus(dir1).getOwner());
+      Assert.assertEquals(user3ProxyUser.getShortUserName(),
+          fs.getFileStatus(file2).getOwner());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      fs = FileSystem.get(cluster.getConf());
+    }
+  }
+
+  @Test
   public void testListStatusWithIntermediateDir() throws Exception {
     String keyName = "object-dir/object-name";
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -612,6 +707,7 @@ public class TestOzoneFileSystem {
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setLocationInfoList(new ArrayList<>())
+        .setOwnerName("user" + RandomStringUtils.randomNumeric(5))
         .build();
 
     OpenKeySession session = writeClient.openKey(keyArgs);

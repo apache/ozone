@@ -658,6 +658,10 @@ public class BucketEndpoint extends EndpointBase {
       keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
     }
     keyMetadata.setLastModified(next.getModificationTime());
+    String ownerName = next.getOwnerName();
+    String displayName = ownerName;
+    // Use ownerName to fill displayName
+    keyMetadata.setOwner(new S3Owner(ownerName, displayName));
     response.addKey(keyMetadata);
   }
 

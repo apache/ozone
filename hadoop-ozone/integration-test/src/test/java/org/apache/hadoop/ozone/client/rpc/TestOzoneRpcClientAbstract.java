@@ -335,6 +335,57 @@ public abstract class TestOzoneRpcClientAbstract {
     store.deleteVolume(volumeName);
   }
 
+  @Test void testKeyOwner() throws IOException {
+    // Save the old user, and switch to the old user after test
+    UserGroupInformation oldUser = UserGroupInformation.getCurrentUser();
+    try {
+      // user1 create a key key1
+      // user1 create a key key2
+      UserGroupInformation user1 = UserGroupInformation
+          .createUserForTesting("user1", new String[] {"user1"});
+      UserGroupInformation user2 = UserGroupInformation
+          .createUserForTesting("user2", new String[] {"user2"});
+      String key1 = "key1";
+      String key2 = "key2";
+      String content = "1234567890";
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      store.createVolume(volumeName);
+      store.getVolume(volumeName).createBucket(bucketName);
+      OzoneVolume volume = store.getVolume(volumeName);
+      volume.addAcl(new OzoneAcl(USER, "user1", ACLType.ALL, ACCESS));
+      volume.addAcl(new OzoneAcl(USER, "user2", ACLType.ALL, ACCESS));
+      OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
+      bucket.addAcl(new OzoneAcl(USER, "user1", ACLType.ALL, ACCESS));
+      bucket.addAcl(new OzoneAcl(USER, "user2", ACLType.ALL, ACCESS));
+
+      createKeyForUser(volumeName, bucketName, key1, content, user1);
+      createKeyForUser(volumeName, bucketName, key2, content, user2);
+
+      Assert.assertNotNull(bucket.getKey(key1));
+      Assert.assertNotNull(bucket.getKey(key2));
+      Assert.assertEquals(user1.getShortUserName(),
+          bucket.getKey(key1).getOwnerName());
+      Assert.assertEquals(user2.getShortUserName(),
+          bucket.getKey(key2).getOwnerName());
+    } finally {
+      UserGroupInformation.setLoginUser(oldUser);
+      ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
+      store = ozClient.getObjectStore();
+    }
+
+  }
+
+  private void createKeyForUser(String volumeName, String bucketName,
+      String keyName, String keyContent, UserGroupInformation user)
+      throws IOException {
+    UserGroupInformation.setLoginUser(user);
+    ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
+    store = ozClient.getObjectStore();
+    OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
+    createTestKey(bucket, keyName, keyContent);
+  }
+
   @Test
   public void testSetAndClrQuota() throws Exception {
     String volumeName = UUID.randomUUID().toString();

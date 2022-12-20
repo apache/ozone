@@ -181,6 +181,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(keyArgs.getKeyName())
+          .setOwnerName(keyArgs.getOwnerName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)

@@ -319,6 +319,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     return OmDirectoryInfo.newBuilder()
             .setName(dirName)
+            .setOwner(keyArgs.getOwnerName())
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setObjectID(objectId)

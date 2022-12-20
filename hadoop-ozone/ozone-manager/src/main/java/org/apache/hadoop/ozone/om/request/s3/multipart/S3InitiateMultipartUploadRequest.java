@@ -209,6 +209,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
+          .setOwnerName(keyArgs.getOwnerName())
           .build();
 
       // Add to cache

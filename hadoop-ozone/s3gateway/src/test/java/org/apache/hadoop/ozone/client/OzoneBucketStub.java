@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -113,7 +114,8 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), replicationConfig, metadata, null,
-                () -> readKey(key)
+                () -> readKey(key),
+                UserGroupInformation.getCurrentUser().getShortUserName()
             ));
             super.close();
           }
@@ -145,7 +147,8 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
-                () -> readKey(key)
+                () -> readKey(key),
+                UserGroupInformation.getCurrentUser().getShortUserName()
             ));
             super.close();
           }
@@ -177,7 +180,8 @@ public class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getDataSize(),
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
-          ozoneKeyDetails.getReplicationConfig());
+          ozoneKeyDetails.getReplicationConfig(),
+          ozoneKeyDetails.getOwnerName());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }

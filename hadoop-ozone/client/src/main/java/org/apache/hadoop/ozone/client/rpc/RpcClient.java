@@ -1186,6 +1186,7 @@ public class RpcClient implements ClientProtocol {
       validator.validate(replicationConfig);
     }
     String requestId = UUID.randomUUID().toString();
+    String ownerName = ugi.getShortUserName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1195,7 +1196,8 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .addAllMetadata(metadata)
         .setAcls(getAclList())
-        .setLatestVersionLocation(getLatestVersionLocation);
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setOwnerName(ownerName);
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try {
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
@@ -1448,8 +1450,8 @@ public class RpcClient implements ClientProtocol {
         key.getDataSize(),
         key.getCreationTime(),
         key.getModificationTime(),
-        key.getReplicationConfig()))
-        .collect(Collectors.toList());
+        key.getReplicationConfig(),
+        key.getOwnerName())).collect(Collectors.toList());
   }
 
   @Override
@@ -1502,7 +1504,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        getInputStream);
+        getInputStream, keyInfo.getOwnerName());
   }
 
   @Override
@@ -1633,6 +1635,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     String requestId = UUID.randomUUID().toString();
+    String ownerName = ugi.getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1642,6 +1645,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
         .setAcls(getAclList())
+        .setOwnerName(ownerName)
         .build();
 
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
@@ -1737,6 +1741,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
+    String ownerName = ugi.getShortUserName();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1744,6 +1749,7 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setMultipartUploadID(uploadID)
         .setAcls(getAclList())
+        .setOwnerName(ownerName)
         .build();
 
     OmMultipartUploadCompleteList
@@ -1840,10 +1846,12 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
       String keyName) throws IOException {
+    String ownerName = ugi.getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setAcls(getAclList())
+        .setOwnerName(ownerName)
         .build();
     ozoneManagerClient.createDirectory(keyArgs);
   }
@@ -1916,6 +1924,7 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication.");
       }
     }
+    String ownerName = ugi.getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1924,6 +1933,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setOwnerName(ownerName)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);

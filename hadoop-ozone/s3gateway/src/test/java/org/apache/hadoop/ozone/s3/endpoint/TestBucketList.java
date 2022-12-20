@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import static org.junit.Assert.fail;
 import org.junit.Test;
@@ -107,6 +108,37 @@ public class TestBucketList {
 
   }
 
+
+  @Test
+  public void listObjectOwner() throws OS3Exception, IOException {
+
+    UserGroupInformation user1 = UserGroupInformation
+        .createUserForTesting("user1", new String[] {"user1"});
+    UserGroupInformation user2 = UserGroupInformation
+        .createUserForTesting("user2", new String[] {"user2"});
+
+    BucketEndpoint getBucket = new BucketEndpoint();
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+
+    UserGroupInformation.setLoginUser(user1);
+    bucket.createKey("key1", 0).close();
+    UserGroupInformation.setLoginUser(user2);
+    bucket.createKey("key2", 0).close();
+
+    getBucket.setClient(client);
+    ListObjectResponse getBucketResponse =
+        (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
+            "key", null, null, null, null, null).getEntity();
+
+    Assert.assertEquals(2, getBucketResponse.getContents().size());
+    Assert.assertEquals(user1.getShortUserName(),
+        getBucketResponse.getContents().get(0).getOwner().getDisplayName());
+    Assert.assertEquals(user2.getShortUserName(),
+        getBucketResponse.getContents().get(1).getOwner().getDisplayName());
+
+  }
 
   @Test
   public void listWithPrefixAndDelimiter() throws OS3Exception, IOException {

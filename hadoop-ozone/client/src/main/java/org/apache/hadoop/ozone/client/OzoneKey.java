@@ -46,6 +46,10 @@ public class OzoneKey {
    */
   private final String name;
   /**
+   * Name of the Key owner.
+   */
+  private final String ownerName;
+  /**
    * Size of the data.
    */
   private final long dataSize;
@@ -70,10 +74,10 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationType type,
-                  int replicationFactor) {
+                  int replicationFactor, String owner) {
     this(volumeName, bucketName, keyName, size, creationTime, modificationTime,
             ReplicationConfig.fromTypeAndFactor(type,
-                    ReplicationFactor.valueOf(replicationFactor)));
+                    ReplicationFactor.valueOf(replicationFactor)), owner);
   }
 
   /**
@@ -83,7 +87,8 @@ public class OzoneKey {
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig) {
+                  long modificationTime, ReplicationConfig replicationConfig,
+                  String owner) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -91,15 +96,16 @@ public class OzoneKey {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
+    this.ownerName = owner;
   }
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata) {
+                  Map<String, String> metadata, String owner) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig);
+        modificationTime, replicationConfig, owner);
     this.metadata.putAll(metadata);
   }
 
@@ -128,6 +134,15 @@ public class OzoneKey {
    */
   public String getName() {
     return name;
+  }
+
+  /**
+   * Returns the Owner Name.
+   *
+   * @return keyName
+   */
+  public String getOwnerName() {
+    return ownerName;
   }
 
   /**
@@ -192,7 +207,7 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata());
+        keyInfo.getMetadata(), keyInfo.getOwnerName());
   }
 
 }
