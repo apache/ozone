@@ -205,6 +205,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .setClusterId(clusterId)
+        .setDataStreamMinPacketSize(1024)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);

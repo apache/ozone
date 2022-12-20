@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -39,6 +40,7 @@ public class ECReconstructionSupervisor implements Closeable {
   private final StateContext context;
   private final ExecutorService executor;
   private final ECReconstructionCoordinator reconstructionCoordinator;
+  private final Clock clock;
   /**
    * how many coordinator tasks currently being running.
    */
@@ -47,18 +49,19 @@ public class ECReconstructionSupervisor implements Closeable {
 
   public ECReconstructionSupervisor(ContainerSet containerSet,
       StateContext context, ExecutorService executor,
-      ECReconstructionCoordinator coordinator) {
+      ECReconstructionCoordinator coordinator, Clock clock) {
     this.containerSet = containerSet;
     this.context = context;
     this.executor = executor;
     this.reconstructionCoordinator = coordinator;
     this.inProgressReconstrucionCoordinatorCounter =
         ConcurrentHashMap.newKeySet();
+    this.clock = clock;
   }
 
   public ECReconstructionSupervisor(ContainerSet containerSet,
       StateContext context, int poolSize,
-      ECReconstructionCoordinator coordinator) {
+      ECReconstructionCoordinator coordinator, Clock clock) {
     // TODO: ReplicationSupervisor and this class can be refactored to have a
     //  common interface.
     this(containerSet, context,
@@ -66,7 +69,7 @@ public class ECReconstructionSupervisor implements Closeable {
             new LinkedBlockingQueue<>(),
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("ECContainerReconstructionThread-%d").build()),
-        coordinator);
+        coordinator, clock);
   }
 
   public void stop() {
@@ -86,7 +89,7 @@ public class ECReconstructionSupervisor implements Closeable {
         .add(taskInfo.getContainerID())) {
       executor.execute(
           new ECReconstructionCoordinatorTask(getReconstructionCoordinator(),
-              taskInfo, inProgressReconstrucionCoordinatorCounter));
+              taskInfo, inProgressReconstrucionCoordinatorCounter, clock));
     }
   }
 

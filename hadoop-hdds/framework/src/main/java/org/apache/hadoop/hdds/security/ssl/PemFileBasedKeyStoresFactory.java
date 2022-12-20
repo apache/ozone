@@ -18,11 +18,10 @@
 package org.apache.hadoop.hdds.security.ssl;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +77,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    * to reload truststore.
    * @param mode client or server
    */
-  private void createTrustManagers(SSLFactory.Mode mode) throws
+  private void createTrustManagers(Mode mode) throws
       GeneralSecurityException, IOException {
     long truststoreReloadInterval = secConfig.getSslTruststoreReloadInterval();
     LOG.info(mode.toString() + " TrustStore reloading at " +
@@ -105,7 +104,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    * to reload keystores.
    * @param mode client or server
    */
-  private void createKeyManagers(SSLFactory.Mode mode) throws
+  private void createKeyManagers(Mode mode) throws
       GeneralSecurityException, IOException {
     long keystoreReloadInterval = secConfig.getSslKeystoreReloadInterval();
     LOG.info(mode.toString() + " KeyStore reloading at " +
@@ -139,20 +138,20 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    * @throws GeneralSecurityException thrown if the keystores could not be
    * initialized due to a security error.
    */
-  public synchronized void init(SSLFactory.Mode mode, boolean requireClientAuth)
+  public synchronized void init(Mode mode, boolean requireClientAuth)
       throws IOException, GeneralSecurityException {
 
     monitoringTimer = new Timer(caClient.getComponentName() + "-"
         + SSL_MONITORING_THREAD_NAME, true);
 
     // key manager
-    if (requireClientAuth || mode == SSLFactory.Mode.SERVER) {
+    if (requireClientAuth || mode == Mode.SERVER) {
       createKeyManagers(mode);
     } else {
       KeyStore keystore = KeyStore.getInstance(DEFAULT_KEYSTORE_TYPE);
       keystore.load(null, null);
       KeyManagerFactory keyMgrFactory = KeyManagerFactory
-              .getInstance(SSLFactory.SSLCERTIFICATE);
+          .getInstance(KeyManagerFactory.getDefaultAlgorithm());
 
       keyMgrFactory.init(keystore, null);
       keyManagers = keyMgrFactory.getKeyManagers();

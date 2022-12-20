@@ -229,8 +229,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
               keyToDelete, omMetadataManager,
               trxnLogIndex, ozoneManager.isRatisEnabled());
-          long numCopy = keyToDelete.getReplicationConfig().getRequiredNodes();
-          usedBytesDiff -= keyToDelete.getDataSize() * numCopy;
+          usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
           checkBucketQuotaInNamespace(omBucketInfo, 1L);
           omBucketInfo.incrUsedNamespace(1L);

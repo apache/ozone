@@ -323,9 +323,9 @@ public class KeyCodec {
     checkPreconditions(basePath);
 
     File privateKeyFile =
-        Paths.get(location.toString(), privateKeyFileName).toFile();
+        Paths.get(basePath.toString(), privateKeyFileName).toFile();
     File publicKeyFile =
-        Paths.get(location.toString(), publicKeyFileName).toFile();
+        Paths.get(basePath.toString(), publicKeyFileName).toFile();
     checkKeyFile(privateKeyFile, force, publicKeyFile);
 
     try (PemWriter privateKeyWriter = new PemWriter(new

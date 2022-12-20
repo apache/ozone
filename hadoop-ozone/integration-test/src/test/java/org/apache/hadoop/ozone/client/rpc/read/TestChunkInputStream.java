@@ -60,7 +60,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
     KeyInputStream keyInputStream = getKeyInputStream(keyName);
 
     BlockInputStream block0Stream =
-        (BlockInputStream)keyInputStream.getBlockStreams().get(0);
+        (BlockInputStream)keyInputStream.getPartStreams().get(0);
     block0Stream.initialize();
 
     ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
@@ -119,7 +119,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
 
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
       BlockInputStream block0Stream =
-          (BlockInputStream) keyInputStream.getBlockStreams().get(0);
+          (BlockInputStream) keyInputStream.getPartStreams().get(0);
       block0Stream.initialize();
 
       ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
@@ -144,7 +144,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
     try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
       BlockInputStream block0Stream =
-          (BlockInputStream)keyInputStream.getBlockStreams().get(0);
+          (BlockInputStream)keyInputStream.getPartStreams().get(0);
       block0Stream.initialize();
 
       ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);

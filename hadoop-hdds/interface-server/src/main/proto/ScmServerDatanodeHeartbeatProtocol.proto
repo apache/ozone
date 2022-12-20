@@ -152,6 +152,9 @@ message CommandQueueReportProto {
 message SCMHeartbeatResponseProto {
   required string datanodeUUID = 1;
   repeated SCMCommandProto commands = 2;
+
+  // Same as term in SCMCommandProto
+  optional int64 term = 3;
 }
 
 message SCMNodeAddressList {
@@ -343,6 +346,7 @@ message SCMCommandProto {
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;
   optional string encodedToken = 16;
+  optional int64 deadlineMsSinceEpoch = 17;
 }
 
 /**
