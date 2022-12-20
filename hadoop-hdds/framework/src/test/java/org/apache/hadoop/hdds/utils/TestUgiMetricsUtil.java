@@ -23,7 +23,10 @@ import org.apache.hadoop.metrics2.MetricsTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class UgiMetricsUtilTest {
+/**
+ * Class for unit tests for {@link UgiMetricsUtil}.
+ */
+class TestUgiMetricsUtil {
 
   @Test
   void testCreateServernameTagWithNonCompatibleKey() {
