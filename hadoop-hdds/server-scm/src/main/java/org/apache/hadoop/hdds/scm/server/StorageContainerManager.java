@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -151,7 +150,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
-import org.apache.ratis.metrics.RatisMetricRegistry;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -269,6 +267,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private String primaryScmNodeId;
 
   /**
@@ -286,8 +285,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
-  private List<Pair<Consumer<RatisMetricRegistry>,
-      Consumer<RatisMetricRegistry>>> ratisRegistryList = null;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -594,7 +591,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       clusterMap = new NetworkTopologyImpl(conf);
     }
     // This needs to be done before initializing Ratis.
-    ratisRegistryList = RatisDropwizardExports
+    ratisReporterList = RatisDropwizardExports
         .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
@@ -1621,7 +1618,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
     serviceManager.stop();
-    RatisDropwizardExports.clear(ratisMetricsMap, ratisRegistryList);
+    RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
     try {
       LOG.info("Stopping SCM MetadataStore.");

@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ratis.metrics.MetricRegistries;
 import org.apache.ratis.metrics.MetricsReporting;
 import org.apache.ratis.metrics.RatisMetricRegistry;
@@ -47,34 +46,29 @@ public class RatisDropwizardExports extends DropwizardExports {
     super(registry, new RatisNameRewriteSampleBuilder());
   }
 
-  public static List<Pair<Consumer<RatisMetricRegistry>,
-      Consumer<RatisMetricRegistry>>> registerRatisMetricReporters(
+  public static List<MetricReporter> registerRatisMetricReporters(
       Map<String, RatisDropwizardExports> ratisMetricsMap,
       BooleanSupplier checkStopped) {
     //All the Ratis metrics (registered from now) will be published via JMX and
     //via the prometheus exporter (used by the /prom servlet
-    List<Pair<Consumer<RatisMetricRegistry>, Consumer<RatisMetricRegistry>>>
-        ratisRegistryPairList = new ArrayList<>();
-    ratisRegistryPairList.add(Pair.of(MetricsReporting.jmxReporter(),
+    List<MetricReporter> ratisReporterList = new ArrayList<>();
+    ratisReporterList.add(new MetricReporter(MetricsReporting.jmxReporter(),
         MetricsReporting.stopJmxReporter()));
     Consumer<RatisMetricRegistry> reporter
         = r1 -> registerDropwizard(r1, ratisMetricsMap, checkStopped);
     Consumer<RatisMetricRegistry> stopper
         = r2 -> deregisterDropwizard(r2, ratisMetricsMap);
-    ratisRegistryPairList.add(Pair.of(reporter, stopper));
+    ratisReporterList.add(new MetricReporter(reporter, stopper));
     
-    for (Pair<Consumer<RatisMetricRegistry>, Consumer<RatisMetricRegistry>>
-         pair : ratisRegistryPairList) {
-      MetricRegistries.global()
-          .addReporterRegistration(pair.getKey(), pair.getValue());
+    for (MetricReporter metricReporter : ratisReporterList) {
+      metricReporter.addToGlobalRegistration();
     }
-    return ratisRegistryPairList;
+    return ratisReporterList;
   }
 
   public static void clear(
       Map<String, RatisDropwizardExports> ratisMetricsMap,
-      List<Pair<Consumer<RatisMetricRegistry>,
-          Consumer<RatisMetricRegistry>>> ratisRegistryPairList) {
+      List<MetricReporter> ratisReporterList) {
     ratisMetricsMap.entrySet().stream().forEach(e -> {
       // remove and deregister from registry only one registered
       // as unregistered element if performed unregister again will
@@ -85,11 +79,9 @@ public class RatisDropwizardExports extends DropwizardExports {
       }
     });
     
-    if (null != ratisRegistryPairList) {
-      for (Pair<Consumer<RatisMetricRegistry>, Consumer<RatisMetricRegistry>>
-          pair : ratisRegistryPairList) {
-        MetricRegistries.global()
-            .removeReporterRegistration(pair.getKey(), pair.getValue());
+    if (null != ratisReporterList) {
+      for (MetricReporter metricReporter : ratisReporterList) {
+        metricReporter.removeFromGlobalRegistration();
       }
     }
     
@@ -118,6 +110,29 @@ public class RatisDropwizardExports extends DropwizardExports {
     Collector c = ratisMetricsMap.remove(name);
     if (c != null) {
       CollectorRegistry.defaultRegistry.unregister(c);
+    }
+  }
+
+  /**
+   * class for keeping track of reporters and add/remove to registry.
+   * 
+   */
+  public static class MetricReporter {
+    private final Consumer<RatisMetricRegistry> reporter;
+    private final Consumer<RatisMetricRegistry> stopper;
+
+    MetricReporter(Consumer<RatisMetricRegistry> reporter,
+                        Consumer<RatisMetricRegistry> stopper) {
+      this.reporter = reporter;
+      this.stopper = stopper;
+    }
+
+    void addToGlobalRegistration() {
+      MetricRegistries.global().addReporterRegistration(reporter, stopper);
+    }
+
+    void removeFromGlobalRegistration() {
+      MetricRegistries.global().removeReporterRegistration(reporter, stopper);
     }
   }
 }

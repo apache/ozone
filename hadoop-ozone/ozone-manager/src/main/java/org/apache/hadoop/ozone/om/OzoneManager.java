@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.function.Consumer;
 import javax.management.ObjectName;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -284,7 +283,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
-import org.apache.ratis.metrics.RatisMetricRegistry;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -382,6 +380,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final RatisSnapshotInfo omRatisSnapshotInfo;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
 
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
@@ -420,8 +419,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final OzoneLockProvider ozoneLockProvider;
   private OMPerformanceMetrics perfMetrics;
-  private List<Pair<Consumer<RatisMetricRegistry>,
-      Consumer<RatisMetricRegistry>>> ratisRegistryList = null;
 
   /**
    * OM Startup mode.
@@ -1973,7 +1970,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isRatisEnabled) {
       if (omRatisServer == null) {
         // This needs to be done before initializing Ratis.
-        ratisRegistryList = RatisDropwizardExports.
+        ratisReporterList = RatisDropwizardExports.
             registerRatisMetricReporters(ratisMetricsMap, () -> isStopped());
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodesMap,
@@ -2087,7 +2084,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omSnapshotProvider.stop();
       }
       OMPerformanceMetrics.unregister();
-      RatisDropwizardExports.clear(ratisMetricsMap, ratisRegistryList);
+      RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);

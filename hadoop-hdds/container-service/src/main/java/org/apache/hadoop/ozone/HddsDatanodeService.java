@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone;
 
-import java.util.function.Consumer;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -32,7 +31,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -82,7 +80,6 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
-import org.apache.ratis.metrics.RatisMetricRegistry;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,12 +110,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private DNMXBeanImpl serviceRuntimeInfo =
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
-  private List<Pair<Consumer<RatisMetricRegistry>,
-      Consumer<RatisMetricRegistry>>> ratisRegistryList = null;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -217,7 +213,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void start() {
     serviceRuntimeInfo.setStartTime();
 
-    ratisRegistryList = RatisDropwizardExports
+    ratisReporterList = RatisDropwizardExports
         .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
 
     OzoneConfiguration.activate();
@@ -594,7 +590,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (Exception ex) {
         LOG.error("Datanode CRL store stop failed", ex);
       }
-      RatisDropwizardExports.clear(ratisMetricsMap, ratisRegistryList);
+      RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
     }
   }
 
