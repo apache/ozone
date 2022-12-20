@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
@@ -143,7 +144,7 @@ public class TestBlockManager {
             eventQueue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
