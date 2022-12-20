@@ -145,7 +145,7 @@ public class TestOmKeyInfo {
 
     // Because for OmKeyLocationInfoGroup we have not implemented equals()
     // method, so it checks only references.
-    Assert.assertNotEquals(key, cloneKey);
+    Assert.assertEquals(key, cloneKey);
 
     // Check each version content here.
     Assert.assertEquals(key.getKeyLocationVersions().size(),
