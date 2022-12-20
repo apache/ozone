@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -88,7 +89,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -143,7 +144,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -242,7 +243,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,

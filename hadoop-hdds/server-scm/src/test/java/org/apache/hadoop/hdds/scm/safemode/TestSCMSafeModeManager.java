@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -254,7 +255,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -281,7 +282,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -307,7 +308,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -340,7 +341,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
@@ -592,7 +593,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider<RatisReplicationConfig> mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -657,7 +658,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,

@@ -496,7 +496,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void scrubPipelines() throws IOException, TimeoutException {
-    Instant currentTime = Instant.now();
+    Instant currentTime = clock.instant();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
