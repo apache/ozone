@@ -1455,8 +1455,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setTransferLeadershipRequest(req)
         .build();
 
-    final TransferLeadershipResponse resp = handleError(submitRequest(omRequest))
-        .getTransferLeadershipResponse();
+    final TransferLeadershipResponse resp = handleError(
+            submitRequest(omRequest)).getTransferLeadershipResponse();
 
     return resp.getSuccess();
   }

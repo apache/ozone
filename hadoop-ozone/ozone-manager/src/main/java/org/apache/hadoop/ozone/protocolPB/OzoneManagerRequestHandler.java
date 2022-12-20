@@ -287,9 +287,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
         break;
       case TransferLeadership:
-        TransferLeadershipResponse transferLeadershipResponse = transferLeadership(
-            request.getTransferLeadershipRequest());
-        responseBuilder.setTransferLeadershipResponse(transferLeadershipResponse);
+        TransferLeadershipResponse transferLeadershipResponse =
+                transferLeadership(request.getTransferLeadershipRequest());
+        responseBuilder.setTransferLeadershipResponse(
+                transferLeadershipResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1222,9 +1223,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl.getS3VolumeContext().getProtobuf();
   }
 
-  private TransferLeadershipResponse transferLeadership(TransferLeadershipRequest request)
+  private TransferLeadershipResponse transferLeadership(
+      TransferLeadershipRequest request)
       throws IOException {
-    TransferLeadershipResponse.Builder resp = TransferLeadershipResponse.newBuilder();
+    TransferLeadershipResponse.Builder resp =
+        TransferLeadershipResponse.newBuilder();
 
     return resp.setSuccess(impl.transferLeadership(request.getOmId())).build();
   }
