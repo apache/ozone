@@ -69,6 +69,7 @@ import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 
 /**
@@ -476,6 +477,44 @@ public class TestECUnderReplicationHandler {
       Assertions.assertEquals(
           IN_SERVICE, s.getDnDetails().getPersistedOpState());
     }
+  }
+
+  /**
+   * HDDS-7683 was a case where the maintenance logic was calling the placement
+   * policy requesting zero nodes. This test asserts that it is never called
+   * with zero nodes to ensure that issue is fixed.
+   */
+  @Test
+  public void testMaintenanceDoesNotRequestZeroNodes() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), Mockito.isNull(),
+            anyInt(), anyLong(), anyLong()))
+        .thenAnswer(invocationOnMock -> {
+          int numNodes = invocationOnMock.getArgument(2);
+          List<DatanodeDetails> targets = new ArrayList<>();
+          for (int i = 0; i < numNodes; i++) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          return targets;
+        });
+
+    ContainerHealthResult.UnderReplicatedHealthResult result =
+        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
+    Mockito.when(result.getContainerInfo()).thenReturn(container);
+    ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
+        ecPlacementPolicy, conf, nodeManager, replicationManager);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands =
+        handler.processAndCreateCommands(availableReplicas,
+            Collections.emptyList(), result, 1);
+    Assertions.assertEquals(1, commands.size());
+    Mockito.verify(ecPlacementPolicy, times(0))
+        .chooseDatanodes(anyList(), Mockito.isNull(), eq(0), anyLong(),
+            anyLong());
   }
 
   /**
