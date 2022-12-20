@@ -36,7 +36,6 @@ public interface PipelineManagerMXBean {
    */
   Map<String, Integer> getPipelineInfo() throws NotLeaderException;
 
-  Map<String, Map<String, Map<String, String>>> getPipelineLeaders()
-      throws NotLeaderException;
+  Map<String, Map<String, Map<String, String>>> getPipelineLeaders();
 
 }
