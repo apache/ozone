@@ -556,7 +556,6 @@ public final class OzoneConfigKeys {
 
   public static final int OZONE_SNAPSHOT_MAX_HISTORY_DEFAULT = 10;
 
-/**
    * There is no need to instantiate this class.
    */
   private OzoneConfigKeys() {
