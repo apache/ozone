@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -80,6 +81,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private AuditLogger auditLogger;
   private OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper;
   private OMMetadataManager omMetadataManager;
+  private SnapshotChainManager snapshotChainManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
   private OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot;
@@ -98,8 +100,11 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    snapshotChainManager = new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);

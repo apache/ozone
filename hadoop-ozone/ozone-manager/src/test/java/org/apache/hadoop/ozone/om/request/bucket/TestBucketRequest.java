@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.junit.After;
 import org.junit.Before;
@@ -53,6 +54,7 @@ public class TestBucketRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
+  protected SnapshotChainManager snapshotChainManager;
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
   protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
@@ -71,9 +73,12 @@ public class TestBucketRequest {
         folder.newFolder().getAbsolutePath());
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    snapshotChainManager = new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
