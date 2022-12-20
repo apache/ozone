@@ -700,7 +700,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public Map<String, String[]> getPipelineLeaders() throws NotLeaderException {
+  public Map<String, Map<String, String[]>> getPipelineLeaders()
+      throws NotLeaderException {
     List<Pipeline> pipelines = getPipelines();
     return pipelineLeaderFormat(pipelines);
   }

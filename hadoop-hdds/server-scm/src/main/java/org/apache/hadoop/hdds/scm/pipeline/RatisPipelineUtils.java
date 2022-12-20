@@ -123,15 +123,16 @@ public final class RatisPipelineUtils {
 
   /**
    * Returns a map containing pipeline information which includes
-   * pipeline-id & the corresponding roles of all datanodes
+   * pipeline-id & the corresponding roles of all datanodes along with
+   * their respective datanode-id
    * part of the pipeline.
    *
    * @param pipelines input pipeline
    * @return map containing pipeline details
    */
-  public static Map<String, String[]> pipelineLeaderFormat(
+  public static Map<String, Map<String, String[]>> pipelineLeaderFormat(
       List<Pipeline> pipelines) {
-    final Map<String, String[]> pipelineInfo = new HashMap<>();
+    final Map<String, Map<String, String[]>> pipelineInfo = new HashMap<>();
 
     pipelines.forEach(pipeline -> {
       String leaderNode = "";
@@ -146,16 +147,19 @@ public final class RatisPipelineUtils {
       }
 
       int numOfNodes = dataNodes.size();
-      String[] info = new String[numOfNodes];
-
+      Map<String, String[]> nodeInfo = new HashMap<>();
       for (int cnt = 0; cnt < numOfNodes; cnt++) {
+        String[] info = new String[2];
         DatanodeDetails node = dataNodes.get(cnt);
         String role =
             node.getHostName().equals(leaderNode) ? "Leader" : "Follower";
-        info[cnt] =
-            "{ HostName : " + node.getHostName() + " | Role : " + role + " }";
+        String dataNodeUUID = node.getUuidString();
+        String hostName = node.getHostName();
+        info[0] = role;
+        info[1] = dataNodeUUID;
+        nodeInfo.put(hostName, info);
       }
-      pipelineInfo.put(pipelineId.toString(), info);
+      pipelineInfo.put(pipelineId.toString(), nodeInfo);
     });
     return pipelineInfo;
   }

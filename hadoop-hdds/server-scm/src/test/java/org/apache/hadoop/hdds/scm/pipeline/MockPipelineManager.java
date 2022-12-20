@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -298,7 +297,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Map<String, String[]> getPipelineLeaders() throws NotLeaderException {
+  public Map<String, Map<String, String[]>> getPipelineLeaders() {
     return null;
   }
 
