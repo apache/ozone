@@ -297,7 +297,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Map<String, Map<String, String[]>> getPipelineLeaders() {
+  public Map<String, Map<String, Map<String, String>>> getPipelineLeaders() {
     return null;
   }
 

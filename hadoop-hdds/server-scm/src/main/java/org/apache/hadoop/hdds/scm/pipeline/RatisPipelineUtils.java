@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -130,9 +130,10 @@ public final class RatisPipelineUtils {
    * @param pipelines input pipeline
    * @return map containing pipeline details
    */
-  public static Map<String, Map<String, String[]>> pipelineLeaderFormat(
-      List<Pipeline> pipelines) {
-    final Map<String, Map<String, String[]>> pipelineInfo = new HashMap<>();
+  public static Map<String, Map<String, Map<String, String>>>
+                          pipelineLeaderFormat(List<Pipeline> pipelines) {
+    final Map<String, Map<String, Map<String, String>>> pipelineInfo =
+        new ConcurrentHashMap<>();
 
     pipelines.forEach(pipeline -> {
       String leaderNode = "";
@@ -147,17 +148,18 @@ public final class RatisPipelineUtils {
       }
 
       int numOfNodes = dataNodes.size();
-      Map<String, String[]> nodeInfo = new HashMap<>();
+      Map<String, Map<String, String>> nodeInfo = new ConcurrentHashMap<>();
       for (int cnt = 0; cnt < numOfNodes; cnt++) {
-        String[] info = new String[2];
+        Map<String, String> info = new ConcurrentHashMap<>();
         DatanodeDetails node = dataNodes.get(cnt);
         String role =
             node.getHostName().equals(leaderNode) ? "Leader" : "Follower";
         String dataNodeUUID = node.getUuidString();
         String hostName = node.getHostName();
-        info[0] = role;
-        info[1] = dataNodeUUID;
-        nodeInfo.put(hostName, info);
+        info.put("Role", role);
+        info.put("UUID", dataNodeUUID);
+        info.put("HostName", hostName);
+        nodeInfo.put("DataNode-" + cnt, info);
       }
       pipelineInfo.put(pipelineId.toString(), nodeInfo);
     });
