@@ -276,7 +276,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache entry can be done outside of lock for this openKey.

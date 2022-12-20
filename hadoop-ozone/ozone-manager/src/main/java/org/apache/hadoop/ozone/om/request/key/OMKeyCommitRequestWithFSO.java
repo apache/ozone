@@ -173,10 +173,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
 

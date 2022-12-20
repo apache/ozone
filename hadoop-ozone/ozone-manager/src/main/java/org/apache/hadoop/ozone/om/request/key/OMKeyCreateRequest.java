@@ -309,7 +309,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1L);
 
       // Add to cache entry can be done outside of lock for this openKey.
