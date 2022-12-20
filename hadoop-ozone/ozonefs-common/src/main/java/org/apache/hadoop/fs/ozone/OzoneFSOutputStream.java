@@ -31,7 +31,8 @@ import java.io.OutputStream;
  * TODO: Make outputStream generic for both rest and rpc clients
  * This class is not thread safe.
  */
-public class OzoneFSOutputStream extends OutputStream implements Syncable {
+public class OzoneFSOutputStream extends OutputStream
+    implements Syncable, OzoneOutputStreamCapabilities {
 
   private final OzoneOutputStream outputStream;
 
