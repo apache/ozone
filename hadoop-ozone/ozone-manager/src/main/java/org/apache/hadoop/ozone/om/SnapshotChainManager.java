@@ -509,10 +509,4 @@ public class SnapshotChainManager {
     loadFromSnapshotInfoTable(metadataManager);
   }
 
-  public void stop() {
-    snapshotChainGlobal.clear();
-    snapshotChainPath.clear();
-    latestGlobalSnapshotID = null;
-    latestPathSnapshotID.clear();
-  }
 }

@@ -25,7 +25,6 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -87,8 +86,6 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketDeletes();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    SnapshotChainManager snapshotChainManager = ozoneManager
-        .getSnapshotChainManager();
 
     OMRequest omRequest = getOmRequest();
     DeleteBucketRequest deleteBucketRequest =
@@ -144,8 +141,11 @@ public class OMBucketDeleteRequest extends OMClientRequest {
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
       }
 
-      if (bucketContainsSnapshot(omMetadataManager, snapshotChainManager,
-          bucketKey)) {
+      // appending '/' to end to eliminate cases where 2 buckets start with same
+      // characters.
+      String snapshotBucketKey = bucketKey + OzoneConsts.OM_KEY_PREFIX;
+
+      if (bucketContainsSnapshot(omMetadataManager, snapshotBucketKey)) {
         LOG.debug("Bucket '{}' can't be deleted when it has snapshots",
             bucketName);
         throw new OMException(
@@ -217,19 +217,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   }
 
   private boolean bucketContainsSnapshot(OMMetadataManager omMetadataManager,
-      SnapshotChainManager snapshotChainManager,
-      String bucketKey) throws IOException {
-    // check first in the in-memory snapshot chain which is initialized on every
-    // OM restart.
-    // TODO: HDDS-6857 : during snapshot deletion the snapshotChainManager needs
-    //  to be refreshed/reloaded upon every delete snapshot op else the check
-    //  below would be inconsistent.
-    if (snapshotChainManager.getLatestPathSnapshot(bucketKey) != null) {
-      return true;
-    }
-    // appending '/' to end to eliminate cases where 2 buckets start with same
-    // characters.
-    String snapshotBucketKey = bucketKey + OzoneConsts.OM_KEY_PREFIX;
+      String snapshotBucketKey) throws IOException {
     return bucketContainsSnapshotInCache(omMetadataManager, snapshotBucketKey)
         || bucketContainsSnapshotInTable(omMetadataManager, snapshotBucketKey);
   }
