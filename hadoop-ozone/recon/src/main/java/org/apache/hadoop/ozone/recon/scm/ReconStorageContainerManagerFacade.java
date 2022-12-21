@@ -197,10 +197,26 @@ public class ReconStorageContainerManagerFacade
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, conf);
 
+    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
+    PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
+        pipelineManager,
+        nodeManager,
+        scmServiceProvider,
+        reconTaskStatusDao,
+        reconTaskConfig);
+    ContainerHealthTask containerHealthTask = new ContainerHealthTask(
+        containerManager,
+        scmServiceProvider,
+        reconTaskStatusDao, containerHealthSchemaManager,
+        containerPlacementPolicy,
+        reconTaskConfig);
+
     StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(nodeManager, pipelineManager, conf);
+        new ReconStaleNodeHandler(nodeManager, pipelineManager,
+            conf, pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
-        pipelineManager, containerManager, scmServiceProvider);
+        pipelineManager, containerManager,
+        scmServiceProvider, containerHealthTask, pipelineSyncTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
@@ -268,19 +284,8 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
 
-    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
-    reconScmTasks.add(new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig));
-    reconScmTasks.add(new ContainerHealthTask(
-        containerManager,
-        scmServiceProvider,
-        reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy,
-        reconTaskConfig));
+    reconScmTasks.add(pipelineSyncTask);
+    reconScmTasks.add(containerHealthTask);
   }
 
   /**
