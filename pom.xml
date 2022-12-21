@@ -68,7 +68,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
     <ozone.version>1.4.0-SNAPSHOT</ozone.version>
-    <ozone.release>Grand Canyon</ozone.release>
+    <ozone.release>Hot Springs</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
