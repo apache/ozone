@@ -198,7 +198,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
             .intercept(new GrpcClientInterceptor());
-    if (secConfig.isGrpcTlsEnabled()) {
+    if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (caCerts != null) {
         sslContextBuilder.trustManager(caCerts);

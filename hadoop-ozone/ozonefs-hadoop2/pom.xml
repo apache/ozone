@@ -53,19 +53,19 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
-      <version>2.7.3</version>
+      <version>${hadoop2.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-annotations</artifactId>
       <scope>provided</scope>
-      <version>2.7.3</version>
+      <version>${hadoop2.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <scope>provided</scope>
-      <version>2.7.3</version>
+      <version>${hadoop2.version}</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.reload4j</groupId>
