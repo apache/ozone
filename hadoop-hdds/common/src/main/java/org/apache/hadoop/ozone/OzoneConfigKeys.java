@@ -551,11 +551,6 @@ public final class OzoneConfigKeys {
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
       TimeUnit.HOURS.toMillis(1);
 
-  public static final String OZONE_SNAPSHOT_MAX_HISTORY =
-      "ozone.om.snapshot.history.max.count";
-
-  public static final int OZONE_SNAPSHOT_MAX_HISTORY_DEFAULT = 10;
-
   /**
    * There is no need to instantiate this class.
    */

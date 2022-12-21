@@ -1029,6 +1029,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       SnapshotLogInfo snapshotLogInfo =
           getSnapshotInfoFromLog(compactionLogPath);
 
+      if (snapshotLogInfo == null) {
+        continue;
+      }
+
       if (maxAllowedTimeInDag >
           compactionLogPruneStartTime - snapshotLogInfo.snapshotCreatedAt) {
         break;
