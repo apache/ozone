@@ -267,6 +267,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private String primaryScmNodeId;
 
   /**
@@ -284,7 +285,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
-  
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -593,8 +594,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       clusterMap = new NetworkTopologyImpl(conf);
     }
     // This needs to be done before initializing Ratis.
-    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap,
-        () -> isStopped.get());
+    ratisReporterList = RatisDropwizardExports
+        .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -1620,7 +1621,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
     serviceManager.stop();
-    RatisDropwizardExports.clear(ratisMetricsMap);
+    RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
     try {
       LOG.info("Stopping SCM MetadataStore.");
