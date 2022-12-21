@@ -60,7 +60,8 @@ public class EmptyContainerHandler extends AbstractCheck {
       request.getReport()
           .incrementAndSample(ReplicationManagerReport.HealthState.EMPTY,
               containerInfo.containerID());
-
+      LOG.debug("Container {} is empty and closed, marking as DELETING",
+          containerInfo);
       // delete replicas if they are closed and empty
       deleteContainerReplicas(containerInfo, replicas);
 
@@ -109,9 +110,6 @@ public class EmptyContainerHandler extends AbstractCheck {
           rp.getState() == ContainerReplicaProto.State.CLOSED);
       Preconditions.assertTrue(rp.getKeyCount() == 0);
 
-      LOG.debug("Trying to delete empty replica with index {} for container " +
-              "{} on datanode {}", rp.getReplicaIndex(),
-          containerInfo.containerID(), rp.getDatanodeDetails().getUuidString());
       try {
         replicationManager.sendDeleteCommand(containerInfo,
             rp.getReplicaIndex(), rp.getDatanodeDetails());
