@@ -1285,6 +1285,10 @@ public class LegacyReplicationManager {
     closeReplicasIfPossible(container, unhealthyReplicas);
     if (unhealthyReplicas.isEmpty()) {
       return;
+    } else {
+      LOG.info("Container {} has {} excess unhealthy replicas. Excess " +
+              "unhealthy replicas will be deleted.",
+          container.getContainerID(), unhealthyReplicas.size());
     }
 
     int excessReplicaCount = replicas.size() -
@@ -2002,6 +2006,14 @@ public class LegacyReplicationManager {
       return;
     }
 
+    if (excess > 0) {
+      int replicationFactor = container.getReplicationFactor().getNumber();
+      LOG.info("Container {} has all unhealthy replicas and is over " +
+              "replicated. Expected replica count" +
+              " is {}, but found {}.", container.getContainerID(),
+          replicationFactor, replicationFactor + excess);
+    }
+
     if (container.getState() == LifeCycleState.CLOSED) {
       // Prefer to delete unhealthy replicas with lower BCS IDs.
       // If the replica became unhealthy after the container was closed but
@@ -2037,6 +2049,9 @@ public class LegacyReplicationManager {
     // we should wait for that to complete and replicate it when it becomes
     // healthy on a future iteration.
     if (numCloseCmdsSent == 0) {
+      LOG.info("Container {} is under replicated missing {} replicas with all" +
+          " replicas unhealthy. Copying unhealthy replicas.",
+          container.getContainerID(), additionalReplicasNeeded);
       // TODO Datanodes currently shuffle sources, so we cannot prioritize
       //  some replicas based on BCSID or origin node ID.
       replicateAnyWithTopology(container,
@@ -2141,6 +2156,13 @@ public class LegacyReplicationManager {
         existingOriginNodeIDs.add(replica.getOriginDatanodeId());
       }
     }
+
+    if (LOG.isDebugEnabled() && nonUniqueDeleteCandidates.size() < excess) {
+      LOG.debug("Unable to delete {} excess replicas of container {}. Only {}" +
+          " replicas can be deleted to preserve unique origin node IDs for " +
+          "this unclosed container.", excess, container.getContainerID(),
+          nonUniqueDeleteCandidates.size());
+    }
     deleteExcess(container, nonUniqueDeleteCandidates, excess);
   }
 
@@ -2236,7 +2258,8 @@ public class LegacyReplicationManager {
               id, misRepDelta);
         }
       } else {
-        LOG.warn("Cannot replicate container {}, no healthy replica found.",
+        LOG.warn("Cannot replicate container {}, no healthy datanodes with " +
+                "replica found.",
             container.containerID());
       }
     } catch (IOException | IllegalStateException ex) {
