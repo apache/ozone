@@ -531,7 +531,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
-            + omBucketInfo.getBucketName() + "exceeded: quotaInBytes: "
+            + omBucketInfo.getBucketName() + " exceeded quotaInBytes: "
             + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
             + allocateSize) + " Bytes.",
             OMException.ResultCodes.QUOTA_EXCEEDED);
