@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -272,14 +273,16 @@ public class TarContainerPacker
     return new TarArchiveOutputStream(output);
   }
 
-  public InputStream decompress(InputStream input)
+  @VisibleForTesting
+  InputStream decompress(InputStream input)
       throws CompressorException {
     return Objects.equals(compression, NO_COMPRESSION) ?
         input : new CompressorStreamFactory()
         .createCompressorInputStream(compression, input);
   }
 
-  public OutputStream compress(OutputStream output)
+  @VisibleForTesting
+  OutputStream compress(OutputStream output)
       throws CompressorException {
     return Objects.equals(compression, NO_COMPRESSION) ?
         output : new CompressorStreamFactory()

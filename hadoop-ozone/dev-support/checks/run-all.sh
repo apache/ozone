@@ -1,0 +1,12 @@
+./build.sh
+./author.sh
+./bats.sh
+./rat.sh
+./docs.sh
+./dependency.sh
+./checkstyle.sh
+./findbugs.sh
+./kubernetes.sh
+./unit.sh
+./integration.sh
+./acceptance.sh

@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.replication;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 import java.util.HashMap;
@@ -31,11 +33,15 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPLICATION_C
  * Defines compression algorithm for container replication.
  */
 public enum CopyContainerCompression {
+
   NO_COMPRESSION,
   GZIP,
   LZ4,
   SNAPPY,
   ZSTD;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CopyContainerCompression.class);
 
   private static final CopyContainerCompression DEFAULT_COMPRESSION =
       CopyContainerCompression.NO_COMPRESSION;
@@ -61,6 +67,7 @@ public enum CopyContainerCompression {
       return conf.getEnum(HDDS_CONTAINER_REPLICATION_COMPRESSION,
           DEFAULT_COMPRESSION);
     } catch (IllegalArgumentException e) {
+      LOG.warn("Unsupported compression codec. Skip compression.");
       return DEFAULT_COMPRESSION;
     }
   }
