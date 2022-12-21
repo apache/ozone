@@ -1559,7 +1559,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (omState == State.BOOTSTRAPPING) {
       bootstrap(omNodeDetails);
-      exitManager.exitSystem(0, "Bootstrapped Successfully", LOG);
     }
 
     omState = State.RUNNING;
