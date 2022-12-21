@@ -1228,6 +1228,15 @@ public class LegacyReplicationManager {
     }
   }
 
+  /**
+   * Processes replicas of the container when all replicas are unhealthy (in
+   * a state that does not match the container state).
+   *
+   * Unhealthy replicas will first be checked to see if they can be closed.
+   * If there are more unhealthy replicas than required, some may be deleted.
+   * If there are fewer unhealthy replicas than required, some may be
+   * replicated.
+   */
   private void handleAllReplicasUnhealthy(ContainerInfo container,
       RatisContainerReplicaCount replicaSet,
       ContainerPlacementStatus placementStatus) {
@@ -1251,13 +1260,12 @@ public class LegacyReplicationManager {
   }
 
   /**
-   * Handles unstable container.
-   * A container is inconsistent if any of the replica state doesn't
-   * match the container state. We have to take appropriate action
-   * based on state of the replica.
+   * Handles a container which has the correct number of healthy replicas,
+   * but an excess of unhealthy replicas.
    *
-   * @param container ContainerInfo
-   * @param replicaSet Set of ContainerReplicas
+   * If the container is closed, the unhealthy replicas can be deleted. If the
+   * container is not yet closed, the unhealthy replicas with non-unique
+   * origin node IDs can be deleted.
    */
   private void handleOverReplicatedExcessUnhealthy(
       final ContainerInfo container,
@@ -1265,7 +1273,7 @@ public class LegacyReplicationManager {
     // Note - ReplicationManager would reach here only if the
     // following conditions are met:
     //   1. Container is in either CLOSED or QUASI-CLOSED state
-    //   2. Either we have adequate healthy replicas with extra unhealthy
+    //   2. We have adequate healthy replicas with extra unhealthy
     //   replicas.
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
@@ -1295,6 +1303,13 @@ public class LegacyReplicationManager {
     }
   }
 
+  /**
+   * Returns the replicas from {@code replicas} that:
+   *  - Do not have in flight deletions
+   *  - Exist on healthy datanodes
+   *  - Have a replica state matching one of {@code validReplicaStates}. If
+   *  this parameter is empty, any replica state is valid.
+   */
   private List<ContainerReplica> getReplicationSources(ContainerInfo container,
       List<ContainerReplica> replicas, State... validReplicaStates) {
     final List<DatanodeDetails> deletionInFlight
@@ -1322,6 +1337,10 @@ public class LegacyReplicationManager {
     return getDeletionCandidates(container, replicas, false);
   }
 
+  /**
+   * A replica is eligible for deletion if its datanode is healthy and
+   * IN_SERVICE.
+   */
   private List<ContainerReplica> getDeletionCandidates(ContainerInfo container,
       List<ContainerReplica> replicas, boolean healthy) {
     return replicas.stream()
@@ -1929,53 +1948,8 @@ public class LegacyReplicationManager {
     }
   }
 
-  /* HELPER METHODS FOR UNHEALTHY OVER AND UNDER REPLICATED CONTAINERS */
-
-  private void handleOverReplicatedAllUnhealthy(ContainerInfo container,
-      List<ContainerReplica> replicas, int excess) {
-    List<ContainerReplica> deleteCandidates =
-        getUnhealthyDeletionCandidates(container, replicas);
-
-    // Only unhealthy replicas which cannot be closed will remain eligible
-    // for deletion, since this method is deleting unhealthy containers only.
-    closeReplicasIfPossible(container, deleteCandidates);
-    if (deleteCandidates.isEmpty()) {
-      return;
-    }
-
-    if (container.getState() == LifeCycleState.CLOSED) {
-      // Prefer to delete unhealthy replicas with lower BCS IDs.
-      deleteExcessLowestBcsIDs(container, deleteCandidates, excess);
-    } else {
-      // Container is not yet closed.
-      // We only need to save the unhealthy replicas if they
-      // represent unique origin node IDs. If recovering these replicas is
-      // possible in the future they could be used to close the container.
-      deleteExcessWithNonUniqueOriginNodeIDs(container,
-          replicas, deleteCandidates, excess);
-    }
-  }
-
-  private void handleUnderReplicatedAllUnhealthy(ContainerInfo container,
-      List<ContainerReplica> replicas, ContainerPlacementStatus placementStatus,
-      int additionalReplicasNeeded) {
-
-    int numCloseCmdsSent = closeReplicasIfPossible(container, replicas);
-    // Only replicate unhealthy containers if none of the unhealthy replicas
-    // could be closed. If we sent a close command to an unhealthy replica,
-    // we should wait for that to complete and replicate it when it becomes
-    // healthy on a future iteration.
-    if (numCloseCmdsSent == 0) {
-      // TODO Datanodes currently shuffle sources, so we cannot prioritize
-      //  some replicas based on BCSID or origin node ID.
-      replicateAnyWithTopology(container,
-          getReplicationSources(container, replicas), placementStatus,
-          additionalReplicasNeeded);
-    }
-  }
-
   private int closeReplicasIfPossible(ContainerInfo container,
-      List<ContainerReplica> replicas) {
+                                      List<ContainerReplica> replicas) {
     // This method should not be used on open containers.
     if (container.getState() == LifeCycleState.OPEN) {
       return 0;
@@ -2003,8 +1977,80 @@ public class LegacyReplicationManager {
     return numCloseCmdsSent;
   }
 
+  /* HELPER METHODS FOR UNHEALTHY OVER AND UNDER REPLICATED CONTAINERS */
+
+  /**
+   * Process a container with more replicas than required where all replicas
+   * are unhealthy.
+   *
+   * First try to close any replicas that are unhealthy due to pending
+   * closure. Replicas that can be closed will become healthy and will not be
+   * processed by this method.
+   * If the container is closed, delete replicas with lower BCSIDs first.
+   * If the container is not yet closed, delete replicas with origin node IDs
+   * already represented by other replicas.
+   */
+  private void handleOverReplicatedAllUnhealthy(ContainerInfo container,
+      List<ContainerReplica> replicas, int excess) {
+    List<ContainerReplica> deleteCandidates =
+        getUnhealthyDeletionCandidates(container, replicas);
+
+    // Only unhealthy replicas which cannot be closed will remain eligible
+    // for deletion, since this method is deleting unhealthy containers only.
+    closeReplicasIfPossible(container, deleteCandidates);
+    if (deleteCandidates.isEmpty()) {
+      return;
+    }
+
+    if (container.getState() == LifeCycleState.CLOSED) {
+      // Prefer to delete unhealthy replicas with lower BCS IDs.
+      // If the replica became unhealthy after the container was closed but
+      // before the replica could be closed, it may have a smaller BCSID.
+      deleteExcessLowestBcsIDs(container, deleteCandidates, excess);
+    } else {
+      // Container is not yet closed.
+      // We only need to save the unhealthy replicas if they
+      // represent unique origin node IDs. If recovering these replicas is
+      // possible in the future they could be used to close the container.
+      deleteExcessWithNonUniqueOriginNodeIDs(container,
+          replicas, deleteCandidates, excess);
+    }
+  }
+
+  /**
+   * Processes container replicas when all replicas are unhealthy and there
+   * are fewer than the required number of replicas.
+   *
+   * If any of these replicas unhealthy because they are pending closure and
+   * they can be closed, close them to create a healthy replica that can be
+   * replicated.
+   * If none of the replicas can be closed, use one of the unhealthy replicas
+   * to restore replica count while satisfying topology requirements.
+   */
+  private void handleUnderReplicatedAllUnhealthy(ContainerInfo container,
+      List<ContainerReplica> replicas, ContainerPlacementStatus placementStatus,
+      int additionalReplicasNeeded) {
+
+    int numCloseCmdsSent = closeReplicasIfPossible(container, replicas);
+    // Only replicate unhealthy containers if none of the unhealthy replicas
+    // could be closed. If we sent a close command to an unhealthy replica,
+    // we should wait for that to complete and replicate it when it becomes
+    // healthy on a future iteration.
+    if (numCloseCmdsSent == 0) {
+      // TODO Datanodes currently shuffle sources, so we cannot prioritize
+      //  some replicas based on BCSID or origin node ID.
+      replicateAnyWithTopology(container,
+          getReplicationSources(container, replicas), placementStatus,
+          additionalReplicasNeeded);
+    }
+  }
+
   /* HELPER METHODS FOR ALL OVER AND UNDER REPLICATED CONTAINERS */
 
+  /**
+   * Deletes the first {@code excess} replicas from {@code deleteCandidates}.
+   * Replicas whose datanode operation state is not IN_SERVICE will be skipped.
+   */
   private void deleteExcess(ContainerInfo container,
       List<ContainerReplica> deleteCandidates, int excess) {
     // Replica which are maintenance or decommissioned are not eligible to
@@ -2098,6 +2144,10 @@ public class LegacyReplicationManager {
     deleteExcess(container, nonUniqueDeleteCandidates, excess);
   }
 
+  /**
+   * Delete {@code excess} replicas from {@code deleteCandidates}, deleting
+   * those with lowest BCSIDs first.
+   */
   private void deleteExcessLowestBcsIDs(ContainerInfo container,
       List<ContainerReplica> deleteCandidates, int excess) {
     // Sort containers with lowest BCSID first. These will be the first ones
@@ -2107,6 +2157,11 @@ public class LegacyReplicationManager {
     deleteExcess(container, deleteCandidates, excess);
   }
 
+  /**
+   * Choose {@code additionalReplicasNeeded} datanodes to make copies of some
+   * of the container replicas to restore replication factor or satisfy
+   * topology requirements.
+   */
   private void replicateAnyWithTopology(ContainerInfo container,
       List<ContainerReplica> replicas,
       ContainerPlacementStatus placementStatus, int additionalReplicasNeeded) {
