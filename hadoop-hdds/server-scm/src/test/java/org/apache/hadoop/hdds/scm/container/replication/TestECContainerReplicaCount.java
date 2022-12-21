@@ -24,11 +24,9 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -583,7 +581,7 @@ public class TestECContainerReplicaCount {
 
     ContainerReplica offlineReplica =
         ReplicationTestUtil.createContainerReplica(container.containerID(),
-    1, DECOMMISSIONING, CLOSED);
+            1, DECOMMISSIONING, CLOSED);
     replica.add(offlineReplica);
 
     ContainerReplica offlineNotReplicated =

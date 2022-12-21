@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -32,7 +31,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.mockito.Mockito;
@@ -121,8 +119,8 @@ public final class DatanodeAdminMonitorTestUtil {
   public static ContainerReplicaCount generateECReplicaCount(
       ContainerID containerID, ECReplicationConfig repConfig,
       HddsProtos.LifeCycleState containerState,
-      Triple<HddsProtos.NodeOperationalState, DatanodeDetails, Integer>
-          ...states) {
+      Triple<HddsProtos.NodeOperationalState, DatanodeDetails,
+          Integer>...states) {
 
     Set<ContainerReplica> replicas = new HashSet<>();
     for (Triple<HddsProtos.NodeOperationalState, DatanodeDetails, Integer> t
@@ -179,8 +177,8 @@ public final class DatanodeAdminMonitorTestUtil {
       ReplicationManager repManager,
       HddsProtos.LifeCycleState containerState,
       ECReplicationConfig repConfig,
-      Triple<HddsProtos.NodeOperationalState, DatanodeDetails, Integer>
-          ...replicaStates)
+      Triple<HddsProtos.NodeOperationalState, DatanodeDetails,
+          Integer>...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
     Mockito.when(repManager.getContainerReplicaCount(
