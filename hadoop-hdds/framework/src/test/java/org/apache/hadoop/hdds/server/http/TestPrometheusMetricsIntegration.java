@@ -79,7 +79,7 @@ public class TestPrometheusMetricsIntegration {
     metrics = DefaultMetricsSystem.instance();
 
     metrics.init("test");
-    sink = new PrometheusMetricsSink();
+    sink = new PrometheusMetricsSink("random");
     metrics.register("Prometheus", "Prometheus", sink);
   }
 
