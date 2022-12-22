@@ -65,6 +65,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -888,12 +889,164 @@ public class TestRocksDBCheckpointDiffer {
     Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 
+  private static Stream<Arguments> compactionDagPruningScenarios() {
+    long currentTimeMillis = System.currentTimeMillis();
+
+    String compactionLogFile0 = "S 1000 snapshotId0 " +
+        (currentTimeMillis - MINUTES.toMillis(30)) + " \n";
+    String compactionLogFile1 = "C 000015,000013,000011,000009:000018,000016," +
+        "000017\n"
+        + "S 2000 snapshotId1 " +
+        (currentTimeMillis - MINUTES.toMillis(24)) + " \n";
+
+    String compactionLogFile2 = "C 000018,000016,000017,000026,000024,000022," +
+        "000020:000027,000030,000028,000031,000029\n"
+        + "S 3000 snapshotId2 " +
+        (currentTimeMillis - MINUTES.toMillis(18)) + " \n";
+
+    String compactionLogFile3 = "C 000027,000030,000028,000031,000029,000039," +
+        "000037,000035,000033:000040,000044,000042,000043,000046,000041," +
+        "000045\n"
+        + "S 3000 snapshotId3 " +
+        (currentTimeMillis - MINUTES.toMillis(12)) + " \n";
+
+    String compactionLogFile4 = "C 000040,000044,000042,000043,000046,000041," +
+        "000045,000054,000052,000050,000048:000059,000055,000056,000060," +
+        "000057,000058\n"
+        + "S 3000 snapshotId4 " +
+        (currentTimeMillis - MINUTES.toMillis(6)) + " \n";
+
+    String compactionLogFileWithoutSnapshot1 = "C 000015,000013,000011," +
+        "000009:000018,000016,000017\n" +
+        "C 000018,000016,000017,000026,000024,000022,000020:000027,000030," +
+        "000028,000031,000029\n";
+
+    String compactionLogFileWithoutSnapshot2 = "C 000027,000030,000028," +
+        "000031,000029,000039,000037,000035,000033:000040,000044,000042," +
+        "000043,000046,000041,000045\n";
+
+    String compactionLogFileWithoutSnapshot3 = "C 000040,000044,000042," +
+        "000043,000046,000041,000045,000054,000052,000050,000048:000059," +
+        "000055,000056,000060,000057,000058\n";
+
+    String compactionLogFileOnlyWithSnapshot1 =
+        "S 3000 snapshotIdWithoutCompaction1 " +
+            (currentTimeMillis - MINUTES.toMillis(18)) + " \n";
+
+    String compactionLogFileOnlyWithSnapshot2 =
+        "S 3000 snapshotIdWithoutCompaction2 " +
+            (currentTimeMillis - MINUTES.toMillis(15)) + " \n";
+
+    String compactionLogFileOnlyWithSnapshot3 =
+        "S 3000 snapshotIdWithoutCompaction3 " +
+            (currentTimeMillis - MINUTES.toMillis(12)) + " \n";
+
+    String compactionLogFileOnlyWithSnapshot4 =
+        "S 3000 snapshotIdWithoutCompaction4 " +
+            (currentTimeMillis - MINUTES.toMillis(9)) + " \n";
+
+    String compactionLogFileOnlyWithSnapshot5 =
+        "S 3000 snapshotIdWithoutCompaction5 " +
+            (currentTimeMillis - MINUTES.toMillis(6)) + " \n";
+
+    String compactionLogFileOnlyWithSnapshot6 =
+        "S 3000 snapshotIdWithoutCompaction6 " +
+            (currentTimeMillis - MINUTES.toMillis(3)) + " \n";
+
+    Set<String> expectedNodes = new HashSet<>(
+        Arrays.asList("000054", "000052", "000050", "000048", "000059",
+            "000055", "000056", "000060", "000057", "000058")
+    );
+
+    Set<String> expectedAllNodes = new HashSet<>(
+        Arrays.asList("000058", "000013", "000035", "000057", "000056",
+            "000011", "000033", "000055", "000018", "000017", "000039",
+            "000016", "000015", "000037", "000059", "000060", "000043",
+            "000020", "000042", "000041", "000040", "000024", "000046",
+            "000045", "000022", "000044", "000029", "000028", "000027",
+            "000026", "000048", "000009", "000050", "000054", "000031",
+            "000030", "000052")
+    );
+
+    return Stream.of(
+        Arguments.of("Each compaction log file has only one snapshot and one" +
+                " compaction statement except first log file.",
+            Arrays.asList(compactionLogFile0, compactionLogFile1,
+                compactionLogFile2, compactionLogFile3, compactionLogFile4),
+            expectedNodes,
+            4
+        ),
+        Arguments.of("Compaction log doesn't have snapshot  because OM" +
+                " restarted. Restart happened before snapshot to be deleted.",
+            Arrays.asList(compactionLogFile0,
+                compactionLogFileWithoutSnapshot1,
+                compactionLogFile3,
+                compactionLogFile4),
+            expectedNodes,
+            3
+        ),
+        Arguments.of("Compaction log doesn't have snapshot because OM" +
+                " restarted. Restart happened after snapshot to be deleted.",
+            Arrays.asList(compactionLogFile0, compactionLogFile1,
+                compactionLogFile2, compactionLogFile3,
+                compactionLogFileWithoutSnapshot3,
+                compactionLogFileOnlyWithSnapshot4),
+            expectedNodes,
+            4
+        ),
+        Arguments.of("No compaction happened in between two snapshots.",
+            Arrays.asList(compactionLogFile0, compactionLogFile1,
+                compactionLogFile2, compactionLogFile3,
+                compactionLogFileOnlyWithSnapshot1,
+                compactionLogFileOnlyWithSnapshot2, compactionLogFile4),
+            expectedNodes,
+            6
+        ),
+        Arguments.of("No snapshot is taken and only one compaction log file,",
+            Collections.singletonList(compactionLogFileWithoutSnapshot1 +
+                compactionLogFileWithoutSnapshot2 +
+                compactionLogFileWithoutSnapshot3),
+            expectedAllNodes,
+            0
+        ),
+        Arguments.of("No snapshot is taken but multiple compaction files" +
+                " because of OM restart.",
+            Arrays.asList(compactionLogFileWithoutSnapshot1,
+                compactionLogFileWithoutSnapshot2,
+                compactionLogFileWithoutSnapshot3),
+            expectedAllNodes,
+            0
+        ),
+        Arguments.of("Only contains snapshots but no compaction.",
+            Arrays.asList(compactionLogFileOnlyWithSnapshot1,
+                compactionLogFileOnlyWithSnapshot2,
+                compactionLogFileOnlyWithSnapshot3,
+                compactionLogFileOnlyWithSnapshot4,
+                compactionLogFileOnlyWithSnapshot5,
+                compactionLogFileOnlyWithSnapshot6),
+            Collections.emptySet(),
+            3
+        ),
+        Arguments.of("No file exists because compaction has not happened" +
+                " and snapshot is not taken.",
+            Collections.emptyList(),
+            Collections.emptySet(),
+            0
+        )
+    );
+  }
+
   /**
    * End-to-end test for snapshot's compaction history pruning.
    */
-  @Test
-  public void testPruneOlderSnapshotsWithCompactionHistory()
-      throws IOException {
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("compactionDagPruningScenarios")
+  public void testPruneOlderSnapshotsWithCompactionHistory(
+      String description,
+      List<String> compactionLogs,
+      Set<String> expectedNodes,
+      int expectedNumberOfLogFilesDeleted
+  ) throws IOException {
     String compactionLogDirName = "./test-compaction-log";
     File compactionLogDir = new File(compactionLogDirName);
     if (!compactionLogDir.exists() && !compactionLogDir.mkdirs()) {
@@ -903,46 +1056,18 @@ public class TestRocksDBCheckpointDiffer {
     String sstBackUpDirName = "./test-compaction-sst-backup";
     File sstBackUpDir = new File(sstBackUpDirName);
     if (!sstBackUpDir.exists() && !sstBackUpDir.mkdirs()) {
-      fail("Error creating SST backup directory: " + sstBackUpDir);
+      fail("Error creating SST backup directory: " + sstBackUpDirName);
     }
 
-    long currentTimeMillis = System.currentTimeMillis();
-
-    String compactionLog0 = "S 1000 snapshotId0 " +
-        (currentTimeMillis - MINUTES.toMillis(30)) + " \n";
-    String compactionLog1 = "C 000015,000013,000011,000009:000018,000016," +
-        "000017\n"
-        + "S 2000 snapshotId1 " +
-        (currentTimeMillis - MINUTES.toMillis(24)) + " \n";
-
-    String compactionLog2 = "C 000018,000016,000017,000026,000024,000022," +
-        "000020:000027,000030,000028,000031,000029\n"
-        + "S 3000 snapshotId2 " +
-        (currentTimeMillis - MINUTES.toMillis(18)) + " \n";
-
-    String compactionLog3 = "C 000027,000030,000028,000031,000029,000039," +
-        "000037,000035,000033:000040,000044,000042,000043,000046,000041," +
-        "000045\n"
-        + "S 3000 snapshotId3 " +
-        (currentTimeMillis - MINUTES.toMillis(12)) + " \n";
-
-    String compactionLog4 = "C 000040,000044,000042,000043,000046,000041," +
-        "000045,000054,000052,000050,000048:000059,000055,000056,000060," +
-        "000057,000058\n"
-        + "S 3000 snapshotId4 " +
-        (currentTimeMillis - MINUTES.toMillis(6)) + " \n";
-
-    List<String> compactionLogs = Arrays.asList(compactionLog0,
-        compactionLog1,
-        compactionLog2,
-        compactionLog3,
-        compactionLog4);
+    List<File> filesCreated = new ArrayList<>();
 
     for (int i = 0; i < compactionLogs.size(); i++) {
-      String compactionFileName = compactionLogDirName + "/0000" + i + ".log";
+      String compactionFileName =
+          compactionLogDirName + "/0000" + i + COMPACTION_LOG_FILE_NAME_SUFFIX;
       File compactionFile = new File(compactionFileName);
       Files.write(compactionFile.toPath(),
           compactionLogs.get(i).getBytes(UTF_8));
+      filesCreated.add(compactionFile);
     }
 
     RocksDBCheckpointDiffer differ =
@@ -955,60 +1080,20 @@ public class TestRocksDBCheckpointDiffer {
 
     differ.pruneOlderSnapshotsWithCompactionHistory();
 
-    Set<String> expectedNodes = new HashSet<>(
-        Arrays.asList("000054", "000052", "000050", "000048", "000059",
-            "000055", "000056", "000060", "000057", "000058")
-    );
-
-    Set<String> expectedArcs = new HashSet<>(
-        Arrays.asList(
-            "000059->000054",
-            "000055->000054",
-            "000056->000054",
-            "000060->000054",
-            "000057->000054",
-            "000058->000054",
-            "000059->000052",
-            "000055->000052",
-            "000056->000052",
-            "000060->000052",
-            "000057->000052",
-            "000058->000052",
-            "000059->000050",
-            "000055->000050",
-            "000056->000050",
-            "000060->000050",
-            "000057->000050",
-            "000058->000050",
-            "000059->000048",
-            "000055->000048",
-            "000056->000048",
-            "000060->000048",
-            "000057->000048",
-            "000058->000048")
-    );
-
     Set<String> actualNodes = differ.getForwardCompactionDAG().nodes().stream()
         .map(CompactionNode::getFileName)
         .collect(Collectors.toSet());
 
-    Set<String> actualArcs = differ.getForwardCompactionDAG().edges().stream()
-        .map(e -> e.source().getFileName() + "->" + e.target().getFileName())
-        .collect(Collectors.toSet());
-
-
     assertEquals(expectedNodes, actualNodes);
-    assertEquals(expectedArcs, actualArcs);
 
-    for (int i = 0; i < 4; i++) {
-      String compactionFileName = compactionLogDirName + "/0000" + i + ".log";
-      File compactionFile = new File(compactionFileName);
+    for (int i = 0; i < expectedNumberOfLogFilesDeleted; i++) {
+      File compactionFile = filesCreated.get(i);
       assertFalse(compactionFile.exists());
     }
 
-    for (int i = 4; i < compactionLogs.size(); i++) {
-      String compactionFileName = compactionLogDirName + "/0000" + i + ".log";
-      File compactionFile = new File(compactionFileName);
+    for (int i = expectedNumberOfLogFilesDeleted; i < compactionLogs.size();
+         i++) {
+      File compactionFile = filesCreated.get(i);
       assertTrue(compactionFile.exists());
     }
 

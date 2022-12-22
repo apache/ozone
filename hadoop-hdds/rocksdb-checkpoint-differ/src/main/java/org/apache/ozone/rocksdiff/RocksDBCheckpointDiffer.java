@@ -107,7 +107,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    */
   private volatile String currentCompactionLogPath = null;
 
-  private static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
+  static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
 
   /**
    * Marks the beginning of a comment line in the compaction log.
@@ -130,6 +130,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * e.g. input1,input2,input3 or output1,output2,output3
    */
   private static final String COMPACTION_LOG_ENTRY_FILE_DELIMITER = ",";
+
+  private static final String SPACE_DELIMITER = " ";
 
   /**
    * Delimiter use to join compaction's input and output file set strings.
@@ -362,7 +364,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
                                                 String snapshotID,
                                                 long creationTime) {
     final String line = COMPACTION_LOG_SEQ_NUM_LINE_PREFIX + sequenceNum +
-        " " + snapshotID + " " + creationTime + "\n";
+        SPACE_DELIMITER + snapshotID + SPACE_DELIMITER + creationTime + "\n";
     appendToCurrentCompactionLog(line);
   }
 
@@ -740,14 +742,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
       logSB.append("Fwd DAG same SST files:      ");
       for (String file : fwdDAGSameFiles) {
-        logSB.append(file).append(" ");
+        logSB.append(file).append(SPACE_DELIMITER);
       }
       LOG.debug(logSB.toString());
 
       logSB.setLength(0);
       logSB.append("Fwd DAG different SST files: ");
       for (String file : fwdDAGDifferentFiles) {
-        logSB.append(file).append(" ");
+        logSB.append(file).append(SPACE_DELIMITER);
       }
       LOG.debug("{}", logSB);
     }
@@ -989,7 +991,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   public void pruneOlderSnapshotsWithCompactionHistory() {
     List<Path> olderSnapshotsLogFilePaths =
         getOlderSnapshotsCompactionLogFilePaths();
-
     List<String> lastCompactionSstFiles =
         getLastCompactionSstFiles(olderSnapshotsLogFilePaths);
 
@@ -1018,14 +1019,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * max time in the compaction DAG.
    */
   private List<Path> getOlderSnapshotsCompactionLogFilePaths() {
-    List<Path> olderSnapshotLogPaths = new ArrayList<>();
-
     long compactionLogPruneStartTime = System.currentTimeMillis();
 
     List<Path> compactionFiles =
         listCompactionLogFileFromCompactionLogDirectory();
 
-    for (Path compactionLogPath : compactionFiles) {
+    int index = compactionFiles.size() - 1;
+    for (; index >= 0; index--) {
+      Path compactionLogPath = compactionFiles.get(index);
       SnapshotLogInfo snapshotLogInfo =
           getSnapshotInfoFromLog(compactionLogPath);
 
@@ -1033,15 +1034,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         continue;
       }
 
-      if (maxAllowedTimeInDag >
-          compactionLogPruneStartTime - snapshotLogInfo.snapshotCreatedAt) {
+      if (compactionLogPruneStartTime - snapshotLogInfo.snapshotCreatedAt >
+          maxAllowedTimeInDag) {
         break;
       }
-
-      olderSnapshotLogPaths.add(compactionLogPath);
     }
 
-    return olderSnapshotLogPaths;
+    if (index >= 0) {
+      return compactionFiles.subList(0, index + 1);
+    } else {
+      return Collections.emptyList();
+    }
   }
 
   /**
@@ -1175,13 +1178,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   /**
    * Converts a snapshot compaction log line to SnapshotLogInfo.
    */
-  private SnapshotLogInfo getSnapshotLogInfo(String line) {
-    String[] splits = line.split(" ");
-    assert (splits.length == 4);
+  private SnapshotLogInfo getSnapshotLogInfo(String logLine) {
+    // Remove `S ` from the line.
+    String line =
+        logLine.substring(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX.length());
 
-    return new SnapshotLogInfo(Long.parseLong(splits[1]),
-        splits[2],
-        Long.parseLong(splits[3]));
+    String[] splits = line.split(SPACE_DELIMITER);
+    Preconditions.checkArgument(splits.length == 3,
+        "Snapshot info log statement has more than expected parameters.");
+
+    return new SnapshotLogInfo(Long.parseLong(splits[0]),
+        splits[1],
+        Long.parseLong(splits[2]));
   }
 
   /**
@@ -1193,8 +1201,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * first the compaction happened in the reverse list.
    * If no compaction happen at all, it returns empty list.
    */
-  @VisibleForTesting
-  List<String> getLastCompactionSstFiles(
+  private List<String> getLastCompactionSstFiles(
       List<Path> compactionLogFiles
   ) {
 
