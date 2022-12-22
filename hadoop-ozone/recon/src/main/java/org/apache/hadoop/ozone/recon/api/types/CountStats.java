@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * volumes/buckets/dir/files etc.
  * */
 public class CountStats {
-  /** Total number of volumes under root, -1 for other types. */
+    /** Total number of volumes under root, -1 for other types. */
   @JsonProperty("numVolume")
   private int numVolume;
 
