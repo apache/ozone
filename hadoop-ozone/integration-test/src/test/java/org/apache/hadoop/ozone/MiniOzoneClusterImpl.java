@@ -950,7 +950,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
-      conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "500");
+      conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "300s");
 
       ConfigurationProvider.setConfiguration(conf);
     }

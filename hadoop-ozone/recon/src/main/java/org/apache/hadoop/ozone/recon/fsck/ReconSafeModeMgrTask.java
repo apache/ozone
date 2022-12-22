@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFA
 
 /**
  * Class that scans the list of containers and keeps track if
- * recon warm up completed and it emits safe node.
+ * recon warm up completed, and it exits safe mode.
  */
 public class ReconSafeModeMgrTask {
 
@@ -76,14 +76,15 @@ public class ReconSafeModeMgrTask {
   public synchronized void start() {
     long timeElapsed = 0L;
     try {
-      checkForReconToEmitSafeNode();
+      tryReconExitSafeMode();
       while (safeModeManager.getInSafeMode() && timeElapsed <= interval) {
         wait(dnHBInterval);
         timeElapsed += dnHBInterval;
         allNodes = nodeManager.getAllNodes();
         containers = containerManager.getContainers();
-        checkForReconToEmitSafeNode();
+        tryReconExitSafeMode();
       }
+      // Exceeded safe mode grace period. Exit safe mode
       if (safeModeManager.getInSafeMode()) {
         safeModeManager.setInSafeMode(false);
       }
@@ -95,7 +96,7 @@ public class ReconSafeModeMgrTask {
     }
   }
 
-  private void checkForReconToEmitSafeNode()
+  private void tryReconExitSafeMode()
       throws InterruptedException {
       // Recon starting first time
     if (null == allNodes || allNodes.size() == 0) {
