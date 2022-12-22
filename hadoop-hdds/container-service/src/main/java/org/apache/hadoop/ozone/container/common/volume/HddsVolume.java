@@ -345,11 +345,15 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  // Ensure that volume is initialized properly with
-  // cleanup path.  Should disk be re-inserted into
-  // cluster, cleanup path should already be on
-  // disk.  This method syncs the HddsVolume
-  // with the path on disk
+  /**
+   * Ensure that volume is initialized properly with
+   * cleanup path. Should disk be re-inserted into
+   * cluster, cleanup path should already be on
+   * disk. This method syncs the HddsVolume
+   * with the path on disk.
+   * 
+   * @param id clusterId or scmId
+   */
   public void checkTmpDirPaths(String id) {
     String tmpPath = createTmpPath(id);
     String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
@@ -387,30 +391,21 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  public void createDeleteServiceDir() {
-    try {
-      if (tmpDirPath == null) {
-        throw new IOException("tmp directory under volume " +
-            "has not been initialized");
+  public void createDeleteServiceDir(String id) {
+    if (tmpDirPath == null) {
+      createTmpDir(id);
+    }
+    String tmpPath = tmpDirPath.toString();
+    String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
+
+    deleteServiceDirPath = Paths.get(deleteServicePath);
+
+    if (Files.notExists(deleteServiceDirPath)) {
+      try {
+        Files.createDirectories(deleteServiceDirPath);
+      } catch (IOException ex) {
+        LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
       }
-      String tmpPath = tmpDirPath.toString();
-      String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
-
-      deleteServiceDirPath = Paths.get(deleteServicePath);
-
-      if (Files.notExists(deleteServiceDirPath)) {
-        try {
-          Files.createDirectories(deleteServiceDirPath);
-        } catch (IOException ex) {
-          LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
-        }
-      }
-    } catch (IOException ex) {
-      String hddsRoot = getHddsRootDir().toString();
-      String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
-
-      LOG.error("Failed to create container_delete_service directory under {}",
-          volPath, ex);
     }
   }
 

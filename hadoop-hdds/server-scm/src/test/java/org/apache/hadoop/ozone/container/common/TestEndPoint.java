@@ -192,7 +192,7 @@ public class TestEndPoint {
           volumeSet.getVolumesList())) {
         hddsVolume.format(clusterId);
         hddsVolume.createWorkingDir(clusterId, null);
-        hddsVolume.createDeleteServiceDir();
+        hddsVolume.createDeleteServiceDir(clusterId);
 
         // Create a container and move it under the tmp delete dir.
         KeyValueContainer container =

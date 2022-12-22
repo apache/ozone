@@ -563,7 +563,7 @@ public final class KeyValueContainerUtil {
 
       if (!hddsVolume.getClusterID().isEmpty()) {
         // Initialize delete directory
-        hddsVolume.createDeleteServiceDir();
+        hddsVolume.createDeleteServiceDir(hddsVolume.getClusterID());
       } else {
         LOG.error("Volume hasn't been formatted " +
             "properly and has no ClusterId. " +

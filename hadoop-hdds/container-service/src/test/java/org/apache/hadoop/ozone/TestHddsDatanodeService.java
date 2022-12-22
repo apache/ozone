@@ -150,7 +150,7 @@ public class TestHddsDatanodeService {
     for (HddsVolume volume : volumes) {
       volume.format(clusterId);
       volume.createWorkingDir(clusterId, null);
-      volume.createDeleteServiceDir();
+      volume.createDeleteServiceDir(clusterId);
 
       // Create a container and move it under the tmp delete dir.
       KeyValueContainer container = setUpTestContainer(volume, schemaVersion);
