@@ -112,6 +112,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
 import org.apache.ratis.util.ExitUtils;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.jooq.DSLContext;
@@ -162,7 +163,7 @@ public class ReconStorageContainerManagerFacade
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerCountBySizeDao containerCountBySizeDao,
-      DSLContext dslContext,
+      UtilizationSchemaDefinition utilizationSchemaDefinition,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
       ReconUtils reconUtils,

@@ -92,14 +92,14 @@ public class ReconTaskConfig {
           "container size distribution in the cluster as reported "
   )
   private long containerSizeCountTaskInterval =
-      Duration.ofMinutes(1).toMillis();
+      Duration.ofMinutes(5).toMillis();
 
   public Duration getContainerSizeCountTaskInterval() {
-    return Duration.ofMillis(missingContainerTaskInterval);
+    return Duration.ofMillis(containerSizeCountTaskInterval);
   }
 
   public void setContainerSizeCountTaskInterval(Duration interval) {
-    this.missingContainerTaskInterval = interval.toMillis();
+    this.containerSizeCountTaskInterval = interval.toMillis();
   }
 
 }
