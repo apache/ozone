@@ -49,6 +49,7 @@ import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Class that scans the list of containers and keeps track of containers with
  * no replicas in a SQL table.
@@ -65,6 +66,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private PlacementPolicy placementPolicy;
   private final long interval;
+
   private Set<ContainerInfo> processedContainers = new HashSet<>();
 
   public ContainerHealthTask(
@@ -172,7 +174,8 @@ public class ContainerHealthTask extends ReconScmTask {
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
           if (ContainerHealthRecords
-              .retainOrUpdateRecord(currentContainer, rec)) {
+              .retainOrUpdateRecord(currentContainer, rec
+              )) {
             // Check if the missing container is deleted in SCM
             if (currentContainer.isMissing() &&
                 containerDeletedInSCM(currentContainer.getContainer())) {
@@ -265,10 +268,13 @@ public class ContainerHealthTask extends ReconScmTask {
      * If the record is to be retained, the fields in the record for actual
      * replica count, delta and reason will be updated if their counts have
      * changed.
-     * @param container ContainerHealthStatus representing the health state of
-     *                  the container.
-     * @param rec Existing database record from the UnhealthyContainers table.
-     * @return
+     *
+     * @param container ContainerHealthStatus representing the
+     *                  health state of the container.
+     * @param rec       Existing database record from the
+     *                  UnhealthyContainers table.
+     * @return returns true or false if need to retain or update the unhealthy
+     * container record
      */
     public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
@@ -342,6 +348,7 @@ public class ContainerHealthTask extends ReconScmTask {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
       }
+
       return records;
     }
 
@@ -434,5 +441,4 @@ public class ContainerHealthTask extends ReconScmTask {
       }
     }
   }
-
 }

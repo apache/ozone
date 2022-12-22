@@ -149,6 +149,18 @@ public final class  ReconServerConfigKeys {
 
   public static final long
       OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
+      "ozone.recon.scm.snapshot.task.interval.delay";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
+      = "24h";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
+      "ozone.recon.scm.snapshot.task.initial.delay";
+
+  public static final String
+      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
   /**
    * Private constructor for utility class.
    */
