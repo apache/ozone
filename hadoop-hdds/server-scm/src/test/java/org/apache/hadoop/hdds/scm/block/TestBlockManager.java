@@ -71,7 +71,6 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -158,7 +157,7 @@ public class TestBlockManager {
             pipelineManager,
             scmMetadataStore.getContainerTable(),
             new ContainerReplicaPendingOps(conf,
-                new MonotonicClock(ZoneId.systemDefault())));
+                Clock.system(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {
