@@ -150,7 +150,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId());
+              ozoneManager.getOMNodeId(),
+              ozoneManager.getMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
@@ -319,6 +320,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
+      omBucketInfo.incrUsedNamespace(numMissingParents);
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),

@@ -22,12 +22,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A PlacementPolicy support choosing datanodes to build
  * pipelines or containers with specified constraints.
  */
-public interface PlacementPolicy {
+public interface PlacementPolicy<Replica> {
 
   default List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
@@ -60,9 +62,19 @@ public interface PlacementPolicy {
    * Given a list of datanode and the number of replicas required, return
    * a PlacementPolicyStatus object indicating if the container meets the
    * placement policy - ie is it on the correct number of racks, etc.
-   * @param dns List of datanodes holding a replica of the container
+   * @param dns List of replica holding a replica of the container
    * @param replicas The expected number of replicas
    */
   ContainerPlacementStatus validateContainerPlacement(
-      List<DatanodeDetails> dns, int replicas);
+          List<DatanodeDetails> dns, int replicas);
+
+  /**
+   * Given a set of replicas of a container which are
+   * neither over underreplicated nor overreplicated,
+   * return a set of replicas to copy to another node to fix misreplication.
+   * @param replicas: Map of replicas with value signifying if
+   *                  replica can be copied
+   */
+  Set<Replica> replicasToCopyToFixMisreplication(
+          Map<Replica, Boolean> replicas);
 }

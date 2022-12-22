@@ -40,6 +40,7 @@ interface IClusterStateResponse {
   volumes: number;
   buckets: number;
   keys: number;
+  openContainers: number;
 }
 
 interface IOverviewState {
@@ -56,6 +57,7 @@ interface IOverviewState {
   lastUpdatedOMDBDelta: number;
   lastUpdatedOMDBFull: number;
   omStatus: string;
+  openContainers: number;
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -82,6 +84,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       lastUpdatedOMDBDelta: 0,
       lastUpdatedOMDBFull: 0,
       omStatus: '',
+      openContainers: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -111,6 +114,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         buckets: clusterState.buckets,
         keys: clusterState.keys,
         missingContainersCount,
+        openContainers: clusterState.openContainers,
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp
@@ -154,7 +158,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus} = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers } = this.state;
       
     const datanodesElement = (
       <span>
@@ -172,7 +176,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         <span className='padded-text'>{containers - missingContainersCount}/{containers}</span>
       </span>
     ) :
-      containers.toString();
+      <div>
+          <span>{containers.toString()}   </span>
+        <Tooltip placement='bottom' title='Number of open containers'>
+          <span>({openContainers})</span>
+        </Tooltip>
+      </div>
     const clusterCapacity = `${size(storageReport.capacity - storageReport.remaining)}/${size(storageReport.capacity)}`;
     return (
       <div className='overview-content'>

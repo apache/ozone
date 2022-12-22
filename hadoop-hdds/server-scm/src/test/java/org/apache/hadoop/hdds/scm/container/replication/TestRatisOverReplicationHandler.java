@@ -1,0 +1,281 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.scm.container.replication;
+
+import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mockito;
+import org.slf4j.event.Level;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+
+/**
+ * Tests for {@link RatisOverReplicationHandler}.
+ */
+public class TestRatisOverReplicationHandler {
+  private ContainerInfo container;
+  private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+  private PlacementPolicy policy;
+
+  @Before
+  public void setup() throws NodeNotFoundException {
+    container = createContainer(HddsProtos.LifeCycleState.CLOSED,
+        RATIS_REPLICATION_CONFIG);
+
+    policy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(policy.validateContainerPlacement(
+        Mockito.anyList(), Mockito.anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+
+    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
+  }
+
+  /**
+   * Handler should create one delete command when a closed ratis container
+   * has 5 replicas and 1 pending delete.
+   */
+  @Test
+  public void testOverReplicatedClosedContainer() throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    // 1 replica is already pending delete, so only 1 new command should be
+    // created
+    testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(),
+        1);
+  }
+
+  /**
+   * The container is quasi closed. All 4 replicas are quasi closed and
+   * originate from the same datanode. This container is over replicated.
+   * Handler should preserve 1 replica and any 1 of the other 3 replicas can
+   * be deleted.
+   */
+  @Test
+  public void testOverReplicatedQuasiClosedContainerWithSameOrigin()
+      throws IOException {
+    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
+        RATIS_REPLICATION_CONFIG);
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0, 0);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
+  }
+
+  /**
+   * The container is quasi closed. All replicas are quasi closed but
+   * originate from different datanodes. While this container is over
+   * replicated, handler should not create a delete command for any replica. It
+   * tries to preserve one replica per unique origin datanode.
+   */
+  @Test
+  public void testOverReplicatedQuasiClosedContainerWithDifferentOrigins()
+      throws IOException {
+    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
+        RATIS_REPLICATION_CONFIG);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0, 0, 0);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+  }
+
+  /**
+   * When a quasi closed container is over replicated, the handler should
+   * prioritize creating delete commands for unhealthy replicas over quasi
+   * closed replicas.
+   */
+  @Test
+  public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
+      throws IOException {
+    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
+        RATIS_REPLICATION_CONFIG);
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0,
+            HddsProtos.NodeOperationalState.IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
+        Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    Assert.assertTrue(
+        commands.containsKey(unhealthyReplica.getDatanodeDetails()));
+  }
+
+  /**
+   * Handler should not create any delete commands if removing a replica
+   * makes the container mis replicated.
+   */
+  @Test
+  public void testOverReplicatedContainerBecomesMisReplicatedOnRemoving()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
+
+    // Ensure a mis-replicated status is returned when 4 or fewer replicas are
+    // checked.
+    Mockito.when(policy.validateContainerPlacement(
+        Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+  }
+
+  /**
+   * Closed container with 4 closed replicas and 1 quasi closed replica. This
+   * container is over replicated and the handler should create a delete
+   * command for the quasi closed replica even if it violates the placement
+   * policy. Once the quasi closed container is removed and we have 4
+   * replicas, then the mocked placement policy considers the container mis
+   * replicated. As long as the rack count does not change, another replica
+   * can be removed.
+   */
+  @Test
+  public void testOverReplicatedClosedContainerWithQuasiClosedReplica()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+    ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            HddsProtos.NodeOperationalState.IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED);
+    replicas.add(quasiClosedReplica);
+
+    // Ensure a mis-replicated status is returned when 4 or fewer replicas are
+    // checked.
+    Mockito.when(policy.validateContainerPlacement(
+            Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+
+    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
+        Collections.emptyList(), getOverReplicatedHealthResult(), 2);
+    Assert.assertTrue(
+        commands.containsKey(quasiClosedReplica.getDatanodeDetails()));
+  }
+
+  @Test
+  public void testOverReplicatedWithDecomAndMaintenanceReplicas()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+    ContainerReplica decommissioningReplica =
+        createContainerReplica(container.containerID(), 0,
+            HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            ContainerReplicaProto.State.CLOSED);
+    ContainerReplica maintenanceReplica =
+        createContainerReplica(container.containerID(), 0,
+            HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+            ContainerReplicaProto.State.CLOSED);
+    replicas.add(decommissioningReplica);
+    replicas.add(maintenanceReplica);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
+        Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    Assert.assertFalse(
+        commands.containsKey(decommissioningReplica.getDatanodeDetails()));
+    Assert.assertFalse(
+        commands.containsKey(maintenanceReplica.getDatanodeDetails()));
+  }
+
+  @Test
+  public void testPerfectlyReplicatedContainer() throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+
+    // now test 4 replicas and 1 pending delete
+    replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
+  }
+
+  /**
+   * Tests whether the specified expectNumCommands number of commands are
+   * created by the handler.
+   *
+   * @param replicas          All replicas of the container
+   * @param pendingOps        Collection of pending ops
+   * @param healthResult      ContainerHealthResult that should be passed to the
+   *                          handler
+   * @param expectNumCommands number of commands expected to be created by
+   *                          the handler
+   * @return map of commands
+   */
+  private Map<DatanodeDetails, SCMCommand<?>> testProcessing(
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
+      ContainerHealthResult healthResult,
+      int expectNumCommands) throws IOException {
+    RatisOverReplicationHandler handler =
+        new RatisOverReplicationHandler(policy);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands =
+        handler.processAndCreateCommands(replicas, pendingOps,
+            healthResult, 2);
+    Assert.assertEquals(expectNumCommands, commands.size());
+
+    return commands;
+  }
+
+  private ContainerHealthResult.OverReplicatedHealthResult
+      getOverReplicatedHealthResult() {
+    ContainerHealthResult.OverReplicatedHealthResult healthResult =
+        Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
+    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
+    return healthResult;
+  }
+}

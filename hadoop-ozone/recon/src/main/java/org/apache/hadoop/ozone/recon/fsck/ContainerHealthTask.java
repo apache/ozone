@@ -24,6 +24,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -56,6 +58,8 @@ public class ContainerHealthTask extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
 
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
+
   private StorageContainerServiceProvider scmClient;
   private ContainerManager containerManager;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
@@ -79,32 +83,41 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   @Override
-  public synchronized void run() {
+  public void run() {
     try {
       while (canRun()) {
-        wait(interval);
-        long start = Time.monotonicNow();
-        long currentTime = System.currentTimeMillis();
-        long existingCount = processExistingDBRecords(currentTime);
-        LOG.info("Container Health task thread took {} milliseconds to" +
-                " process {} existing database records.",
-            Time.monotonicNow() - start, existingCount);
-        start = Time.monotonicNow();
-        final List<ContainerInfo> containers = containerManager.getContainers();
-        containers.stream()
-            .filter(c -> !processedContainers.contains(c))
-            .forEach(c -> processContainer(c, currentTime));
-        recordSingleRunCompletion();
-        LOG.info("Container Health task thread took {} milliseconds for" +
-                " processing {} containers.", Time.monotonicNow() - start,
-            containers.size());
-        processedContainers.clear();
+        triggerContainerHealthCheck();
+        Thread.sleep(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+    }
+  }
+
+  public void triggerContainerHealthCheck() {
+    lock.writeLock().lock();
+    try {
+      long start = Time.monotonicNow();
+      long currentTime = System.currentTimeMillis();
+      long existingCount = processExistingDBRecords(currentTime);
+      LOG.info("Container Health task thread took {} milliseconds to" +
+              " process {} existing database records.",
+          Time.monotonicNow() - start, existingCount);
+      start = Time.monotonicNow();
+      final List<ContainerInfo> containers = containerManager.getContainers();
+      containers.stream()
+          .filter(c -> !processedContainers.contains(c))
+          .forEach(c -> processContainer(c, currentTime));
+      recordSingleRunCompletion();
+      LOG.info("Container Health task thread took {} milliseconds for" +
+              " processing {} containers.", Time.monotonicNow() - start,
+          containers.size());
+      processedContainers.clear();
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 

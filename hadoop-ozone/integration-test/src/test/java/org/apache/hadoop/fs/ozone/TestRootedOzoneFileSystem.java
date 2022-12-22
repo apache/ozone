@@ -22,6 +22,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -35,7 +36,6 @@ import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -89,10 +89,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.HashMap;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -316,6 +316,44 @@ public class TestRootedOzoneFileSystem {
 
     // Cleanup
     fs.delete(grandparent, true);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDirWithECEnabled()
+          throws Exception {
+    String key = "object-dir/object-name1";
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    new ECReplicationConfig("RS-3-2-1024"),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+
+    List<String> dirs = Arrays.asList(volumeName, bucketName, "object-dir",
+            "object-name1");
+    for (int size = 1; size <= dirs.size(); size++) {
+      String path = "/" + dirs.subList(0, size).stream()
+              .collect(Collectors.joining("/"));
+      Path parent = new Path(path);
+      // Wait until the filestatus is updated
+      if (!enabledFileSystemPaths) {
+        GenericTestUtils.waitFor(() -> {
+          try {
+            fs.getFileStatus(parent);
+            return true;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 1000, 120000);
+      }
+      FileStatus fileStatus = fs.getFileStatus(parent);
+      Assert.assertEquals((size == dirs.size() - 1 &&
+           !bucketLayout.isFileSystemOptimized()) || size == dirs.size(),
+           fileStatus.isErasureCoded());
+    }
+
   }
 
   @Test

@@ -20,10 +20,12 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.PrivateKey;
@@ -39,7 +41,7 @@ import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes
  * Certificate client provides and interface to certificate operations that
  * needs to be performed by all clients in the Ozone eco-system.
  */
-public interface CertificateClient {
+public interface CertificateClient extends Closeable {
 
   /**
    * Returns the private key of the specified component if it exists on the
@@ -323,4 +325,13 @@ public interface CertificateClient {
    */
   boolean processCrl(CRLInfo crl);
 
+  /**
+   * Return the store factory for key manager and trust manager for server.
+   */
+  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
+
+  /**
+   * Return the store factory for key manager and trust manager for client.
+   */
+  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
 }
