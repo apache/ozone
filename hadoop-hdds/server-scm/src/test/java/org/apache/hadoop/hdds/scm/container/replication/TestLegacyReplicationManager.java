@@ -697,13 +697,17 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1, replicationManager.getMetrics()
           .getInflightReplication());
 
-      // We should have one under replicated and one quasi_closed_stuck
+      // The quasi closed container cannot be closed, but it should have been
+      // restored to full replication on the previous run.
+      // The unhealthy replica should remain until the next iteration.
       ReplicationManagerReport report = replicationManager.getContainerReport();
       Assertions.assertEquals(1, report.getStat(LifeCycleState.QUASI_CLOSED));
       Assertions.assertEquals(1, report.getStat(
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
-      Assertions.assertEquals(1, report.getStat(
+      Assertions.assertEquals(0, report.getStat(
           ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+      Assertions.assertEquals(1, report.getStat(
+          ReplicationManagerReport.HealthState.UNHEALTHY));
 
       // Create the replica so replication manager sees it on the next run.
       List<CommandForDatanode> replicateCommands = datanodeCommandHandler
@@ -1369,7 +1373,7 @@ public class TestLegacyReplicationManager {
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
       Assertions.assertEquals(1, report.getStat(
           ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-      Assertions.assertEquals(0, report.getStat(
+      Assertions.assertEquals(1, report.getStat(
           ReplicationManagerReport.HealthState.UNHEALTHY));
 
       List<CommandForDatanode> replicateCommands = datanodeCommandHandler

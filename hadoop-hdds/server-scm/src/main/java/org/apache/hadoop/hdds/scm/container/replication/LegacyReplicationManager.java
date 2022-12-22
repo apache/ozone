@@ -521,21 +521,31 @@ public class LegacyReplicationManager {
          * Check if the container is under replicated and take appropriate
          * action.
          */
-        updateReportReplicationStats(container.containerID(),
-            placementStatus, replicaSet, report);
         boolean sufficientlyReplicated = replicaSet.isSufficientlyReplicated();
         boolean placementSatisfied = placementStatus.isPolicySatisfied();
+        ContainerID containerID = container.containerID();
+        if (!placementStatus.isPolicySatisfied()) {
+          report.incrementAndSample(HealthState.MIS_REPLICATED, containerID);
+        }
+        if (!replicaSet.isHealthy()) {
+          report.incrementAndSample(HealthState.UNHEALTHY, containerID);
+        }
         if (!sufficientlyReplicated || !placementSatisfied) {
           // Replicate container if needed.
           if (!inflightReplication.isFull() || !inflightDeletion.isFull()) {
-            if (!replicaSet.isUnrecoverable()) {
+            if (replicaSet.isUnrecoverable()) {
+              // There are no healthy or unhealthy replicas.
+              report.incrementAndSample(HealthState.MISSING, containerID);
+              report.incrementAndSample(HealthState.UNDER_REPLICATED,
+                  containerID);
+            } else {
               if (replicaSet.getHealthyReplicaCount() == 0 &&
                   replicaSet.getUnhealthyReplicaCount() != 0) {
                 handleAllReplicasUnhealthy(container, replicaSet,
-                    placementStatus);
+                    placementStatus, report);
               } else {
                 handleUnderReplicatedHealthy(container,
-                    replicaSet, placementStatus);
+                    replicaSet, placementStatus, report);
               }
             }
           }
@@ -547,7 +557,7 @@ public class LegacyReplicationManager {
          * action.
          */
         if (replicaSet.isOverReplicated()) {
-          handleOverReplicatedHealthy(container, replicaSet);
+          handleOverReplicatedHealthy(container, replicaSet, report);
           return;
         }
 
@@ -557,54 +567,13 @@ public class LegacyReplicationManager {
        are not in the same state as the container itself.
        */
         if (!replicaSet.isHealthy()) {
-          report.incrementAndSample(HealthState.UNHEALTHY,
-              container.containerID());
-          report.incrementAndSample(HealthState.OVER_REPLICATED,
-              container.containerID());
-          handleOverReplicatedExcessUnhealthy(container, replicaSet);
+          handleOverReplicatedExcessUnhealthy(container, replicaSet, report);
         }
       }
     } catch (ContainerNotFoundException ex) {
       LOG.warn("Missing container {}.", id);
     } catch (Exception ex) {
       LOG.warn("Process container {} error: ", id, ex);
-    }
-  }
-
-  private void updateReportReplicationStats(ContainerID containerID,
-      ContainerPlacementStatus placementStatus,
-      RatisContainerReplicaCount replicaSet, ReplicationManagerReport report) {
-
-    if (!replicaSet.isSufficientlyReplicated()) {
-      if (replicaSet.getHealthyReplicaCount() == 0) {
-        if (replicaSet.isUnrecoverable()) {
-          // There are no healthy or unhealthy replicas.
-          report.incrementAndSample(HealthState.MISSING, containerID);
-          report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
-        } else {
-          // There are only unhealthy replicas.
-          // Over/under replicated status is determined by the number of
-          // unhealthy replicas.
-          int numUnhealthyReplicas = replicaSet.getUnhealthyReplicaCount();
-          if (numUnhealthyReplicas > replicaSet.getReplicationFactor()) {
-            report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
-          } else if (numUnhealthyReplicas < replicaSet.getReplicationFactor()) {
-            report.incrementAndSample(HealthState.UNDER_REPLICATED,
-                containerID);
-          }
-        }
-      } else {
-        // There is at least one healthy replica, so it is under replicated.
-        report.incrementAndSample(HealthState.UNDER_REPLICATED, containerID);
-      }
-    }
-
-    if (!placementStatus.isPolicySatisfied()) {
-      report.incrementAndSample(HealthState.MIS_REPLICATED, containerID);
-    }
-
-    if (replicaSet.isOverReplicated()) {
-      report.incrementAndSample(HealthState.OVER_REPLICATED, containerID);
     }
   }
 
@@ -1164,7 +1133,8 @@ public class LegacyReplicationManager {
    */
   private void handleUnderReplicatedHealthy(final ContainerInfo container,
       final RatisContainerReplicaCount replicaSet,
-      final ContainerPlacementStatus placementStatus) {
+      final ContainerPlacementStatus placementStatus,
+      ReplicationManagerReport report) {
     LOG.debug("Handling under-replicated container: {}", container);
     if (replicaSet.isSufficientlyReplicated()
         && placementStatus.isPolicySatisfied()) {
@@ -1178,6 +1148,11 @@ public class LegacyReplicationManager {
     int numCloseCommandsSent = closeReplicasIfPossible(container, allReplicas);
     int replicasNeeded =
         replicaSet.additionalReplicaNeeded() - numCloseCommandsSent;
+
+    if (replicasNeeded > 0) {
+      report.incrementAndSample(HealthState.UNDER_REPLICATED,
+          container.containerID());
+    }
 
     List<ContainerReplica> replicationSources = getReplicationSources(container,
         replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
@@ -1196,7 +1171,8 @@ public class LegacyReplicationManager {
    *                   current replica count and inflight adds and deletes
    */
   private void handleOverReplicatedHealthy(final ContainerInfo container,
-      final RatisContainerReplicaCount replicaSet) {
+      final RatisContainerReplicaCount replicaSet,
+      ReplicationManagerReport report) {
 
     final ContainerID id = container.containerID();
     final int replicationFactor =
@@ -1206,6 +1182,9 @@ public class LegacyReplicationManager {
       LOG.info("Container {} is over replicated. Expected replica count" +
                       " is {}, but found {}.", id, replicationFactor,
               replicationFactor + excess);
+
+      report.incrementAndSample(HealthState.OVER_REPLICATED,
+          container.containerID());
 
       // The list of replicas that we can potentially delete to fix the over
       // replicated state. This method is only concerned with healthy replicas.
@@ -1239,7 +1218,8 @@ public class LegacyReplicationManager {
    */
   private void handleAllReplicasUnhealthy(ContainerInfo container,
       RatisContainerReplicaCount replicaSet,
-      ContainerPlacementStatus placementStatus) {
+      ContainerPlacementStatus placementStatus,
+      ReplicationManagerReport report) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
     int excessReplicas = replicas.size() -
@@ -1248,10 +1228,10 @@ public class LegacyReplicationManager {
 
     if (missingReplicas > 0) {
       handleUnderReplicatedAllUnhealthy(container, replicas,
-          placementStatus, missingReplicas);
+          placementStatus, missingReplicas, report);
     } else if (excessReplicas > 0) {
       handleOverReplicatedAllUnhealthy(container, replicas,
-          excessReplicas);
+          excessReplicas, report);
     } else {
       // We have the correct number of unhealthy replicas. See if any of them
       // can be closed.
@@ -1269,7 +1249,8 @@ public class LegacyReplicationManager {
    */
   private void handleOverReplicatedExcessUnhealthy(
       final ContainerInfo container,
-      final RatisContainerReplicaCount replicaSet) {
+      final RatisContainerReplicaCount replicaSet,
+      ReplicationManagerReport report) {
     // Note - ReplicationManager would reach here only if the
     // following conditions are met:
     //   1. Container is in either CLOSED or QUASI-CLOSED state
@@ -1283,27 +1264,28 @@ public class LegacyReplicationManager {
     // Only unhealthy replicas which cannot be closed will remain eligible
     // for deletion, since this method is deleting unhealthy containers only.
     closeReplicasIfPossible(container, unhealthyReplicas);
-    if (unhealthyReplicas.isEmpty()) {
-      return;
-    } else {
+    if (!unhealthyReplicas.isEmpty()) {
       LOG.info("Container {} has {} excess unhealthy replicas. Excess " +
               "unhealthy replicas will be deleted.",
           container.getContainerID(), unhealthyReplicas.size());
-    }
 
-    int excessReplicaCount = replicas.size() -
-        container.getReplicationConfig().getRequiredNodes();
-    if (container.getState() == LifeCycleState.CLOSED) {
-      // The container is already closed. The unhealthy replicas are extras
-      // and unnecessary.
-      deleteExcess(container, unhealthyReplicas, excessReplicaCount);
-    } else {
-      // Container is not yet closed.
-      // We only need to save the unhealthy replicas if they
-      // represent unique origin node IDs. If recovering these replicas is
-      // possible in the future they could be used to close the container.
-      deleteExcessWithNonUniqueOriginNodeIDs(container,
-          replicaSet.getReplicas(), unhealthyReplicas, excessReplicaCount);
+      report.incrementAndSample(HealthState.OVER_REPLICATED,
+          container.containerID());
+
+      int excessReplicaCount = replicas.size() -
+          container.getReplicationConfig().getRequiredNodes();
+      if (container.getState() == LifeCycleState.CLOSED) {
+        // The container is already closed. The unhealthy replicas are extras
+        // and unnecessary.
+        deleteExcess(container, unhealthyReplicas, excessReplicaCount);
+      } else {
+        // Container is not yet closed.
+        // We only need to save the unhealthy replicas if they
+        // represent unique origin node IDs. If recovering these replicas is
+        // possible in the future they could be used to close the container.
+        deleteExcessWithNonUniqueOriginNodeIDs(container,
+            replicaSet.getReplicas(), unhealthyReplicas, excessReplicaCount);
+      }
     }
   }
 
@@ -1995,7 +1977,8 @@ public class LegacyReplicationManager {
    * already represented by other replicas.
    */
   private void handleOverReplicatedAllUnhealthy(ContainerInfo container,
-      List<ContainerReplica> replicas, int excess) {
+      List<ContainerReplica> replicas, int excess,
+      ReplicationManagerReport report) {
     List<ContainerReplica> deleteCandidates =
         getUnhealthyDeletionCandidates(container, replicas);
 
@@ -2007,6 +1990,8 @@ public class LegacyReplicationManager {
     }
 
     if (excess > 0) {
+      report.incrementAndSample(HealthState.OVER_REPLICATED,
+          container.containerID());
       int replicationFactor = container.getReplicationFactor().getNumber();
       LOG.info("Container {} has all unhealthy replicas and is over " +
               "replicated. Expected replica count" +
@@ -2041,8 +2026,10 @@ public class LegacyReplicationManager {
    */
   private void handleUnderReplicatedAllUnhealthy(ContainerInfo container,
       List<ContainerReplica> replicas, ContainerPlacementStatus placementStatus,
-      int additionalReplicasNeeded) {
+      int additionalReplicasNeeded, ReplicationManagerReport report) {
 
+    report.incrementAndSample(HealthState.UNDER_REPLICATED,
+        container.containerID());
     int numCloseCmdsSent = closeReplicasIfPossible(container, replicas);
     // Only replicate unhealthy containers if none of the unhealthy replicas
     // could be closed. If we sent a close command to an unhealthy replica,
