@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +40,6 @@ public class ECReconstructionCoordinatorTask implements Runnable {
   private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
-  private long deadlineMsSinceEpoch = 0;
   private final Clock clock;
 
   public ECReconstructionCoordinatorTask(
@@ -80,6 +80,15 @@ public class ECReconstructionCoordinatorTask implements Runnable {
                 " {} since the current time {}ms is past the deadline {}ms",
             containerID, clock.millis(),
             reconstructionCommandInfo.getDeadline());
+        return;
+      }
+
+      final OptionalLong currentTerm =
+          reconstructionCoordinator.getTermOfLeaderSCM();
+      final long taskTerm = reconstructionCommandInfo.getTerm();
+      if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
+        LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
+            this, taskTerm, currentTerm.getAsLong());
         return;
       }
 

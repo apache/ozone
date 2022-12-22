@@ -41,7 +41,9 @@ public class PrometheusMetricsSink implements MetricsSink {
   /**
    * Cached output lines for each metrics.
    */
-  private final Map<String, Map<String, String>> metricLines =
+  private Map<String, Map<String, String>> metricLines =
+      Collections.synchronizedSortedMap(new TreeMap<>());
+  private Map<String, Map<String, String>> nextMetricLines =
       Collections.synchronizedSortedMap(new TreeMap<>());
   private final String servername;
 
@@ -51,18 +53,18 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   @Override
   public void putMetrics(MetricsRecord metricsRecord) {
-    for (AbstractMetric metrics : metricsRecord.metrics()) {
-      if (metrics.type() == MetricType.COUNTER
-          || metrics.type() == MetricType.GAUGE) {
+    for (AbstractMetric metric : metricsRecord.metrics()) {
+      if (metric.type() == MetricType.COUNTER
+          || metric.type() == MetricType.GAUGE) {
 
         String metricName =
             PrometheusMetricsSinkUtil.getMetricName(metricsRecord.name(),
-                metrics.name());
+                metric.name());
 
         // If there is no username this should be null
         String username =
             PrometheusMetricsSinkUtil.getUsername(metricsRecord.name(),
-                metrics.name());
+                metric.name());
 
         String key = PrometheusMetricsSinkUtil.prometheusName(
             metricsRecord.name(), metricName);
@@ -73,11 +75,13 @@ public class PrometheusMetricsSink implements MetricsSink {
         String metricKey = "# TYPE "
             + key
             + " "
-            + metrics.type().toString().toLowerCase();
+            + metric.type().toString().toLowerCase();
 
-        metricLines.computeIfAbsent(metricKey,
-                any -> Collections.synchronizedSortedMap(new TreeMap<>()))
-            .put(prometheusMetricKeyAsString, String.valueOf(metrics.value()));
+        synchronized (this) {
+          nextMetricLines.computeIfAbsent(metricKey,
+                  any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+              .put(prometheusMetricKeyAsString, String.valueOf(metric.value()));
+        }
       }
     }
   }
@@ -116,7 +120,11 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   @Override
   public void flush() {
-
+    synchronized (this) {
+      metricLines = nextMetricLines;
+      nextMetricLines = Collections
+          .synchronizedSortedMap(new TreeMap<>());
+    }
   }
 
   @Override
@@ -124,14 +132,15 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   }
 
-  public void writeMetrics(Writer writer) throws IOException {
-    for (Map.Entry<String, Map<String, String>> metricEntry
+  public synchronized void writeMetrics(Writer writer)
+      throws IOException {
+    for (Map.Entry<String, Map<String, String>> metricsEntry
         : metricLines.entrySet()) {
-      writer.write(metricEntry.getKey() + "\n");
+      writer.write(metricsEntry.getKey() + "\n");
 
-      for (Map.Entry<String, String> metric
-          : metricEntry.getValue().entrySet()) {
-        writer.write(metric.getKey() + " " + metric.getValue() + "\n");
+      for (Map.Entry<String, String> metrics
+          : metricsEntry.getValue().entrySet()) {
+        writer.write(metrics.getKey() + " " + metrics.getValue() + "\n");
       }
     }
   }

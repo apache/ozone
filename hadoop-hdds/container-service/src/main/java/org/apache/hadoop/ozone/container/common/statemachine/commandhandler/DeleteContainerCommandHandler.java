@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -73,26 +74,44 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     final DeleteContainerCommand deleteContainerCommand =
         (DeleteContainerCommand) command;
     final ContainerController controller = ozoneContainer.getController();
-    executor.execute(() -> {
-      final long startTime = Time.monotonicNow();
-      invocationCount.incrementAndGet();
-      try {
-        if (command.hasExpired(clock.millis())) {
-          LOG.info("Not processing the delete container command for " +
-              "container {} as the current time {}ms is after the command " +
-              "deadline {}ms", deleteContainerCommand.getContainerID(),
-              clock.millis(), command.getDeadline());
-          timeoutCount.incrementAndGet();
+    executor.execute(() ->
+        handleInternal(command, context, deleteContainerCommand, controller));
+  }
+
+  private void handleInternal(SCMCommand command, StateContext context,
+      DeleteContainerCommand deleteContainerCommand,
+      ContainerController controller) {
+    final long startTime = Time.monotonicNow();
+    invocationCount.incrementAndGet();
+    try {
+      if (command.hasExpired(clock.millis())) {
+        LOG.info("Not processing the delete container command for " +
+            "container {} as the current time {}ms is after the command " +
+            "deadline {}ms", deleteContainerCommand.getContainerID(),
+            clock.millis(), command.getDeadline());
+        timeoutCount.incrementAndGet();
+        return;
+      }
+
+      if (context != null) {
+        final OptionalLong currentTerm = context.getTermOfLeaderSCM();
+        final long cmdTerm = command.getTerm();
+        if (currentTerm.isPresent() && cmdTerm < currentTerm.getAsLong()) {
+          LOG.info("Ignoring delete container command for container {} since " +
+              "SCM leader has new term ({} < {})",
+              deleteContainerCommand.getContainerID(),
+              cmdTerm, currentTerm.getAsLong());
           return;
         }
-        controller.deleteContainer(deleteContainerCommand.getContainerID(),
-            deleteContainerCommand.isForce());
-      } catch (IOException e) {
-        LOG.error("Exception occurred while deleting the container.", e);
-      } finally {
-        totalTime.getAndAdd(Time.monotonicNow() - startTime);
       }
-    });
+
+      controller.deleteContainer(deleteContainerCommand.getContainerID(),
+          deleteContainerCommand.isForce());
+    } catch (IOException e) {
+      LOG.error("Exception occurred while deleting the container.", e);
+    } finally {
+      totalTime.getAndAdd(Time.monotonicNow() - startTime);
+    }
   }
 
   @Override

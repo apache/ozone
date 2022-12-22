@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -71,7 +72,9 @@ public interface PlacementPolicy<Replica> {
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas
+   * @param replicas: Map of replicas with value signifying if
+   *                  replica can be copied
    */
-  Set<Replica> replicasToCopyToFixMisreplication(Set<Replica> replicas);
+  Set<Replica> replicasToCopyToFixMisreplication(
+          Map<Replica, Boolean> replicas);
 }

@@ -91,13 +91,13 @@ public class ClusterStateEndpoint {
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
     int containers = this.containerManager.getContainers().size();
     int pipelines = this.pipelineManager.getPipelines().size();
-    List<UnhealthyContainers> unhealthyContainers = containerHealthSchemaManager
+    List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0, MISSING_CONTAINER_COUNT_LIMIT);
-    int totalMissingContainerCount = unhealthyContainers.size() ==
+    int totalMissingContainerCount = missingContainers.size() ==
         MISSING_CONTAINER_COUNT_LIMIT ?
-        MISSING_CONTAINER_COUNT_LIMIT : unhealthyContainers.size();
+        MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size();
     int openContainersCount = this.containerManager.getContainerStateCount(
         HddsProtos.LifeCycleState.OPEN);
     int healthyDatanodes =
