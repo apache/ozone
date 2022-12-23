@@ -124,6 +124,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     }
     assertEquals(2, actualPairsContainerCount.size(),
         "Unexpected number of columns");
+    assertEquals(expectedPairsFileCount, actualPairsFileCount,
+        "Columns Do not Match ");
 
   }
 

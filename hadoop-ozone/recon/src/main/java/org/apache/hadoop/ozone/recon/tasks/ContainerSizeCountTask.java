@@ -34,7 +34,10 @@ import org.jooq.Record1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 
@@ -109,9 +112,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
     for (ContainerInfo container : containers) {
       // The containers present in both the processed containers map and
       // also in cache are the ones that have not been deleted
-      deletedContainers.remove(container);
-      if (!processedContainers.containsKey( // For New Container being created
-          container.getContainerID())) {
+      deletedContainers.remove(container.containerID());
+      // For New Container being created
+      if (!processedContainers.containsKey(container.containerID())) {
         processedContainers.put(container.containerID(),
             container.getUsedBytes());
         handlePutKeyEvent(container.getUsedBytes(),
@@ -127,7 +130,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       }
     }
     // Loop to handle Container delete operations
-    for (ContainerID containerId : deletedContainers.keySet()) {
+    for (Map.Entry<ContainerID, Long> containerId : deletedContainers.entrySet()) {
       // The containers which were not present in cache but were still there
       // in the processed containers map are the ones that have been deleted
       processedContainers.remove(containerId);
