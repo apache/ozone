@@ -18,14 +18,15 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
 import org.apache.hadoop.ozone.client.OzoneClientException;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -47,26 +48,34 @@ public class TestOzoneAddress {
     });
   }
 
-  private String prefix;
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
+
+  private final String prefix;
+  private OzoneAddress address;
 
   public TestOzoneAddress(String prefix) {
     this.prefix = prefix;
   }
 
   @Test
-  public void checkUrlTypes() throws OzoneClientException, IOException {
-    OzoneAddress address;
-
+  public void checkRootUrlType() throws OzoneClientException {
     address = new OzoneAddress("");
     address.ensureRootAddress();
 
     address = new OzoneAddress(prefix + "");
     address.ensureRootAddress();
+  }
 
+  @Test
+  public void checkVolumeUrlType() throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1");
     address.ensureVolumeAddress();
     Assert.assertEquals("vol1", address.getVolumeName());
+  }
 
+  @Test
+  public void checkBucketUrlType() throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket");
     address.ensureBucketAddress();
     Assert.assertEquals("vol1", address.getVolumeName());
@@ -76,7 +85,10 @@ public class TestOzoneAddress {
     address.ensureBucketAddress();
     Assert.assertEquals("vol1", address.getVolumeName());
     Assert.assertEquals("bucket", address.getBucketName());
+  }
 
+  @Test
+  public void checkKeyUrlType() throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket/key");
     address.ensureKeyAddress();
     Assert.assertEquals("vol1", address.getVolumeName());
@@ -96,7 +108,10 @@ public class TestOzoneAddress {
     Assert.assertEquals("key1/key3/key", address.getKeyName());
     Assert.assertFalse("this should not be a prefix",
         address.isPrefix());
+  }
 
+  @Test
+  public void checkPrefixUrlType() throws OzoneClientException {
     address = new OzoneAddress(prefix + "vol1/bucket/prefix");
     address.ensurePrefixAddress();
     Assert.assertEquals("vol1", address.getVolumeName());
@@ -104,6 +119,22 @@ public class TestOzoneAddress {
     Assert.assertEquals("prefix", address.getKeyName());
     Assert.assertTrue("this should be a prefix",
         address.isPrefix());
+  }
 
+  @Test
+  public void checkSnapshotUrlType() throws OzoneClientException {
+    address = new OzoneAddress(prefix + "vol1/bucket/.snapshot/snap1");
+    address.ensureSnapshotAddress();
+    Assert.assertEquals("vol1", address.getVolumeName());
+    Assert.assertEquals("bucket", address.getBucketName());
+    Assert.assertEquals(".snapshot/snap1", address.getSnapshotName());
+    Assert.assertEquals(".snapshot/snap1", address.getKeyName());
+
+    address = new OzoneAddress(prefix + "vol1/bucket/.snapshot/snap1/key1");
+
+    exception.expect(OzoneClientException.class);
+    exception.expectMessage("Invalid snapshot address.");
+
+    address.ensureSnapshotAddress();
   }
 }

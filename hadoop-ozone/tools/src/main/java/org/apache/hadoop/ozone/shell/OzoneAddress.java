@@ -54,6 +54,8 @@ public class OzoneAddress {
 
   private String bucketName = "";
 
+  private String snapshotName = "";
+
   private String keyName = "";
 
   private boolean isPrefix = false;
@@ -293,6 +295,10 @@ public class OzoneAddress {
     return bucketName;
   }
 
+  public String getSnapshotName() {
+    return snapshotName;
+  }
+
   public String getKeyName() {
     return keyName;
   }
@@ -340,6 +346,27 @@ public class OzoneAddress {
     } else if (bucketName.length() == 0) {
       throw new OzoneClientException(
           "Bucket name is missing");
+    }
+  }
+
+  public void ensureSnapshotAddress()
+      throws OzoneClientException {
+    if (keyName.length() == 0) {
+      throw new OzoneClientException(
+          "Snapshot name is missing.");
+    } else if (volumeName.length() == 0) {
+      throw new OzoneClientException(
+          "Volume name is missing.");
+    } else if (bucketName.length() == 0) {
+      throw new OzoneClientException(
+          "Bucket name is missing.");
+    }
+
+    if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+      snapshotName += keyName;
+    } else {
+      throw new OzoneClientException(
+          "Invalid snapshot address.");
     }
   }
 
