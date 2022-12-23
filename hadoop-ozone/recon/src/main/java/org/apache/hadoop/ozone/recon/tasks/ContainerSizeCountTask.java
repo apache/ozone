@@ -75,6 +75,12 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
 
+  /**
+   * The run() method is the main loop of the ContainerSizeCountTask class.
+   * It periodically retrieves a list of containers from the containerManager,
+   * and then calls either to reprocess() or process() method depending on
+   * whether the processedContainers map is empty or not.
+   */
   @Override
   protected synchronized void run() {
     try {
@@ -104,6 +110,32 @@ public class ContainerSizeCountTask extends ReconScmTask {
     }
   }
 
+
+  /**
+   * The process() function is responsible for updating the counts of
+   * containers being tracked in a containerSizeCountMap based on the
+   * ContainerInfo objects in the list containers.It then iterates through
+   * the list of containers and does the following for each container:
+   *
+   * 1) If the container is not present in processedContainers,
+   *    it is a new container, so it is added to the processedContainers map
+   *    and the count for its size in the containerSizeCountMap is incremented
+   *    by 1 using the handlePutKeyEvent() function.
+   * 2) If the container is present in processedContainers but its size has
+   *    the processedContainers map is updated to the new size and the count for
+   *    the old size in the containerSizeCountMap is decremented by 1 using the
+   *    handleDeleteKeyEvent() function. The count for the new size is then
+   *    incremented by 1 using the handlePutKeyEvent() function.
+   * 3) If the container is present in both processedContainers and containers,
+   *    it means the container has not been deleted. Therefore, it is removed
+   *    from the deletedContainers map.
+   *
+   * The remaining containers inside the deletedContainers map are the ones
+   * that are not in the cluster and need to be deleted. Finally, the counts in
+   * the containerSizeCountMap are written to the database using the
+   * writeCountsToDB() function.
+   */
+
   private void process(List<ContainerInfo> containers) {
     Map<ContainerSizeCountKey, Long> containerSizeCountMap = new HashMap<>();
     Map<ContainerID, Long> deletedContainers = new HashMap<>();
@@ -130,7 +162,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
       }
     }
     // Loop to handle Container delete operations
-    for (Map.Entry<ContainerID, Long> containerId : deletedContainers.entrySet()) {
+    for (Map.Entry<ContainerID, Long> containerId :
+        deletedContainers.entrySet()) {
       // The containers which were not present in cache but were still there
       // in the processed containers map are the ones that have been deleted
       processedContainers.remove(containerId);
@@ -161,6 +194,21 @@ public class ContainerSizeCountTask extends ReconScmTask {
   /**
    * Populate DB with the counts of container sizes calculated
    * using the dao.
+   * <p>
+   * The writeCountsToDB function updates the database with the count of
+   * container sizes. It does this by creating two lists of records to be
+   * inserted or updated in the database. It iterates over the keys of the
+   * containerSizeCountMap and creates a new record for each key. It then
+   * checks whether the database has been truncated or not. If it has not been
+   * truncated, it attempts to find the current count for the container size
+   * in the database and either inserts a new record or updates the current
+   * record with the updated count. If the database has been truncated,
+   * it only inserts a new record if the count is non-zero. Finally, it
+   * uses the containerCountBySizeDao to insert the new records and update
+   * the existing records in the database.
+   *
+   * @param isDbTruncated that checks if the database has been truncated or not.
+   * @param containerSizeCountMap stores counts of container sizes
    */
   private void writeCountsToDB(boolean isDbTruncated,
                                Map<ContainerSizeCountKey, Long>
@@ -205,6 +253,15 @@ public class ContainerSizeCountTask extends ReconScmTask {
   /**
    * Calculate and update the count of containers being tracked by
    * containerSizeCountMap.
+   *
+   * The function calculates the upper size bound of the size range that the
+   * given container size belongs to, using the getContainerSizeCountKey
+   * function. It then increments the count of containers belonging to that
+   * size range by 1. If the map does not contain an entry for the calculated
+   * size range, the count is set to +1. The updated count is then stored in
+   * the map under the calculated size range. This function is used to handle
+   * a create event, i.e., when a container is created in the cluster.
+   *
    * Used by reprocess() and process().
    *
    * @param containerSize to calculate the upperSizeBound
@@ -220,6 +277,15 @@ public class ContainerSizeCountTask extends ReconScmTask {
   /**
    * Calculate and update the count of container being tracked by
    * containerSizeCountMap.
+   *
+   * The function calculates the upper size bound of the size range that the
+   * given container size belongs to, using the getContainerSizeCountKey
+   * function. It then decrements the count of containers belonging to that
+   * size range by 1. If the map does not contain an entry for the calculated
+   * size range, the count is set to -1. The updated count is then stored in
+   * the map under the calculated size range. This function is used to handle
+   * a delete event, i.e., when a container is deleted from the cluster.
+   *
    * Used by process().
    *
    * @param containerSize to calculate the upperSizeBound
@@ -232,6 +298,18 @@ public class ContainerSizeCountTask extends ReconScmTask {
     containerSizeCountMap.put(key, count);
   }
 
+  /**
+   *
+   * The purpose of this function is to categorize containers into different
+   * size ranges, or "bins," based on their size.
+   * The ContainerSizeCountKey object is used to store the upper bound value
+   * for each size range, and is later used to lookup the count of containers
+   * in that size range within a Map.
+   *
+   * Used by handleDeleteKeyEvent() and handlePutKeyEvent()
+   *
+   * @param containerSize to calculate the upperSizeBound
+   */
   private ContainerSizeCountKey getContainerSizeCountKey(
       long containerSize) {
     return new ContainerSizeCountKey(
@@ -241,6 +319,11 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
 
+  /**
+   *  The ContainerSizeCountKey class is a simple key class that has a single
+   *  field, containerSizeUpperBound, which is a Long representing the upper
+   *  bound of the container size range.
+   */
   private static class ContainerSizeCountKey {
 
     private Long containerSizeUpperBound;
