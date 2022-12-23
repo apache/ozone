@@ -268,8 +268,15 @@ public class DatanodeSimulator implements Callable<Void> {
   }
 
   private void loadOrCreateDatanodes() throws UnknownHostException {
+    List<InetSocketAddress> allEndpoints = new LinkedList<>(
+        scmClients.keySet());
+    allEndpoints.add(reconAddress);
+
     if (reload) {
       datanodes = loadDatanodesFromFile();
+      for (DatanodeSimulationState datanode : datanodes) {
+        datanode.initEndpointsState(allEndpoints);
+      }
     } else {
       datanodes = new ArrayList<>(datanodesCount);
     }
@@ -279,9 +286,6 @@ public class DatanodeSimulator implements Callable<Void> {
         HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    List<InetSocketAddress> allEndpoints = new LinkedList<>(
-        scmClients.keySet());
-    allEndpoints.add(reconAddress);
 
     for (int i = datanodes.size(); i < datanodesCount; i++) {
       datanodes.add(new DatanodeSimulationState(randomDatanodeDetails(conf),
@@ -413,7 +417,7 @@ public class DatanodeSimulator implements Callable<Void> {
       }
     } catch (Exception e) {
       LOGGER.info("Error sending heartbeat for {}: {}",
-          dn.getDatanodeDetails().getUuidString(), e.getMessage());
+          dn.getDatanodeDetails().getUuidString(), e.getMessage(), e);
     }
   }
 

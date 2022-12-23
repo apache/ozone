@@ -81,13 +81,17 @@ class DatanodeSimulationState {
     this();
     this.datanodeDetails = datanodeDetails;
     this.fullContainerReportDurationMs = fullContainerReportDurationMs;
-    for (InetSocketAddress endpoint : allEndpoints) {
-      endpointStates.put(endpoint, new EndpointState());
-    }
+    initEndpointsState(allEndpoints);
     this.targetContainersCount = targetContainersCount;
   }
 
   DatanodeSimulationState() {
+  }
+
+  void initEndpointsState(List<InetSocketAddress> allEndpoints) {
+    for (InetSocketAddress endpoint : allEndpoints) {
+      endpointStates.put(endpoint, new EndpointState());
+    }
   }
 
   public synchronized void ackHeartbeatResponse(
@@ -314,6 +318,23 @@ class DatanodeSimulationState {
 
   public void setReadOnly(boolean readOnly) {
     this.readOnly = readOnly;
+  }
+
+  public long getFullContainerReportDurationMs() {
+    return fullContainerReportDurationMs;
+  }
+
+  public void setFullContainerReportDurationMs(
+      long fullContainerReportDurationMs) {
+    this.fullContainerReportDurationMs = fullContainerReportDurationMs;
+  }
+
+  public int getTargetContainersCount() {
+    return targetContainersCount;
+  }
+
+  public void setTargetContainersCount(int targetContainersCount) {
+    this.targetContainersCount = targetContainersCount;
   }
 
   private static class DatanodeDetailsSerializer
