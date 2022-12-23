@@ -77,7 +77,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval
 import static org.apache.hadoop.hdds.utils.HddsVersionInfo.HDDS_VERSION_INFO;
 
 /**
- * This command simulates a number of datanodes and target to coordinate with
+ * This command simulates a number of datanodes and coordinates with
  * SCM to create a number of containers on the said datanodes.
  * <p>
  * This tool is created to verify the SCM/Recon ability to handle thousands
