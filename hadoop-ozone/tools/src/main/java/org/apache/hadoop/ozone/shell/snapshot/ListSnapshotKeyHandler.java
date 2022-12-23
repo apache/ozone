@@ -52,7 +52,7 @@ public class ListSnapshotKeyHandler extends SnapshotHandler {
     String keyPrefix = snapshotName;
 
     if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
-      keyPrefix += listOptions.getPrefix();
+      keyPrefix += "/" + listOptions.getPrefix();
     }
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
