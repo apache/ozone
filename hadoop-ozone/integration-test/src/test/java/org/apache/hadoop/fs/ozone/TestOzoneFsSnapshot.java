@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import java.util.Random;
 import java.util.UUID;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -150,7 +149,7 @@ public class TestOzoneFsSnapshot {
 
       res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, snapshotName});
-      // Asserts that create request fails due to same snapshot name provided twice
+      // Asserts that create request fails since snapshot name provided twice
       assertEquals(1, res);
     } finally {
       shell.close();
@@ -231,7 +230,8 @@ public class TestOzoneFsSnapshot {
 
       int res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", "invalidURI"});
-      // Asserts that create request failed since invalid volume-bucket URI passed
+      // Asserts that create request failed since
+      // invalid volume-bucket URI passed
       assertEquals(1, res);
 
     } finally {
@@ -267,12 +267,14 @@ public class TestOzoneFsSnapshot {
 
       res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, name63});
-      // Asserts that create request succeeded since namelength less than 64 char
+      // Asserts that create request succeeded since namelength
+      // less than 64 char
       assertEquals(0, res);
 
       res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, name64});
-      // Asserts that create request fails since namelength more than 64 char
+      // Asserts that create request fails since namelength
+      // more than 64 char
       assertEquals(1, res);
 
       SnapshotInfo snapshotInfo = ozoneManager
