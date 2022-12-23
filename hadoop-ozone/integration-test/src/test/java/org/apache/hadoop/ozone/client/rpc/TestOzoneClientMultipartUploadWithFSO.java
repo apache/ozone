@@ -412,6 +412,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
     keyName = parentDir + UUID.randomUUID().toString();
     String uploadID = initiateMultipartUpload(bucket, keyName, RATIS, ONE);
 
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedNamespace(), 4);
+
     // upload part 1.
     byte[] data = generateData(5 * 1024 * 1024,
             (byte) RandomUtils.nextLong());
