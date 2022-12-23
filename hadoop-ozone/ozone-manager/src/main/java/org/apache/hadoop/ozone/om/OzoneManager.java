@@ -1776,10 +1776,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     for (String omNodeId : decommissionedOMs) {
       if (isCurrentNode(omNodeId)) {
         // Decommissioning Node should not receive the configuration change
-        // request. Shut it down.
-        String errorMsg = "Shutting down as OM has been decommissioned.";
-        LOG.error("Fatal Error: {}", errorMsg);
-        exitManager.forceExit(1, errorMsg, LOG);
+        // request. It may receive the request if the newly added node id or
+        // the decommissioned node id is same.
+        LOG.warn("New OM node Id: {} is same as decommissioned earlier",
+            omNodeId);
       } else {
         // Remove decommissioned node from peer list (which internally
         // removed from Ratis peer list too)
