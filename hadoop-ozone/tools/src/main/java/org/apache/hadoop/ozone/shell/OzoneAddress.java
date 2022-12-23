@@ -349,6 +349,14 @@ public class OzoneAddress {
     }
   }
 
+  /**
+   * Currently, we are only checking for the
+   * snapshot indicator and the snapshot name.
+   * It could be modified in the future to
+   * accept keys as well under the snapshot prefix.
+   *
+   * @throws OzoneClientException
+   */
   public void ensureSnapshotAddress()
       throws OzoneClientException {
     if (keyName.length() == 0) {
