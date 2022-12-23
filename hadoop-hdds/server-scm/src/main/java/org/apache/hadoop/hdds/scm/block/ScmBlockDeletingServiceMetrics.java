@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 
 /**
  * Metrics related to Block Deleting Service running in SCM.
@@ -75,6 +76,9 @@ public final class ScmBlockDeletingServiceMetrics {
 
   @Metric(about = "The number of created txs which are added into DB.")
   private MutableCounterLong numBlockDeletionTransactionCreated;
+
+  @Metric(about = "The number of datanodes that SCM have sent commands to.")
+  private MutableGaugeInt numDatanodesSentCommands;
 
   private ScmBlockDeletingServiceMetrics() {
   }
@@ -130,6 +134,10 @@ public final class ScmBlockDeletingServiceMetrics {
     this.numBlockDeletionTransactionCreated.incr(count);
   }
 
+  public void setNumDatanodesSentCommands(int count) {
+    this.numDatanodesSentCommands.set(count);
+  }
+
   public long getNumBlockDeletionCommandSent() {
     return numBlockDeletionCommandSent.value();
   }
@@ -160,6 +168,10 @@ public final class ScmBlockDeletingServiceMetrics {
 
   public long getNumBlockDeletionTransactionCreated() {
     return numBlockDeletionTransactionCreated.value();
+  }
+
+  public long getNumDatanodesSentCommands() {
+    return numDatanodesSentCommands.value();
   }
 
   @Override

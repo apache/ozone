@@ -168,12 +168,13 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
+          int datanodeCnt = transactions.getDatanodeTransactionMap().size();
           // TODO: Fix ME!!!
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
-              transactions.getBlocksDeleted(),
-              transactions.getDatanodeTransactionMap().size(),
+              transactions.getBlocksDeleted(), datanodeCnt,
               Time.monotonicNow() - startTime);
+          metrics.setNumDatanodesSentCommands(datanodeCnt);
         } catch (NotLeaderException nle) {
           LOG.warn("Skip current run, since not leader any more.", nle);
           return EmptyTaskResult.newResult();

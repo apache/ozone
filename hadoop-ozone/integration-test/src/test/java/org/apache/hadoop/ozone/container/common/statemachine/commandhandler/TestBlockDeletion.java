@@ -283,6 +283,7 @@ public class TestBlockDeletion {
     Assertions.assertTrue(metrics.getNumBlockDeletionTransactionSent() >=
         metrics.getNumBlockDeletionTransactionFailure() +
             metrics.getNumBlockDeletionTransactionSuccess());
+    Assertions.assertTrue(metrics.getNumDatanodesSentCommands() > 0);
     LOG.info(metrics.toString());
   }
 
