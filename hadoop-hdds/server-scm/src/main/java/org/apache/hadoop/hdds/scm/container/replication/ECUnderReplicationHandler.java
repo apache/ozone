@@ -400,6 +400,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     // this many maintenance replicas need another copy
     int additionalMaintenanceCopiesNeeded =
         replicaCount.additionalMaintenanceCopiesNeeded(true);
+    if (additionalMaintenanceCopiesNeeded == 0) {
+      return;
+    }
     List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
         additionalMaintenanceCopiesNeeded);
     excludedNodes.addAll(targets);

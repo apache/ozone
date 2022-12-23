@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
@@ -63,7 +62,7 @@ public class ContainerSet {
   private long recoveringTimeout;
 
   public ContainerSet(long recoveringTimeout) {
-    this.clock = new MonotonicClock(ZoneOffset.UTC);
+    this.clock = Clock.system(ZoneOffset.UTC);
     this.recoveringTimeout = recoveringTimeout;
   }
 

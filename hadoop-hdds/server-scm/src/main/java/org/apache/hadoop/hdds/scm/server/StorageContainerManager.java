@@ -140,7 +140,6 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
@@ -267,6 +266,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private String primaryScmNodeId;
 
   /**
@@ -284,7 +284,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
-  
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -582,7 +582,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @SuppressWarnings("methodLength")
   private void initializeSystemManagers(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
-    Clock clock = new MonotonicClock(ZoneOffset.UTC);
+    // Use SystemClock when data is persisted
+    // and used again after system restarts.
+    Clock systemClock = Clock.system(ZoneOffset.UTC);
 
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -590,8 +592,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       clusterMap = new NetworkTopologyImpl(conf);
     }
     // This needs to be done before initializing Ratis.
-    RatisDropwizardExports.registerRatisMetricReporters(ratisMetricsMap,
-        () -> isStopped.get());
+    ratisReporterList = RatisDropwizardExports
+        .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -670,14 +672,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               eventQueue,
               scmContext,
               serviceManager,
-              clock
+              systemClock
               );
     }
 
     finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
         scmContext);
 
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
+    containerReplicaPendingOps =
+        new ContainerReplicaPendingOps(conf, systemClock);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
@@ -698,7 +701,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     final String backgroundServiceName = "ExpiredContainerReplicaOpScrubber";
     BackgroundSCMService expiredContainerReplicaOpScrubber =
-        new BackgroundSCMService.Builder().setClock(clock)
+        new BackgroundSCMService.Builder().setClock(systemClock)
             .setScmContext(scmContext)
             .setServiceName(backgroundServiceName)
             .setIntervalInMillis(containerReplicaOpScrubberIntervalMs)
@@ -732,7 +735,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }  else {
       LegacyReplicationManager legacyRM = new LegacyReplicationManager(
           conf, containerManager, containerPlacementPolicy, eventQueue,
-          scmContext, scmNodeManager, scmHAManager, clock,
+          scmContext, scmNodeManager, scmHAManager, systemClock,
           getScmMetadataStore().getMoveTable());
       replicationManager = new ReplicationManager(
           conf,
@@ -742,7 +745,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           eventQueue,
           scmContext,
           scmNodeManager,
-          clock,
+          systemClock,
           legacyRM,
           containerReplicaPendingOps);
     }
@@ -1617,7 +1620,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
     serviceManager.stop();
-    RatisDropwizardExports.clear(ratisMetricsMap);
+    RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
     try {
       LOG.info("Stopping SCM MetadataStore.");

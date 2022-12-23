@@ -18,9 +18,10 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -44,16 +45,14 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 
 /**
- * Tests the ECMisReplicationHandling functionality.
+ * Tests the RatisReplicationHandling functionality.
  */
-public class TestECMisReplicationHandler extends TestMisReplicationHandler {
-  private static final int DATA = 3;
-  private static final int PARITY = 2;
-
+public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
   public void setup() {
-    ECReplicationConfig repConfig = new ECReplicationConfig(DATA, PARITY);
+    RatisReplicationConfig repConfig = RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE);
     setup(repConfig);
   }
 
@@ -62,19 +61,17 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   public void testMisReplicationWithAllNodesAvailable(int misreplicationCount)
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                Pair.of(IN_SERVICE, 5));
+        .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+            Pair.of(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
-            0, misreplicationCount, Math.min(misreplicationCount, 5));
+            0, misreplicationCount, Math.min(misreplicationCount, 3));
   }
 
   @Test
   public void testMisReplicationWithNoNodesReturned() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+                    Pair.of(IN_SERVICE, 0));
     PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             Mockito.mock(ContainerPlacementStatus.class);
@@ -96,28 +93,25 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   public void testMisReplicationWithSomeNodesNotInService(
           int misreplicationCount) throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_MAINTENANCE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+                    Pair.of(IN_MAINTENANCE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
-            0, misreplicationCount, Math.min(misreplicationCount, 3));
+            0, misreplicationCount, Math.min(misreplicationCount, 2));
   }
 
   @Test
   public void testMisReplicationWithUndereplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(Pair.of(IN_SERVICE, 0),
+                    Pair.of(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(), 0, 1, 0);
   }
 
   @Test
   public void testMisReplicationWithOvereplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
-                    Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
-                    Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+            .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+                    Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(), 0, 1, 0);
   }
 
@@ -125,9 +119,8 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   public void testMisReplicationWithSatisfiedPlacementPolicy()
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+                    Pair.of(IN_SERVICE, 0));
     PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             Mockito.mock(ContainerPlacementStatus.class);
@@ -143,9 +136,8 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   public void testMisReplicationWithPendingOps()
           throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
-            .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-                    Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-                    Pair.of(IN_SERVICE, 5));
+            .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+                    Pair.of(IN_SERVICE, 0));
     PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
             Mockito.mock(ContainerPlacementStatus.class);
@@ -155,12 +147,12 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = Collections.singletonList(
             ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 1));
+                    MockDatanodeDetails.randomDatanodeDetails(), 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
     pendingOp = Collections.singletonList(ContainerReplicaOp
             .create(ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
-                    .stream().findAny().get().getDatanodeDetails(), 1));
+                    .stream().findAny().get().getDatanodeDetails(), 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
   }
@@ -169,6 +161,6 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   protected MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           NodeManager nodeManager) {
-    return new ECMisReplicationHandler(placementPolicy, conf, nodeManager);
+    return new RatisMisReplicationHandler(placementPolicy, conf, nodeManager);
   }
 }

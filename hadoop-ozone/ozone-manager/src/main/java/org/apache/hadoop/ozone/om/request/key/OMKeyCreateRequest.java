@@ -150,7 +150,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId());
+              ozoneManager.getOMNodeId(),
+              ozoneManager.getMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
@@ -266,11 +267,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             .getAllParentInfo(ozoneManager, keyArgs,
                 pathInfo.getMissingParents(), inheritAcls, trxnLogIndex);
 
-        // Add cache entries for the prefix directories.
-        // Skip adding for the file key itself, until Key Commit.
-        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-            bucketName, Optional.absent(), Optional.of(missingParentInfos),
-            trxnLogIndex);
         numMissingParents = missingParentInfos.size();
       }
 
@@ -311,7 +307,16 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // check bucket and volume quota
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
+      omBucketInfo.incrUsedNamespace(numMissingParents);
+
+      if (numMissingParents > 0) {
+        // Add cache entries for the prefix directories.
+        // Skip adding for the file key itself, until Key Commit.
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, Optional.absent(), Optional.of(missingParentInfos),
+            trxnLogIndex);
+      }
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -320,7 +325,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheKey<>(dbOpenKeyName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
-      omBucketInfo.incrUsedNamespace(numMissingParents);
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),

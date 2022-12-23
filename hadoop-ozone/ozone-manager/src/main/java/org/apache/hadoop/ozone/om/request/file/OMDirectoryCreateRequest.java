@@ -213,12 +213,15 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             missingParents, inheritAcls, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
+        checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
+        omBucketInfo.incrUsedNamespace(numMissingParents + 1L);
+
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
-        OmBucketInfo omBucketInfo =
-            getBucketInfo(omMetadataManager, volumeName, bucketName);
-        omBucketInfo.incrUsedNamespace(numMissingParents + 1L);
+        
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             dirKeyInfo, missingParentInfos, result, getBucketLayout(),
