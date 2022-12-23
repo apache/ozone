@@ -338,15 +338,13 @@ public class DatanodeSimulator implements Callable<Void> {
 
     // Schedule heartbeat tasks for the given datanode to all SCMs/Recon.
     long scmHeartbeatInterval = HddsServerUtil.getScmHeartbeatInterval(conf);
-    for (Map.Entry<InetSocketAddress,
-        StorageContainerDatanodeProtocolClientSideTranslatorPB> entry :
-        scmClients.entrySet()) {
+    scmClients.forEach((endpoint, client) -> {
       // Use random initial delay as a jitter to avoid peaks.
       long initialDelay = RandomUtils.nextLong(0, scmHeartbeatInterval);
-      Runnable runnable = () -> heartbeat(entry.getKey(), entry.getValue(), dn);
+      Runnable runnable = () -> heartbeat(endpoint, client, dn);
       heartbeatScheduler.scheduleAtFixedRate(runnable, initialDelay,
           scmHeartbeatInterval, TimeUnit.MILLISECONDS);
-    }
+    });
 
     long reconHeartbeatInterval =
         HddsServerUtil.getReconHeartbeatInterval(conf);
@@ -452,14 +450,14 @@ public class DatanodeSimulator implements Callable<Void> {
         .build();
   }
 
-  private DatanodeDetails randomDatanodeDetails(ConfigurationSource conf)
+  private DatanodeDetails randomDatanodeDetails(ConfigurationSource config)
       throws UnknownHostException {
     DatanodeDetails details = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .build();
     details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
     details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
-    details.setHostName(HddsUtils.getHostName(conf));
+    details.setHostName(HddsUtils.getHostName(config));
     details.setIpAddress(randomIp());
     details.setPort(DatanodeDetails.Port.Name.STANDALONE, 0);
     details.setPort(DatanodeDetails.Port.Name.RATIS, 0);
@@ -520,7 +518,7 @@ public class DatanodeSimulator implements Callable<Void> {
   }
 
   private StorageContainerDatanodeProtocolClientSideTranslatorPB
-  createScmClient(InetSocketAddress address) throws IOException {
+      createScmClient(InetSocketAddress address) throws IOException {
 
     Configuration hadoopConfig =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
@@ -548,7 +546,7 @@ public class DatanodeSimulator implements Callable<Void> {
   }
 
   private StorageContainerDatanodeProtocolClientSideTranslatorPB
-  createReconClient(InetSocketAddress address) throws IOException {
+      createReconClient(InetSocketAddress address) throws IOException {
     Configuration hadoopConfig =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
     RPC.setProtocolEngine(hadoopConfig, ReconDatanodeProtocolPB.class,

@@ -87,7 +87,7 @@ class DatanodeSimulationState {
     this.targetContainersCount = targetContainersCount;
   }
 
-  public DatanodeSimulationState() {
+  DatanodeSimulationState() {
   }
 
   public synchronized void ackHeartbeatResponse(
@@ -278,46 +278,42 @@ class DatanodeSimulationState {
 
   @JsonSerialize(using = DatanodeDetailsSerializer.class)
   @JsonDeserialize(using = DatanodeDeserializer.class)
-  public DatanodeDetails getDatanodeDetails() {
+  public synchronized DatanodeDetails getDatanodeDetails() {
     return datanodeDetails;
   }
 
-  public void setDatanodeDetails(
+  public synchronized void setDatanodeDetails(
       DatanodeDetails datanodeDetails) {
     this.datanodeDetails = datanodeDetails;
   }
 
-  public Set<String> getPipelines() {
+  public synchronized Set<String> getPipelines() {
     return pipelines;
   }
 
-  public void setPipelines(Set<String> pipelines) {
+  public synchronized void setPipelines(Set<String> pipelines) {
     this.pipelines = pipelines;
   }
 
-  public boolean isRegistered() {
+  public synchronized boolean isRegistered() {
     return isRegistered;
   }
 
-  public void setRegistered(boolean registered) {
+  public synchronized void setRegistered(boolean registered) {
     isRegistered = registered;
   }
 
-  public Map<Long, ContainerReplicaProto.State> getContainers() {
+  public synchronized Map<Long, ContainerReplicaProto.State> getContainers() {
     return containers;
   }
 
-  public void setContainers(
+  public synchronized void setContainers(
       Map<Long, ContainerReplicaProto.State> containers) {
     this.containers = containers;
   }
 
   public void setReadOnly(boolean readOnly) {
     this.readOnly = readOnly;
-  }
-
-  public boolean isReadOnly() {
-    return readOnly;
   }
 
   private static class DatanodeDetailsSerializer
