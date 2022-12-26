@@ -68,6 +68,10 @@ public class OnDemandContainerReplicationSource
           " is not found.", CONTAINER_NOT_FOUND);
     }
 
+    if (!packer.containsKey(compression)) {
+      throw new IOException("Can't compress the container. Compression " +
+          compression + " is not found.");
+    }
     controller.exportContainer(
         container.getContainerType(), containerId, destination,
         packer.get(compression));
