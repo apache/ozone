@@ -405,7 +405,7 @@ public class TestBucketList {
 
     ListObjectResponse response = (ListObjectResponse) getBucket.get(
         "b1", delimiter, encodingType, null, 1000, prefix,
-        null, null, startAfter, null, null).getEntity();
+        null, startAfter, null, null, null).getEntity();
 
     // Assert encodingType == url.
     // The Object name will be encoded by ObjectKeyNameAdapter
@@ -423,7 +423,7 @@ public class TestBucketList {
 
     response = (ListObjectResponse) getBucket.get(
         "b1", delimiter, null, null, 1000, prefix,
-        null, null, startAfter, null, null).getEntity();
+        null, startAfter, null, null, null).getEntity();
 
     // Assert encodingType == null.
     // The Object name will not be encoded by ObjectKeyNameAdapter
@@ -438,6 +438,7 @@ public class TestBucketList {
     Assert.assertNull(response.getContents().get(0).getKey().getEncodingType());
 
   }
+
   @Test
   public void testEncodingTypeException() throws IOException, OS3Exception {
     BucketEndpoint getBucket = new BucketEndpoint();
