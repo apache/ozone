@@ -277,6 +277,7 @@ public final class OmUtils {
       // Although indirectly the Ranger sync service task could invoke write
       // operation SetRangerServiceVersion.
     case GetKeyInfo:
+    case TransferLeadership:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

@@ -174,6 +174,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantL
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TransferOmLeadershipRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
@@ -1460,6 +1461,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()),
         resp.getCaCertificate(), resp.getCaCertsList());
   }
+
+  @Override
+  public void transferLeadership(String host, boolean isRandom)
+      throws IOException {
+    TransferOmLeadershipRequest.Builder builder = TransferOmLeadershipRequest.
+        newBuilder();
+    if (isRandom) {
+      builder.setIsRandom(true);
+    } else {
+      String pattern = "^((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))(\\." +
+          "((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))){3}:\\d+$";
+      if (host == null || !host.matches(pattern)) {
+        throw new IllegalArgumentException("Host is " + host + " or does not " +
+            "match the IP:PORT format");
+      }
+      builder.setHost(host);
+      builder.setIsRandom(false);
+    }
+    OMRequest omRequest = createOMRequest(Type.TransferLeadership)
+        .setTransferOmLeadershipRequest(builder.build())
+        .build();
+    handleError(submitRequest(omRequest));
+  }
+
 
   @Override
   public boolean triggerRangerBGSync(boolean noWait) throws IOException {

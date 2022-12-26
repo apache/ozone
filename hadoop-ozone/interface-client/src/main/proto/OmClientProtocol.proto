@@ -124,6 +124,7 @@ enum Type {
   RangerBGSync = 109;
   EchoRPC = 110;
   GetKeyInfo = 111;
+  TransferLeadership = 112;
 }
 
 message OMRequest {
@@ -230,6 +231,7 @@ message OMRequest {
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
   optional EchoRPCRequest                   EchoRPCRequest                 = 110;
   optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
+  optional TransferOmLeadershipRequest      TransferOmLeadershipRequest    = 112;
 }
 
 message OMResponse {
@@ -329,6 +331,7 @@ message OMResponse {
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
   optional EchoRPCResponse                   EchoRPCResponse               = 110;
   optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
+  optional TransferOmLeadershipResponse      TransferOmLeadershipResponse  = 112;
 }
 
 enum Status {
@@ -1068,6 +1071,14 @@ message GetKeyInfoResponse {
   optional KeyInfo keyInfo = 1;
   optional VolumeInfo volumeInfo = 2;
   optional string UserPrincipal = 3;
+}
+
+message TransferOmLeadershipRequest {
+  required bool isRandom = 1;
+  optional string host = 2;
+}
+
+message TransferOmLeadershipResponse {
 }
 
 message RenameKeysRequest {

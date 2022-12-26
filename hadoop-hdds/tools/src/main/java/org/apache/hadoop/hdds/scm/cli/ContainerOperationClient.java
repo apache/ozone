@@ -465,6 +465,12 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public void transferLeadership(String host, boolean isRandom)
+      throws IOException {
+    storageContainerLocationClient.transferLeadership(host, isRandom);
+  }
+
+  @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
     return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
   }

@@ -408,6 +408,15 @@ public interface OzoneManagerProtocol
   ServiceInfoEx getServiceInfo() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param host          the string of the host, should be IP:PORT format
+   * @param isRandom      whether to choose random follower as target leader
+   * @throws IOException
+   */
+  void transferLeadership(String host, boolean isRandom) throws IOException;
+
+  /**
    * Triggers Ranger background sync task immediately.
    *
    * Requires Ozone administrator privilege.

@@ -98,6 +98,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.TransferScmLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.TransferScmLeadershipResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -663,6 +665,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   getResetDeletedBlockRetryCount(
                       request.getResetDeletedBlockRetryCountRequest()))
               .build();
+      case TransferLeadership:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setTransferScmLeadershipResponse(
+                  transferScmLeadership(
+                      request.getTransferScmLeadershipRequest()))
+              .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1173,5 +1183,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setResetCount(impl.resetDeletedBlockRetryCount(
             request.getTransactionIdList()))
         .build();
+  }
+
+  public TransferScmLeadershipResponseProto transferScmLeadership(
+      TransferScmLeadershipRequestProto request) throws IOException {
+    String host = request.hasHost() ? request.getHost() : null;
+    boolean isRandom = request.getIsRandom();
+    impl.transferLeadership(host, isRandom);
+    return TransferScmLeadershipResponseProto.getDefaultInstance();
   }
 }

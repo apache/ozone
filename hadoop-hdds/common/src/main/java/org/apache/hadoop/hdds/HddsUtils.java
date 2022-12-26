@@ -27,6 +27,7 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -34,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -74,9 +77,20 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
+import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.client.RaftClientConfigKeys;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.retry.ExponentialBackoffRetry;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -775,5 +789,91 @@ public final class HddsUtils {
     }
 
     return msg;
+  }
+
+  /**
+   * Use raft client to send admin request, transfer the leadership.
+   * If not isRandom, then use host to match the target leader.
+   * 1. Set priority and send setConfiguration request
+   * 2. Trigger transferLeadership API.
+   *
+   * @param server        the Raft server
+   * @param groupId       the Raft group Id
+   * @param host          the string of the host, should be IP:PORT format
+   * @param isRandom      whether to choose random follower as target leader
+   * @param curLeader     the current Raft leader
+   * @throws IOException
+   */
+  public static void transferRatisLeadership(RaftServer server,
+      RaftGroupId groupId, String host, boolean isRandom, RaftPeer curLeader)
+      throws IOException {
+    if (isRandom && curLeader == null) {
+      throw new IOException("Cannot find the ratis leader.");
+    }
+    RaftGroup raftGroup = server.getDivision(groupId).getGroup();
+    RaftClient raftClient = createBackoffRaftClient(raftGroup);
+    RaftPeerId targetLeaderId = null;
+    for (RaftPeer tmp : raftGroup.getPeers()) {
+      if (isRandom ? !tmp.equals(curLeader) : tmp.getAddress().equals(host) ||
+          tmp.getAddress().equals(host.replace("127.0.0.1", "localhost"))) {
+        targetLeaderId = tmp.getId();
+        break;
+      }
+    }
+    if (targetLeaderId == null) {
+      throw new IOException("Cannot choose the target leader. The host is " +
+          host + " and the peers are " + raftGroup.getPeers().stream().
+          map(RaftPeer::getAddress).collect(Collectors.toList()) + ".");
+    }
+    LOG.info("Chosen the targetLeaderId {} to transfer leadership",
+        targetLeaderId);
+
+    // Set priority
+    List<RaftPeer> peersWithNewPriorities = new ArrayList<>();
+    for (RaftPeer peer : raftGroup.getPeers()) {
+      peersWithNewPriorities.add(
+          RaftPeer.newBuilder(peer)
+              .setPriority(peer.getId().equals(targetLeaderId) ? 2 : 1)
+              .build()
+      );
+    }
+    RaftClientReply reply;
+    // Set new configuration
+    reply = raftClient.admin().setConfiguration(peersWithNewPriorities);
+    if (reply.isSuccess()) {
+      LOG.info("Successfully set new priority for division: {}",
+          peersWithNewPriorities);
+    } else {
+      LOG.warn("Failed to set new priority for division: {}." +
+          " Ratis reply: {}", peersWithNewPriorities, reply);
+      throw new IOException(reply.getException());
+    }
+
+    // Trigger the transferLeadership
+    reply = raftClient.admin().transferLeadership(targetLeaderId, 60000);
+    if (reply.isSuccess()) {
+      LOG.info("Successfully transferred leadership to {}.", targetLeaderId);
+    } else {
+      LOG.warn("Failed to transfer leadership to {}. Ratis reply: {}",
+          targetLeaderId, reply);
+      throw new IOException(reply.getException());
+    }
+  }
+
+  public static RaftClient createBackoffRaftClient(RaftGroup raftGroup) {
+    RaftProperties properties = new RaftProperties();
+    RaftClientConfigKeys.Rpc.setRequestTimeout(properties,
+        TimeDuration.valueOf(15, TimeUnit.SECONDS));
+    ExponentialBackoffRetry retryPolicy = ExponentialBackoffRetry.newBuilder()
+        .setBaseSleepTime(TimeDuration.valueOf(2000, TimeUnit.MILLISECONDS))
+        .setMaxAttempts(10)
+        .setMaxSleepTime(
+            TimeDuration.valueOf(10000, TimeUnit.MILLISECONDS))
+        .build();
+    return RaftClient.newBuilder()
+        .setRaftGroup(raftGroup)
+        .setProperties(properties)
+        .setRetryPolicy(retryPolicy)
+        .build();
   }
 }

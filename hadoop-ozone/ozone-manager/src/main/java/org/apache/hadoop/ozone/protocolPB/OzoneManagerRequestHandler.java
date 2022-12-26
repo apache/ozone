@@ -108,6 +108,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantG
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TransferOmLeadershipRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TransferOmLeadershipResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
@@ -283,6 +285,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case GetKeyInfo:
         responseBuilder.setGetKeyInfoResponse(
             getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
+        break;
+      case TransferLeadership:
+        responseBuilder.setTransferOmLeadershipResponse(transferLeadership(
+            request.getTransferOmLeadershipRequest()));
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1217,5 +1223,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   public OzoneManager getOzoneManager() {
     return impl;
+  }
+
+  private TransferOmLeadershipResponse transferLeadership(
+      TransferOmLeadershipRequest req) throws IOException {
+    String host = req.hasHost() ? req.getHost() : null;
+    boolean isRandom = req.getIsRandom();
+    impl.transferLeadership(host, isRandom);
+    return TransferOmLeadershipResponse.getDefaultInstance();
   }
 }

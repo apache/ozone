@@ -88,6 +88,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.TransferScmLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -700,6 +701,27 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  @Override
+  public void transferLeadership(String host, boolean isRandom)
+      throws IOException {
+    TransferScmLeadershipRequestProto.Builder reqBuilder =
+        TransferScmLeadershipRequestProto.newBuilder();
+    if (isRandom) {
+      reqBuilder.setIsRandom(true);
+    } else {
+      String pattern = "^((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))(\\." +
+          "((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))){3}:\\d+$";
+      if (host == null || !host.matches(pattern)) {
+        throw new IllegalArgumentException("Host is " + host + " or does not " +
+            "match the IP:PORT format");
+      }
+      reqBuilder.setHost(host);
+      reqBuilder.setIsRandom(false);
+    }
+    submitRequest(Type.TransferLeadership,
+        builder -> builder.setTransferScmLeadershipRequest(reqBuilder.build()));
   }
 
   @Override

@@ -50,6 +50,8 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -77,6 +79,9 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,6 +100,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.HddsUtils.transferRatisLeadership;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -779,6 +785,33 @@ public class SCMClientProtocolServer implements
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
+      }
+    }
+  }
+
+  @Override
+  public void transferLeadership(String host, boolean isRandom)
+      throws IOException {
+    boolean auditSuccess = true;
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("host", host);
+    auditMap.put("isRandom", String.valueOf(isRandom));
+    try {
+      SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
+      RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager().
+          getRatisServer()).getLeader();
+      RaftServer server = scmRatisServer.getDivision().getRaftServer();
+      RaftGroupId groupID = scmRatisServer.getSCMStateMachine().getGroupId();
+      transferRatisLeadership(server, groupID, host, isRandom, curLeader);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.TRANSFER_SCM_LEADER, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            SCMAction.TRANSFER_SCM_LEADER, auditMap));
       }
     }
   }

@@ -361,6 +361,15 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param host          the string of the host, should be IP:PORT format
+   * @param isRandom      whether to choose random follower as target leader
+   * @throws IOException
+   */
+  void transferLeadership(String host, boolean isRandom) throws IOException;
+
+  /**
    * Reset the expired deleted block retry count.
    * @param txIDs transactionId list to be reset
    * @throws IOException

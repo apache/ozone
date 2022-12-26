@@ -40,4 +40,8 @@ public abstract class ScmSubcommand implements Callable<Void> {
       return null;
     }
   }
+
+  public ScmOption getScmOption() {
+    return scmOption;
+  }
 }
