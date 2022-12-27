@@ -37,9 +37,6 @@ import com.google.protobuf.BlockingService;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
@@ -535,11 +532,8 @@ public final class HddsServerUtil {
   public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
       OutputStream destination)
       throws IOException {
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination);
-        ArchiveOutputStream archiveOutputStream =
-            new TarArchiveOutputStream(gzippedOut);
+    try (ArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(destination);
         Stream<Path> files =
             Files.list(checkpoint.getCheckpointLocation())) {
       for (Path path : files.collect(Collectors.toList())) {
@@ -551,10 +545,6 @@ public final class HddsServerUtil {
           }
         }
       }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
     }
   }
 

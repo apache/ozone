@@ -175,7 +175,7 @@ public class StorageContainerServiceProviderImpl
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();
     File targetFile = new File(scmSnapshotDBParentDir, snapshotFileName +
-            ".tar.gz");
+            ".tar");
 
     try {
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {

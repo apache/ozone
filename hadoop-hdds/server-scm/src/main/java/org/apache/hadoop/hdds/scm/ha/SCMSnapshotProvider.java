@@ -104,7 +104,7 @@ public class SCMSnapshotProvider {
     String snapshotFilePath =
         Paths.get(scmSnapshotDir.getAbsolutePath(), snapshotFileName).toFile()
             .getAbsolutePath();
-    File targetFile = new File(snapshotFilePath + ".tar.gz");
+    File targetFile = new File(snapshotFilePath + ".tar");
 
 
     // the downloadClient instance will be created as and when install snapshot

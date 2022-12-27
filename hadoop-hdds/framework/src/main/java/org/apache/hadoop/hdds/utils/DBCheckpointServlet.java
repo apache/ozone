@@ -40,9 +40,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -171,7 +168,7 @@ public class DBCheckpointServlet extends HttpServlet {
       response.setContentType("application/x-tgz");
       response.setHeader("Content-Disposition",
           "attachment; filename=\"" +
-               file.toString() + ".tgz\"");
+               file + ".tar\"");
 
       Instant start = Instant.now();
       writeDBCheckpointToStream(checkpoint,
@@ -211,30 +208,21 @@ public class DBCheckpointServlet extends HttpServlet {
       OutputStream destination)
       throws IOException {
 
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
+    try (ArchiveOutputStream archiveOutputStream =
+        new TarArchiveOutputStream(destination)) {
 
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
+      Path checkpointPath = checkpoint.getCheckpointLocation();
+      try (Stream<Path> files = Files.list(checkpointPath)) {
+        for (Path path : files.collect(Collectors.toList())) {
+          if (path != null) {
+            Path fileName = path.getFileName();
+            if (fileName != null) {
+              includeFile(path.toFile(), fileName.toString(),
+                  archiveOutputStream);
             }
           }
         }
       }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
     }
   }
 
