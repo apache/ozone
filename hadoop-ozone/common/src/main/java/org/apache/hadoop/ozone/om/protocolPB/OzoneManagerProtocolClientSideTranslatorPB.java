@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -1470,12 +1471,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (isRandom) {
       builder.setIsRandom(true);
     } else {
-      String pattern = "^((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))(\\." +
-          "((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))){3}:\\d+$";
-      if (host == null || !host.matches(pattern)) {
-        throw new IllegalArgumentException("Host is " + host + " or does not " +
-            "match the IP:PORT format");
-      }
+      HddsUtils.validateHost(host);
       builder.setHost(host);
       builder.setIsRandom(false);
     }

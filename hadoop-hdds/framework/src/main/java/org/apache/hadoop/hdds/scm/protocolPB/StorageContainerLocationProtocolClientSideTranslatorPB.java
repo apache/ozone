@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
@@ -711,12 +712,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (isRandom) {
       reqBuilder.setIsRandom(true);
     } else {
-      String pattern = "^((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))(\\." +
-          "((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))){3}:\\d+$";
-      if (host == null || !host.matches(pattern)) {
-        throw new IllegalArgumentException("Host is " + host + " or does not " +
-            "match the IP:PORT format");
-      }
+      HddsUtils.validateHost(host);
       reqBuilder.setHost(host);
       reqBuilder.setIsRandom(false);
     }

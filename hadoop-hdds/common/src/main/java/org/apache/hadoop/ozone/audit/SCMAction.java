@@ -51,7 +51,7 @@ public enum SCMAction implements AuditAction {
   ADD_SCM,
   GET_REPLICATION_MANAGER_REPORT,
   RESET_DELETED_BLOCK_RETRY_COUNT,
-  TRANSFER_SCM_LEADER;
+  TRANSFER_LEADER;
 
   @Override
   public String getAction() {

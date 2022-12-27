@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -100,7 +101,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.apache.hadoop.hdds.HddsUtils.transferRatisLeadership;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -802,16 +802,17 @@ public class SCMClientProtocolServer implements
           getRatisServer()).getLeader();
       RaftServer server = scmRatisServer.getDivision().getRaftServer();
       RaftGroupId groupID = scmRatisServer.getSCMStateMachine().getGroupId();
-      transferRatisLeadership(server, groupID, host, isRandom, curLeader);
+      RatisHelper.transferRatisLeadership(server, groupID, host,
+          isRandom, curLeader);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.TRANSFER_SCM_LEADER, auditMap, ex));
+          SCMAction.TRANSFER_LEADER, auditMap, ex));
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            SCMAction.TRANSFER_SCM_LEADER, auditMap));
+            SCMAction.TRANSFER_LEADER, auditMap));
       }
     }
   }
