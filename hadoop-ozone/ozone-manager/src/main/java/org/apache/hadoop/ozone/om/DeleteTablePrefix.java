@@ -1,7 +1,27 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.Time;
+
+import javax.annotation.Nonnull;
 
 /**
  * Keys in deletion table are hex-encoded String of Timestamp + UpdateID.
@@ -40,6 +60,7 @@ public class DeleteTablePrefix {
     } else {
       this.timestamp = Time.now();
     }
+    assert transactionLogIndex >= 0;
     this.transactionLogIndex = transactionLogIndex;
   }
 
@@ -49,7 +70,7 @@ public class DeleteTablePrefix {
    * @param omKeyInfo the key info to get object id from
    * @return Unique and monotonically increasing String for deletion table
    */
-  public String buildKey(OmKeyInfo omKeyInfo) {
+  public @Nonnull String buildKey(@Nonnull OmKeyInfo omKeyInfo) {
     // Log.toHexString() is much faster, but the string is compact. Heading 0s
     // are all erased. e.g. 15L becomes "F", while we want "00000000000F".
     if (timestamp == 0) {

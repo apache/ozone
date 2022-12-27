@@ -354,8 +354,6 @@ public class TestOzoneAtRestEncryption {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    // To retrieve the entry in delete table, timestamp is mocked and saved
-
     //Step 3
     bucket.deleteKey(key.getName());
 

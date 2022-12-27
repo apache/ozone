@@ -1169,14 +1169,12 @@ message PurgePathRequest {
   required uint64 bucketId = 2;
   optional string deletedDir = 3;
   repeated KeyInfo deletedSubFiles = 4;
+  repeated KeyInfo markDeletedSubDirs = 5;
 }
 
 message DeleteOpenKeysRequest {
   repeated OpenKeyBucket openKeysPerBucket = 1;
   optional BucketLayoutProto bucketLayout = 2;
-  // This will be set when the request is received in pre-Execute. This
-  // value is used in deletion service.
-  optional uint64 modificationTime = 3;
 }
 
 message OpenKeyBucket {
