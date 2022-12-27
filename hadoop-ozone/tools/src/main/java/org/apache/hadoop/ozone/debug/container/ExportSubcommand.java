@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.concurrent.Callable;
 
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
@@ -61,6 +62,7 @@ public class ExportSubcommand implements Callable<Void> {
       description = "Count of containers to export")
   private long containerCount = 1;
 
+
   @Override
   public Void call() throws Exception {
     parent.loadContainersFromVolumes();
@@ -74,7 +76,7 @@ public class ExportSubcommand implements Callable<Void> {
           new File(destination, "container-" + containerId + ".tar.gz");
       try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
         try {
-          replicationSource.copyData(containerId, fos);
+          replicationSource.copyData(containerId, fos, GZIP);
         } catch (StorageContainerException e) {
           if (e.getResult() == CONTAINER_NOT_FOUND) {
             continue;

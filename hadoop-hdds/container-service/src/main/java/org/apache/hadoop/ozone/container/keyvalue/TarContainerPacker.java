@@ -28,8 +28,10 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.stream.Stream;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -60,6 +62,18 @@ public class TarContainerPacker
 
   private static final String CONTAINER_FILE_NAME = "container.yaml";
 
+  private final String compression;
+
+  private static final String NO_COMPRESSION = "no_compression";
+
+  public TarContainerPacker() {
+    this.compression = NO_COMPRESSION;
+  }
+
+  public TarContainerPacker(String compression) {
+    this.compression = compression;
+  }
+
   /**
    * Given an input stream (tar file) extract the data to the specified
    * directories.
@@ -77,7 +91,7 @@ public class TarContainerPacker
     Path chunksRoot = Paths.get(containerData.getChunksPath());
 
     try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+        ArchiveInputStream archiveInput = untar(decompressed)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -180,7 +194,7 @@ public class TarContainerPacker
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
     try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+        ArchiveInputStream archiveInput = untar(decompressed)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -259,16 +273,20 @@ public class TarContainerPacker
     return new TarArchiveOutputStream(output);
   }
 
-  private static InputStream decompress(InputStream input)
+  @VisibleForTesting
+  InputStream decompress(InputStream input)
       throws CompressorException {
-    return new CompressorStreamFactory()
-        .createCompressorInputStream(CompressorStreamFactory.GZIP, input);
+    return Objects.equals(compression, NO_COMPRESSION) ?
+        input : new CompressorStreamFactory()
+        .createCompressorInputStream(compression, input);
   }
 
-  private static OutputStream compress(OutputStream output)
+  @VisibleForTesting
+  OutputStream compress(OutputStream output)
       throws CompressorException {
-    return new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP, output);
+    return Objects.equals(compression, NO_COMPRESSION) ?
+        output : new CompressorStreamFactory()
+        .createCompressorOutputStream(compression, output);
   }
 
 }
