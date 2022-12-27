@@ -95,7 +95,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
  * Helper class to test OMClientRequest classes.
  */
 public final class OMRequestTestUtils {
-  private static AtomicLong objectCounter = new AtomicLong(Time.now());
+  private static AtomicLong objectCounter = new AtomicLong(2L);
 
   private OMRequestTestUtils() {
     //Do nothing
