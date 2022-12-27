@@ -289,6 +289,12 @@ public class ReconStorageContainerManagerFacade
 
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
+    reconSafeModeMgrTask = new ReconSafeModeMgrTask(
+        containerManager,
+        nodeManager,
+        safeModeManager,
+        reconTaskConfig,
+        ozoneConfiguration);
   }
 
   /**
