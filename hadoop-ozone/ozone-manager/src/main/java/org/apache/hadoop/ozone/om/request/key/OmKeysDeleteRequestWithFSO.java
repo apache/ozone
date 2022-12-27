@@ -141,7 +141,6 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId,
           DeleteTablePrefix deleteTablePrefix) {
     OMClientResponse omClientResponse;
-
     omClientResponse = new OMKeysDeleteResponseWithFSO(omResponse
         .setDeleteKeysResponse(
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()

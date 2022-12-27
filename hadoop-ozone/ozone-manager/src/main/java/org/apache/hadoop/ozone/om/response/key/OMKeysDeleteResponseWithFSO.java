@@ -48,11 +48,11 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
   private long volumeId;
 
   public OMKeysDeleteResponseWithFSO(
-          @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
-          @NotNull DeleteTablePrefix deleteTablePrefix,
-          @NotNull List<OmKeyInfo> keyDeleteList,
-          @NotNull List<OmKeyInfo> dirDeleteList,
-          @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
+      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
+      @NotNull DeleteTablePrefix deleteTablePrefix,
+      @NotNull List<OmKeyInfo> keyDeleteList,
+      @NotNull List<OmKeyInfo> dirDeleteList,
+      @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
     super(omResponse, deleteTablePrefix, keyDeleteList, omBucketInfo);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;

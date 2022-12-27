@@ -68,7 +68,6 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
-
     deleteFromKeyTable(omMetadataManager, batchOperation);
     insertToDeleteTable(omMetadataManager, batchOperation);
 

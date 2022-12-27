@@ -55,6 +55,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
   public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull DeleteTablePrefix deleteTablePrefix,
       @Nonnull List<OmKeyInfo> keysToDelete) {
+
     super(omResponse);
     this.deleteTablePrefix = deleteTablePrefix;
     this.omKeyInfoList = keysToDelete;
@@ -133,7 +134,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfo);
       repeatedOmKeyInfo.clearGDPRdata();
       omMetadataManager.getDeletedTable().putWithBatch(
-              batchOperation, key, repeatedOmKeyInfo);
+          batchOperation, key, repeatedOmKeyInfo);
     }
   }
 

@@ -262,7 +262,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId,
       DeleteTablePrefix deleteTablePrefix) {
     OMClientResponse omClientResponse;
-
     omClientResponse = new OMKeysDeleteResponse(omResponse
         .setDeleteKeysResponse(
             DeleteKeysResponse.newBuilder().setStatus(deleteStatus)

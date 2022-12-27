@@ -42,12 +42,8 @@ public class RepeatedOmKeyInfo {
   }
 
   public RepeatedOmKeyInfo(OmKeyInfo omKeyInfos) {
-    this();
-    this.omKeyInfoList.add(omKeyInfos);
-  }
-
-  public RepeatedOmKeyInfo() {
     this.omKeyInfoList = new ArrayList<>();
+    this.omKeyInfoList.add(omKeyInfos);
   }
 
   public void addOmKeyInfo(OmKeyInfo info) {

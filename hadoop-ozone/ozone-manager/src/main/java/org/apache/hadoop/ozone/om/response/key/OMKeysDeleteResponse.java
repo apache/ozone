@@ -45,9 +45,9 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private OmBucketInfo omBucketInfo;
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
-          @Nonnull DeleteTablePrefix deleteTablePrefix,
-          @Nonnull List<OmKeyInfo> keysToDelete,
-          @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull DeleteTablePrefix deleteTablePrefix,
+      @Nonnull List<OmKeyInfo> keysToDelete,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, deleteTablePrefix, keysToDelete);
     this.omBucketInfo = omBucketInfo;
   }

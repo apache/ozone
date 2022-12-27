@@ -352,11 +352,10 @@ public class TestOzoneAtRestEncryption {
     //As TDE is enabled, the TDE encryption details should not be null.
     Assert.assertNotNull(key.getFileEncryptionInfo());
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-
     //Step 3
     bucket.deleteKey(key.getName());
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     GenericTestUtils.waitFor(() -> {
       try {
         TableIterator<String, ? extends TypedTable.KeyValue<String,

@@ -45,10 +45,10 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private Map<String, OmKeyInfo> keysToDelete;
 
   public OMOpenKeysDeleteResponse(
-          @Nonnull OMResponse omResponse,
-          @Nonnull DeleteTablePrefix prefix,
-          @Nonnull Map<String, OmKeyInfo> keysToDelete,
-          @Nonnull BucketLayout bucketLayout) {
+      @Nonnull OMResponse omResponse,
+      @Nonnull DeleteTablePrefix prefix,
+      @Nonnull Map<String, OmKeyInfo> keysToDelete,
+      @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, prefix, new ArrayList<>(), bucketLayout);
     this.keysToDelete = keysToDelete;
