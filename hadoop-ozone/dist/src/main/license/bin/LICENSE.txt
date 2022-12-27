@@ -479,6 +479,7 @@ BSD 3-Clause
 BSD 2-Clause
 =====================
 
+   com.github.luben:zstd-jni
    dnsjava:dnsjava
    org.codehaus.woodstox:stax2-api
 

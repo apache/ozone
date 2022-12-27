@@ -113,6 +113,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.21</commons-compress.version>
     <commons-configuration2.version>2.1.1</commons-configuration2.version>
+    <zstd-jni.version>1.5.2-5</zstd-jni.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
     <commons-io.version>2.11.0</commons-io.version>
     <commons-lang3.version>3.7</commons-lang3.version>
@@ -761,6 +762,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>commons-validator</groupId>
         <artifactId>commons-validator</artifactId>
         <version>${commons-validator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.luben</groupId>
+        <artifactId>zstd-jni</artifactId>
+        <version>${zstd-jni.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.activation</groupId>

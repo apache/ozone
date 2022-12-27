@@ -194,6 +194,8 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
 
+  public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
+      "hdds.container.replication.compression";
   public static final String HDDS_X509_ROOTCA_CERTIFICATE_FILE =
       "hdds.x509.rootca.certificate.file";
 

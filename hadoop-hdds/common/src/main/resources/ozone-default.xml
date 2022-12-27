@@ -2118,6 +2118,14 @@
     <description>X509 signature certificate.</description>
   </property>
   <property>
+    <name>hdds.container.replication.compression</name>
+    <value>NO_COMPRESSION</value>
+    <tag>OZONE, HDDS, DATANODE</tag>
+    <description>Compression algorithm used for closed container replication.
+      Possible chooices include NO_COMPRESSION, GZIP, SNAPPY, LZ4, ZSTD
+    </description>
+  </property>
+  <property>
     <name>hdds.x509.rootca.certificate.file</name>
     <value></value>
     <description>Path to an external CA certificate. The file format is expected
