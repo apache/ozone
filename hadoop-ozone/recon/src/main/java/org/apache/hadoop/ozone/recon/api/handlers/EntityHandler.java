@@ -287,8 +287,13 @@ public abstract class EntityHandler {
 
   static boolean volumeExists(ReconOMMetadataManager omMetadataManager,
                               String volName) throws IOException {
+    return getVolume(omMetadataManager, volName) != null;
+  }
+
+  static OmVolumeArgs getVolume(ReconOMMetadataManager omMetadataManager,
+                                String volName) throws IOException {
     String volDBKey = omMetadataManager.getVolumeKey(volName);
-    return omMetadataManager.getVolumeTable().getSkipCache(volDBKey) != null;
+    return omMetadataManager.getVolumeTable().getSkipCache(volDBKey);
   }
 
   /**

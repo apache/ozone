@@ -52,6 +52,7 @@ public class VolumeEntityHandler extends EntityHandler {
             new NamespaceSummaryResponse(EntityType.VOLUME);
     String[] names = getNames();
     List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    OmVolumeArgs volume = getVolume(getOmMetadataManager(), names[0]);
     namespaceSummaryResponse.setNumBucket(buckets.size());
     int totalDir = 0;
     long totalKey = 0L;
@@ -65,6 +66,8 @@ public class VolumeEntityHandler extends EntityHandler {
 
     namespaceSummaryResponse.setNumTotalDir(totalDir);
     namespaceSummaryResponse.setNumTotalKey(totalKey);
+    namespaceSummaryResponse.setAge(volume.getCreationTime());
+    namespaceSummaryResponse.setLastModified(volume.getModificationTime());
 
     return namespaceSummaryResponse;
   }

@@ -138,6 +138,31 @@ public class DUResponse {
     @JsonProperty("isKey")
     private boolean isKey;
 
+    @JsonProperty("keyCount")
+    private long keyCount;
+
+    @JsonProperty("bucketCount")
+    private long bucketCount;
+
+    @JsonProperty("dirCount")
+    private long dirCount;
+
+    @JsonProperty("volumeCount")
+    private long volumeCount;
+
+    @JsonProperty("type")
+    private EntityType entityType;
+
+    /** Age of entity in
+     * human-readable format. */
+    @JsonProperty("age")
+    private long age;
+
+    /** When entity was last modified in
+     * human-readable format. */
+    @JsonProperty("lastModified")
+    private long lastModified;
+
     public DiskUsage() {
       this.sizeWithReplica = -1L;
       this.isKey = false;
@@ -173,6 +198,62 @@ public class DUResponse {
 
     public boolean isKey() {
       return isKey;
+    }
+
+    public long getKeyCount() {
+      return keyCount;
+    }
+
+    public void setKeyCount(long keyCount) {
+      this.keyCount = keyCount;
+    }
+
+    public long getBucketCount() {
+      return bucketCount;
+    }
+
+    public void setBucketCount(long bucketCount) {
+      this.bucketCount = bucketCount;
+    }
+
+    public long getDirCount() {
+      return dirCount;
+    }
+
+    public void setDirCount(long dirCount) {
+      this.dirCount = dirCount;
+    }
+
+    public long getVolumeCount() {
+      return volumeCount;
+    }
+
+    public void setVolumeCount(long volumeCount) {
+      this.volumeCount = volumeCount;
+    }
+
+    public EntityType getEntityType() {
+      return entityType;
+    }
+
+    public void setEntityType(EntityType entityType) {
+      this.entityType = entityType;
+    }
+
+    public long getAge() {
+      return age;
+    }
+
+    public void setAge(long age) {
+      this.age = age;
+    }
+
+    public long getLastModified() {
+      return lastModified;
+    }
+
+    public void setLastModified(long lastModified) {
+      this.lastModified = lastModified;
     }
   }
 }

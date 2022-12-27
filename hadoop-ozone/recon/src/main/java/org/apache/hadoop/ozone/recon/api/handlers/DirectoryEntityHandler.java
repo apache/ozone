@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
@@ -53,14 +54,18 @@ public class DirectoryEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    // path should exist so we don't need any extra verification/null check
+    // path should exist, so we don't need any extra verification/null check
     long dirObjectId = getBucketHandler().getDirObjectId(getNames());
+    long dirCreationTime = getBucketHandler().getDirCreationTime(getNames());
+    long dirLastModifiedTime = getBucketHandler().getDirLastModifiedTime(
+        getNames());
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.DIRECTORY);
     namespaceSummaryResponse
         .setNumTotalDir(getTotalDirCount(dirObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
-
+    namespaceSummaryResponse.setAge(dirCreationTime);
+    namespaceSummaryResponse.setLastModified(dirLastModifiedTime);
     return namespaceSummaryResponse;
   }
 

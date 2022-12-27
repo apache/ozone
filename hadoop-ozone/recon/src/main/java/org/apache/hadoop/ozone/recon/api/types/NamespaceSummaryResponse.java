@@ -43,6 +43,16 @@ public class NamespaceSummaryResponse {
   @JsonProperty("numKey")
   private long numTotalKey;
 
+  /** Age of entity in
+   * human-readable format. */
+  @JsonProperty("age")
+  private long age;
+
+  /** When entity was last modified in
+   * human-readable format. */
+  @JsonProperty("lastModified")
+  private long lastModified;
+
   /** Path Status. */
   @JsonProperty("status")
   private ResponseStatus status;
@@ -102,5 +112,21 @@ public class NamespaceSummaryResponse {
 
   public void setStatus(ResponseStatus status) {
     this.status = status;
+  }
+
+  public long getAge() {
+    return age;
+  }
+
+  public void setAge(long age) {
+    this.age = age;
+  }
+
+  public long getLastModified() {
+    return lastModified;
+  }
+
+  public void setLastModified(long lastModified) {
+    this.lastModified = lastModified;
   }
 }

@@ -48,6 +48,9 @@ public class KeyEntityHandler extends EntityHandler {
           throws IOException {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.KEY);
+    OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(getNames());
+    namespaceSummaryResponse.setAge(keyInfo.getCreationTime());
+    namespaceSummaryResponse.setLastModified(keyInfo.getModificationTime());
 
     return namespaceSummaryResponse;
   }

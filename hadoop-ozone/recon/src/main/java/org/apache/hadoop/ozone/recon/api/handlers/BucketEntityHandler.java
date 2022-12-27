@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+
 /**
  * Class for handling bucket entity type.
  */
@@ -54,12 +55,18 @@ public class BucketEntityHandler extends EntityHandler {
     String[] names = getNames();
     assert (names.length == 2);
     long bucketObjectId = getBucketHandler().getBucketObjectId(names);
+    OmBucketInfo omBucketInfo = getBucketHandler().getOmBucketInfo(names);
     namespaceSummaryResponse
       .setNumTotalDir(getTotalDirCount(bucketObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
-
+    namespaceSummaryResponse.setAge(omBucketInfo
+        .getCreationTime());
+    namespaceSummaryResponse.setLastModified(omBucketInfo
+        .getModificationTime());
     return namespaceSummaryResponse;
   }
+
+
 
   @Override
   public DUResponse getDuResponse(

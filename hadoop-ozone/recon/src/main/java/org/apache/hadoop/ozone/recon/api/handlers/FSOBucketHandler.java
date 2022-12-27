@@ -238,6 +238,41 @@ public class FSOBucketHandler extends BucketHandler {
     return getDirObjectId(names, names.length);
   }
 
+  @Override
+  public long getDirCreationTime(String[] names) throws IOException {
+    long creationTime = System.currentTimeMillis();
+    OmDirectoryInfo dirInfo = getDirInfo(names, names.length);
+    if (null != dirInfo) {
+      creationTime = dirInfo.getCreationTime();
+    }
+    return creationTime;
+  }
+
+  @Override
+  public long getDirLastModifiedTime(String[] names) throws IOException {
+    long lastModifiedTime = System.currentTimeMillis();
+    OmDirectoryInfo dirInfo = getDirInfo(names, names.length);
+    if (null != dirInfo) {
+      lastModifiedTime = dirInfo.getModificationTime();
+    }
+    return lastModifiedTime;
+  }
+
+  private OmDirectoryInfo getDirInfo(String[] names, int cutoff)
+      throws IOException {
+    long dirObjectId = getBucketObjectId(names);
+    String dirKey;
+    OmDirectoryInfo dirInfo = null;
+    for (int i = 2; i < cutoff; ++i) {
+      dirKey = getOmMetadataManager().getOzonePathKey(getVolumeObjectId(names),
+          getBucketObjectId(names), dirObjectId, names[i]);
+      dirInfo =
+          getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
+      dirObjectId = dirInfo.getObjectID();
+    }
+    return dirInfo;
+  }
+
   /**
    * Given a valid path request and a cutoff length where should be iterated
    * up to.
@@ -249,16 +284,7 @@ public class FSOBucketHandler extends BucketHandler {
    */
   @Override
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
-    long dirObjectId = getBucketObjectId(names);
-    String dirKey;
-    for (int i = 2; i < cutoff; ++i) {
-      dirKey = getOmMetadataManager().getOzonePathKey(getVolumeObjectId(names),
-              getBucketObjectId(names), dirObjectId, names[i]);
-      OmDirectoryInfo dirInfo =
-              getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
-      dirObjectId = dirInfo.getObjectID();
-    }
-    return dirObjectId;
+    return getDirInfo(names, cutoff).getObjectID();
   }
 
   @Override

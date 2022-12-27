@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -83,6 +84,11 @@ public abstract class BucketHandler {
 
   public abstract long getDirObjectId(String[] names)
           throws IOException;
+  public abstract long getDirCreationTime(String[] names)
+      throws IOException;
+
+  public abstract long getDirLastModifiedTime(String[] names)
+      throws IOException;
 
   public abstract long getDirObjectId(String[] names, int cutoff)
           throws IOException;
@@ -147,10 +153,15 @@ public abstract class BucketHandler {
    * @throws IOException
    */
   public long getBucketObjectId(String[] names) throws IOException {
+    OmBucketInfo bucketInfo = getOmBucketInfo(names);
+    return bucketInfo.getObjectID();
+  }
+
+  public OmBucketInfo getOmBucketInfo(String[] names) throws IOException {
     String bucketKey = omMetadataManager.getBucketKey(names[0], names[1]);
     OmBucketInfo bucketInfo = omMetadataManager
         .getBucketTable().getSkipCache(bucketKey);
-    return bucketInfo.getObjectID();
+    return bucketInfo;
   }
 
   public static BucketHandler getBucketHandler(

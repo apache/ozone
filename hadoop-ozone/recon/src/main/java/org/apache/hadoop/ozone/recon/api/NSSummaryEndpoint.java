@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
+import org.apache.hadoop.ozone.recon.api.types.EntityMetricsResponse;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
@@ -39,6 +40,12 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * REST APIs for namespace metadata summary.
@@ -48,6 +55,7 @@ import java.io.IOException;
 @AdminOnly
 public class NSSummaryEndpoint {
 
+  public static final String COUNT = "count";
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   private final ReconOMMetadataManager omMetadataManager;
@@ -60,6 +68,129 @@ public class NSSummaryEndpoint {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
+  }
+
+  @GET
+  @Path("/entitymetrics")
+  public Response getEntityMetrics(@QueryParam("path") String path,
+                                   @DefaultValue("size")
+                                   @QueryParam("orderBy") String orderBy,
+                                   @DefaultValue("10")
+                                   @QueryParam("count") int count)
+      throws IOException {
+    if (path == null || path.length() == 0) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    EntityMetricsResponse entityMetricsResponse;
+    if (!isInitializationComplete()) {
+      entityMetricsResponse =
+          new EntityMetricsResponse(EntityType.UNKNOWN);
+      entityMetricsResponse.setStatus(ResponseStatus.INITIALIZING);
+    } else {
+      Map<String, List<DUResponse.DiskUsage>> childMetricsListMap =
+          new HashMap<>();
+      NamespaceSummaryResponse nsSummaryData =
+          getNamespaceSummaryResponse(path);
+      DUResponse duResponse = getDuResponse(path, true, true);
+
+      EntityType entityType = nsSummaryData.getEntityType();
+      entityMetricsResponse = new EntityMetricsResponse(entityType);
+
+      if (COUNT.equalsIgnoreCase(orderBy)) {
+        switch (entityType) {
+        case ROOT:
+          childMetricsListMap.put(EntityType.VOLUME.name(),
+              duResponse.getDuData()
+              .stream().sorted(Comparator.comparingLong(
+                  DUResponse.DiskUsage::getVolumeCount).reversed())
+              .limit(count).collect(Collectors.toList()));
+          break;
+        case VOLUME:
+          childMetricsListMap.put(EntityType.BUCKET.name(),
+              duResponse.getDuData()
+              .stream().sorted(Comparator.comparingLong(
+                  DUResponse.DiskUsage::getBucketCount).reversed())
+              .limit(count).collect(Collectors.toList()));
+          break;
+        case BUCKET:
+        case DIRECTORY:
+          List<DUResponse.DiskUsage> keys = getKeys(duResponse.getDuData());
+          List<DUResponse.DiskUsage> dirs = getDirs(duResponse.getDuData());
+          childMetricsListMap.put(EntityType.KEY.name(),
+              keys.stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getKeyCount).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          childMetricsListMap.put(EntityType.DIRECTORY.name(),
+              dirs.stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getKeyCount).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        default:
+          childMetricsListMap.put(EntityType.UNKNOWN.name(),
+              duResponse.getDuData()
+              .stream().sorted(Comparator.comparingLong(
+                  DUResponse.DiskUsage::getKeyCount).reversed())
+              .limit(count).collect(Collectors.toList()));
+          break;
+        }
+      } else {
+        switch (entityType) {
+        case ROOT:
+          childMetricsListMap.put(EntityType.VOLUME.name(),
+              duResponse.getDuData()
+                  .stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getSizeWithReplica).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        case VOLUME:
+          childMetricsListMap.put(EntityType.BUCKET.name(),
+              duResponse.getDuData()
+                  .stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getSizeWithReplica).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        case BUCKET:
+        case DIRECTORY:
+          List<DUResponse.DiskUsage> keys = getKeys(duResponse.getDuData());
+          List<DUResponse.DiskUsage> dirs = getDirs(duResponse.getDuData());
+          childMetricsListMap.put(EntityType.KEY.name(),
+              keys.stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getSizeWithReplica).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          childMetricsListMap.put(EntityType.DIRECTORY.name(),
+              dirs.stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getSizeWithReplica).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        default:
+          childMetricsListMap.put(EntityType.UNKNOWN.name(),
+              duResponse.getDuData()
+              .stream().sorted(Comparator.comparingLong(
+                  DUResponse.DiskUsage::getSizeWithReplica).reversed())
+              .limit(count).collect(Collectors.toList()));
+          break;
+        }
+      }
+      entityMetricsResponse.setNsSummaryResponse(nsSummaryData);
+      entityMetricsResponse.setChildMetricsListMap(childMetricsListMap);
+    }
+    return Response.ok(entityMetricsResponse).build();
+  }
+
+  private List<DUResponse.DiskUsage> getDirs(
+      List<DUResponse.DiskUsage> duData) {
+    return duData.stream()
+        .filter(diskUsage ->
+            diskUsage.getEntityType().equals(EntityType.DIRECTORY))
+        .collect(Collectors.toList());
+  }
+
+  private List<DUResponse.DiskUsage> getKeys(
+      List<DUResponse.DiskUsage> duData) {
+    return duData.stream()
+        .filter(diskUsage ->
+            diskUsage.getEntityType().equals(EntityType.KEY))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -76,22 +207,24 @@ public class NSSummaryEndpoint {
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
+    return Response.ok(getNamespaceSummaryResponse(path)).build();
+  }
 
+  private NamespaceSummaryResponse getNamespaceSummaryResponse(String path)
+      throws IOException {
     NamespaceSummaryResponse namespaceSummaryResponse;
     if (!isInitializationComplete()) {
       namespaceSummaryResponse =
           new NamespaceSummaryResponse(EntityType.UNKNOWN);
       namespaceSummaryResponse.setStatus(ResponseStatus.INITIALIZING);
-      return Response.ok(namespaceSummaryResponse).build();
+    } else {
+      EntityHandler handler = EntityHandler.getEntityHandler(
+          reconNamespaceSummaryManager,
+          omMetadataManager, reconSCM, path);
+
+      namespaceSummaryResponse = handler.getSummaryResponse();
     }
-
-    EntityHandler handler = EntityHandler.getEntityHandler(
-            reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, path);
-
-    namespaceSummaryResponse = handler.getSummaryResponse();
-
-    return Response.ok(namespaceSummaryResponse).build();
+    return namespaceSummaryResponse;
   }
 
   /**
@@ -114,21 +247,45 @@ public class NSSummaryEndpoint {
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
+    return Response.ok(getDuResponse(path, listFile, withReplica)).build();
+  }
 
+  private DUResponse getDuResponse(String path, boolean listFile,
+                                   boolean withReplica) throws IOException {
+    AtomicBoolean isError = new AtomicBoolean(false);
     DUResponse duResponse = new DUResponse();
     if (!isInitializationComplete()) {
       duResponse.setStatus(ResponseStatus.INITIALIZING);
-      return Response.ok(duResponse).build();
+    } else {
+      EntityHandler handler = EntityHandler.getEntityHandler(
+          reconNamespaceSummaryManager,
+          omMetadataManager, reconSCM, path);
+      duResponse = handler.getDuResponse(
+          listFile, withReplica);
+      duResponse.getDuData().forEach(diskUsage -> {
+        try {
+          EntityHandler childEntityHandler = EntityHandler.getEntityHandler(
+              reconNamespaceSummaryManager,
+              omMetadataManager, reconSCM, diskUsage.getSubpath());
+          NamespaceSummaryResponse namespaceSummaryResponse =
+              childEntityHandler.getSummaryResponse();
+          diskUsage.setEntityType(namespaceSummaryResponse.getEntityType());
+          diskUsage.setKeyCount(namespaceSummaryResponse.getNumTotalKey());
+          diskUsage.setBucketCount(namespaceSummaryResponse.getNumBucket());
+          diskUsage.setVolumeCount(namespaceSummaryResponse.getNumVolume());
+          diskUsage.setDirCount(namespaceSummaryResponse.getNumTotalDir());
+          diskUsage.setAge(namespaceSummaryResponse.getAge());
+          diskUsage.setLastModified(
+              namespaceSummaryResponse.getLastModified());
+        } catch (Exception exp) {
+          isError.set(true);
+        }
+      });
     }
-
-    EntityHandler handler = EntityHandler.getEntityHandler(
-            reconNamespaceSummaryManager,
-            omMetadataManager, reconSCM, path);
-
-    duResponse = handler.getDuResponse(
-            listFile, withReplica);
-
-    return Response.ok(duResponse).build();
+    if (isError.get()) {
+      duResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
+    }
+    return duResponse;
   }
 
   /**

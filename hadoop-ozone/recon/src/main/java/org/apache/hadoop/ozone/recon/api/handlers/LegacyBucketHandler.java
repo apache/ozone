@@ -262,6 +262,38 @@ public class LegacyBucketHandler extends BucketHandler {
     return keyDataSizeWithReplica;
   }
 
+  /***
+   * Get the created timestamp for the key directory path.
+   * @param names parsed path request in a list of names
+   * @return the created timestamp for the key directory path
+   * @throws IOException
+   */
+  @Override
+  public long getDirCreationTime(String[] names) throws IOException {
+    OmKeyInfo dirInfo = getOmKeyInfo(names, names.length);
+    if (null != dirInfo) {
+      return dirInfo.getCreationTime();
+    } else {
+      throw new IOException("OmKeyInfo for the directory is null");
+    }
+  }
+
+  /***
+   * Get the last modified timestamp for the key directory path.
+   * @param names parsed path request in a list of names
+   * @return the last modified timestamp for the key directory path
+   * @throws IOException
+   */
+  @Override
+  public long getDirLastModifiedTime(String[] names) throws IOException {
+    OmKeyInfo dirInfo = getOmKeyInfo(names, names.length);
+    if (null != dirInfo) {
+      return dirInfo.getModificationTime();
+    } else {
+      throw new IOException("OmKeyInfo for the directory is null");
+    }
+  }
+
   /**
    * Given a valid path request for a directory,
    * return the directory object ID.
@@ -284,6 +316,18 @@ public class LegacyBucketHandler extends BucketHandler {
    */
   @Override
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
+    OmKeyInfo dirInfo = getOmKeyInfo(names, cutoff);
+    long dirObjectId;
+    if (dirInfo != null) {
+      dirObjectId = dirInfo.getObjectID();
+    } else {
+      throw new IOException("OmKeyInfo for the directory is null");
+    }
+    return dirObjectId;
+  }
+
+  private OmKeyInfo getOmKeyInfo(String[] names, int cutoff)
+      throws IOException {
     long dirObjectId = getBucketObjectId(names);
     StringBuilder bld = new StringBuilder();
     for (int i = 0; i < cutoff; ++i) {
@@ -293,14 +337,7 @@ public class LegacyBucketHandler extends BucketHandler {
     bld.append(OM_KEY_PREFIX);
     String dirKey = bld.toString();
     OmKeyInfo dirInfo = getKeyTable().getSkipCache(dirKey);
-
-    if (dirInfo != null) {
-      dirObjectId = dirInfo.getObjectID();
-    } else {
-      throw new IOException("OmKeyInfo for the directory is null");
-    }
-
-    return dirObjectId;
+    return dirInfo;
   }
 
   @Override
