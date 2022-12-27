@@ -317,7 +317,7 @@ public class LegacyBucketHandler extends BucketHandler {
   @Override
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
     OmKeyInfo dirInfo = getOmKeyInfo(names, cutoff);
-    long dirObjectId;
+    long dirObjectId = getBucketObjectId(names);
     if (dirInfo != null) {
       dirObjectId = dirInfo.getObjectID();
     } else {
@@ -328,7 +328,6 @@ public class LegacyBucketHandler extends BucketHandler {
 
   private OmKeyInfo getOmKeyInfo(String[] names, int cutoff)
       throws IOException {
-    long dirObjectId = getBucketObjectId(names);
     StringBuilder bld = new StringBuilder();
     for (int i = 0; i < cutoff; ++i) {
       bld.append(OM_KEY_PREFIX)
