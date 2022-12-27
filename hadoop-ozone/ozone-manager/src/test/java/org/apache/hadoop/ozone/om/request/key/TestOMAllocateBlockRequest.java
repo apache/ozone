@@ -79,7 +79,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     Assert.assertTrue(omKeyLocationInfo.size() == 0);
 
     OMClientResponse omAllocateBlockResponse =
-        omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
+        omAllocateBlockRequest.validateAndUpdateCache(ozoneManager,
+            OMRequestTestUtils.newTrxnLogIndex(),
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,

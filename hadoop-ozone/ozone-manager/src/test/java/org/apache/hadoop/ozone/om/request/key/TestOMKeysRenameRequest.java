@@ -51,7 +51,8 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
         new OMKeysRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeysRenameResponse =
-        omKeysRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
+        omKeysRenameRequest.validateAndUpdateCache(ozoneManager,
+            OMRequestTestUtils.newTrxnLogIndex(),
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertTrue(omKeysRenameResponse.getOMResponse().getSuccess());
@@ -81,7 +82,8 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
         new OMKeysRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeysRenameResponse =
-        omKeysRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
+        omKeysRenameRequest.validateAndUpdateCache(ozoneManager,
+            OMRequestTestUtils.newTrxnLogIndex(),
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertFalse(omKeysRenameResponse.getOMResponse().getSuccess());

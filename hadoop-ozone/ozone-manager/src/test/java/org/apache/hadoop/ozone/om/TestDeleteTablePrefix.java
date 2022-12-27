@@ -19,14 +19,17 @@
 package org.apache.hadoop.ozone.om;
 
 import mockit.Expectations;
+import mockit.integration.junit4.JMockit;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 /**
  * Test delete table prefix is correctly built.
  */
+@RunWith(JMockit.class)
 public class TestDeleteTablePrefix {
   @Test
   public void testKeyForDeleteTable() {
@@ -36,7 +39,7 @@ public class TestDeleteTablePrefix {
             new DeleteTablePrefix(1L, true).buildKey(omKeyInfo));
 
     long current = Time.now();
-    String expectedTimestamp = String.format("%016X-%16X-2A", current, 3L);
+    String expectedTimestamp = String.format("%016X-%016X-2A-0", 3L, current);
 
     new Expectations(Time.class) {
       {

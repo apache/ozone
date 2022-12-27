@@ -109,7 +109,8 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
             getOmKeyDeleteRequest(modifiedOmRequest);
 
     OMClientResponse omClientResponse = omKeyDeleteRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
+        .validateAndUpdateCache(ozoneManager,
+            OMRequestTestUtils.newTrxnLogIndex(),
             ozoneManagerDoubleBufferHelper,
             omKeyDeleteRequest.getBucketLayout());
 

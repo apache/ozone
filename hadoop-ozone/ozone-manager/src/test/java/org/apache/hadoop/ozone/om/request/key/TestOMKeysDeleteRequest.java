@@ -64,7 +64,8 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
   protected void checkDeleteKeysResponse(
       OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
     OMClientResponse omClientResponse =
-        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L,
+        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager,
+            OMRequestTestUtils.newTrxnLogIndex(),
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
@@ -108,7 +109,8 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
   protected void checkDeleteKeysResponseForFailure(
       OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
     OMClientResponse omClientResponse =
-        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L,
+        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager,
+        OMRequestTestUtils.newTrxnLogIndex(),
         ozoneManagerDoubleBufferHelper);
 
     Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
