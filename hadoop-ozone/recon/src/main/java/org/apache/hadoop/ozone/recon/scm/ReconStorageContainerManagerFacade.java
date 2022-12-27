@@ -286,15 +286,11 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
-
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
-        containerManager,
-        nodeManager,
-        safeModeManager,
-        reconTaskConfig,
-        ozoneConfiguration);
+        containerManager, nodeManager, safeModeManager,
+        reconTaskConfig, ozoneConfiguration);
   }
 
   /**
