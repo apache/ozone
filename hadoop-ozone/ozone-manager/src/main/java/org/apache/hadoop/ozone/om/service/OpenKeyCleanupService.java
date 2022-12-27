@@ -201,7 +201,6 @@ public class OpenKeyCleanupService extends BackgroundService {
           DeleteOpenKeysRequest.newBuilder()
               .addAllOpenKeysPerBucket(openKeyBuckets)
               .setBucketLayout(bucketLayout.toProto())
-              .setModificationTime(Time.now())
               .build();
 
       OMRequest omRequest = OMRequest.newBuilder()

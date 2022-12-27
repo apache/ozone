@@ -64,20 +64,6 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteOpenKeysRequest request = getOmRequest().getDeleteOpenKeysRequest();
-    Preconditions.checkNotNull(request);
-
-    OzoneManagerProtocolProtos.DeleteOpenKeysRequest.Builder builder =
-        request.toBuilder()
-            .setModificationTime(Time.now());
-
-    return getOmRequest().toBuilder()
-            .setDeleteOpenKeysRequest(builder.build())
-            .setUserInfo(getUserIfNotExists(ozoneManager)).build();
-  }
-
-  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 

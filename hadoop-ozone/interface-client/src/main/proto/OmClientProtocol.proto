@@ -1111,9 +1111,6 @@ message DeleteKeyArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
-    // This will be set when the request is received in pre-Execute. This
-    // value is used in deletion service.
-    optional uint64 modificationTime = 4;
 }
 
 message DeleteKeysResponse {
@@ -1172,7 +1169,6 @@ message PurgePathRequest {
   required uint64 bucketId = 2;
   optional string deletedDir = 3;
   repeated KeyInfo deletedSubFiles = 4;
-  repeated KeyInfo markDeletedSubDirs = 5;
 }
 
 message DeleteOpenKeysRequest {
