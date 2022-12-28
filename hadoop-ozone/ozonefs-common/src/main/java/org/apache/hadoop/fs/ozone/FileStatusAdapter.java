@@ -71,7 +71,7 @@ public final class FileStatusAdapter {
     this.owner = owner;
     this.group = group;
     this.symlink = symlink;
-    this.blockLocations = locations.clone();
+    this.blockLocations = (locations == null) ? null : locations.clone();
     this.isEncrypted = isEncrypted;
     this.isErasureCoded = isErasureCoded;
   }

@@ -363,7 +363,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     try {
       incrementCounter(Statistic.OBJECTS_QUERY, 1);
       OzoneFileStatus status = bucket.getFileStatus(key);
-      return toFileStatusAdapter(status, userName, uri, qualifiedPath);
+      return toFileStatusAdapterLocated(status, userName, uri, qualifiedPath);
 
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -517,7 +517,33 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
+  // same as toFileStatusAdapterLocated but this omits keyLocations
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
+      String owner, URI defaultUri, Path workingDir) {
+    OmKeyInfo keyInfo = status.getKeyInfo();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
+    return new FileStatusAdapter(
+        keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
+        new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
+            .makeQualified(defaultUri, workingDir),
+        status.isDirectory(),
+        replication,
+        status.getBlockSize(),
+        keyInfo.getModificationTime(),
+        keyInfo.getModificationTime(),
+        status.isDirectory() ? (short) 00777 : (short) 00666,
+        owner,
+        owner,
+        null,
+        null,
+        OzoneClientUtils.isKeyEncrypted(keyInfo),
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
+    );
+  }
+
+  private FileStatusAdapter toFileStatusAdapterLocated(OzoneFileStatus status,
       String owner, URI defaultUri, Path workingDir) {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
