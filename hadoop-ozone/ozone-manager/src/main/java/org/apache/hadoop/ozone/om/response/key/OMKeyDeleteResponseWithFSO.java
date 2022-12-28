@@ -51,9 +51,9 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
   @SuppressWarnings("parameternumber")
   public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
-          @Nonnull String keyName, @Nonnull DeleteTablePrefix prefix,
-          @Nonnull OmKeyInfo omKeyInfo, @Nonnull OmBucketInfo omBucketInfo,
-          @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId) {
+      @Nonnull String keyName, @Nonnull DeleteTablePrefix prefix,
+      @Nonnull OmKeyInfo omKeyInfo, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId) {
     super(omResponse, prefix, Arrays.asList(omKeyInfo),
         omBucketInfo);
 

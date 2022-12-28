@@ -101,6 +101,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
     if (omKeyInfoList.isEmpty()) {
       return;
     }
+    // If Key is not empty add this to delete table.
     Table<String, OmKeyInfo> keyTable =
         omMetadataManager.getKeyTable(getBucketLayout());
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
@@ -118,6 +119,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       if (isKeyEmpty(omKeyInfo)) {
         continue;
       }
+      // If Key is not empty add this to delete table.
 
       // Append object ID to the deletion key in the delete table for uniqueness
       String key = deleteTablePrefix.buildKey(omKeyInfo);
