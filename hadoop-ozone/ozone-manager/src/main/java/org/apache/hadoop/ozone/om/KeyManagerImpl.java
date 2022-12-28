@@ -1622,7 +1622,6 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    refreshPipeline(keyInfoList);
 
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
@@ -1756,10 +1755,6 @@ public class KeyManagerImpl implements KeyManager {
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    // refreshPipeline flag check has been removed as part of
-    // https://issues.apache.org/jira/browse/HDDS-3658.
-    // Please refer this jira for more details.
-    refreshPipeline(keyInfoList);
 
     if (omKeyArgs.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
