@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -42,8 +41,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -196,169 +193,12 @@ public abstract class OMClientRequest implements RequestAuditor {
     return getUserInfo();
   }
 
-  /**
-   * Check Acls of ozone object.
-   * @param ozoneManager
-   * @param resType
-   * @param storeType
-   * @param aclType
-   * @param vol
-   * @param bucket
-   * @param key
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  public void checkAcls(OzoneManager ozoneManager,
+  protected void checkAcls(OzoneManager ozoneManager,
       OzoneObj.ResourceType resType,
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key) throws IOException {
-    checkAcls(ozoneManager, resType, storeType, aclType, vol, bucket, key,
-        ozoneManager.getVolumeOwner(vol, aclType, resType),
-        ozoneManager.getBucketOwner(vol, bucket, aclType, resType));
-  }
-
-  /**
-   * Check Acls for the ozone key.
-   * @param ozoneManager
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   * @throws IOException
-   */
-  protected void checkACLsWithFSO(OzoneManager ozoneManager, String volumeName,
-                                  String bucketName, String keyName,
-                                  IAccessAuthorizer.ACLType aclType)
-      throws IOException {
-
-    // TODO: Presently not populating sub-paths under a single bucket
-    //  lock. Need to revisit this to handle any concurrent operations
-    //  along with this.
-    OzonePrefixPathImpl pathViewer = new OzonePrefixPathImpl(volumeName,
-        bucketName, keyName, ozoneManager.getKeyManager());
-
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOzonePrefixPath(pathViewer).build();
-
-    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
-        .setAclRights(aclType)
-        // recursive checks for a dir with sub-directories or sub-files
-        .setRecursiveAccessCheck(pathViewer.isCheckRecursiveAccess());
-
-    // check Acl
-    if (ozoneManager.getAclsEnabled()) {
-      String volumeOwner = ozoneManager.getVolumeOwner(obj.getVolumeName(),
-          contextBuilder.getAclRights(), obj.getResourceType());
-      String bucketOwner = ozoneManager.getBucketOwner(obj.getVolumeName(),
-          obj.getBucketName(), contextBuilder.getAclRights(),
-          obj.getResourceType());
-      UserGroupInformation currentUser = createUGI();
-      contextBuilder.setClientUgi(currentUser);
-      contextBuilder.setIp(getRemoteAddress());
-      contextBuilder.setHost(getHostName());
-      contextBuilder.setAclType(IAccessAuthorizer.ACLIdentityType.USER);
-
-      boolean isVolOwner = isOwner(currentUser, volumeOwner);
-      IAccessAuthorizer.ACLType parentAclRight = aclType;
-      if (isVolOwner) {
-        contextBuilder.setOwnerName(volumeOwner);
-      } else {
-        contextBuilder.setOwnerName(bucketOwner);
-      }
-      if (ozoneManager.isNativeAuthorizerEnabled()) {
-        if (aclType == IAccessAuthorizer.ACLType.CREATE ||
-                aclType == IAccessAuthorizer.ACLType.DELETE ||
-                aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
-          parentAclRight = IAccessAuthorizer.ACLType.WRITE;
-        } else if (aclType == IAccessAuthorizer.ACLType.READ_ACL ||
-                aclType == IAccessAuthorizer.ACLType.LIST) {
-          parentAclRight = IAccessAuthorizer.ACLType.READ;
-        }
-      } else {
-        parentAclRight = IAccessAuthorizer.ACLType.READ;
-
-      }
-      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
-              .setResType(OzoneObj.ResourceType.VOLUME)
-              .setStoreType(OzoneObj.StoreType.OZONE)
-              .setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setKeyName(keyName).build();
-      RequestContext volumeContext = RequestContext.newBuilder()
-              .setClientUgi(currentUser)
-              .setIp(getRemoteAddress())
-              .setHost(getHostName())
-              .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-              .setAclRights(parentAclRight)
-              .setOwnerName(volumeOwner)
-              .build();
-      ozoneManager.checkAcls(volumeObj, volumeContext, true);
-      ozoneManager.checkAcls(obj, contextBuilder.build(), true);
-    }
-  }
-
-  private boolean isOwner(UserGroupInformation callerUgi,
-                                 String ownerName) {
-    if (ownerName == null) {
-      return false;
-    }
-    if (callerUgi.getUserName().equals(ownerName) ||
-        callerUgi.getShortUserName().equals(ownerName)) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Check Acls of ozone object with volOwner given.
-   * @param ozoneManager
-   * @param resType
-   * @param storeType
-   * @param aclType
-   * @param vol
-   * @param bucket
-   * @param key
-   * @param volOwner
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  public void checkAcls(OzoneManager ozoneManager,
-      OzoneObj.ResourceType resType,
-      OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
-      String vol, String bucket, String key, String volOwner)
-      throws IOException {
-    ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress(), getHostName(), true,
-        volOwner);
-  }
-
-  /**
-   * Check Acls of ozone object with volOwner given.
-   * @param ozoneManager
-   * @param resType
-   * @param storeType
-   * @param aclType
-   * @param vol
-   * @param bucket
-   * @param key
-   * @param volOwner
-   * @param bucketOwner
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  public void checkAcls(OzoneManager ozoneManager,
-      OzoneObj.ResourceType resType,
-      OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
-      String vol, String bucket, String key, String volOwner,
-      String bucketOwner)
-      throws IOException {
-
-    OzoneAclUtils.checkAllAcls(ozoneManager, resType, storeType, aclType,
-            vol, bucket, key, volOwner, bucketOwner, createUGI(),
+    ozoneManager.getAclManager().checkAllAcls(resType, storeType, aclType,
+            vol, bucket, key, createUGI(),
             getRemoteAddress(), getHostName());
   }
 

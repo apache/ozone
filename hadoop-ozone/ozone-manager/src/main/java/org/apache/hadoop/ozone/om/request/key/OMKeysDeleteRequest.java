@@ -132,7 +132,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
@@ -153,8 +152,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         try {
           // check Acl
           checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
               getOzoneKeyStatus(omMetadataManager, volumeName, bucketName,
                   keyName));

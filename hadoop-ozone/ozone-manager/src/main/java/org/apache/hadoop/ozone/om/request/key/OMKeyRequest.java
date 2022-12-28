@@ -215,19 +215,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         getBucketLayout());
   }
 
-  // For keys batch delete and rename only
-  protected String getVolumeOwner(OMMetadataManager omMetadataManager,
-      String volumeName) throws IOException {
-    String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
-    OmVolumeArgs volumeArgs =
-        omMetadataManager.getVolumeTable().get(dbVolumeKey);
-    if (volumeArgs == null) {
-      throw new OMException("Volume not found " + volumeName,
-          VOLUME_NOT_FOUND);
-    }
-    return volumeArgs.getOwnerName();
-  }
-
   protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
     Optional<FileEncryptionInfo> encInfo = Optional.absent();
@@ -341,28 +328,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
           volume, bucket, key);
-    }
-  }
-
-  /**
-   * Check Acls for the ozone key with volumeOwner.
-   * @param ozoneManager
-   * @param volume
-   * @param bucket
-   * @param key
-   * @param aclType
-   * @param resourceType
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
-      String bucket, String key, IAccessAuthorizer.ACLType aclType,
-      OzoneObj.ResourceType resourceType, String volumeOwner)
-      throws IOException {
-    if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE,
-          aclType, volume, bucket, key, volumeOwner,
-          ozoneManager.getBucketOwner(volume, bucket, aclType, resourceType));
     }
   }
 

@@ -178,8 +178,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
@@ -230,15 +228,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
-import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.*;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -271,7 +261,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
@@ -414,6 +403,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final OzoneLockProvider ozoneLockProvider;
   private OMPerformanceMetrics perfMetrics;
+  private AclManager aclManager;
 
   /**
    * OM Startup mode.
@@ -596,6 +586,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
+
+    this.aclManager = new AclManager(metadataManager, omRpcAddress,
+            accessAuthorizer, isNativeAuthorizerEnabled);
 
     if (startupOption == StartupOption.BOOTSTRAP) {
       isBootstrapping = true;
@@ -2266,216 +2259,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  /**
-   * Checks if current caller has acl permissions.
-   *
-   * @param resType - Type of ozone resource. Ex volume, bucket.
-   * @param store   - Store type. i.e Ozone, S3.
-   * @param acl     - type of access to be checked.
-   * @param vol     - name of volume
-   * @param bucket  - bucket name
-   * @param key     - key
-   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
-   */
-  private void checkAcls(ResourceType resType, StoreType store,
-      ACLType acl, String vol, String bucket, String key)
-      throws IOException {
-    UserGroupInformation user;
-    if (getS3Auth() != null) {
-      String principal =
-          OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId());
-      user = UserGroupInformation.createRemoteUser(principal);
-    } else {
-      user = ProtobufRpcEngine.Server.getRemoteUser();
-    }
-
-    InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
-    String volumeOwner = getVolumeOwner(vol, acl, resType);
-    String bucketOwner = getBucketOwner(vol, bucket, acl, resType);
-
-    OzoneAclUtils.checkAllAcls(this, resType, store, acl,
-        vol, bucket, key, volumeOwner, bucketOwner,
-        user != null ? user : getRemoteUser(),
-        remoteIp != null ? remoteIp : omRpcAddress.getAddress(),
-        remoteIp != null ? remoteIp.getHostName() : omRpcAddress.getHostName());
+  public AclManager getAclManager() {
+    return aclManager;
   }
-
-  private boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
-    if (ownerName == null) {
-      return false;
-    }
-    if (callerUgi.getUserName().equals(ownerName) ||
-            callerUgi.getShortUserName().equals(ownerName)) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * A variant of checkAcls that doesn't throw exception if permission denied.
-   *
-   * @return true if permission granted, false if permission denied.
-   */
-  private boolean hasAcls(String userName, ResourceType resType,
-      StoreType store, ACLType acl, String vol, String bucket, String key) {
-    try {
-      return checkAcls(resType, store, acl, vol, bucket, key,
-          UserGroupInformation.createRemoteUser(userName),
-          ProtobufRpcEngine.Server.getRemoteIp(),
-          ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-          false, getVolumeOwner(vol, acl, resType));
-    } catch (OMException ex) {
-      // Should not trigger exception here at all
-      return false;
-    }
-  }
-
-  public String getVolumeOwner(String vol, ACLType type, ResourceType resType)
-      throws OMException {
-    String volOwnerName = null;
-    if (!vol.equals(OzoneConsts.OZONE_ROOT) &&
-        !(type == ACLType.CREATE && resType == ResourceType.VOLUME)) {
-      volOwnerName = getVolumeOwner(vol);
-    }
-    return volOwnerName;
-  }
-
-  private String getVolumeOwner(String volume) throws OMException {
-    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
-        VOLUME_LOCK, volume);
-    String dbVolumeKey = metadataManager.getVolumeKey(volume);
-    OmVolumeArgs volumeArgs = null;
-    try {
-      volumeArgs = metadataManager.getVolumeTable().get(dbVolumeKey);
-    } catch (IOException ioe) {
-      if (ioe instanceof OMException) {
-        throw (OMException)ioe;
-      } else {
-        throw new OMException("getVolumeOwner for Volume " + volume + " failed",
-            ResultCodes.INTERNAL_ERROR);
-      }
-    } finally {
-      if (lockAcquired) {
-        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
-      }
-    }
-    if (volumeArgs != null) {
-      return volumeArgs.getOwnerName();
-    } else {
-      throw new OMException("Volume " + volume + " is not found",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
-    }
-  }
-
-  /**
-   * Return the owner of a given bucket.
-   *
-   * @return String
-   */
-  public String getBucketOwner(String volume, String bucket, ACLType type,
-       ResourceType resType) throws OMException {
-    String bucketOwner = null;
-    if ((resType != ResourceType.VOLUME) &&
-        !(type == ACLType.CREATE && resType == ResourceType.BUCKET)) {
-      bucketOwner = getBucketOwner(volume, bucket);
-    }
-    return bucketOwner;
-  }
-
-  private String getBucketOwner(String volume, String bucket)
-      throws OMException {
-
-    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volume, bucket);
-    String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
-    OmBucketInfo bucketInfo = null;
-    try {
-      bucketInfo = metadataManager.getBucketTable().get(dbBucketKey);
-    } catch (IOException ioe) {
-      if (ioe instanceof OMException) {
-        throw (OMException)ioe;
-      } else {
-        throw new OMException("getBucketOwner for Bucket " + volume + "/" +
-            bucket  + " failed: " + ioe.getMessage(),
-            ResultCodes.INTERNAL_ERROR);
-      }
-    } finally {
-      if (lockAcquired) {
-        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volume, bucket);
-      }
-    }
-    if (bucketInfo != null) {
-      return bucketInfo.getOwner();
-    } else {
-      throw new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND);
-    }
-  }
-
-  /**
-   * CheckAcls for the ozone object.
-   *
-   * @return true if permission granted, false if permission denied.
-   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
-   *                     and throwOnPermissionDenied set to true.
-   */
-  @SuppressWarnings("parameternumber")
-  public boolean checkAcls(ResourceType resType, StoreType storeType,
-      ACLType aclType, String vol, String bucket, String key,
-      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      boolean throwIfPermissionDenied, String owner)
-      throws OMException {
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(resType)
-        .setStoreType(storeType)
-        .setVolumeName(vol)
-        .setBucketName(bucket)
-        .setKeyName(key).build();
-    RequestContext context = RequestContext.newBuilder()
-        .setClientUgi(ugi)
-        .setIp(remoteAddress)
-        .setHost(hostName)
-        .setAclType(ACLIdentityType.USER)
-        .setAclRights(aclType)
-        .setOwnerName(owner)
-        .build();
-
-    return checkAcls(obj, context, throwIfPermissionDenied);
-  }
-
-  /**
-   * CheckAcls for the ozone object.
-   *
-   * @return true if permission granted, false if permission denied.
-   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
-   *                     and throwOnPermissionDenied set to true.
-   */
-  public boolean checkAcls(OzoneObj obj, RequestContext context,
-                           boolean throwIfPermissionDenied)
-      throws OMException {
-
-    if (!accessAuthorizer.checkAccess(obj, context)) {
-      if (throwIfPermissionDenied) {
-        String volumeName = obj.getVolumeName() != null ?
-                "Volume:" + obj.getVolumeName() + " " : "";
-        String bucketName = obj.getBucketName() != null ?
-                "Bucket:" + obj.getBucketName() + " " : "";
-        String keyName = obj.getKeyName() != null ?
-                "Key:" + obj.getKeyName() : "";
-        LOG.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            context.getClientUgi().getUserName(), context.getAclRights(),
-            obj.getResourceType(), volumeName, bucketName, keyName);
-        throw new OMException("User " + context.getClientUgi().getUserName() +
-            " doesn't have " + context.getAclRights() +
-            " permission to access " + obj.getResourceType() + " " +
-            volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
-      }
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-
 
   /**
    * Return true if Ozone acl's are enabled, else false.
@@ -2508,8 +2294,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Map<String, String> auditMap = buildAuditMap(volume);
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.READ, volume,
-                null, null);
+        aclManager.checkAcls(ResourceType.VOLUME, StoreType.OZONE,
+                ACLType.READ, volume, null, null);
       }
       metrics.incNumVolumeInfos();
       return volumeManager.getVolumeInfo(volume);
@@ -2562,8 +2348,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         String remoteUserName = remoteUserUgi.getShortUserName();
         // if not admin nor list my own volumes, check ACL.
         if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
-          checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
-                  OzoneConsts.OZONE_ROOT, null, null);
+          aclManager.checkAcls(ResourceType.VOLUME, StoreType.OZONE,
+                  ACLType.LIST, OzoneConsts.OZONE_ROOT, null, null);
         }
         // List all volumes first
         List<OmVolumeArgs> listAllVolumes = volumeManager.listVolumes(
@@ -2571,7 +2357,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         List<OmVolumeArgs> result = new ArrayList<>();
         // Filter all volumes by LIST ACL
         for (OmVolumeArgs volumeArgs : listAllVolumes) {
-          if (hasAcls(userName, ResourceType.VOLUME, StoreType.OZONE,
+          if (aclManager.hasAcls(userName, ResourceType.VOLUME, StoreType.OZONE,
               ACLType.LIST, volumeArgs.getVolume(), null, null)) {
             result.add(volumeArgs);
           }
@@ -2617,7 +2403,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+        aclManager.checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
             OzoneConsts.OZONE_ROOT, null, null);
       }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
@@ -2650,7 +2436,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         String.valueOf(maxNumOfBuckets));
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+        aclManager.checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
                 volumeName, null, null);
       }
       metrics.incNumBucketLists();
@@ -2686,8 +2472,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume,
-                bucket, null);
+        aclManager.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+                ACLType.READ, volume, bucket, null);
       }
       metrics.incNumBucketInfos();
       final OmBucketInfo bucketInfo =
@@ -2728,7 +2514,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
-                () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
+                () -> aclManager.checkAcls(ResourceType.KEY, StoreType.OZONE,
                         ACLType.READ, bucket.realVolume(), bucket.realBucket(),
                         args.getKeyName())
         );
@@ -2781,7 +2567,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
-                checkAcls(ResourceType.KEY, StoreType.OZONE,
+                aclManager.checkAcls(ResourceType.KEY, StoreType.OZONE,
                         ACLType.READ, bucket.realVolume(),
                         bucket.realBucket(), args.getKeyName())
         );
@@ -2827,7 +2613,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+        aclManager.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
                 bucket.realVolume(), bucket.realBucket(), keyPrefix);
       }
       metrics.incNumKeyLists();
@@ -2859,7 +2645,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+        aclManager.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
                 volumeName, bucketName, keyPrefix);
       }
       metrics.incNumTrashKeyLists();
@@ -3494,7 +3280,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       if (isAclEnabled) {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
+        aclManager.checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
                 bucket.realVolume(), bucket.realBucket(), args.getKeyName());
       }
       metrics.incNumLookupFile();
@@ -3539,8 +3325,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-                bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+        aclManager.checkAcls(getResourceType(args), StoreType.OZONE,
+                ACLType.READ, bucket.realVolume(), bucket.realBucket(),
+                args.getKeyName());
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -3571,8 +3358,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       if (isAclEnabled) {
-        checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
+        aclManager.checkAcls(obj.getResourceType(), obj.getStoreType(),
+                ACLType.READ_ACL, obj.getVolumeName(), obj.getBucketName(),
+                obj.getKeyName());
       }
       metrics.incNumGetAcl();
       switch (obj.getResourceType()) {
@@ -4181,11 +3969,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     if (isAclEnabled) {
-      final ACLType type = ACLType.READ;
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, type,
-          volumeName, bucketName, null, userGroupInformation,
-          remoteAddress, hostName, true,
-          getVolumeOwner(volumeName, type, ResourceType.BUCKET));
+      aclManager.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+              ACLType.READ, volumeName, bucketName, null);
     }
 
     return resolveBucketLink(

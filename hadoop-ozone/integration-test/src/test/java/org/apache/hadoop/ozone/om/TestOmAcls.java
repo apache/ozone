@@ -94,7 +94,7 @@ public class TestOmAcls {
         .build();
     cluster.waitForClusterToBeReady();
     logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
+        GenericTestUtils.LogCapturer.captureLogs(AclManager.getLogger());
   }
 
   @AfterClass

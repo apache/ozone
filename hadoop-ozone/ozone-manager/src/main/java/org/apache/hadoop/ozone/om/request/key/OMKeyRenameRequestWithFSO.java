@@ -113,8 +113,11 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       // old key and create operation on new key
 
       // check Acl fromKeyName
-      checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
-          IAccessAuthorizer.ACLType.DELETE);
+      if (ozoneManager.getAclsEnabled()) {
+        ozoneManager.getAclManager().checkACLsWithFSO(ozoneManager, volumeName,
+            bucketName, fromKeyName, IAccessAuthorizer.ACLType.DELETE,
+            getRemoteAddress(), getHostName(), createUGI());
+      }
 
       // check Acl toKeyName
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
