@@ -59,8 +59,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager,
-            OMRequestTestUtils.newTrxnLogIndex(),
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,

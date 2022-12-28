@@ -45,27 +45,19 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
   private OMRequest omRequest;
 
   @Test
-  public void testPreExecute() throws Exception {
-    createPreRequisites();
-    doPreExecute(omRequest);
-  }
-
-  @Test
   public void testKeysDeleteRequest() throws Exception {
 
     createPreRequisites();
 
-    OMKeysDeleteRequest omKeysDeleteRequest = new OMKeysDeleteRequest(
-        doPreExecute(omRequest), getBucketLayout());
-
+    OMKeysDeleteRequest omKeysDeleteRequest =
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponse(omKeysDeleteRequest);
   }
 
   protected void checkDeleteKeysResponse(
       OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
     OMClientResponse omClientResponse =
-        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager,
-            OMRequestTestUtils.newTrxnLogIndex(),
+        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
@@ -101,16 +93,15 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
                 .setBucketName(bucketName).setVolumeName(volumeName)
                     .addAllKeys(deleteKeyList).addKeys("dummy"))).build();
 
-    OMKeysDeleteRequest omKeysDeleteRequest = new OMKeysDeleteRequest(
-        doPreExecute(omRequest), getBucketLayout());
+    OMKeysDeleteRequest omKeysDeleteRequest =
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
   }
 
   protected void checkDeleteKeysResponseForFailure(
       OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
     OMClientResponse omClientResponse =
-        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager,
-        OMRequestTestUtils.newTrxnLogIndex(),
+        omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L,
         ozoneManagerDoubleBufferHelper);
 
     Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
@@ -165,19 +156,6 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
             .setCmdType(DeleteKeys)
             .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
                 .setDeleteKeys(deleteKeyArgs).build()).build();
-  }
-
-  private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
-
-    OMKeysDeleteRequest omKeyDeleteRequest =
-        new OMKeysDeleteRequest(omRequest, getBucketLayout());
-
-    OMRequest modifiedOmRequest = omKeyDeleteRequest.preExecute(ozoneManager);
-
-    // Will not be equal, as UserInfo will be set.
-    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
-
-    return modifiedOmRequest;
   }
 
   public List<String> getDeleteKeyList() {

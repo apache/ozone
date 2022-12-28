@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -46,7 +45,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
-
     String ozoneKey = addKeyToTable();
     OmKeyInfo omKeyInfo = omMetadataManager
             .getKeyTable(getBucketLayout()).get(ozoneKey);
@@ -145,7 +143,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     long trxnLogIndex = 0x360L;
     omBucketInfo = OmBucketInfo.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
-            .setCreationTime(Time.now()).build();
+            .build();
 
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 

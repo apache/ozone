@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -122,7 +121,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
+        .build();
 
     DeleteTablePrefix prefix = new DeleteTablePrefix(360L, true);
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(

@@ -34,10 +34,10 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
 
   @Override
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-          OzoneManagerProtocolProtos.OMResponse omResponse,
-          DeleteTablePrefix deleteTablePrefix) throws Exception {
+      OzoneManagerProtocolProtos.OMResponse omResponse,
+      DeleteTablePrefix deleteTablePrefix) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
-            deleteTablePrefix, omKeyInfo, getOmBucketInfo(), false,
+        deleteTablePrefix, omKeyInfo, getOmBucketInfo(), false,
         omMetadataManager.getVolumeId(volumeName));
   }
 

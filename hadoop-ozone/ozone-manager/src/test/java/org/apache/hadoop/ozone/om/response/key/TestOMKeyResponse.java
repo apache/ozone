@@ -100,7 +100,6 @@ public class TestOMKeyResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setObjectID(System.currentTimeMillis())
-            .setCreationTime(System.currentTimeMillis())
             .setStorageType(StorageType.DISK)
             .setIsVersionEnabled(false)
             .build();
