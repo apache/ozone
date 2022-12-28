@@ -68,7 +68,7 @@ Setup Snapshot Paths
 
 *** Test Cases ***
 Test set up paths for the snapshot
-    Setup Paths
+    Setup Snapshot Paths
 
 Test create snapshot
     Create snapshot
