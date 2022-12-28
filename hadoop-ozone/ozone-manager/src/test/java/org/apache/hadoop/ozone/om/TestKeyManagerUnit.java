@@ -613,15 +613,13 @@ public class TestKeyManagerUnit {
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volume)
         .setBucketName(bucket)
-        .setKeyName("")
-        .setSortDatanodesInPipeline(true);
+        .setKeyName("");
     List<OzoneFileStatus> fileStatusList =
         keyManager.listStatus(builder.build(), false,
             null, Long.MAX_VALUE, client);
 
     Assert.assertEquals(10, fileStatusList.size());
     verify(containerClient).getContainerWithPipelineBatch(containerIDs);
-    verify(blockClient).sortDatanodes(nodes, client);
   }
 
   @Test

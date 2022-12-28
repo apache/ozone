@@ -1623,9 +1623,6 @@ public class KeyManagerImpl implements KeyManager {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
 
-    if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
-    }
     return fileStatusList;
   }
 
