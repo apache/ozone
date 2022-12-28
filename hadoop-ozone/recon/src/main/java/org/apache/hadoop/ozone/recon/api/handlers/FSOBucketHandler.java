@@ -284,7 +284,11 @@ public class FSOBucketHandler extends BucketHandler {
    */
   @Override
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
-    return getDirInfo(names, cutoff).getObjectID();
+    OmDirectoryInfo dirInfo = getDirInfo(names, cutoff);
+    if (null != dirInfo) {
+      return dirInfo.getObjectID();
+    }
+    return getBucketObjectId(names);
   }
 
   @Override
