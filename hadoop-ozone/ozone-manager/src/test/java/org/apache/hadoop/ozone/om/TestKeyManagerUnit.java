@@ -570,9 +570,6 @@ public class TestKeyManagerUnit {
     OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
 
     final Pipeline pipeline = MockPipeline.createPipeline(3);
-    final List<String> nodes = pipeline.getNodes().stream()
-        .map(DatanodeDetails::getUuidString)
-        .collect(toList());
 
     List<Long> containerIDs = new ArrayList<>();
     List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
@@ -619,7 +616,6 @@ public class TestKeyManagerUnit {
             null, Long.MAX_VALUE, client);
 
     Assert.assertEquals(10, fileStatusList.size());
-    verify(containerClient).getContainerWithPipelineBatch(containerIDs);
   }
 
   @Test
