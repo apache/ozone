@@ -282,6 +282,7 @@ import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGr
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.OzoneManagerInterService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -2609,14 +2610,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.READ, volume,
-          null, null);
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volume);
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.READ, volume,
+                null, null);
+      }
       metrics.incNumVolumeInfos();
       return volumeManager.getVolumeInfo(volume);
     } catch (Exception ex) {
@@ -2748,10 +2748,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<OmBucketInfo> listBuckets(String volumeName,
       String startKey, String prefix, int maxNumOfBuckets)
       throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST, volumeName,
-          null, null);
-    }
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
     auditMap.put(OzoneConsts.START_KEY, startKey);
@@ -2759,6 +2755,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.MAX_NUM_OF_BUCKETS,
         String.valueOf(maxNumOfBuckets));
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+                volumeName, null, null);
+      }
       metrics.incNumBucketLists();
       return bucketManager.listBuckets(volumeName,
           startKey, prefix, maxNumOfBuckets);
@@ -2787,14 +2787,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume,
-          bucket, null);
-    }
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volume);
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume,
+                bucket, null);
+      }
       metrics.incNumBucketInfos();
       final OmBucketInfo bucketInfo =
           bucketManager.getBucketInfo(volume, bucket);
@@ -2882,17 +2882,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         perfMetrics.getGetKeyInfoResolveBucketLatencyNs(),
         () -> resolveBucketLink(resolvedVolumeArgs));
 
-    if (isAclEnabled) {
-      captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
-          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName())
-      );
-    }
-
     boolean auditSuccess = true;
     OmKeyArgs resolvedArgs = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
+                checkAcls(ResourceType.KEY, StoreType.OZONE,
+                        ACLType.READ, bucket.realVolume(),
+                        bucket.realBucket(), args.getKeyName())
+        );
+      }
+
       metrics.incNumGetKeyInfo();
       OmKeyInfo keyInfo =
           keyManager.getKeyInfo(resolvedArgs, getClientAddress());
@@ -2925,11 +2926,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-          bucket.realVolume(), bucket.realBucket(), keyPrefix);
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.START_KEY, startKey);
@@ -2937,6 +2933,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+                bucket.realVolume(), bucket.realBucket(), keyPrefix);
+      }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
           startKey, keyPrefix, maxKeys);
@@ -2958,22 +2958,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException {
-
-    // bucket links not supported
-
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-          volumeName, bucketName, keyPrefix);
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
     auditMap.put(OzoneConsts.START_KEY, startKeyName);
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
     auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
-
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+                volumeName, bucketName, keyPrefix);
+      }
       metrics.incNumTrashKeyLists();
       return keyManager.listTrash(volumeName, bucketName,
           startKeyName, keyPrefix, maxKeys);
@@ -3599,17 +3594,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
     ResolvedBucket bucket = resolveBucketLink(args);
 
-    if (isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
+                bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      }
       metrics.incNumLookupFile();
       return keyManager.lookupFile(args, getClientAddress());
     } catch (Exception ex) {
@@ -3645,17 +3639,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     ResolvedBucket bucket = resolveBucketLink(args);
 
-    if (isAclEnabled) {
-      checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+                bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
           maxListingPageSize, getClientAddress(), allowPartialPrefixes);
