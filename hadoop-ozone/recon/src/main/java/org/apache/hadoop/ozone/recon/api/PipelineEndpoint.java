@@ -77,7 +77,7 @@ public class PipelineEndpoint {
       UUID pipelineId = pipeline.getId().getId();
       List<String> datanodes = new ArrayList<>();
       PipelineMetadata.Builder builder = PipelineMetadata.newBuilder();
-      pipeline.getNodes().forEach(node -> datanodes.add(node.getHostName()));
+      pipeline.getNodes().forEach(node -> datanodes.add(node.getHostName() + "/" + node.getUuid()));
       long duration =
           Instant.now().toEpochMilli() -
               pipeline.getCreationTimestamp().toEpochMilli();

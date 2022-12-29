@@ -684,9 +684,9 @@
         "status": "OPEN",
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost2.storage.enterprise.com",
-          "localhost3.storage.enterprise.com"
+          "localhost1.storage.enterprise.com/7d8c6c89-6bd2-43cd-974d-a54344eb46bf",
+          "localhost2.storage.enterprise.com/747c77f6-fefe-467e-812c-f77a212da985",
+          "localhost3.storage.enterprise.com/747c77f6-fefe-467e-812c-f77a212da985"
         ],
         "lastLeaderElection": 1578491471528,
         "duration": 389445,
@@ -700,9 +700,9 @@
         "status": "OPEN",
         "leaderNode": "localhost5.storage.enterprise.com",
         "datanodes": [
-          "localhost4.storage.enterprise.com",
-          "localhost5.storage.enterprise.com",
-          "localhost6.storage.enterprise.com"
+          "localhost4.storage.enterprise.com/747c77f6-fefe-467e-812c-f77a212da985",
+          "localhost5.storage.enterprise.com/747c77f6-fefe-467e-812c-f77a212da985",
+          "localhost6.storage.enterprise.com/cd3a5146-b37f-4a03-b1f0-0f5c98cd7939"
         ],
         "lastLeaderElection": 1578441471528,
         "duration": 50073382,
@@ -716,9 +716,9 @@
         "status": "CLOSED",
         "leaderNode": "localhost9.storage.enterprise.com",
         "datanodes": [
-          "localhost7.storage.enterprise.com",
-          "localhost8.storage.enterprise.com",
-          "localhost9.storage.enterprise.com"
+          "localhost7.storage.enterprise.com/747c77f6-fefe-467e-812c-f77a212da985",
+          "localhost8.storage.enterprise.com/7d8c6c89-6bd2-43cd-974d-a54344eb46bf",
+          "localhost9.storage.enterprise.com/747c77f6-fefe-467e-812c-f77a212da985"
         ],
         "lastLeaderElection": 1578441871828,
         "duration": 49712212,
