@@ -23,8 +23,11 @@ import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Utility class to read audit logs.
@@ -48,8 +51,9 @@ public final class AuditLogUtils {
    */
   public static void verifyAuditLog(AuditAction action,
                                     AuditEventStatus eventStatus) {
-    File file = new File(AUDITLOG_FILENAME);
-    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+    Path file = Paths.get(AUDITLOG_FILENAME);
+    try (BufferedReader br = Files.newBufferedReader(file,
+            StandardCharsets.UTF_8)) {
       String line;
       while ((line = br.readLine()) != null) {
         if (line.contains(action.getAction()) &&
