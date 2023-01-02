@@ -49,7 +49,7 @@ public class KeyEntityHandler extends EntityHandler {
     NamespaceSummaryResponse namespaceSummaryResponse =
             new NamespaceSummaryResponse(EntityType.KEY);
     OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(getNames());
-    namespaceSummaryResponse.setAge(keyInfo.getCreationTime());
+    namespaceSummaryResponse.setCreateTime(keyInfo.getCreationTime());
     namespaceSummaryResponse.setLastModified(keyInfo.getModificationTime());
 
     return namespaceSummaryResponse;

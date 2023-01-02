@@ -45,8 +45,8 @@ public class NamespaceSummaryResponse {
 
   /** Age of entity in
    * human-readable format. */
-  @JsonProperty("age")
-  private long age;
+  @JsonProperty("createTime")
+  private long createTime;
 
   /** When entity was last modified in
    * human-readable format. */
@@ -114,12 +114,12 @@ public class NamespaceSummaryResponse {
     this.status = status;
   }
 
-  public long getAge() {
-    return age;
+  public long getCreateTime() {
+    return createTime;
   }
 
-  public void setAge(long age) {
-    this.age = age;
+  public void setCreateTime(long createTime) {
+    this.createTime = createTime;
   }
 
   public long getLastModified() {

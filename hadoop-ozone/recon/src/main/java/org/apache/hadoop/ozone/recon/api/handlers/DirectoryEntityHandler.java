@@ -63,7 +63,7 @@ public class DirectoryEntityHandler extends EntityHandler {
     namespaceSummaryResponse
         .setNumTotalDir(getTotalDirCount(dirObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
-    namespaceSummaryResponse.setAge(dirCreationTime);
+    namespaceSummaryResponse.setCreateTime(dirCreationTime);
     namespaceSummaryResponse.setLastModified(dirLastModifiedTime);
     return namespaceSummaryResponse;
   }

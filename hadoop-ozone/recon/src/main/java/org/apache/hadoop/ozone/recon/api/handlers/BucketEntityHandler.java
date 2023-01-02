@@ -59,7 +59,7 @@ public class BucketEntityHandler extends EntityHandler {
     namespaceSummaryResponse
       .setNumTotalDir(getTotalDirCount(bucketObjectId));
     namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
-    namespaceSummaryResponse.setAge(omBucketInfo
+    namespaceSummaryResponse.setCreateTime(omBucketInfo
         .getCreationTime());
     namespaceSummaryResponse.setLastModified(omBucketInfo
         .getModificationTime());

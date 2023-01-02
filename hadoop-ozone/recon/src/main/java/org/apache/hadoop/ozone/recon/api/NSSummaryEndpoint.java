@@ -274,7 +274,7 @@ public class NSSummaryEndpoint {
           diskUsage.setBucketCount(namespaceSummaryResponse.getNumBucket());
           diskUsage.setVolumeCount(namespaceSummaryResponse.getNumVolume());
           diskUsage.setDirCount(namespaceSummaryResponse.getNumTotalDir());
-          diskUsage.setAge(namespaceSummaryResponse.getAge());
+          diskUsage.setCreateTime(namespaceSummaryResponse.getCreateTime());
           diskUsage.setLastModified(
               namespaceSummaryResponse.getLastModified());
         } catch (Exception exp) {

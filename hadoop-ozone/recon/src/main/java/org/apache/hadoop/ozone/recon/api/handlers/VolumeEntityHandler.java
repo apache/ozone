@@ -66,7 +66,7 @@ public class VolumeEntityHandler extends EntityHandler {
 
     namespaceSummaryResponse.setNumTotalDir(totalDir);
     namespaceSummaryResponse.setNumTotalKey(totalKey);
-    namespaceSummaryResponse.setAge(volume.getCreationTime());
+    namespaceSummaryResponse.setCreateTime(volume.getCreationTime());
     namespaceSummaryResponse.setLastModified(volume.getModificationTime());
 
     return namespaceSummaryResponse;
