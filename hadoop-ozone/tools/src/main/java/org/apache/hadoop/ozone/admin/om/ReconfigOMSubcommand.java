@@ -40,7 +40,8 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
     name = "reconfig",
-    customSynopsis = "ozone admin om reconfig -address=<ip:port> -op=start|status|properties",
+    customSynopsis = "ozone admin om reconfig -address=<ip:port> -op=" +
+        "start|status|properties",
     description = "Dynamic reconfiguring without stopping the OM.\n" +
         "Three operations are provided:\n" +
         "\tstart:      Execute the reconfig operation asynchronously\n" +
@@ -72,21 +73,26 @@ public class ReconfigOMSubcommand implements Callable<Void> {
     user = UserGroupInformation.getCurrentUser();
 
     InetSocketAddress socketAddr = NetUtils.createSocketAddr(address);
-    OMNodeDetails omNode = new OMNodeDetails.Builder().setRpcAddress(socketAddr).build();
+    OMNodeDetails omNode = new OMNodeDetails.Builder().setRpcAddress(socketAddr)
+        .build();
     try (OMAdminProtocolClientSideImpl omAdminProtocolClient = 
-             OMAdminProtocolClientSideImpl.createProxyForSingleOM(ozoneConf, user, omNode)) {
+             OMAdminProtocolClientSideImpl.createProxyForSingleOM(ozoneConf,
+                 user, omNode)) {
 
       if ("start".equals(op)) {
         omAdminProtocolClient.startOmReconfiguration();
-        System.out.printf("Started OM reconfiguration task on node [%s].\n", address);
+        System.out.printf("Started OM reconfiguration task on node [%s].%n",
+            address);
 
       } else if ("status".equals(op)) {
-        ReconfigurationTaskStatus status = omAdminProtocolClient.getOmReconfigurationStatus();
+        ReconfigurationTaskStatus status =
+            omAdminProtocolClient.getOmReconfigurationStatus();
         System.out.printf("Reconfiguring status for node [%s]: ", address);
         printReconfigurationStatus(status);
 
       } else if ("properties".equals(op)) {
-        List<String> properties = omAdminProtocolClient.listOmReconfigurableProperties();
+        List<String> properties =
+            omAdminProtocolClient.listOmReconfigurableProperties();
         System.out.printf("OM Node [%s] Reconfigurable properties:%n", address);
         for (String name : properties) {
           System.out.println(name);
@@ -95,7 +101,8 @@ public class ReconfigOMSubcommand implements Callable<Void> {
         System.err.println("Unknown operation: " + op);
       }
     } catch (IOException e) {
-      System.err.printf("OM Node [%s] Reconfigure op=%s Failed: %s.", address, op, e.getMessage());
+      System.err.printf("OM Node [%s] Reconfigure op=%s Failed: %s.", address,
+          op, e.getMessage());
     }
     return null;
   }
@@ -110,22 +117,24 @@ public class ReconfigOMSubcommand implements Callable<Void> {
       System.out.println(" and is still running.");
       return;
     }
-    System.out.println(" and finished at " + new Date(status.getEndTime()).toString() + ".");
+    System.out.printf(" and finished at %s.%n", new Date(status.getEndTime()));
     if (status.getStatus() == null) {
       // Nothing to report.
       return;
     }
-    for (Map.Entry<ReconfigurationUtil.PropertyChange, Optional<String>> result : status
-        .getStatus().entrySet()) {
+    for (Map.Entry<ReconfigurationUtil.PropertyChange, Optional<String>>
+        result : status.getStatus().entrySet()) {
       if (!result.getValue().isPresent()) {
         System.out.printf(
             "SUCCESS: Changed OM property %s%n\tFrom: \"%s\"%n\tTo: \"%s\"%n",
-            result.getKey().prop, result.getKey().oldVal, result.getKey().newVal);
+            result.getKey().prop, result.getKey().oldVal,
+            result.getKey().newVal);
       } else {
         final String errorMsg = result.getValue().get();
         System.out.printf(
             "FAILED: Change OM property %s%n\tFrom: \"%s\"%n\tTo: \"%s\"%n",
-            result.getKey().prop, result.getKey().oldVal, result.getKey().newVal);
+            result.getKey().prop, result.getKey().oldVal,
+            result.getKey().newVal);
         System.out.println("\tError: " + errorMsg + ".");
       }
     }

@@ -48,8 +48,10 @@ public final class OzoneConfigUtil {
    * Return list of OzoneAdministrators from config.
    * The service startup user will default to an admin.
    */
-  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf, String starterUser) {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
+      String starterUser) {
+    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS);
     if (!ozAdmins.contains(starterUser)) {
       ozAdmins.add(starterUser);
     }

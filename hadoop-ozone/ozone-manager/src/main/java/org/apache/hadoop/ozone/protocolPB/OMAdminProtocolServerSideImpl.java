@@ -131,7 +131,8 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     String operation = "getOmReconfigurationStatus";
     checkAdminUserPrivilege(operation);
 
-    ReconfigurationTaskStatus status = ozoneManager.getReconfigurationTaskStatus();
+    ReconfigurationTaskStatus status =
+        ozoneManager.getReconfigurationTaskStatus();
     GetOmReconfigurationStatusResponseProto.Builder builder =
         GetOmReconfigurationStatusResponseProto.newBuilder();
 
@@ -139,8 +140,8 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     if (status.stopped()) {
       builder.setEndTime(status.getEndTime());
       assert status.getStatus() != null;
-      for (Map.Entry<ReconfigurationUtil.PropertyChange, Optional<String>> result : status
-          .getStatus().entrySet()) {
+      for (Map.Entry<ReconfigurationUtil.PropertyChange, Optional<String>>
+          result : status.getStatus().entrySet()) {
         GetOmReconfigurationStatusConfigChangeProto.Builder changeBuilder = 
             GetOmReconfigurationStatusConfigChangeProto.newBuilder();
         ReconfigurationUtil.PropertyChange change = result.getKey();
@@ -160,8 +161,9 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   }
 
   @Override
-  public StartOmReconfigurationResponseProto startOmReconfiguration(RpcController controller,
-      StartOmReconfigurationRequestProto request) throws ServiceException {
+  public StartOmReconfigurationResponseProto startOmReconfiguration(
+      RpcController controller, StartOmReconfigurationRequestProto request)
+      throws ServiceException {
     String operation = "startOmReconfiguration";
     checkAdminUserPrivilege(operation);
 
@@ -174,8 +176,9 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   }
 
   @Override
-  public ListOmReconfigurablePropertiesResponseProto listOmReconfigurableProperties(
-      RpcController controller, ListOmReconfigurablePropertiesRequestProto request)
+  public ListOmReconfigurablePropertiesResponseProto
+  listOmReconfigurableProperties(RpcController controller,
+      ListOmReconfigurablePropertiesRequestProto request)
       throws ServiceException {
     String operation = "listOmReconfigurableProperties";
     checkAdminUserPrivilege(operation);
@@ -190,7 +193,8 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   /**
    * Check ozone admin privilege, throws exception if not admin.
    */
-  private void checkAdminUserPrivilege(String operation) throws ServiceException {
+  private void checkAdminUserPrivilege(String operation)
+      throws ServiceException {
     try {
       ozoneManager.checkAdminUserPrivilege(operation);
     } catch (IOException e) {

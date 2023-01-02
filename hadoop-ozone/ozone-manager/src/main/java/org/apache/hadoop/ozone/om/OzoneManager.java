@@ -452,8 +452,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
   /** A list of property that are reconfigurable at runtime. */
-  private final TreeSet<String> reconfigurableProperties = Sets.newTreeSet(Lists.newArrayList(
-      OZONE_ADMINISTRATORS
+  private final TreeSet<String> reconfigurableProperties = Sets.newTreeSet(
+      Lists.newArrayList(
+          OZONE_ADMINISTRATORS
   ));
   
   @SuppressWarnings("methodlength")
@@ -4624,16 +4625,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (property.equals(OZONE_ADMINISTRATORS)) {
       return reconfOzoneAdmins(newVal);
     } else {
-      throw new ReconfigurationException(property, newVal, getConfiguration().get(property));
+      throw new ReconfigurationException(property, newVal,
+          getConfiguration().get(property));
     }
   }
 
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins =
-        OzoneConfigUtil.getOzoneAdminsFromConfig(getConfiguration(), omStarterUser);
+        OzoneConfigUtil.getOzoneAdminsFromConfig(getConfiguration(),
+            omStarterUser);
     omAdmins.setAdminUsernames(admins);
-    LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS, newVal, admins);
+    LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
+        newVal, admins);
     return String.valueOf(newVal);
   }
 

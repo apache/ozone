@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,9 +76,10 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   private final OMAdminProtocolPB rpcProxy;
   private final String omPrintInfo; // For targeted OM proxy
 
-  private final static GetOmReconfigurationStatusRequestProto VOID_GET_RECONFIG_STATUS =
+  private static final GetOmReconfigurationStatusRequestProto
+      VOID_GET_RECONFIG_STATUS =
       GetOmReconfigurationStatusRequestProto.newBuilder().build();
-  private final static StartOmReconfigurationRequestProto VOID_START_RECONFIG =
+  private static final StartOmReconfigurationRequestProto VOID_START_RECONFIG =
       StartOmReconfigurationRequestProto.newBuilder().build();
   private static final ListOmReconfigurablePropertiesRequestProto
       VOID_LIST_RECONFIGURABLE_PROPERTIES = 
@@ -245,20 +245,24 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   public ReconfigurationTaskStatus getOmReconfigurationStatus()
       throws IOException {
     GetOmReconfigurationStatusResponseProto response;
-    Map<ReconfigurationUtil.PropertyChange, java.util.Optional<String>> statusMap = null;
+    Map<ReconfigurationUtil.PropertyChange, java.util.Optional<String>>
+        statusMap = null;
     long startTime;
     long endTime = 0;
     try {
-      response = rpcProxy.getOmReconfigurationStatus(NULL_RPC_CONTROLLER, VOID_GET_RECONFIG_STATUS);
+      response = rpcProxy.getOmReconfigurationStatus(NULL_RPC_CONTROLLER,
+          VOID_GET_RECONFIG_STATUS);
       startTime = response.getStartTime();
       if (response.hasEndTime()) {
         endTime = response.getEndTime();
       }
       if (response.getChangesCount() > 0) {
         statusMap = Maps.newHashMap();
-        for (GetOmReconfigurationStatusConfigChangeProto change : response.getChangesList()) {
-          ReconfigurationUtil.PropertyChange pc = new ReconfigurationUtil.PropertyChange(
-              change.getName(), change.getNewValue(), change.getOldValue());
+        for (GetOmReconfigurationStatusConfigChangeProto change :
+            response.getChangesList()) {
+          ReconfigurationUtil.PropertyChange pc =
+              new ReconfigurationUtil.PropertyChange(change.getName(),
+                  change.getNewValue(), change.getOldValue());
           String errorMessage = null;
           if (change.hasErrorMessage()) {
             errorMessage = change.getErrorMessage();
