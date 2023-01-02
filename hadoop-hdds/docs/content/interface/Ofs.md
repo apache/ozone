@@ -117,7 +117,7 @@ For more usage, see: https://issues.apache.org/jira/secure/attachment/12987636/D
 OFS doesn't allow creating keys(files) directly under root or volumes.
 Users will receive an error message when they try to do that:
 
-```
+```bash
 $ ozone fs -touch /volume1/key1
 touch: Cannot create file under root or volume.
 ```
@@ -128,17 +128,17 @@ With OFS, fs.defaultFS (in core-site.xml) no longer needs to have a specific
 volume and bucket in its path like o3fs did.
 Simply put the OM host or service ID (in case of HA):
 
-```
+```xml
 <property>
-<name>fs.defaultFS</name>
-<value>ofs://omservice</value>
+  <name>fs.defaultFS</name>
+  <value>ofs://omservice</value>
 </property>
 ```
 
 The client would then be able to access every volume and bucket on the cluster
 without specifying the hostname or service ID.
 
-```
+```bash
 $ ozone fs -mkdir -p /volume1/bucket1
 ```
 
@@ -148,14 +148,14 @@ Admins can create and delete volumes and buckets easily with Hadoop FS shell.
 Volumes and buckets are treated similar to directories so they will be created
 if they don't exist with `-p`:
 
-```
+```bash
 $ ozone fs -mkdir -p ofs://omservice/volume1/bucket1/dir1/
 ```
 
 Note that the supported volume and bucket name character set rule still applies.
 For instance, bucket and volume names don't take underscore(`_`):
 
-```
+```bash
 $ ozone fs -mkdir -p /volume_1
 mkdir: Bucket or Volume name has an unsupported character : _
 ```
@@ -170,7 +170,7 @@ Important: To use it, first, an **admin** needs to create the volume tmp
 (the volume name is hardcoded for now) and set its ACL to world ALL access.
 Namely:
 
-```
+```bash
 $ ozone sh volume create tmp
 $ ozone sh volume setacl tmp -al world::a
 ```
@@ -180,7 +180,7 @@ These commands only needs to be done **once per cluster**.
 Then, **each user** needs to mkdir first to initialize their own temp bucket
 once.
 
-```
+```bash
 $ ozone fs -mkdir /tmp
 2020-06-04 00:00:00,050 [main] INFO rpc.RpcClient: Creating Bucket: tmp/0238 ...
 ```
@@ -188,7 +188,7 @@ $ ozone fs -mkdir /tmp
 After that they can write to it just like they would do to a regular
 directory. e.g.:
 
-```
+```bash
 $ ozone fs -touch /tmp/key1
 ```
 
@@ -198,12 +198,12 @@ In order to enable trash in Ozone, Please add these configs to core-site.xml
 
 {{< highlight xml >}}
 <property>
-<name>fs.trash.interval</name>
-<value>10</value>
+  <name>fs.trash.interval</name>
+  <value>10</value>
 </property>
 <property>
-<name>fs.trash.classname</name>
-<value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+  <name>fs.trash.classname</name>
+  <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
 </property>
 {{< /highlight >}}
                                            
@@ -212,7 +212,7 @@ When keys are deleted with trash enabled, they are moved to a trash directory
 under each bucket, because keys aren't allowed to be moved(renamed) between
 buckets in Ozone.
 
-```
+```bash
 $ ozone fs -rm /volume1/bucket1/key1
 2020-06-04 00:00:00,100 [main] INFO fs.TrashPolicyDefault: Moved: 'ofs://id1/volume1/bucket1/key1' to trash at: ofs://id1/volume1/bucket1/.Trash/hadoop/Current/volume1/bucket1/key1
 ```
@@ -230,7 +230,7 @@ This is very similar to how the HDFS encryption zone handles trash location.
 
 OFS supports recursive volume, bucket and key listing.
 
-i.e. `ozone fs -ls -R ofs://omservice/`` will recursively list all volumes,
+i.e. `ozone fs -ls -R ofs://omservice/` will recursively list all volumes,
 buckets and keys the user has LIST permission to if ACL is enabled.
 If ACL is disabled, the command would just list literally everything on that
 cluster.
