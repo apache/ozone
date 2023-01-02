@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
-import org.apache.hadoop.ozone.recon.api.types.EntityMetricsResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
@@ -41,7 +41,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -56,6 +55,7 @@ import java.util.stream.Collectors;
 public class NSSummaryEndpoint {
 
   public static final String COUNT = "count";
+  public static final String SIZE = "size";
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   private final ReconOMMetadataManager omMetadataManager;
@@ -71,7 +71,7 @@ public class NSSummaryEndpoint {
   }
 
   @GET
-  @Path("/entitymetrics")
+  @Path("/entityinfo")
   public Response getEntityMetrics(@QueryParam("path") String path,
                                    @DefaultValue("size")
                                    @QueryParam("orderBy") String orderBy,
@@ -81,20 +81,20 @@ public class NSSummaryEndpoint {
     if (path == null || path.length() == 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
-    EntityMetricsResponse entityMetricsResponse;
+    EntityInfoResponse entityInfoResponse;
     if (!isInitializationComplete()) {
-      entityMetricsResponse =
-          new EntityMetricsResponse(EntityType.UNKNOWN);
-      entityMetricsResponse.setStatus(ResponseStatus.INITIALIZING);
+      entityInfoResponse =
+          new EntityInfoResponse(EntityType.UNKNOWN);
+      entityInfoResponse.setStatus(ResponseStatus.INITIALIZING);
     } else {
-      Map<String, List<DUResponse.DiskUsage>> childMetricsListMap =
-          new HashMap<>();
       NamespaceSummaryResponse nsSummaryData =
           getNamespaceSummaryResponse(path);
       DUResponse duResponse = getDuResponse(path, true, true);
 
       EntityType entityType = nsSummaryData.getEntityType();
-      entityMetricsResponse = new EntityMetricsResponse(entityType);
+      entityInfoResponse = new EntityInfoResponse(entityType);
+      Map<String, List<DUResponse.DiskUsage>> childMetricsListMap =
+          entityInfoResponse.getChildMetricsListMap();
 
       if (COUNT.equalsIgnoreCase(orderBy)) {
         switch (entityType) {
@@ -133,7 +133,7 @@ public class NSSummaryEndpoint {
               .limit(count).collect(Collectors.toList()));
           break;
         }
-      } else {
+      } else if (SIZE.equalsIgnoreCase(orderBy)) {
         switch (entityType) {
         case ROOT:
           childMetricsListMap.put(EntityType.VOLUME.name(),
@@ -170,11 +170,53 @@ public class NSSummaryEndpoint {
               .limit(count).collect(Collectors.toList()));
           break;
         }
+      } else {
+        switch (entityType) {
+        case ROOT:
+          childMetricsListMap.put(EntityType.VOLUME.name(),
+              duResponse.getDuData()
+                  .stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getCreateTime).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        case VOLUME:
+          childMetricsListMap.put(EntityType.BUCKET.name(),
+              duResponse.getDuData()
+                  .stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getCreateTime).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        case BUCKET:
+        case DIRECTORY:
+          List<DUResponse.DiskUsage> keys = getKeys(duResponse.getDuData());
+          List<DUResponse.DiskUsage> dirs = getDirs(duResponse.getDuData());
+          childMetricsListMap.put(EntityType.KEY.name(),
+              keys.stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getCreateTime).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          childMetricsListMap.put(EntityType.DIRECTORY.name(),
+              dirs.stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getCreateTime).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        default:
+          childMetricsListMap.put(EntityType.UNKNOWN.name(),
+              duResponse.getDuData()
+                  .stream().sorted(Comparator.comparingLong(
+                      DUResponse.DiskUsage::getCreateTime).reversed())
+                  .limit(count).collect(Collectors.toList()));
+          break;
+        }
       }
-      entityMetricsResponse.setNsSummaryResponse(nsSummaryData);
-      entityMetricsResponse.setChildMetricsListMap(childMetricsListMap);
+      entityInfoResponse.setNumVolume(nsSummaryData.getNumVolume());
+      entityInfoResponse.setNumBucket(nsSummaryData.getNumBucket());
+      entityInfoResponse.setNumTotalDir(nsSummaryData.getNumTotalDir());
+      entityInfoResponse.setNumTotalKey(nsSummaryData.getNumTotalKey());
+      entityInfoResponse.setCreateTime(nsSummaryData.getCreateTime());
+      entityInfoResponse.setLastModified(nsSummaryData.getLastModified());
+      entityInfoResponse.setChildMetricsListMap(childMetricsListMap);
     }
-    return Response.ok(entityMetricsResponse).build();
+    return Response.ok(entityInfoResponse).build();
   }
 
   private List<DUResponse.DiskUsage> getDirs(
