@@ -53,7 +53,7 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
 
   private final OzoneManager ozoneManager;
 
-  private final static StartOmReconfigurationResponseProto START_RECONFIG_RESP = 
+  private static final StartOmReconfigurationResponseProto START_RECONFIG_RESP =
       StartOmReconfigurationResponseProto.newBuilder().build();
 
   public OMAdminProtocolServerSideImpl(OzoneManager om) {
@@ -177,7 +177,7 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
 
   @Override
   public ListOmReconfigurablePropertiesResponseProto
-  listOmReconfigurableProperties(RpcController controller,
+      listOmReconfigurableProperties(RpcController controller,
       ListOmReconfigurablePropertiesRequestProto request)
       throws ServiceException {
     String operation = "listOmReconfigurableProperties";
