@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRe
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
