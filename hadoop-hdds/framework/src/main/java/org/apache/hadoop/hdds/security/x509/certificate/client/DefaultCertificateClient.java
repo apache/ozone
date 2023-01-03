@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -127,8 +128,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private List<String> pemEncodedCACerts = null;
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
-  // Prevent concurrent multiple renew case
-  private Lock renewLock = new ReentrantLock();;
+
+  // Lock to protect the certificate renew process, to make sure there is only
+  // one renew process is ongoing at one time.
+  // Certificate renew steps:
+  //  1. generate new keys and sign new certificate, persist all data to disk
+  //  2. switch on disk new keys and certificate with current ones
+  //  3. save new certificate ID into service VERSION file
+  //  4. refresh in memory certificate ID and reload all new certificates
+  private Lock renewLock = new ReentrantLock();
+
   private ScheduledExecutorService executorService;
   private Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
@@ -548,7 +557,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException {
+      throws CertificateException {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
         .setConfiguration(securityConfig.getConfiguration());
@@ -1189,26 +1198,36 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         securityConfig.getCertificateLocation(component).toString() +
             HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
 
-    if (!currentKeyDir.renameTo(backupKeyDir)) {
-      // Cannot rename current key dir to the backup dir
-      throw new CertificateException("Failed to rename " +
+    try {
+      Files.move(currentKeyDir.toPath(), backupKeyDir.toPath(),
+          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      // Cannot move current key dir to the backup dir
+      throw new CertificateException("Failed to move " +
           currentKeyDir.getAbsolutePath() +
           " to " + backupKeyDir.getAbsolutePath() + " during " +
           "certificate renew.", RENEW_ERROR);
     }
-    if (!currentCertDir.renameTo(backupCertDir)) {
-      // Cannot rename current cert dir to the backup dir
+
+    try {
+      Files.move(currentCertDir.toPath(), backupCertDir.toPath(),
+          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      // Cannot move current cert dir to the backup dir
       rollbackBackupDir(currentKeyDir, currentCertDir, backupKeyDir,
           backupCertDir);
-      throw new CertificateException("Failed to rename " +
+      throw new CertificateException("Failed to move " +
           currentCertDir.getAbsolutePath() +
           " to " + backupCertDir.getAbsolutePath() + " during " +
           "certificate renew.", RENEW_ERROR);
     }
 
-    if (!newKeyDir.renameTo(currentKeyDir)) {
-      // Cannot rename new dir as the current dir
-      String msg = "Failed to rename " + newKeyDir.getAbsolutePath() +
+    try {
+      Files.move(newKeyDir.toPath(), currentKeyDir.toPath(),
+          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      // Cannot move new dir as the current dir
+      String msg = "Failed to move " + newKeyDir.getAbsolutePath() +
           " to " + currentKeyDir.getAbsolutePath() +
           " during certificate renew.";
       // rollback
@@ -1217,15 +1236,20 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throw new CertificateException(msg, RENEW_ERROR);
     }
 
-    if (!newCertDir.renameTo(currentCertDir)) {
-      // Cannot rename new dir as the current dir
-      String msg = "Failed to rename " + newCertDir.getAbsolutePath() +
+    try {
+      Files.move(newCertDir.toPath(), currentCertDir.toPath(),
+          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      // Cannot move new dir as the current dir
+      String msg = "Failed to move " + newCertDir.getAbsolutePath() +
           " to " + currentCertDir.getAbsolutePath() +
           " during certificate renew.";
       // delete new key directory
       try {
         Files.createDirectories(currentKeyDir.toPath());
-      } catch (IOException e) {
+      } catch (IOException e1) {
+        getLogger().error("Failed to delete current KeyDir {} which is moved " +
+            " from the newly generated KeyDir {}", currentKeyDir, newKeyDir, e);
         throw new CertificateException(msg, RENEW_ERROR);
       }
       // rollback
@@ -1242,25 +1266,28 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private void rollbackBackupDir(File currentKeyDir, File currentCertDir,
       File backupKeyDir, File backupCertDir) throws CertificateException {
     // move backup dir back as current dir
-    if (!currentKeyDir.exists() && backupKeyDir.exists()) {
-      if (!backupKeyDir.renameTo(currentKeyDir)) {
-        String msg = "Failed to rename " + backupKeyDir.getAbsolutePath() +
-            " back to " + currentKeyDir.getAbsolutePath() +
-            " during rollback.";
-        // Need a manual recover process.
-        throw new CertificateException(msg, ROLLBACK_ERROR);
-      }
+    try {
+      Files.move(backupKeyDir.toPath(), currentKeyDir.toPath(),
+          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      String msg = "Failed to move " + backupKeyDir.getAbsolutePath() +
+          " back to " + currentKeyDir.getAbsolutePath() +
+          " during rollback.";
+      // Need a manual recover process.
+      throw new CertificateException(msg, ROLLBACK_ERROR);
     }
 
-    if (!currentCertDir.exists() && backupCertDir.exists()) {
-      if (!backupCertDir.renameTo(currentCertDir)) {
-        String msg = "Failed to rename " + backupCertDir.getAbsolutePath() +
-            " back to " + currentCertDir.getAbsolutePath()  +
-            " during rollback.";
-        // Need a manual recover process.
-        throw new CertificateException(msg, ROLLBACK_ERROR);
-      }
+    try {
+      Files.move(backupCertDir.toPath(), currentCertDir.toPath(),
+          StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException e) {
+      String msg = "Failed to move " + backupCertDir.getAbsolutePath() +
+          " back to " + currentCertDir.getAbsolutePath()  +
+          " during rollback.";
+      // Need a manual recover process.
+      throw new CertificateException(msg, ROLLBACK_ERROR);
     }
+
     Preconditions.checkArgument(currentCertDir.exists());
     Preconditions.checkArgument(currentKeyDir.exists());
   }
@@ -1327,7 +1354,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   @Override
   public abstract CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws IOException;
+      throws CertificateException;
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
       throws IOException {
@@ -1368,17 +1395,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
-   *  Task to monitor the certificate lifetime.
+   *  Task to monitor certificate lifetime and renew the certificate if needed.
    */
   public class CertificateLifetimeMonitor implements Runnable {
     @Override
     public void run() {
-      Duration timeLeft = timeBeforeExpiryGracePeriod(getCertificate());
-      if (timeLeft.isZero()) {
-        String newCertId;
 
-        renewLock.lock();
-        try {
+      renewLock.lock();
+      try {
+        Duration timeLeft = timeBeforeExpiryGracePeriod(getCertificate());
+        if (timeLeft.isZero()) {
+          String newCertId;
           try {
             getLogger().info("Current certificate has entered the expiry" +
                     " grace period {}. Starting renew key and certs.",
@@ -1407,9 +1434,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           reloadKeyAndCertificate(newCertId);
           // cleanup backup directory
           cleanBackupDir();
-        } finally {
-          renewLock.unlock();
         }
+      } finally {
+        renewLock.unlock();
       }
     }
   }

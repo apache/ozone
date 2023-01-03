@@ -68,7 +68,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException {
+      throws CertificateException {
     return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
@@ -81,7 +81,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws IOException {
+      throws CertificateException {
     CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);

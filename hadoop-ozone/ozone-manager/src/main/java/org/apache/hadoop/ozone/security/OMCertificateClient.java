@@ -107,7 +107,7 @@ public class OMCertificateClient extends CommonCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException {
+      throws CertificateException {
     return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
@@ -119,7 +119,7 @@ public class OMCertificateClient extends CommonCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws IOException {
+      throws CertificateException {
     CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);
@@ -127,8 +127,12 @@ public class OMCertificateClient extends CommonCertificateClient {
     String hostname = omInfo.getHostName();
     String subject;
     if (builder.hasDnsName()) {
-      subject = UserGroupInformation.getCurrentUser().getShortUserName()
-          + "@" + hostname;
+      try {
+        subject = UserGroupInformation.getCurrentUser().getShortUserName()
+            + "@" + hostname;
+      } catch (IOException e) {
+        throw new CertificateException("Failed to getCurrentUser", e);
+      }
     } else {
       // With only IP in alt.name, certificate validation would fail if subject
       // isn't a hostname either, so omit username.

@@ -151,7 +151,7 @@ public interface CertificateClient extends Closeable {
    * @return CertificateSignRequest.Builder
    */
   CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException;
+      throws CertificateException;
 
   /**
    * Send request to SCM to sign the certificate and save certificates returned

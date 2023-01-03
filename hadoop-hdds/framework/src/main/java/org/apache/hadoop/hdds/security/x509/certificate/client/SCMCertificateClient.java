@@ -131,7 +131,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException {
+      throws CertificateException {
     return super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true)
@@ -153,7 +153,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
 
   @Override
   public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws IOException {
+      throws CertificateException {
     return null;
   }
 }

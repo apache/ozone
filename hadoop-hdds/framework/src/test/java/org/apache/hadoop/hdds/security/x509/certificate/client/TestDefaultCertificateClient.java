@@ -457,7 +457,7 @@ public class TestDefaultCertificateClient {
 
           @Override
           public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-              throws IOException {
+              throws CertificateException {
             return null;
           }
         };

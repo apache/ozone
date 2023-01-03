@@ -214,11 +214,7 @@ public class ReconServer extends GenericCli {
       // New cert ID cannot be persisted into VERSION file.
       LOG.error("Failed to persist new cert ID {} to VERSION file." +
           "Terminating OzoneManager...", newCertId, ex);
-      try {
-        stop();
-      } catch (Exception e) {
-        LOG.error("Error during stop Recon server", e);
-      }
+      terminateRecon();
     }
   }
 

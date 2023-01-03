@@ -54,7 +54,7 @@ public abstract class CommonCertificateClient extends DefaultCertificateClient {
    */
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
-      throws IOException {
+      throws CertificateException {
     return super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);
