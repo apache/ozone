@@ -148,7 +148,7 @@ public abstract class BaseHttpServer {
           conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
 
       if (prometheusSupport) {
-        prometheusMetricsSink = new PrometheusMetricsSink();
+        prometheusMetricsSink = new PrometheusMetricsSink(name);
         httpServer.getWebAppContext().getServletContext()
             .setAttribute(PROMETHEUS_SINK, prometheusMetricsSink);
         HddsPrometheusConfig prometheusConfig =
