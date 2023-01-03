@@ -380,7 +380,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
 
     @Override
-    public Set<ContainerReplica> replicasToRemove(
+    public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
             Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
             int expectedUniqueGroups) {
       return null;

@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -205,7 +204,7 @@ public class TestContainerPlacementFactory {
     }
 
     @Override
-    public Set<ContainerReplica> replicasToRemove(
+    public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
             Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
             int expectedUniqueGroups) {
       return null;

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -40,9 +39,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -507,8 +510,9 @@ public abstract class SCMCommonPlacementPolicy implements
   }
 
   @Override
-  public Set<ContainerReplica> replicasToRemove(Set<ContainerReplica> replicas,
-         int expectedCountPerUniqueReplica, int expectedUniqueGroups) {
+  public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
+          int expectedUniqueGroups) {
     Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
     Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
             = new HashMap<>();
@@ -571,9 +575,5 @@ public abstract class SCMCommonPlacementPolicy implements
       }
     }
     return replicasToRemove;
-  }
-
-  protected Node getPlacementGroup(DatanodeDetails dn) {
-    return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
   }
 }
