@@ -138,7 +138,7 @@ public class SnapshotDiffManager {
     final Set<String> deltaFilesForKeyOrFileTable =
         getDeltaFiles(fromSnapshot, toSnapshot,
             Collections.singletonList(fsKeyTable.getName()),
-                fsInfo, tsInfo, differ, volume, bucket);
+                fsInfo, tsInfo, volume, bucket);
 
     addToObjectIdMap(fsKeyTable, tsKeyTable, deltaFilesForKeyOrFileTable,
         oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, false);
@@ -152,7 +152,7 @@ public class SnapshotDiffManager {
       final Set<String> deltaFilesForDirTable =
           getDeltaFiles(fromSnapshot, toSnapshot,
               Collections.singletonList(fsDirTable.getName()),
-                  fsInfo, tsInfo, differ, volume, bucket);
+                  fsInfo, tsInfo, volume, bucket);
       addToObjectIdMap(fsDirTable, tsDirTable, deltaFilesForDirTable,
           oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, true);
     }
@@ -210,10 +210,11 @@ public class SnapshotDiffManager {
   }
 
   @NotNull
+  @SuppressWarnings("parameternumber")
   private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
       OmSnapshot toSnapshot, List<String> tablesToLookUp,
       SnapshotInfo fsInfo, SnapshotInfo tsInfo,
-      RocksDBCheckpointDiffer differ, String volume, String bucket)
+      String volume, String bucket)
           throws RocksDBException, IOException {
     // TODO: Refactor the parameter list
 
