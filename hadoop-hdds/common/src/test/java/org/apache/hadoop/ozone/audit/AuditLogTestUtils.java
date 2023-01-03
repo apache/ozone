@@ -15,10 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.utils;
-
-import org.apache.hadoop.ozone.audit.AuditAction;
-import org.apache.hadoop.ozone.audit.AuditEventStatus;
+package org.apache.hadoop.ozone.audit;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -32,10 +29,10 @@ import java.nio.file.Paths;
 /**
  * Utility class to read audit logs.
  */
-public final class AuditLogUtils {
+public final class AuditLogTestUtils {
   private static final String AUDITLOG_FILENAME = "audit.log";
 
-  private AuditLogUtils() {
+  private AuditLogTestUtils() {
   }
 
   /**

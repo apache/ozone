@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.ozone.utils.AuditLogUtils;
+import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -45,7 +45,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.utils.AuditLogUtils.verifyAuditLog;
+import static org.apache.hadoop.ozone.audit.AuditLogTestUtils.verifyAuditLog;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -69,7 +69,7 @@ public class TestOmAcls {
   private static GenericTestUtils.LogCapturer logCapturer;
 
   static {
-    AuditLogUtils.enableAuditLog();
+    AuditLogTestUtils.enableAuditLog();
   }
 
   /**

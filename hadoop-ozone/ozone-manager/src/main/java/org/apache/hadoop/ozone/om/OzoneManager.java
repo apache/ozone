@@ -2826,20 +2826,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ResolvedBucket bucket = captureLatencyNs(
         perfMetrics.getLookupResolveBucketLatencyNs(),
         () -> resolveBucketLink(args));
-
-    if (isAclEnabled) {
-      captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
-          () -> checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName())
-      );
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     OmKeyArgs resolvedArgs = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
+                () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
+                        ACLType.READ, bucket.realVolume(), bucket.realBucket(),
+                        args.getKeyName())
+        );
+      }
       metrics.incNumKeyLookups();
       return keyManager.lookupKey(resolvedArgs, getClientAddress());
     } catch (Exception ex) {
