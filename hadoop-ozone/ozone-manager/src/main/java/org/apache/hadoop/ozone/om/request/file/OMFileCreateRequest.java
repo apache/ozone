@@ -141,7 +141,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId());
+              ozoneManager.getOMNodeId(),
+              ozoneManager.getMetrics());
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)
@@ -277,7 +278,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getReplicationConfig().getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      numMissingParents = missingParentInfos.size();
+      checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
+      omBucketInfo.incrUsedNamespace(numMissingParents);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -292,7 +295,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
 
-      numMissingParents = missingParentInfos.size();
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
           .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),

@@ -165,6 +165,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   }
 
   @Override
+  protected OMKeyCreateRequest getOMKeyCreateRequest(
+      OMRequest omRequest, BucketLayout layout) {
+    return new OMKeyCreateRequestWithFSO(omRequest, layout);
+  }
+  
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }

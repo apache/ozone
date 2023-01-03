@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
@@ -37,6 +38,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
@@ -68,8 +75,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
@@ -105,6 +117,11 @@ public class SecurityConfig {
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
+  private final long keystoreReloadInterval;
+  private final long truststoreReloadInterval;
+  private final String externalRootCaPublicKeyPath;
+  private final String externalRootCaPrivateKeyPath;
+  private final String externalRootCaCert;
 
   /**
    * Constructs a SecurityConfig.
@@ -176,8 +193,18 @@ public class SecurityConfig {
           "greater than maximum Certificate duration");
     }
 
+    this.externalRootCaCert = this.configuration.get(
+        HDDS_X509_ROOTCA_CERTIFICATE_FILE,
+        HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT);
+    this.externalRootCaPublicKeyPath = this.configuration.get(
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT);
+    this.externalRootCaPrivateKeyPath = this.configuration.get(
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
+
     this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
-                                          HDDS_X509_CRL_NAME_DEFAULT);
+        HDDS_X509_CRL_NAME_DEFAULT);
 
     // First Startup -- if the provider is null, check for the provider.
     if (SecurityConfig.provider == null) {
@@ -190,6 +217,15 @@ public class SecurityConfig {
         }
       }
     }
+
+    this.keystoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.truststoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -384,6 +420,18 @@ public class SecurityConfig {
         HDDS_GRPC_TLS_PROVIDER_DEFAULT));
   }
 
+  public String getExternalRootCaPrivateKeyPath() {
+    return externalRootCaPrivateKeyPath;
+  }
+
+  public String getExternalRootCaPublicKeyPath() {
+    return externalRootCaPublicKeyPath;
+  }
+
+  public String getExternalRootCaCert() {
+    return externalRootCaCert;
+  }
+
   /**
    * Return true if using test certificates with authority as localhost. This
    * should be used only for unit test where certificates are generated by
@@ -420,5 +468,13 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
+  }
+
+  public long getSslKeystoreReloadInterval() {
+    return keystoreReloadInterval;
+  }
+
+  public long getSslTruststoreReloadInterval() {
+    return truststoreReloadInterval;
   }
 }

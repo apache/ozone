@@ -153,6 +153,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           .setBucketName(dbBucketInfo.getBucketName())
           .setObjectID(dbBucketInfo.getObjectID())
           .setBucketLayout(dbBucketInfo.getBucketLayout())
+          .setBucketEncryptionKey(dbBucketInfo.getEncryptionKeyInfo())
           .setUpdateID(transactionLogIndex);
       bucketInfoBuilder.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketArgs.getMetadataList()));
@@ -201,6 +202,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (defaultReplicationConfig != null) {
         // Resetting the default replication config.
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
+      } else if (dbBucketInfo.getDefaultReplicationConfig() != null) {
+        // Retaining existing default replication config
+        bucketInfoBuilder.setDefaultReplicationConfig(
+                  dbBucketInfo.getDefaultReplicationConfig());
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());

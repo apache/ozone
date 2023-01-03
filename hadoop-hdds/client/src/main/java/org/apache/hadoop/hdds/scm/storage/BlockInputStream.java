@@ -276,11 +276,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  public synchronized long getRemaining() {
-    return length - getPos();
-  }
-
-  @Override
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
     Preconditions.checkArgument(strategy != null);

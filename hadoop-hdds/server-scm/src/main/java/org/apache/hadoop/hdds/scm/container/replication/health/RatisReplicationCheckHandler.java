@@ -66,6 +66,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
     ContainerHealthResult health = checkHealth(request);
+    LOG.debug("Checking container {} in RatisReplicationCheckHandler",
+        container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
       // If the container is healthy, there is nothing else to do in this
       // handler so return as unhandled so any further handlers will be tried.
@@ -88,6 +90,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           !underHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending" +
+          " is [{}]. isUnrecoverable is [{}]", container,
+          underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable());
       return true;
     }
 
@@ -101,6 +107,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
+      LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +
+              " is [{}]", container, overHealth.isReplicatedOkAfterPending());
       return true;
     }
     if (health.getHealthState() ==
@@ -113,8 +121,14 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       if (!misRepHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(misRepHealth);
       }
+      LOG.debug("Container {} is Mid Replicated. isReplicatedOkAfterPending" +
+          " is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
       return true;
     }
+    // Should not get here, but in case it does the container is not healthy,
+    // but is also not under, over or mis replicated.
+    LOG.warn("Container {} is not healthy but is not under, over or "
+        + " mis-replicated. Should not happen.", container);
     return false;
   }
 
