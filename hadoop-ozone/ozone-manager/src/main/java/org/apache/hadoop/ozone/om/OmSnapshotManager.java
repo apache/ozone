@@ -150,8 +150,9 @@ public final class OmSnapshotManager {
 
     // Write snapshot generation (latest sequence number) to compaction log.
     // This will be used for DAG reconstruction as snapshotGeneration.
-    dbCpDiffer.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber,
-        snapshotInfo.getSnapshotID());
+    dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
+        snapshotInfo.getSnapshotID(),
+        snapshotInfo.getCreationTime());
 
     // Set compaction log filename to the latest DB sequence number
     // right after taking the RocksDB checkpoint for Ozone snapshot.
