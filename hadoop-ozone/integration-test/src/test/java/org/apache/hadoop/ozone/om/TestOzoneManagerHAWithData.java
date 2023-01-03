@@ -28,11 +28,12 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -105,6 +106,20 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
   @Test
+  public void testOMHAMetrics() throws InterruptedException {
+    Thread.sleep(2000);
+    OzoneManager om = getCluster().getOzoneManager(1);
+    OMHAMetrics omhaMetrics = om.getOmhaMetrics();
+
+    String omRoles = omhaMetrics.getMetricsRegistry()
+        .getTag("OMRoles").value();
+
+    Assertions.assertEquals(om.getRatisRoles(), omRoles);
+    Assertions.assertEquals(getNumOfOMs(),
+        omhaMetrics.getNumOfOMNodes().value());
+  }
+
+  @Test
   public void testFileOperationsAndDelete() throws Exception {
     testFileOperationsWithRecursive();
     testFileOperationsWithNonRecursive();
@@ -135,7 +150,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       testCreateFile(ozoneBucket, keyName, data, true, false);
       fail("testFileOperationsWithRecursive");
     } catch (OMException ex) {
-      Assert.assertEquals(FILE_ALREADY_EXISTS, ex.getResult());
+      Assertions.assertEquals(FILE_ALREADY_EXISTS, ex.getResult());
     }
 
     // Try now with a file name which is same as a directory.
@@ -145,7 +160,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       testCreateFile(ozoneBucket, keyName, data, true, false);
       fail("testFileOperationsWithNonRecursive");
     } catch (OMException ex) {
-      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+      Assertions.assertEquals(NOT_A_FILE, ex.getResult());
     }
 
   }
@@ -185,7 +200,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     } catch (OMException ex) {
       // The expected exception PARTIAL_DELETE, as if not able to delete, we
       // return error codee PARTIAL_DElETE.
-      Assert.assertEquals(PARTIAL_DELETE, ex.getResult());
+      Assertions.assertEquals(PARTIAL_DELETE, ex.getResult());
     }
   }
 
@@ -206,7 +221,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     try {
       testCreateFile(ozoneBucket, keyName, data, false, false);
     } catch (OMException ex) {
-      Assert.assertEquals(DIRECTORY_NOT_FOUND, ex.getResult());
+      Assertions.assertEquals(DIRECTORY_NOT_FOUND, ex.getResult());
     }
 
     // create directory, now this should pass.
@@ -221,7 +236,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       testCreateFile(ozoneBucket, keyName, data, false, false);
       fail("testFileOperationsWithRecursive");
     } catch (OMException ex) {
-      Assert.assertEquals(FILE_ALREADY_EXISTS, ex.getResult());
+      Assertions.assertEquals(FILE_ALREADY_EXISTS, ex.getResult());
     }
 
 
@@ -241,7 +256,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       testCreateFile(ozoneBucket, keyName, data, false, false);
       fail("testFileOperationsWithNonRecursive");
     } catch (OMException ex) {
-      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+      Assertions.assertEquals(NOT_A_FILE, ex.getResult());
     }
 
   }
@@ -274,7 +289,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     String newLeaderOMNodeId =
         omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    Assert.assertTrue(!leaderOMNodeId.equals(newLeaderOMNodeId));
+    Assertions.assertTrue(!leaderOMNodeId.equals(newLeaderOMNodeId));
   }
 
   private String initiateMultipartUpload(OzoneBucket ozoneBucket,
@@ -286,7 +301,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
             ReplicationFactor.ONE);
 
     String uploadID = omMultipartInfo.getUploadID();
-    Assert.assertTrue(uploadID != null);
+    Assertions.assertTrue(uploadID != null);
     return uploadID;
   }
 
@@ -305,15 +320,15 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
         ozoneBucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
-    Assert.assertTrue(omMultipartUploadCompleteInfo != null);
-    Assert.assertTrue(omMultipartUploadCompleteInfo.getHash() != null);
+    Assertions.assertTrue(omMultipartUploadCompleteInfo != null);
+    Assertions.assertTrue(omMultipartUploadCompleteInfo.getHash() != null);
 
 
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
 
     byte[] fileContent = new byte[value.getBytes(UTF_8).length];
     ozoneInputStream.read(fileContent);
-    Assert.assertEquals(value, new String(fileContent, UTF_8));
+    Assertions.assertEquals(value, new String(fileContent, UTF_8));
   }
 
   @Test
@@ -368,10 +383,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     long smLastAppliedIndex =
         ozoneManager.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     long ratisSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
-    Assert.assertTrue("LastAppliedIndex on OM State Machine ("
-            + smLastAppliedIndex + ") is less than the saved snapshot index("
-            + ratisSnapshotIndex + ").",
-        smLastAppliedIndex >= ratisSnapshotIndex);
+    Assertions.assertTrue(smLastAppliedIndex >= ratisSnapshotIndex,
+        "LastAppliedIndex on OM State Machine ("
+        + smLastAppliedIndex + ") is less than the saved snapshot index("
+        + ratisSnapshotIndex + ").");
 
     // Add more transactions to Ratis to trigger another snapshot
     while (appliedLogIndex <= (smLastAppliedIndex + getSnapshotThreshold())) {
@@ -393,8 +408,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     // The new snapshot index must be greater than the previous snapshot index
     long ratisSnapshotIndexNew = ozoneManager.getRatisSnapshotIndex();
-    Assert.assertTrue("Latest snapshot index must be greater than previous " +
-        "snapshot indices", ratisSnapshotIndexNew > ratisSnapshotIndex);
+    Assertions.assertTrue(ratisSnapshotIndexNew > ratisSnapshotIndex,
+        "Latest snapshot index must be greater than previous " +
+            "snapshot indices");
 
   }
 
@@ -459,7 +475,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     final long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
     // The stopped OM should be lagging behind the leader OM.
-    Assert.assertTrue(followerOM1LastAppliedIndex < leaderOMSnaphsotIndex);
+    Assertions.assertTrue(followerOM1LastAppliedIndex < leaderOMSnaphsotIndex);
 
     // Restart the stopped OM.
     followerOM1.restart();
@@ -478,7 +494,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    Assert.assertTrue(followerOM1LastAppliedIndexNew > leaderOMSnaphsotIndex);
+    Assertions.assertTrue(
+        followerOM1LastAppliedIndexNew > leaderOMSnaphsotIndex);
   }
 
   @Test
@@ -522,15 +539,15 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     List<OzoneMultipartUploadPartListParts.PartInfo> partInfoList =
         ozoneMultipartUploadPartListParts.getPartInfoList();
 
-    Assert.assertTrue(partInfoList.size() == partsMap.size());
+    Assertions.assertTrue(partInfoList.size() == partsMap.size());
 
     for (int i = 0; i < partsMap.size(); i++) {
-      Assert.assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
+      Assertions.assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
           partInfoList.get(i).getPartName());
 
     }
 
-    Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+    Assertions.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
   }
 
   /**
