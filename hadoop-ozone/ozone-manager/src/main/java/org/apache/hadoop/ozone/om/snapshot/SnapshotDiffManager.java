@@ -22,17 +22,21 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffReportEntry;
 
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.jetbrains.annotations.NotNull;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,28 +58,10 @@ public class SnapshotDiffManager {
     // TODO: Once RocksDBCheckpointDiffer exposes method to get list
     //  of delta SST files, plug it in here.
 
-    Set<String> fromSnapshotFiles = RdbUtil.getKeyTableSSTFiles(fromSnapshot
-        .getMetadataManager().getStore().getDbLocation().getPath());
-    Set<String> toSnapshotFiles = RdbUtil.getKeyTableSSTFiles(toSnapshot
-        .getMetadataManager().getStore().getDbLocation().getPath());
-
-    final Set<String> deltaFiles = new HashSet<>();
-    deltaFiles.addAll(fromSnapshotFiles);
-    deltaFiles.addAll(toSnapshotFiles);
-
-    // TODO: Filter out the files.
-
-    final Stream<String> keysToCheck = new ManagedSstFileReader(deltaFiles)
-        .getKeyStream();
-
     final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
         fromSnapshot.getMetadataManager());
 
-    final Table<String, OmKeyInfo> fsKeyTable = fromSnapshot
-        .getMetadataManager().getKeyTable(bucketLayout);
-    final Table<String, OmKeyInfo> tsKeyTable = toSnapshot
-        .getMetadataManager().getKeyTable(bucketLayout);
-
+    // TODO: Filter out the files.
     /*
      * The reason for having ObjectID to KeyName mapping instead of OmKeyInfo
      * is to reduce the memory footprint.
@@ -87,22 +73,65 @@ public class SnapshotDiffManager {
 
     final Set<Long> objectIDsToCheck = new HashSet<>();
 
+    // add to object ID map for key/file.
+
+    final Table<String, OmKeyInfo> fsKeyTable = fromSnapshot
+        .getMetadataManager().getKeyTable(bucketLayout);
+    final Table<String, OmKeyInfo> tsKeyTable = toSnapshot
+        .getMetadataManager().getKeyTable(bucketLayout);
+    final Set<String> deltaFilesForKeyOrFileTable =
+        getDeltaFiles(fromSnapshot, toSnapshot,
+            Collections.singletonList(fsKeyTable.getName()));
+
+    addToObjectIdMap(fsKeyTable, tsKeyTable, deltaFilesForKeyOrFileTable,
+        oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, false);
+
+    if (bucketLayout.isFileSystemOptimized()) {
+      // add to object ID map for directory.
+      final Table<String, OmDirectoryInfo> fsDirTable =
+          fromSnapshot.getMetadataManager().getDirectoryTable();
+      final Table<String, OmDirectoryInfo> tsDirTable =
+          toSnapshot.getMetadataManager().getDirectoryTable();
+      final Set<String> deltaFilesForDirTable =
+          getDeltaFiles(fromSnapshot, toSnapshot,
+              Collections.singletonList(fsDirTable.getName()));
+      addToObjectIdMap(fsDirTable, tsDirTable, deltaFilesForDirTable,
+          oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, true);
+    }
+
+    return new SnapshotDiffReport(volume, bucket, fromSnapshot.getName(),
+        toSnapshot.getName(), generateDiffReport(objectIDsToCheck,
+        oldObjIdToKeyMap, newObjIdToKeyMap));
+  }
+
+  private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
+      Table<String, ? extends WithObjectID> tsTable, Set<String> deltaFiles,
+      Map<Long, String> oldObjIdToKeyMap, Map<Long, String> newObjIdToKeyMap,
+      Set<Long> objectIDsToCheck, boolean isDirectoryTable)
+      throws RocksDBException {
+    if (deltaFiles.isEmpty()) {
+      return;
+    }
+    final Stream<String> keysToCheck =
+        new ManagedSstFileReader(deltaFiles).getKeyStream();
     keysToCheck.forEach(key -> {
       try {
-        final OmKeyInfo oldKey = fsKeyTable.get(key);
-        final OmKeyInfo newKey = tsKeyTable.get(key);
+        final WithObjectID oldKey = fsTable.get(key);
+        final WithObjectID newKey = tsTable.get(key);
         if (areKeysEqual(oldKey, newKey)) {
           // We don't have to do anything.
           return;
         }
         if (oldKey != null) {
           final long oldObjId = oldKey.getObjectID();
-          oldObjIdToKeyMap.put(oldObjId, oldKey.getKeyName());
+          oldObjIdToKeyMap
+              .put(oldObjId, getKeyOrDirectoryName(isDirectoryTable, oldKey));
           objectIDsToCheck.add(oldObjId);
         }
         if (newKey != null) {
           final long newObjId = newKey.getObjectID();
-          newObjIdToKeyMap.put(newObjId, newKey.getKeyName());
+          newObjIdToKeyMap
+              .put(newObjId, getKeyOrDirectoryName(isDirectoryTable, newKey));
           objectIDsToCheck.add(newObjId);
         }
       } catch (IOException e) {
@@ -110,10 +139,33 @@ public class SnapshotDiffManager {
       }
     });
     keysToCheck.close();
+  }
 
-    return new SnapshotDiffReport(volume, bucket, fromSnapshot.getName(),
-        toSnapshot.getName(), generateDiffReport(objectIDsToCheck,
-        oldObjIdToKeyMap, newObjIdToKeyMap));
+  private String getKeyOrDirectoryName(boolean isDirectory,
+      WithObjectID object) {
+    if (isDirectory) {
+      OmDirectoryInfo directoryInfo = (OmDirectoryInfo) object;
+      return directoryInfo.getName();
+    }
+    OmKeyInfo keyInfo = (OmKeyInfo) object;
+    return keyInfo.getKeyName();
+  }
+
+  @NotNull
+  private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
+      OmSnapshot toSnapshot, List<String> tablesToLookUp)
+      throws RocksDBException {
+    Set<String> fromSnapshotFiles = RdbUtil.getSSTFilesForComparison(
+        fromSnapshot.getMetadataManager().getStore().getDbLocation().getPath(),
+        tablesToLookUp);
+    Set<String> toSnapshotFiles = RdbUtil.getSSTFilesForComparison(
+        toSnapshot.getMetadataManager().getStore().getDbLocation().getPath(),
+        tablesToLookUp);
+
+    final Set<String> deltaFiles = new HashSet<>();
+    deltaFiles.addAll(fromSnapshotFiles);
+    deltaFiles.addAll(toSnapshotFiles);
+    return deltaFiles;
   }
 
   private List<DiffReportEntry> generateDiffReport(
@@ -224,7 +276,7 @@ public class SnapshotDiffManager {
     return mManager.getBucketTable().get(bucketTableKey).getBucketLayout();
   }
 
-  private boolean areKeysEqual(OmKeyInfo oldKey, OmKeyInfo newKey) {
+  private boolean areKeysEqual(WithObjectID oldKey, WithObjectID newKey) {
     if (oldKey == null && newKey == null) {
       return true;
     }
