@@ -294,6 +294,8 @@ public final class OzoneManagerDoubleBuffer {
                 terminate(ex, omResponse.get());
               }
             });
+            // Finished omResponse processing, set omResponse to null;
+            omResponse.set(null);
 
             // Commit transaction info to DB.
             flushedEpochs = readyBuffer.stream().map(
@@ -389,10 +391,12 @@ public final class OzoneManagerDoubleBuffer {
       } catch (IOException ex) {
         terminate(ex, omResponse.get());
       } catch (Throwable t) {
-        final String s = "OMDoubleBuffer flush thread " +
-            Thread.currentThread().getName() + " encountered Throwable error" +
-            " when handling OMRequest: " + omResponse.get();
-        ExitUtils.terminate(2, s, t, LOG);
+        StringBuilder s = new StringBuilder("OMDoubleBuffer flush thread " +
+            Thread.currentThread().getName() + " encountered Throwable error");
+        if (omResponse.get() != null) {
+          s.append(" when handling OMRequest: ").append(omResponse.get());
+        }
+        ExitUtils.terminate(2, s.toString(), t, LOG);
       }
     }
   }
@@ -483,10 +487,13 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   private void terminate(IOException ex, OMResponse omResponse) {
-    String message = "During flush to DB encountered error in " +
-        "OMDoubleBuffer flush thread " + Thread.currentThread().getName() +
-        " when handling OMRequest: " + omResponse;
-    ExitUtils.terminate(1, message, ex, LOG);
+    StringBuilder message = new StringBuilder(
+        "During flush to DB encountered error in " +
+        "OMDoubleBuffer flush thread " + Thread.currentThread().getName());
+    if (omResponse != null) {
+      message.append(" when handling OMRequest: ").append(omResponse);
+    }
+    ExitUtils.terminate(1, message.toString(), ex, LOG);
   }
 
   /**
