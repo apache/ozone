@@ -37,6 +37,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * This class provides a set of methods to test for over / under replication of
@@ -443,6 +444,12 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     // on another ONLINE node, ie in the healthy set. This means we avoid
     // blocking decommission or maintenance caused by un-recoverable EC
     // containers.
+    if (datanode.getPersistedOpState() == IN_SERVICE) {
+      // The node passed into this method must be a node going offline, so it
+      // cannot be IN_SERVICE. If an IN_SERVICE mode is passed, just return
+      // false.
+      return false;
+    }
     ContainerReplica thisReplica = null;
     for (ContainerReplica r : replicas) {
       if (r.getDatanodeDetails().equals(datanode)) {
