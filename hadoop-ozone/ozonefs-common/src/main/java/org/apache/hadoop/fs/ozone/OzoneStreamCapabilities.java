@@ -44,4 +44,8 @@ final class OzoneStreamCapabilities {
    * TODO: If Hadoop dependency is upgraded, this string can be removed.
    */
   static final String UNBUFFER = "in:unbuffer";
+
+  static final String HSYNC = "hsync";
+
+  static final String HFLUSH = "hflush";
 }
