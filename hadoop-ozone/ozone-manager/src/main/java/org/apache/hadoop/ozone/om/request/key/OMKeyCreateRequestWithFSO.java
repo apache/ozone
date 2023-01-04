@@ -186,7 +186,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
               .getRequiredNodes();
       checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if

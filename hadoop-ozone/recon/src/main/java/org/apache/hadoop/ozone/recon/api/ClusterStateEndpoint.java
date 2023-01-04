@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -90,13 +91,15 @@ public class ClusterStateEndpoint {
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
     int containers = this.containerManager.getContainers().size();
     int pipelines = this.pipelineManager.getPipelines().size();
-    List<UnhealthyContainers> unhealthyContainers = containerHealthSchemaManager
+    List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0, MISSING_CONTAINER_COUNT_LIMIT);
-    int totalMissingContainerCount = unhealthyContainers.size() ==
+    int totalMissingContainerCount = missingContainers.size() ==
         MISSING_CONTAINER_COUNT_LIMIT ?
-        MISSING_CONTAINER_COUNT_LIMIT : unhealthyContainers.size();
+        MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size();
+    int openContainersCount = this.containerManager.getContainerStateCount(
+        HddsProtos.LifeCycleState.OPEN);
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
@@ -139,6 +142,7 @@ public class ClusterStateEndpoint {
         .setMissingContainers(totalMissingContainerCount)
         .setTotalDatanodes(datanodeDetails.size())
         .setHealthyDatanodes(healthyDatanodes)
+        .setOpenContainers(openContainersCount)
         .build();
     return Response.ok(response).build();
   }

@@ -202,6 +202,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (defaultReplicationConfig != null) {
         // Resetting the default replication config.
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
+      } else if (dbBucketInfo.getDefaultReplicationConfig() != null) {
+        // Retaining existing default replication config
+        bucketInfoBuilder.setDefaultReplicationConfig(
+                  dbBucketInfo.getDefaultReplicationConfig());
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());

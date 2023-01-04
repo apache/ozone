@@ -377,6 +377,14 @@ public final class SCMContainerPlacementRackAware
   }
 
   @Override
+  protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    if (numberOfRacks == 1) {
+      return numReplicas;
+    }
+    return Math.max(numReplicas - 1, 1);
+  }
+
+  @Override
   protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
   }

@@ -75,10 +75,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
+          
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
-          if (null != omBucketInfo) {
+          // or key does not belong to bucket as bucket is recreated
+          if (null != omBucketInfo
+              && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.incrUsedNamespace(-1L);
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
@@ -98,7 +101,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
-          if (null != omBucketInfo) {
+          // or key does not belong to bucket as bucket is recreated
+          if (null != omBucketInfo
+              && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
             omBucketInfo.incrUsedNamespace(-1L);
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);

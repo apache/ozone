@@ -71,7 +71,6 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.sun.jmx.mbeanserver.Introspector;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
@@ -110,6 +109,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private DNMXBeanImpl serviceRuntimeInfo =
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
@@ -154,7 +154,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     try {
       OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
               new OzoneConfiguration());
-      Introspector.checkCompliance(DNMXBeanImpl.class);
       HddsDatanodeService hddsDatanodeService =
           createHddsDatanodeService(args, true);
       hddsDatanodeService.run(args);
@@ -212,8 +211,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void start() {
     serviceRuntimeInfo.setStartTime();
 
-    RatisDropwizardExports.
-        registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
+    ratisReporterList = RatisDropwizardExports
+        .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
@@ -589,7 +588,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (Exception ex) {
         LOG.error("Datanode CRL store stop failed", ex);
       }
-      RatisDropwizardExports.clear(ratisMetricsMap);
+      RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
     }
   }
 
@@ -602,6 +601,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         } catch (Throwable t) {
           LOG.warn("ServicePlugin {} could not be closed", plugin, t);
         }
+      }
+    }
+
+    if (dnCertClient != null) {
+      try {
+        dnCertClient.close();
+      } catch (IOException e) {
+        LOG.warn("Certificate client could not be closed", e);
       }
     }
   }

@@ -94,11 +94,13 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.LengthInputStream;
-import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
+import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneCryptoInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -1213,6 +1215,48 @@ public class RpcClient implements ClientProtocol {
     return createOutputStream(openKey, requestId);
   }
 
+  @Override
+  public OzoneDataStreamOutput createStreamKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
+      throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    if (checkKeyNameEnabled) {
+      HddsClientUtils.verifyKeyName(keyName);
+    }
+    HddsClientUtils.checkNotNull(keyName, replicationConfig);
+    String requestId = UUID.randomUUID().toString();
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .addAllMetadata(metadata)
+        .setAcls(getAclList());
+
+    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
+      try {
+        GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
+        builder.addAllMetadata(gKey.getKeyDetails());
+      } catch (Exception e) {
+        if (e instanceof InvalidKeyException &&
+            e.getMessage().contains("Illegal key size or default parameters")) {
+          LOG.error("Missing Unlimited Strength Policy jars. Please install " +
+              "Java Cryptography Extension (JCE) Unlimited Strength " +
+              "Jurisdiction Policy Files");
+        }
+        throw new IOException(e);
+      }
+    }
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    return createDataStreamOutput(openKey, requestId, replicationConfig);
+  }
+
   private KeyProvider.KeyVersion getDEK(FileEncryptionInfo feInfo)
       throws IOException {
     // check crypto protocol version
@@ -1623,6 +1667,70 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(
+      String volumeName,
+      String bucketName,
+      String keyName,
+      long size,
+      int partNumber,
+      String uploadID)
+      throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    if (checkKeyNameEnabled) {
+      HddsClientUtils.verifyKeyName(keyName);
+    }
+    HddsClientUtils.checkNotNull(keyName, uploadID);
+    Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000, "Part " +
+        "number should be greater than zero and less than or equal to 10000");
+    Preconditions.checkArgument(size >= 0, "size should be greater than or " +
+        "equal to zero");
+    String requestId = UUID.randomUUID().toString();
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setIsMultipartKey(true)
+        .setMultipartUploadID(uploadID)
+        .setMultipartUploadPartNumber(partNumber)
+        .setAcls(getAclList())
+        .build();
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+
+    KeyDataStreamOutput keyOutputStream =
+        new KeyDataStreamOutput.Builder()
+            .setHandler(openKey)
+            .setXceiverClientManager(xceiverClientManager)
+            .setOmClient(ozoneManagerClient)
+            .setRequestID(requestId)
+            .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
+            .setMultipartNumber(partNumber)
+            .setMultipartUploadID(uploadID)
+            .setIsMultipartKey(true)
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+            .setConfig(clientConfig)
+            .build();
+    keyOutputStream
+        .addPreallocateBlocks(
+            openKey.getKeyInfo().getLatestVersionLocations(),
+            openKey.getOpenVersion());
+
+    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
+    if (feInfo != null) {
+      // todo: need to support file encrypt,
+      //  https://issues.apache.org/jira/browse/HDDS-5892
+      throw new UnsupportedOperationException(
+          "FileEncryptionInfo is not yet supported in " +
+              "createMultipartStreamKey");
+    } else {
+      return new OzoneDataStreamOutput(keyOutputStream);
+    }
+  }
+
+  @Override
   public OmMultipartUploadCompleteInfo completeMultipartUpload(
       String volumeName, String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap) throws IOException {
@@ -1833,6 +1941,25 @@ public class RpcClient implements ClientProtocol {
         .build();
   }
 
+  @Override
+  public OzoneDataStreamOutput createStreamFile(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite, boolean recursive)
+      throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setAcls(getAclList())
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .build();
+    OpenKeySession keySession =
+        ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
+    return createDataStreamOutput(keySession, UUID.randomUUID().toString(),
+        replicationConfig);
+  }
 
   @Override
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
@@ -1960,9 +2087,27 @@ public class RpcClient implements ClientProtocol {
                 keyInfo.getKeyName(), i);
         cryptoInputStreams.add(ozoneCryptoInputStream);
       }
-      return new MultipartCryptoKeyInputStream(keyInfo.getKeyName(),
-          cryptoInputStreams);
+      return new OzoneInputStream(
+          new MultipartInputStream(keyInfo.getKeyName(), cryptoInputStreams));
     }
+  }
+  private OzoneDataStreamOutput createDataStreamOutput(OpenKeySession openKey,
+      String requestId, ReplicationConfig replicationConfig)
+      throws IOException {
+    KeyDataStreamOutput keyOutputStream =
+        new KeyDataStreamOutput.Builder()
+            .setHandler(openKey)
+            .setXceiverClientManager(xceiverClientManager)
+            .setOmClient(ozoneManagerClient)
+            .setRequestID(requestId)
+            .setReplicationConfig(replicationConfig)
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+            .setConfig(clientConfig)
+            .build();
+    keyOutputStream
+        .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
+            openKey.getOpenVersion());
+    return new OzoneDataStreamOutput(keyOutputStream);
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,

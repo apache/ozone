@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -254,6 +255,7 @@ public class TestECContainerRecovery {
     waitForContainerCount(5, container.containerID(), scm);
   }
 
+  @Flaky("HDDS-7617")
   @Test
   public void testECContainerRecoveryWithTimedOutRecovery() throws Exception {
     byte[] inputData = getInputBytes(3);

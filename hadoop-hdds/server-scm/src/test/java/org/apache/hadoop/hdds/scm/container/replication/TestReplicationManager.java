@@ -62,9 +62,11 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -245,6 +247,94 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.MISSING));
   }
 
+  /**
+   * A closed EC container with 3 closed and 2 unhealthy replicas is under
+   * replicated. RM should add it to under replicated queue.
+   */
+  @Test
+  public void testUnderReplicatedClosedContainerWithUnhealthyReplicas()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicas(container,
+        ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerReplica unhealthyReplica1 =
+        createContainerReplica(container.containerID(), 4,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica unhealthyReplica2 =
+        createContainerReplica(container.containerID(), 5,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica1);
+    replicas.add(unhealthyReplica2);
+
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * A closed EC container with 2 closed and 3 unhealthy replicas is
+   * unrecoverable. It should not be queued to under replicated queue but
+   * should be recorded as missing (currently, we're calling an unrecoverable
+   * EC container missing).
+   */
+  @Test
+  public void testUnrecoverableClosedContainerWithUnhealthyReplicas()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicas(container,
+        ContainerReplicaProto.State.UNHEALTHY, 3, 4, 5);
+    ContainerReplica closedReplica1 =
+        createContainerReplica(container.containerID(), 1,
+            IN_SERVICE, ContainerReplicaProto.State.CLOSED);
+    ContainerReplica closedReplica2 =
+        createContainerReplica(container.containerID(), 2,
+            IN_SERVICE, ContainerReplicaProto.State.CLOSED);
+    replicas.add(closedReplica1);
+    replicas.add(closedReplica2);
+
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+  }
+
+  @Test
+  public void
+      testUnderReplicatedClosedContainerWithUnHealthyAndClosingReplicas()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicas(container,
+        ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerReplica unhealthyReplica1 =
+        createContainerReplica(container.containerID(), 4,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica unhealthyReplica2 =
+        createContainerReplica(container.containerID(), 5,
+            IN_SERVICE, ContainerReplicaProto.State.CLOSING);
+    replicas.add(unhealthyReplica1);
+    replicas.add(unhealthyReplica2);
+
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
   @Test
   public void testUnderAndOverReplicated()
       throws ContainerNotFoundException {
@@ -300,6 +390,13 @@ public class TestReplicationManager {
 
   @Test
   public void testUnderReplicationQueuePopulated() {
+    // Make it always return mis-replicated. Only a perfectly replicated
+    // container should make it the mis-replicated state as under / over
+    // replicated take precedence.
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+
     ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(decomContainer, ContainerReplicaProto.State.CLOSED,
@@ -313,6 +410,10 @@ public class TestReplicationManager {
     ContainerInfo underRep0 = createContainerInfo(repConfig, 3,
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(underRep0, ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+
+    ContainerInfo misRep = createContainerInfo(repConfig, 4,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(misRep, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
 
     enableProcessAll();
     replicationManager.processAll();
@@ -347,6 +448,10 @@ public class TestReplicationManager {
 
     res = replicationManager.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep0, res.getContainerInfo());
+
+    // Next is the mis-rep container, which has a remaining redundancy of 6.
+    res = replicationManager.dequeueUnderReplicatedContainer();
+    Assert.assertEquals(misRep, res.getContainerInfo());
 
     res = replicationManager.dequeueUnderReplicatedContainer();
     Assert.assertNull(res);
@@ -476,6 +581,15 @@ public class TestReplicationManager {
     command.setReplicaIndex(1);
 
     replicationManager.sendDatanodeCommand(command, containerInfo, target);
+
+    // Ensure that the command deadline is set to current time
+    // + evenTime * factor
+    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    long expectedDeadline = clock.millis() +
+        Math.round(rmConf.getEventTimeout() *
+            rmConf.getCommandDeadlineFactor());
+    Assert.assertEquals(expectedDeadline, command.getDeadline());
 
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
