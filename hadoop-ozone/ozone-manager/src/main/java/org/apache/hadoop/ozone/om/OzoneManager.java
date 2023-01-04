@@ -1828,16 +1828,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
+    List<ServiceInfo> serviceList = new ArrayList<>();
     if (isRatisEnabled) {
-      List<ServiceInfo> serviceList = new ArrayList<>();
       try {
         serviceList = getServiceList();
       } catch (IOException ex) {
         LOG.error("IOException while getting the ServiceInfo list.", ex);
       }
-      String ratisRoles = ratisRolesToString();
-      omHAMetricsInit(serviceList, ratisRoles);
     }
+    String ratisRoles = ratisRolesToString();
+    omHAMetricsInit(serviceList, ratisRoles);
   }
 
   /**
