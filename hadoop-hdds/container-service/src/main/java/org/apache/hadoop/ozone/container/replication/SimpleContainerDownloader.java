@@ -38,6 +38,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
  * from the first available datanode.
@@ -47,16 +48,16 @@ import org.slf4j.LoggerFactory;
  */
 public class SimpleContainerDownloader implements ContainerDownloader {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
   private final Path workingDirectory;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
+  private final String compression;
 
-  public SimpleContainerDownloader(
-      ConfigurationSource conf, CertificateClient certClient) {
-
+  public SimpleContainerDownloader(ConfigurationSource conf,
+      CertificateClient certClient) {
     String workDirString =
         conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
 
@@ -68,6 +69,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     }
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
+    this.compression = CopyContainerCompression.getConf(conf).toString();
   }
 
   @Override
@@ -118,7 +120,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            workingDirectory, securityConfig, certClient);
+            workingDirectory, securityConfig, certClient, compression);
     result = grpcReplicationClient.download(containerId)
         .whenComplete((r, ex) -> {
           try {

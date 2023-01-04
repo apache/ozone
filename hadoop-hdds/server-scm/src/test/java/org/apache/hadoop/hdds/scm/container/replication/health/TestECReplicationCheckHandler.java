@@ -481,9 +481,8 @@ public class TestECReplicationCheckHandler {
     Assert.assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
 
     Assert.assertTrue(healthCheck.handle(request));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
@@ -531,7 +530,6 @@ public class TestECReplicationCheckHandler {
     Assert.assertTrue(healthCheck.handle(request));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
@@ -567,7 +565,6 @@ public class TestECReplicationCheckHandler {
     Assert.assertTrue(healthCheck.handle(request));
     Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
@@ -604,7 +601,6 @@ public class TestECReplicationCheckHandler {
     Assert.assertTrue(healthCheck.handle(request));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, report.getStat(

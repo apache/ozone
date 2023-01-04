@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.hdds.security.ssl;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,6 @@ import java.util.function.Consumer;
  * can optionally also be specified in the constructor, otherwise any
  * exception occurring during process will be logged using this class' logger.
  */
-@InterfaceAudience.Private
 public class MonitoringTimerTask extends TimerTask {
 
   static final Logger LOG = LoggerFactory.getLogger(MonitoringTimerTask.class);

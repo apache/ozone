@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
@@ -61,12 +60,9 @@ public class ReplicationServer {
 
   private int port;
 
-  public ReplicationServer(
-      ContainerController controller,
-      ReplicationConfig replicationConfig,
-      SecurityConfig secConf,
-      CertificateClient caClient
-  ) {
+  public ReplicationServer(ContainerController controller,
+      ReplicationConfig replicationConfig, SecurityConfig secConf,
+      CertificateClient caClient) {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
@@ -81,17 +77,17 @@ public class ReplicationServer {
             new OnDemandContainerReplicationSource(controller)
         ), new GrpcServerInterceptor()));
 
-    if (secConf.isSecurityEnabled()) {
+    if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
         SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(
-            caClient.getPrivateKey(), caClient.getCertificate());
+            caClient.getServerKeyStoresFactory().getKeyManagers()[0]);
 
         sslContextBuilder = GrpcSslContexts.configure(
             sslContextBuilder, secConf.getGrpcSslProvider());
 
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslContextBuilder.trustManager(HAUtils.buildCAX509List(caClient,
-            secConf.getConfiguration()));
+        sslContextBuilder.trustManager(
+            caClient.getServerKeyStoresFactory().getTrustManagers()[0]);
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (IOException ex) {
@@ -106,14 +102,8 @@ public class ReplicationServer {
 
   public void start() throws IOException {
     server.start();
-
-    if (port == 0) {
-      LOG.info("{} is started using port {}", getClass().getSimpleName(),
-          server.getPort());
-    }
-
     port = server.getPort();
-
+    LOG.info("{} is started using port {}", getClass().getSimpleName(), port);
   }
 
   public void stop() {

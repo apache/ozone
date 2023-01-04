@@ -655,7 +655,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     File destination = tempFolder.newFile();
     try (FileOutputStream fos = new FileOutputStream(destination)) {
-      replicationSource.copyData(containerId, fos);
+      replicationSource.copyData(containerId, fos, "NO_COMPRESSION");
     }
     return destination;
   }

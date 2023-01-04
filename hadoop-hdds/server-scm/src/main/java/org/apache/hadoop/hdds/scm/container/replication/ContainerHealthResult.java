@@ -113,7 +113,15 @@ public class ContainerHealthResult {
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
         boolean replicatedOkWithPending, boolean unrecoverable) {
-      super(containerInfo, HealthState.UNDER_REPLICATED);
+      this(containerInfo, remainingRedundancy, dueToDecommission,
+          replicatedOkWithPending, unrecoverable, HealthState.UNDER_REPLICATED);
+    }
+
+    protected UnderReplicatedHealthResult(ContainerInfo containerInfo,
+        int remainingRedundancy, boolean dueToDecommission,
+        boolean replicatedOkWithPending, boolean unrecoverable,
+        HealthState healthState) {
+      super(containerInfo, healthState);
       this.remainingRedundancy = remainingRedundancy;
       this.dueToDecommission = dueToDecommission;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
@@ -148,7 +156,7 @@ public class ContainerHealthResult {
       if (dueToDecommission) {
         result += DECOMMISSION_REDUNDANCY;
       } else {
-        result += remainingRedundancy;
+        result += getRemainingRedundancy();
       }
       return result;
     }
@@ -207,19 +215,28 @@ public class ContainerHealthResult {
    * containers are not spread across enough racks.
    */
   public static class MisReplicatedHealthResult
-      extends ContainerHealthResult {
+      extends UnderReplicatedHealthResult {
 
-    private final boolean replicatedOkAfterPending;
+    /**
+     * In UnderReplicatedHealthState, DECOMMISSION_REDUNDANCY is defined as
+     * 5 so that containers which are really under replicated get fixed as a
+     * priority over decommissioning hosts. We have defined that a container
+     * can only be mis replicated if it is not over or under replicated. Fixing
+     * mis replication is arguably less important than competing a decommission.
+     * So as a lot of mis replicated container do not block decommission, we
+     * set the redundancy of mis replicated containers to 6 so they sort after
+     * under / over replicated and decommissioning replicas in the under
+     * replication queue.
+     */
+    private static final int MIS_REP_REDUNDANCY = 6;
 
     public MisReplicatedHealthResult(ContainerInfo containerInfo,
         boolean replicatedOkAfterPending) {
-      super(containerInfo, HealthState.MIS_REPLICATED);
-      this.replicatedOkAfterPending = replicatedOkAfterPending;
+      super(containerInfo, MIS_REP_REDUNDANCY, false,
+          replicatedOkAfterPending, false,
+          HealthState.MIS_REPLICATED);
     }
 
-    public boolean isReplicatedOkAfterPending() {
-      return replicatedOkAfterPending;
-    }
   }
 
   /**

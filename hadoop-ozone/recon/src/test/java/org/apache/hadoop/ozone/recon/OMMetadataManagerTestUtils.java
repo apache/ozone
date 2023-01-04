@@ -233,7 +233,8 @@ public final class OMMetadataManagerTestUtils {
                                   long bucketObjectId,
                                   long volumeObjectId,
                                   List<OmKeyLocationInfoGroup> locationVersions,
-                                  BucketLayout bucketLayout)
+                                  BucketLayout bucketLayout,
+                                  long dataSize)
           throws IOException {
 
     String omKey;
@@ -248,6 +249,7 @@ public final class OMMetadataManagerTestUtils {
                     .setBucketName(bucketName)
                     .setVolumeName(volName)
                     .setKeyName(keyName)
+                    .setDataSize(dataSize)
                     .setOmKeyLocationInfos(locationVersions)
                     .setReplicationConfig(
                         StandaloneReplicationConfig.getInstance(ONE))

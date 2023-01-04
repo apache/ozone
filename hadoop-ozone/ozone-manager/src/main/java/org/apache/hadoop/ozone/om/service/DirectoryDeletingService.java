@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -148,61 +150,54 @@ public class DirectoryDeletingService extends BackgroundService {
                  deleteTableIterator = ozoneManager.getMetadataManager().
             getDeletedDirTable().iterator()) {
 
+          List<Pair<String, OmKeyInfo>> allSubDirList
+              = new ArrayList<>((int) remainNum);
           long startTime = Time.monotonicNow();
           while (remainNum > 0 && deleteTableIterator.hasNext()) {
             pendingDeletedDirInfo = deleteTableIterator.next();
-            // step-0: Get one pending deleted directory
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Pending deleted dir name: {}",
-                  pendingDeletedDirInfo.getValue().getKeyName());
-            }
-            final String[] keys = pendingDeletedDirInfo.getKey()
-                .split(OM_KEY_PREFIX);
-            final long volumeId = Long.parseLong(keys[1]);
-            final long bucketId = Long.parseLong(keys[2]);
 
-            // step-1: get all sub directories under the deletedDir
-            List<OmKeyInfo> subDirs = ozoneManager.getKeyManager()
-                .getPendingDeletionSubDirs(volumeId, bucketId,
-                    pendingDeletedDirInfo.getValue(), remainNum);
-            remainNum = remainNum - subDirs.size();
-
-            if (LOG.isDebugEnabled()) {
-              for (OmKeyInfo dirInfo : subDirs) {
-                LOG.debug("Moved sub dir name: {}", dirInfo.getKeyName());
-              }
-            }
-
-            // step-2: get all sub files under the deletedDir
-            List<OmKeyInfo> subFiles = ozoneManager.getKeyManager()
-                .getPendingDeletionSubFiles(volumeId, bucketId,
-                    pendingDeletedDirInfo.getValue(), remainNum);
-            remainNum = remainNum - subFiles.size();
-
-            if (LOG.isDebugEnabled()) {
-              for (OmKeyInfo fileInfo : subFiles) {
-                LOG.debug("Moved sub file name: {}", fileInfo.getKeyName());
-              }
-            }
-
-          // step-3: Since there is a boundary condition of 'numEntries' in
-          // each batch, check whether the sub paths count reached batch size
-          // limit. If count reached limit then there can be some more child
-          // paths to be visited and will keep the parent deleted directory
-          // for one more pass.
-            String purgeDeletedDir = remainNum > 0 ?
-                pendingDeletedDirInfo.getKey() : null;
-
-            PurgePathRequest request = wrapPurgeRequest(volumeId, bucketId,
-                purgeDeletedDir, subFiles, subDirs);
+            PurgePathRequest request = prepareDeleteDirRequest(
+                remainNum, pendingDeletedDirInfo.getValue(),
+                pendingDeletedDirInfo.getKey(), allSubDirList);
             purgePathRequestList.add(request);
-
+            remainNum = remainNum - request.getDeletedSubFilesCount();
+            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
             // Count up the purgeDeletedDir, subDirs and subFiles
-            if (purgeDeletedDir != null) {
+            if (request.getDeletedDir() != null
+                && !request.getDeletedDir().isEmpty()) {
               dirNum++;
             }
-            subDirNum += subDirs.size();
-            subFileNum += subFiles.size();
+            subDirNum += request.getMarkDeletedSubDirsCount();
+            subFileNum += request.getDeletedSubFilesCount();
+          }
+          
+          // Optimization to handle delete sub-dir and keys to remove quickly
+          // This case will be useful to handle when depth of directory is high
+          int subdirDelNum = 0;
+          int subDirRecursiveCnt = 0;
+          while (remainNum > 0 && subDirRecursiveCnt < allSubDirList.size()) {
+            try {
+              Pair<String, OmKeyInfo> stringOmKeyInfoPair
+                  = allSubDirList.get(subDirRecursiveCnt);
+              PurgePathRequest request = prepareDeleteDirRequest(
+                  remainNum, stringOmKeyInfoPair.getValue(),
+                  stringOmKeyInfoPair.getKey(), allSubDirList);
+              purgePathRequestList.add(request);
+              remainNum = remainNum - request.getDeletedSubFilesCount();
+              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+              // Count up the purgeDeletedDir, subDirs and subFiles
+              if (request.getDeletedDir() != null
+                  && !request.getDeletedDir().isEmpty()) {
+                subdirDelNum++;
+              }
+              subDirNum += request.getMarkDeletedSubDirsCount();
+              subFileNum += request.getDeletedSubFilesCount();
+              subDirRecursiveCnt++;
+            } catch (IOException e) {
+              LOG.error("Error while running delete directories and files " +
+                  "background task. Will retry at next run for subset.", e);
+              break;
+            }
           }
 
           // TODO: need to handle delete with non-ratis
@@ -211,14 +206,15 @@ public class DirectoryDeletingService extends BackgroundService {
           }
 
           if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
-            deletedDirsCount.addAndGet(dirNum);
-            movedDirsCount.addAndGet(subDirNum);
+            deletedDirsCount.addAndGet(dirNum + subdirDelNum);
+            movedDirsCount.addAndGet(subDirNum - subdirDelNum);
             movedFilesCount.addAndGet(subFileNum);
-            LOG.info("Number of dirs deleted: {}, Number of sub-files moved:" +
+            LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
+                    "deleted: {}, Number of sub-files moved:" +
                     " {} to DeletedTable, Number of sub-dirs moved {} to " +
                     "DeletedDirectoryTable, iteration elapsed: {}ms," +
                     " totalRunCount: {}",
-                dirNum, subFileNum, subDirNum,
+                dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
                 Time.monotonicNow() - startTime, getRunCount());
           }
 
@@ -231,6 +227,57 @@ public class DirectoryDeletingService extends BackgroundService {
       // place holder by returning empty results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
+  }
+  
+  private PurgePathRequest prepareDeleteDirRequest(
+      long remainNum, OmKeyInfo pendingDeletedDirInfo, String delDirName,
+      List<Pair<String, OmKeyInfo>> subDirList) throws IOException {
+    // step-0: Get one pending deleted directory
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Pending deleted dir name: {}",
+          pendingDeletedDirInfo.getKeyName());
+    }
+    
+    final String[] keys = delDirName.split(OM_KEY_PREFIX);
+    final long volumeId = Long.parseLong(keys[1]);
+    final long bucketId = Long.parseLong(keys[2]);
+    
+    // step-1: get all sub directories under the deletedDir
+    List<OmKeyInfo> subDirs = ozoneManager.getKeyManager()
+        .getPendingDeletionSubDirs(volumeId, bucketId,
+            pendingDeletedDirInfo, remainNum);
+    remainNum = remainNum - subDirs.size();
+
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    for (OmKeyInfo dirInfo : subDirs) {
+      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+          bucketId, dirInfo.getParentObjectID(), dirInfo.getFileName());
+      String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+          dirInfo.getObjectID(), ozoneDbKey);
+      subDirList.add(Pair.of(ozoneDeleteKey, dirInfo));
+      LOG.debug("Moved sub dir name: {}", dirInfo.getKeyName());
+    }
+
+    // step-2: get all sub files under the deletedDir
+    List<OmKeyInfo> subFiles = ozoneManager.getKeyManager()
+        .getPendingDeletionSubFiles(volumeId, bucketId,
+            pendingDeletedDirInfo, remainNum);
+    remainNum = remainNum - subFiles.size();
+
+    if (LOG.isDebugEnabled()) {
+      for (OmKeyInfo fileInfo : subFiles) {
+        LOG.debug("Moved sub file name: {}", fileInfo.getKeyName());
+      }
+    }
+
+    // step-3: Since there is a boundary condition of 'numEntries' in
+    // each batch, check whether the sub paths count reached batch size
+    // limit. If count reached limit then there can be some more child
+    // paths to be visited and will keep the parent deleted directory
+    // for one more pass.
+    String purgeDeletedDir = remainNum > 0 ? delDirName : null;
+    return wrapPurgeRequest(volumeId, bucketId,
+        purgeDeletedDir, subFiles, subDirs);
   }
 
   /**
