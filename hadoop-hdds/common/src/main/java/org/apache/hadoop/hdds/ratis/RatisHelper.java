@@ -498,41 +498,31 @@ public final class RatisHelper {
    *
    * @param server        the Raft server
    * @param groupId       the Raft group Id
-   * @param host          the string of the host, should be IP:PORT format
-   * @param isRandom      whether to choose random follower as target leader
-   * @param curLeader     the current Raft leader
+   * @param targetPeerId  the target expected leader
+
    * @throws IOException
    */
   public static void transferRatisLeadership(RaftServer server,
-      RaftGroupId groupId, String host, boolean isRandom, RaftPeer curLeader)
+      RaftGroupId groupId, RaftPeerId targetPeerId)
       throws IOException {
-    if (isRandom && curLeader == null) {
-      throw new IOException("Cannot find the ratis leader.");
-    }
     RaftGroup raftGroup = server.getDivision(groupId).getGroup();
     RaftClient raftClient = createBackoffRaftClient(raftGroup);
-    RaftPeerId targetLeaderId = null;
-    for (RaftPeer tmp : raftGroup.getPeers()) {
-      if (isRandom ? !tmp.equals(curLeader) : tmp.getAddress().equals(host) ||
-          tmp.getAddress().equals(host.replace("127.0.0.1", "localhost"))) {
-        targetLeaderId = tmp.getId();
-        break;
-      }
-    }
-    if (targetLeaderId == null) {
-      throw new IOException("Cannot choose the target leader. The host is " +
-          host + " and the peers are " + raftGroup.getPeers().stream().
-          map(RaftPeer::getAddress).collect(Collectors.toList()) + ".");
+    if (!raftGroup.getPeers().stream().map(RaftPeer::getId)
+        .collect(Collectors.toSet()).contains(targetPeerId)) {
+      throw new IOException("Cannot choose the target leader. The expected " +
+          "leader RaftPeerId is " + targetPeerId + " and the peers are " +
+          raftGroup.getPeers().stream().map(RaftPeer::getId)
+              .collect(Collectors.toList()) + ".");
     }
     LOG.info("Chosen the targetLeaderId {} to transfer leadership",
-        targetLeaderId);
+        targetPeerId);
 
     // Set priority
     List<RaftPeer> peersWithNewPriorities = new ArrayList<>();
     for (RaftPeer peer : raftGroup.getPeers()) {
       peersWithNewPriorities.add(
           RaftPeer.newBuilder(peer)
-              .setPriority(peer.getId().equals(targetLeaderId) ? 2 : 1)
+              .setPriority(peer.getId().equals(targetPeerId) ? 2 : 1)
               .build()
       );
     }
@@ -549,12 +539,12 @@ public final class RatisHelper {
     }
 
     // Trigger the transferLeadership
-    reply = raftClient.admin().transferLeadership(targetLeaderId, 60000);
+    reply = raftClient.admin().transferLeadership(targetPeerId, 60000);
     if (reply.isSuccess()) {
-      LOG.info("Successfully transferred leadership to {}.", targetLeaderId);
+      LOG.info("Successfully transferred leadership to {}.", targetPeerId);
     } else {
       LOG.warn("Failed to transfer leadership to {}. Ratis reply: {}",
-          targetLeaderId, reply);
+          targetPeerId, reply);
       throw new IOException(reply.getException());
     }
   }

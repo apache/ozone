@@ -603,20 +603,6 @@ public final class HddsUtils {
         "Path should be a descendant of %s", ancestor);
   }
 
-  /**
-   * Validation for host in IP:PORT format.
-   *
-   * @param host the string to be validated
-   */
-  public static void validateHost(String host) {
-    String pattern = "^((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))(\\." +
-        "((2((5[0-5])|([0-4]\\d)))|([0-1]?\\d{1,2}))){3}:\\d+$";
-    if (host == null || !host.matches(pattern)) {
-      throw new IllegalArgumentException("Host is " + host + " or does not " +
-          "match the IP:PORT format");
-    }
-  }
-
   public static File createDir(String dirPath) {
     File dirFile = new File(dirPath);
     if (!dirFile.mkdirs() && !dirFile.exists()) {

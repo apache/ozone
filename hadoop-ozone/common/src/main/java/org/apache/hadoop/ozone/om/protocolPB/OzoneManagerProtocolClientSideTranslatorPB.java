@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -175,7 +175,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantL
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TransferOmLeadershipRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
@@ -1464,15 +1463,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void transferLeadership(String host, boolean isRandom)
+  public void transferLeadership(String nodeId, boolean isRandom)
       throws IOException {
-    TransferOmLeadershipRequest.Builder builder = TransferOmLeadershipRequest.
-        newBuilder();
+    TransferLeadershipRequestProto.Builder builder =
+        TransferLeadershipRequestProto.newBuilder();
     if (isRandom) {
       builder.setIsRandom(true);
     } else {
-      HddsUtils.validateHost(host);
-      builder.setHost(host);
+      builder.setNodeId(nodeId);
       builder.setIsRandom(false);
     }
     OMRequest omRequest = createOMRequest(Type.TransferLeadership)

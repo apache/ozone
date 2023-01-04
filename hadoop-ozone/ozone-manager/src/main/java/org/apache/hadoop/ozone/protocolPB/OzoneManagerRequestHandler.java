@@ -30,6 +30,8 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -108,8 +110,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantG
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TransferOmLeadershipRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TransferOmLeadershipResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
@@ -1225,11 +1225,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl;
   }
 
-  private TransferOmLeadershipResponse transferLeadership(
-      TransferOmLeadershipRequest req) throws IOException {
-    String host = req.hasHost() ? req.getHost() : null;
+  private TransferLeadershipResponseProto transferLeadership(
+      TransferLeadershipRequestProto req) throws IOException {
+    String nodeId = req.hasNodeId() ? req.getNodeId() : "";
     boolean isRandom = req.getIsRandom();
-    impl.transferLeadership(host, isRandom);
-    return TransferOmLeadershipResponse.getDefaultInstance();
+    impl.transferLeadership(nodeId, isRandom);
+    return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

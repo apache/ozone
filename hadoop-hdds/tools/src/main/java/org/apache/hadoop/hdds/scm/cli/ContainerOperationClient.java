@@ -465,9 +465,9 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void transferLeadership(String host, boolean isRandom)
+  public void transferLeadership(String nodeId, boolean isRandom)
       throws IOException {
-    storageContainerLocationClient.transferLeadership(host, isRandom);
+    storageContainerLocationClient.transferLeadership(nodeId, isRandom);
   }
 
   @Override

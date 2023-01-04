@@ -98,12 +98,7 @@ public class TestTransferLeadershipShell {
     cluster.waitForClusterToBeReady();
     Assertions.assertEquals(newLeader, getScmLeader(cluster));
 
-    String[] args2 = {"scm", "transfer", "-o", oldLeader.getScmNodeDetails()
-        .getRatisAddressPortStr()};
-    ozoneAdmin.execute(args2);
-    cluster.waitForClusterToBeReady();
-    Assertions.assertEquals(oldLeader, getScmLeader(cluster));
-
+    oldLeader = getScmLeader(cluster);
     String[] args3 = {"scm", "transfer", "-r"};
     ozoneAdmin.execute(args3);
     cluster.waitForClusterToBeReady();
@@ -124,12 +119,7 @@ public class TestTransferLeadershipShell {
     Thread.sleep(3000);
     Assertions.assertEquals(newLeader, cluster.getOMLeader());
 
-    String[] args2 = {"om", "transfer", "-o",
-        oldLeader.getNodeDetails().getRatisAddressPortStr()};
-    ozoneAdmin.execute(args2);
-    Thread.sleep(3000);
-    Assertions.assertEquals(oldLeader, cluster.getOMLeader());
-
+    oldLeader = cluster.getOMLeader();
     String[] args3 = {"om", "transfer", "-r"};
     ozoneAdmin.execute(args3);
     Thread.sleep(3000);

@@ -410,11 +410,11 @@ public interface OzoneManagerProtocol
   /**
    * Transfer the raft leadership.
    *
-   * @param host          the string of the host, should be IP:PORT format
+   * @param nodeId        the nodeId of the target expected leader
    * @param isRandom      whether to choose random follower as target leader
    * @throws IOException
    */
-  void transferLeadership(String host, boolean isRandom) throws IOException;
+  void transferLeadership(String nodeId, boolean isRandom) throws IOException;
 
   /**
    * Triggers Ranger background sync task immediately.

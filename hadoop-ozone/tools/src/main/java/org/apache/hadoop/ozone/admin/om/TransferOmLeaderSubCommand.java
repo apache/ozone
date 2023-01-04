@@ -18,22 +18,10 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Handler of ozone admin om transfer command.
@@ -66,13 +54,6 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
     )
     private String omNodeId;
 
-    @CommandLine.Option(
-        names = {"-o", "--host"},
-        description = "The target leader Ozone Manager Host to " +
-            "transfer leadership in IP:PORT format."
-    )
-    private String omHost;
-
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
     private boolean isRandom;
@@ -80,54 +61,10 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    convertToHost();
     OzoneManagerProtocol client =
         parent.createOmClient(omServiceId, null, true);
-    client.transferLeadership(configGroup.omHost, configGroup.isRandom);
-    System.out.println("Transfer leadership success");
+    client.transferLeadership(configGroup.omNodeId, configGroup.isRandom);
+    System.out.println("Transfer leadership success.");
     return null;
-  }
-
-  /**
-   * Convert the omNodeId to IP:PORT format.
-   *
-   * @throws IOException
-   */
-  private void convertToHost() throws IOException {
-    if (configGroup.omNodeId != null) {
-      OzoneConfiguration conf = parent.getParent().getOzoneConf();
-      if (omServiceId == null) {
-        omServiceId = conf.getTrimmed(OZONE_OM_INTERNAL_SERVICE_ID);
-        if (omServiceId == null) {
-          Collection<String> serviceIds = conf.getTrimmedStringCollection(
-              OZONE_OM_SERVICE_IDS_KEY);
-          if (serviceIds.size() == 1) {
-            omServiceId = serviceIds.iterator().next();
-          } else {
-            throw new IOException("Find " + serviceIds.size() + " " +
-                OZONE_OM_SERVICE_IDS_KEY + ". Please specify one with " +
-                "-id/--service-id");
-          }
-        }
-      }
-      Objects.requireNonNull(omServiceId);
-      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
-          omServiceId, configGroup.omNodeId);
-      String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
-      if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
-        throw new IllegalArgumentException("Configuration does not have any" +
-            " value set for " + rpcAddrKey + ". OM RPC Address should be" +
-            " set for all nodes in an OM service.");
-      }
-      String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
-          omServiceId, configGroup.omNodeId);
-      int ratisPort = conf.getInt(ratisPortKey, OZONE_OM_RATIS_PORT_DEFAULT);
-      // Remove possible RPC port
-      if (rpcAddrStr.contains(":")) {
-        rpcAddrStr = rpcAddrStr.split(":")[0];
-      }
-      configGroup.omHost = rpcAddrStr.concat(":")
-          .concat(String.valueOf(ratisPort));
-    }
   }
 }

@@ -18,23 +18,11 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.ozone.ha.ConfUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Mixin;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Objects;
 import java.util.concurrent.Callable;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 /**
  * Handler of ozone admin om transfer command.
@@ -60,16 +48,9 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     @CommandLine.Option(
         names = {"-n", "--nodeId"},
         description = "The target Node Id of OM to transfer leadership." +
-            " Will convert to host with default ratis port. E.g OM1."
+            " Will convert to host with default ratis port. E.g SCM1."
     )
     private String scmNodeId;
-
-    @CommandLine.Option(
-        names = {"-o", "--host"},
-        description = "The target leader Ozone Manager Host to " +
-            "transfer leadership."
-    )
-    private String scmHost;
 
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
@@ -78,55 +59,10 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    convertToHost();
     ScmClient client = scmOption.createScmClient(
         parent.getParent().getOzoneConf());
-    client.transferLeadership(configGroup.scmHost, configGroup.isRandom);
-    System.out.println("Transfer leadership success");
+    client.transferLeadership(configGroup.scmNodeId, configGroup.isRandom);
+    System.out.println("Transfer leadership success.");
     return null;
-  }
-
-  /**
-   * Convert the scmNodeId to IP:PORT format.
-   *
-   * @throws IOException
-   */
-  private void convertToHost() throws IOException {
-    if (configGroup.scmNodeId != null) {
-      String scmServiceId = scmOption.getScmServiceId();
-      OzoneConfiguration conf = parent.getParent().getOzoneConf();
-      if (scmServiceId == null) {
-        scmServiceId = conf.getTrimmed(OZONE_SCM_DEFAULT_SERVICE_ID);
-        if (scmServiceId == null) {
-          Collection<String> serviceIds = conf.getTrimmedStringCollection(
-              OZONE_SCM_SERVICE_IDS_KEY);
-          if (serviceIds.size() == 1) {
-            scmServiceId = serviceIds.iterator().next();
-          } else {
-            throw new IOException("Find " + serviceIds.size() + " " +
-                OZONE_SCM_SERVICE_IDS_KEY + ". Please specify one with " +
-                "-id/--service-id");
-          }
-        }
-      }
-      Objects.requireNonNull(scmServiceId);
-      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
-          scmServiceId, configGroup.scmNodeId);
-      String rpcAddrStr = conf.get(rpcAddrKey);
-      if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
-        throw new IllegalArgumentException("Configuration does not have any" +
-            " value set for " + rpcAddrKey + ". SCM RPC Address should be" +
-            " set for all nodes in an OM service.");
-      }
-      String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
-          scmServiceId, configGroup.scmNodeId);
-      int ratisPort = conf.getInt(ratisPortKey, OZONE_SCM_RATIS_PORT_DEFAULT);
-      // Remove possible RPC port
-      if (rpcAddrStr.contains(":")) {
-        rpcAddrStr = rpcAddrStr.split(":")[0];
-      }
-      configGroup.scmHost = rpcAddrStr.concat(":")
-          .concat(String.valueOf(ratisPort));
-    }
   }
 }

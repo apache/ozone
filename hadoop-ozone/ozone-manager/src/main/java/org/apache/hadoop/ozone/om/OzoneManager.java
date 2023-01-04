@@ -3194,21 +3194,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void transferLeadership(String host, boolean isRandom)
+  public void transferLeadership(String nodeId, boolean isRandom)
       throws IOException {
     if (!isRatisEnabled) {
       throw new IOException("Ratis is not enabled at the server.");
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put("host", host);
+    auditMap.put("nodeId", nodeId);
     auditMap.put("isRandom", String.valueOf(isRandom));
     try {
       RaftServer server = omRatisServer.getServer();
       RaftGroupId groupID = omRatisServer.getRaftGroup().getGroupId();
-      RaftPeer curLeader = omRatisServer.getLeader();
-      RatisHelper.transferRatisLeadership(server, groupID, host,
-          isRandom, curLeader);
+      RaftPeerId targetPeerId;
+      if (isRandom) {
+        RaftPeer curLeader = omRatisServer.getLeader();
+        targetPeerId = server.getDivision(groupID).getGroup()
+            .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
+            .map(RaftPeer::getId).orElse(null);
+      } else {
+        targetPeerId = RaftPeerId.valueOf(nodeId);
+      }
+      RatisHelper.transferRatisLeadership(server, groupID, targetPeerId);
     } catch (IOException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(

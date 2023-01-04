@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
@@ -98,8 +100,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.TransferScmLeadershipRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.TransferScmLeadershipResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -1185,11 +1185,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
-  public TransferScmLeadershipResponseProto transferScmLeadership(
-      TransferScmLeadershipRequestProto request) throws IOException {
-    String host = request.hasHost() ? request.getHost() : null;
+  public TransferLeadershipResponseProto transferScmLeadership(
+      TransferLeadershipRequestProto request) throws IOException {
+    String nodeId = request.hasNodeId() ? request.getNodeId() : "";
     boolean isRandom = request.getIsRandom();
-    impl.transferLeadership(host, isRandom);
-    return TransferScmLeadershipResponseProto.getDefaultInstance();
+    impl.transferLeadership(nodeId, isRandom);
+    return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

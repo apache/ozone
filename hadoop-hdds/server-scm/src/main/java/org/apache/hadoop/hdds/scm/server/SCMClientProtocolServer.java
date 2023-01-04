@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -77,11 +78,13 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
@@ -94,6 +97,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -102,8 +106,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -790,20 +797,32 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void transferLeadership(String host, boolean isRandom)
+  public void transferLeadership(String nodeId, boolean isRandom)
       throws IOException {
     boolean auditSuccess = true;
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("host", host);
+    auditMap.put("host", nodeId);
     auditMap.put("isRandom", String.valueOf(isRandom));
     try {
       SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
-      RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager().
-          getRatisServer()).getLeader();
       RaftServer server = scmRatisServer.getDivision().getRaftServer();
       RaftGroupId groupID = scmRatisServer.getSCMStateMachine().getGroupId();
-      RatisHelper.transferRatisLeadership(server, groupID, host,
-          isRandom, curLeader);
+      RaftPeerId targetPeerId;
+      if (isRandom) {
+        RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager().
+            getRatisServer()).getLeader();
+        targetPeerId = server.getDivision(groupID).getGroup()
+            .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
+            .map(RaftPeer::getId).orElse(null);
+      } else {
+        String ratisAddr = convertToRatisAddr(nodeId);
+        targetPeerId = server.getDivision(groupID).getGroup().getPeers()
+            .stream()
+            .filter(a -> a.getAddress().equals(ratisAddr) || a.getAddress()
+                .equals(ratisAddr.replace("127.0.0.1", "localhost")))
+            .findFirst().map(RaftPeer::getId).orElse(null);
+      }
+      RatisHelper.transferRatisLeadership(server, groupID, targetPeerId);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
@@ -815,6 +834,30 @@ public class SCMClientProtocolServer implements
             SCMAction.TRANSFER_LEADER, auditMap));
       }
     }
+  }
+
+  private String convertToRatisAddr(String scmNodeId) throws IOException {
+    SCMNodeDetails localScm = scm.getSCMHANodeDetails().getLocalNodeDetails();
+    String scmServiceId = localScm.getServiceId();
+    Objects.requireNonNull(scmServiceId);
+    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, scmNodeId);
+
+    String rpcAddrStr = scm.getConfiguration().get(rpcAddrKey);
+    if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
+      throw new IOException("Configuration does not have any" +
+          " value set for " + rpcAddrKey + ". Please confirm the nodeId " +
+          "is right.");
+    }
+    String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
+        scmServiceId, scmNodeId);
+    int ratisPort = scm.getConfiguration().
+        getInt(ratisPortKey, OZONE_SCM_RATIS_PORT_DEFAULT);
+    // Remove possible RPC port
+    if (rpcAddrStr.contains(":")) {
+      rpcAddrStr = rpcAddrStr.split(":")[0];
+    }
+    return rpcAddrStr.concat(":").concat(String.valueOf(ratisPort));
   }
 
   @Override

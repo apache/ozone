@@ -451,3 +451,11 @@ message ContainerBalancerConfigurationProto {
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
 }
+
+message TransferLeadershipRequestProto {
+    required bool isRandom = 1;
+    optional string nodeId = 2;
+}
+
+message TransferLeadershipResponseProto {
+}
