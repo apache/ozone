@@ -400,7 +400,7 @@ public class BasicRootedOzoneClientAdapterImpl
       short replication, boolean overWrite, boolean recursive)
       throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
       throw new IOException("Cannot create file under root or volume.");
     }
