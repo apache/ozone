@@ -261,7 +261,7 @@ public class TestStorageContainerManager {
 
   private void verifyPermissionDeniedException(Exception e, String userName) {
     String expectedErrorMessage = "Access denied for user "
-        + userName + ". " + "Superuser privilege is required.";
+        + userName + ". " + "SCM superuser privilege is required.";
     Assert.assertTrue(e instanceof IOException);
     Assert.assertEquals(expectedErrorMessage, e.getMessage());
   }

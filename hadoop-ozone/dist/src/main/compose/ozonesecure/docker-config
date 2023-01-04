@@ -79,6 +79,8 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 
+OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
+
 HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
 HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM

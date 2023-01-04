@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -139,6 +141,7 @@ public class DatanodeStateMachine implements Closeable {
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
 
+    Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
     layoutStorage = new DatanodeLayoutStorage(conf,
         datanodeDetails.getUuidString());
@@ -180,7 +183,7 @@ public class DatanodeStateMachine implements Closeable {
         conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, replicationConfig);
+            replicatorMetrics, replicationConfig, clock);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -188,12 +191,12 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionMetrics = ECReconstructionMetrics.create();
 
     ECReconstructionCoordinator ecReconstructionCoordinator =
-        new ECReconstructionCoordinator(conf, certClient,
+        new ECReconstructionCoordinator(conf, certClient, context,
             ecReconstructionMetrics);
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
             replicationConfig.getReplicationMaxStreams(),
-            ecReconstructionCoordinator);
+            ecReconstructionCoordinator, clock);
 
 
     // When we add new handlers just adding a new handler here should do the
@@ -207,7 +210,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new ReconstructECContainersCommandHandler(conf,
             ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getContainerDeleteThreads()))
+            dnConf.getContainerDeleteThreads(), clock))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))

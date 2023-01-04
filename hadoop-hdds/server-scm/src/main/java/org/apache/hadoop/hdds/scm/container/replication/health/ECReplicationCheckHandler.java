@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,6 +45,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  * they are added to the queue passed within the request object.
  */
 public class ECReplicationCheckHandler extends AbstractCheck {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECReplicationCheckHandler.class);
 
   private final PlacementPolicy placementPolicy;
 
@@ -60,6 +65,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     ContainerInfo container = request.getContainerInfo();
     ContainerID containerID = container.containerID();
     ContainerHealthResult health = checkHealth(request);
+    LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
       // If the container is healthy, there is nothing else to do in this
       // handler so return as unhandled so any further handlers will be tried.
@@ -82,6 +88,10 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           !underHealth.isUnrecoverable()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
+          + "is [{}]. isUnrecoverable is [{}]", container,
+          underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable());
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
@@ -92,6 +102,8 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
+      LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending "
+          + "is [{}]", container, overHealth.isReplicatedOkAfterPending());
       return true;
     } else if (health.getHealthState() ==
         ContainerHealthResult.HealthState.MIS_REPLICATED) {
@@ -102,10 +114,14 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       if (!misRepHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(misRepHealth);
       }
+      LOG.debug("Container {} is Mis Replicated. isReplicatedOkAfterPending "
+          + "is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
       return true;
     }
-    // Should not get here, but incase it does the container is not healthy,
+    // Should not get here, but in case it does the container is not healthy,
     // but is also not under or over replicated.
+    LOG.warn("Container {} is not healthy but is not under, over or "
+        + " mis-replicated. Should not happen.", container);
     return false;
   }
 

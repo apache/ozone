@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
@@ -220,83 +221,85 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = folder.newFile("exported.tar.gz");
+    for (Map.Entry<CopyContainerCompression, String> entry :
+        CopyContainerCompression.getCompressionMapping().entrySet()) {
+      TarContainerPacker packer = new TarContainerPacker(entry.getValue());
 
-    TarContainerPacker packer = new TarContainerPacker();
+      //export the container
+      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+        keyValueContainer
+            .exportContainerData(fos, packer);
+      }
 
-    //export the container
-    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
-      keyValueContainer
-          .exportContainerData(fos, packer);
-    }
+      //delete the original one
+      keyValueContainer.delete();
 
-    //delete the original one
-    keyValueContainer.delete();
+      //create a new one
+      KeyValueContainerData containerData =
+          new KeyValueContainerData(containerId,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
-    //create a new one
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(containerId,
-            keyValueContainerData.getLayoutVersion(),
-            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
-            datanodeId.toString());
-    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
-    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
-    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-
-    container.populatePathFields(scmId, containerVolume);
-    try (FileInputStream fis = new FileInputStream(folderToExport)) {
-      container.importContainerData(fis, packer);
-    }
-
-    assertEquals("value1", containerData.getMetadata().get("key1"));
-    assertEquals(keyValueContainerData.getContainerDBType(),
-        containerData.getContainerDBType());
-    assertEquals(keyValueContainerData.getState(),
-        containerData.getState());
-    assertEquals(numberOfKeysToWrite,
-        containerData.getBlockCount());
-    assertEquals(keyValueContainerData.getLayoutVersion(),
-        containerData.getLayoutVersion());
-    assertEquals(keyValueContainerData.getMaxSize(),
-        containerData.getMaxSize());
-    assertEquals(keyValueContainerData.getBytesUsed(),
-        containerData.getBytesUsed());
-
-    //Can't overwrite existing container
-    try {
+      container.populatePathFields(scmId, containerVolume);
       try (FileInputStream fis = new FileInputStream(folderToExport)) {
         container.importContainerData(fis, packer);
       }
-      fail("Container is imported twice. Previous files are overwritten");
-    } catch (IOException ex) {
-      //all good
-      assertTrue(container.getContainerFile().exists());
-    }
 
-    //Import failure should cleanup the container directory
-    containerData =
-        new KeyValueContainerData(containerId + 1,
-            keyValueContainerData.getLayoutVersion(),
-            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
-            datanodeId.toString());
-    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
-    container = new KeyValueContainer(containerData, CONF);
+      assertEquals("value1", containerData.getMetadata().get("key1"));
+      assertEquals(keyValueContainerData.getContainerDBType(),
+          containerData.getContainerDBType());
+      assertEquals(keyValueContainerData.getState(),
+          containerData.getState());
+      assertEquals(numberOfKeysToWrite,
+          containerData.getBlockCount());
+      assertEquals(keyValueContainerData.getLayoutVersion(),
+          containerData.getLayoutVersion());
+      assertEquals(keyValueContainerData.getMaxSize(),
+          containerData.getMaxSize());
+      assertEquals(keyValueContainerData.getBytesUsed(),
+          containerData.getBytesUsed());
 
-    containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    container.populatePathFields(scmId, containerVolume);
-    try {
-      FileInputStream fis = new FileInputStream(folderToExport);
-      fis.close();
-      container.importContainerData(fis, packer);
-      fail("Container import should fail");
-    } catch (Exception ex) {
-      assertTrue(ex instanceof IOException);
-    } finally {
-      File directory =
-          new File(container.getContainerData().getContainerPath());
-      assertFalse(directory.exists());
+      //Can't overwrite existing container
+      try {
+        try (FileInputStream fis = new FileInputStream(folderToExport)) {
+          container.importContainerData(fis, packer);
+        }
+        fail("Container is imported twice. Previous files are overwritten");
+      } catch (IOException ex) {
+        //all good
+        assertTrue(container.getContainerFile().exists());
+      }
+
+      //Import failure should cleanup the container directory
+      containerData =
+          new KeyValueContainerData(containerId + 1,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      container = new KeyValueContainer(containerData, CONF);
+
+      containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+      container.populatePathFields(scmId, containerVolume);
+      try {
+        FileInputStream fis = new FileInputStream(folderToExport);
+        fis.close();
+        container.importContainerData(fis, packer);
+        fail("Container import should fail");
+      } catch (Exception ex) {
+        assertTrue(ex instanceof IOException);
+      } finally {
+        File directory =
+            new File(container.getContainerData().getContainerPath());
+        assertFalse(directory.exists());
+      }
     }
   }
 

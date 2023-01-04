@@ -22,10 +22,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,18 +37,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorInputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -55,7 +55,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 
 /**
  * Test the tar/untar for a given container.
@@ -73,8 +72,7 @@ public class TestTarContainerPacker {
 
   private static final String TEST_DESCRIPTOR_FILE_CONTENT = "descriptor";
 
-  private final ContainerPacker<KeyValueContainerData> packer
-      = new TarContainerPacker();
+  private TarContainerPacker packer;
 
   private static final Path SOURCE_CONTAINER_ROOT =
       Paths.get("target/test/data/packer-source-dir");
@@ -91,16 +89,29 @@ public class TestTarContainerPacker {
   private final String schemaVersion;
   private OzoneConfiguration conf;
 
-  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo) {
+  public TestTarContainerPacker(
+      ContainerTestVersionInfo versionInfo, String compression) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    packer = new TarContainerPacker(compression);
+
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
+    List<ContainerTestVersionInfo> layoutList =
+        ContainerTestVersionInfo.getLayoutList();
+    List<Object[]> parameterList = new ArrayList<>();
+    for (ContainerTestVersionInfo containerTestVersionInfo : layoutList) {
+      for (Map.Entry<CopyContainerCompression, String> entry :
+          CopyContainerCompression.getCompressionMapping().entrySet()) {
+        parameterList.add(
+            new Object[]{containerTestVersionInfo, entry.getValue()});
+      }
+    }
+    return parameterList;
   }
 
   @BeforeClass
@@ -174,8 +185,7 @@ public class TestTarContainerPacker {
     //THEN: check the result
     TarArchiveInputStream tarStream = null;
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      CompressorInputStream uncompressed = new CompressorStreamFactory()
-          .createCompressorInputStream(GZIP, input);
+      InputStream uncompressed = packer.decompress(input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
       TarArchiveEntry entry;
@@ -353,9 +363,8 @@ public class TestTarContainerPacker {
       throws Exception {
     File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
-         CompressorOutputStream gzipped = new CompressorStreamFactory()
-             .createCompressorOutputStream(GZIP, output);
-         ArchiveOutputStream archive = new TarArchiveOutputStream(gzipped)) {
+         OutputStream compressed = packer.compress(output);
+         ArchiveOutputStream archive = new TarArchiveOutputStream(compressed)) {
       TarContainerPacker.includeFile(file, entryName, archive);
     }
     return targetFile;
