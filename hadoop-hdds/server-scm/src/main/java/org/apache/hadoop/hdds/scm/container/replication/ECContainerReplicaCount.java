@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -36,6 +37,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * This class provides a set of methods to test for over / under replication of
@@ -419,6 +421,49 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     maintenanceIndexes.forEach((k, v) -> healthy.merge(k, v, Integer::sum));
     return hasFullSetOfIndexes(healthy) && onlineIndexes.size()
         >= repConfig.getData() + remainingMaintenanceRedundancy;
+  }
+
+  /**
+   * If we are checking a container for sufficient replication for "offline",
+   * ie decommission or maintenance, then it is not really a requirement that
+   * all replicas for the container are present. Instead, we can ensure the
+   * replica on the node going offline has a copy elsewhere on another
+   * IN_SERVICE node, and if so that replica is sufficiently replicated.
+   * @param datanode The datanode being checked to go offline.
+   * @return True if the container is sufficiently replicated or if this replica
+   *         on the passed node is present elsewhere on an IN_SERVICE node.
+   */
+  @Override
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode) {
+    boolean sufficientlyReplicated = isSufficientlyReplicated(false);
+    if (sufficientlyReplicated) {
+      return true;
+    }
+    // If it is not sufficiently replicated (ie the container has all replicas)
+    // then we need to check if the replica that is on this node is available
+    // on another ONLINE node, ie in the healthy set. This means we avoid
+    // blocking decommission or maintenance caused by un-recoverable EC
+    // containers.
+    if (datanode.getPersistedOpState() == IN_SERVICE) {
+      // The node passed into this method must be a node going offline, so it
+      // cannot be IN_SERVICE. If an IN_SERVICE mode is passed, just return
+      // false.
+      return false;
+    }
+    ContainerReplica thisReplica = null;
+    for (ContainerReplica r : replicas) {
+      if (r.getDatanodeDetails().equals(datanode)) {
+        thisReplica = r;
+        break;
+      }
+    }
+    if (thisReplica == null) {
+      // From the set of replicas, none are on the passed datanode.
+      // This should not happen in practice but if it does we cannot indicate
+      // the container is sufficiently replicated.
+      return false;
+    }
+    return healthyIndexes.containsKey(thisReplica.getReplicaIndex());
   }
 
   @Override

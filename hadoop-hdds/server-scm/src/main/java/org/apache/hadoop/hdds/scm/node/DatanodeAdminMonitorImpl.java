@@ -345,7 +345,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
-        if (replicaSet.isSufficientlyReplicated()) {
+        if (replicaSet.isSufficientlyReplicatedForOffline(dn)) {
           sufficientlyReplicated++;
         } else {
           if (LOG.isDebugEnabled()) {
