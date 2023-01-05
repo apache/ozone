@@ -235,12 +235,12 @@ public class SnapshotDiffManager {
       List<String> sstDiffList =
               differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
       LOG.debug("SST diff list: {}", sstDiffList);
-      deltaFiles.addAll(sstDiffList);  // TODO: Uncomment this.
+      deltaFiles.addAll(sstDiffList);
 
       // TODO: Remove the workaround below when the SnapDiff logic can read
       //  tombstones in SST files.
       // Workaround: Append "From DB" SST files to the deltaFiles list so that
-      //  the current SnapDiff logic can
+      //  the current SnapDiff logic correctly handles deleted keys.
       if (!deltaFiles.isEmpty()) {
         Set<String> fromSnapshotFiles =
                 RdbUtil.getSSTFilesForComparison(
