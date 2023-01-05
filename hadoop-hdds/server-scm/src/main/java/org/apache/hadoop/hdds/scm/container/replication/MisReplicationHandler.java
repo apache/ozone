@@ -95,15 +95,17 @@ public abstract class MisReplicationHandler implements
   }
 
   private Set<ContainerReplica> filterSources(Set<ContainerReplica> replicas) {
-    return replicas.stream().filter(r -> r
-                    .getState() == StorageContainerDatanodeProtocolProtos
-                    .ContainerReplicaProto.State.CLOSED)
-            .filter(r -> ReplicationManager
-                    .getNodeStatus(r.getDatanodeDetails(), nodeManager)
-                    .isHealthy())
-            .filter(r -> r.getDatanodeDetails().getPersistedOpState()
-                    == HddsProtos.NodeOperationalState.IN_SERVICE)
-            .collect(Collectors.toSet());
+    return replicas.stream()
+        .filter(r -> r.getState() == StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED || r.getState() ==
+                StorageContainerDatanodeProtocolProtos
+                    .ContainerReplicaProto.State.QUASI_CLOSED
+        )
+        .filter(r -> ReplicationManager.getNodeStatus(
+            r.getDatanodeDetails(), nodeManager).isHealthy())
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState()
+            == HddsProtos.NodeOperationalState.IN_SERVICE)
+        .collect(Collectors.toSet());
   }
 
   protected abstract ReplicateContainerCommand getReplicateCommand(
