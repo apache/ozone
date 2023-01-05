@@ -24,10 +24,13 @@ import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
@@ -78,15 +81,6 @@ public interface CertificateClient extends Closeable {
   X509Certificate getCertificate();
 
   /**
-   * Returns whether certificate of the specified component is renewed.
-   *
-   * @return true if it's renewed recently.
-   */
-  default boolean isCertificateRenewed() {
-    return false;
-  }
-
-  /**
    * Return the latest CA certificate known to the client.
    * @return latest ca certificate known to the client.
    */
@@ -98,6 +92,12 @@ public interface CertificateClient extends Closeable {
    * @return true if it trusted, false otherwise.
    */
   boolean verifyCertificate(X509Certificate certificate);
+
+  /**
+   * Set the serial ID of default certificate for the specified component.
+   * @param certSerialId - certificate ID.
+   * */
+  void setCertificateId(String certSerialId);
 
   /**
    * Creates digital signature over the data stream using the components private
@@ -141,7 +141,35 @@ public interface CertificateClient extends Closeable {
    *
    * @return CertificateSignRequest.Builder
    */
-  CertificateSignRequest.Builder getCSRBuilder() throws CertificateException;
+   CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+       throws IOException;
+
+  /**
+   * Returns a CSR builder that can be used to create a Certificate sigining
+   * request.
+   *
+   * @return CertificateSignRequest.Builder
+   */
+  CertificateSignRequest.Builder getCSRBuilder()
+      throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException;
 
   /**
    * Get the certificate of well-known entity from SCM.
