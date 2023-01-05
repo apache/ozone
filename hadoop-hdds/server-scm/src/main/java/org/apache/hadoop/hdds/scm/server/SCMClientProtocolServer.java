@@ -799,6 +799,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void transferLeadership(String nodeId, boolean isRandom)
       throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
     boolean auditSuccess = true;
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("host", nodeId);

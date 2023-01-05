@@ -3196,6 +3196,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void transferLeadership(String nodeId, boolean isRandom)
       throws IOException {
+    final UserGroupInformation ugi = getRemoteUser();
+    if (!isAdmin(ugi)) {
+      throw new OMException(
+          "Only Ozone admins are allowed to transfer raft leadership.",
+          PERMISSION_DENIED);
+    }
     if (!isRatisEnabled) {
       throw new IOException("Ratis is not enabled at the server.");
     }
