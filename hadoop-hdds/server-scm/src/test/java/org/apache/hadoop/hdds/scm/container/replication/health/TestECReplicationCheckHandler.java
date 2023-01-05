@@ -20,6 +20,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -48,6 +49,7 @@ import java.util.Set;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
@@ -263,6 +265,88 @@ public class TestECReplicationCheckHandler {
     Assert.assertFalse(result.isReplicatedOkAfterPending());
     Assert.assertFalse(result.underReplicatedDueToDecommission());
     Assert.assertTrue(result.isUnrecoverable());
+
+    Assert.assertTrue(healthCheck.handle(request));
+    // Unrecoverable so not added to the queue
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+  }
+
+  @Test
+  public void testUnderReplicatedAndUnrecoverableWithDecommission() {
+    testUnderReplicatedAndUnrecoverableWithOffline(DECOMMISSIONING);
+  }
+
+  @Test
+  public void testUnderReplicatedAndUnrecoverableWithMaintenance() {
+    testUnderReplicatedAndUnrecoverableWithOffline(ENTERING_MAINTENANCE);
+  }
+
+  private void testUnderReplicatedAndUnrecoverableWithOffline(
+      HddsProtos.NodeOperationalState offlineState) {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .build();
+
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(request);
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(-1, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    Assert.assertTrue(result.isUnrecoverable());
+    Assert.assertTrue(result.hasUnreplicatedOfflineIndexes());
+
+    Assert.assertTrue(healthCheck.handle(request));
+    // Unrecoverable so not added to the queue
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+  }
+
+  @Test
+  public void testUnderReplicatedAndUnrecoverableWithDecommissionPending() {
+    testUnderReplicatedAndUnrecoverableWithOffline(DECOMMISSIONING);
+  }
+
+  @Test
+  public void testUnderReplicatedAndUnrecoverableWithMaintenancePending() {
+    testUnderReplicatedAndUnrecoverableWithOffline(ENTERING_MAINTENANCE);
+  }
+
+  private void testUnderReplicatedAndUnrecoverableWithOfflinePending(
+      HddsProtos.NodeOperationalState offlineState) {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
+    List<ContainerReplicaOp> pending = new ArrayList<>();
+    pending.add(ContainerReplicaOp.create(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2));
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .setPendingOps(pending)
+        .build();
+
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(request);
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(-1, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    Assert.assertTrue(result.isUnrecoverable());
+    Assert.assertFalse(result.hasUnreplicatedOfflineIndexes());
 
     Assert.assertTrue(healthCheck.handle(request));
     // Unrecoverable so not added to the queue

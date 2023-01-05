@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -245,6 +246,17 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public boolean isSufficientlyReplicated() {
     return isSufficientlyReplicated(false);
+  }
+
+  /**
+   * For Ratis, this method is the same as isSufficientlyReplicated.
+   * @param datanode Not used in this implementation
+   * @return True if the container is sufficiently replicated and False
+   *         otherwise.
+   */
+  @Override
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode) {
+    return isSufficientlyReplicated();
   }
 
   /**

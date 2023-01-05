@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -35,6 +36,8 @@ public interface ContainerReplicaCount {
   Set<ContainerReplica> getReplicas();
 
   boolean isSufficientlyReplicated();
+
+  boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode);
 
   boolean isOverReplicated();
 
