@@ -20,7 +20,7 @@ FairCallQueue
 
 This document contains information for setting up the `FairCallQueue` feature with Ozone 
 and testing it in a docker based dev cluster. In order for `FairCallQueue` to be enabled and used, 
-Hadoop RPC must be used as transport protocol for OM - S3G communication. It won't work if gRPC is enabled.
+Hadoop RPC must be used as transport protocol for OM - S3G communication. There is no implementation for gRPC.
 
 There is a custom `IdentityProvider` implementation for Ozone that must be specified in the configuration, otherwise
 there is no S3G impersonation which makes the `FairCallQueue` ineffective since it's only reading one user.
@@ -29,7 +29,7 @@ there is no S3G impersonation which makes the `FairCallQueue` ineffective since 
 
 There must be a port specified to which the OM will forward any activity 
 and the `FailCallQueue` and `DecayRpcScheduler` will listen to. 
-Then this port will have to be part of every configuration name.
+Furthermore, this port will have to be part of every configuration name.
 
 Port used for below examples : 9862
 
