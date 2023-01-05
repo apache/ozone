@@ -43,6 +43,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 
 /**
@@ -611,5 +612,39 @@ public class TestECContainerReplicaCount {
     // replica is on a healthy node
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
         inServiceReplica.getDatanodeDetails()));
+  }
+
+  @Test
+  public void testSufficientlyReplicatedWithUnhealthyAndPendingDelete() {
+    Set<ContainerReplica> replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    ContainerReplica unhealthyReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            1, IN_SERVICE, UNHEALTHY);
+    replica.add(unhealthyReplica);
+
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplica.getDatanodeDetails(),
+        unhealthyReplica.getReplicaIndex()));
+
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, replica, pendingOps, 1);
+    Assertions.assertTrue(rcnt.isSufficientlyReplicated(false));
+
+    // Add another pending delete to an index that is not an unhealthy index
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(), 2));
+
+    rcnt = new ECContainerReplicaCount(container, replica, pendingOps, 1);
+    Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
+    Assertions.assertEquals(2, rcnt.unavailableIndexes(false).get(0));
   }
 }

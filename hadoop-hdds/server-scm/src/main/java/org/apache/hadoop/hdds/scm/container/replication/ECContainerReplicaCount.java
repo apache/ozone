@@ -90,11 +90,24 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
 
+    Set<DatanodeDetails> unhealthyReplicaDNs = new HashSet<>();
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        unhealthyReplicaDNs.add(r.getDatanodeDetails());
+      }
+    }
+
     for (ContainerReplicaOp op : replicaPendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
         pendingAdd.add(op.getReplicaIndex());
       } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete.add(op.getReplicaIndex());
+        if (!unhealthyReplicaDNs.contains(op.getTarget())) {
+          // We ignore unhealthy replicas later in this method, so we also
+          // need to ignore pending deletes on those unhealthy replicas,
+          // otherwise the pending delete will decrement the healthy count and
+          // make the container appear under-replicated when it is not.
+          pendingDelete.add(op.getReplicaIndex());
+        }
       }
     }
 
