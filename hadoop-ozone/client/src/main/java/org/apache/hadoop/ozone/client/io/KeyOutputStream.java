@@ -450,8 +450,11 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   public void hsync() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.HSYNC);
-    //TODO send hsyncKey to update length;
-    //     see blockOutputStreamEntryPool.commitKey(offset);
+    //TODO HDDS-7593: send hsyncKey to update length;
+    //     where the hsyncKey op is similar to
+    //     blockOutputStreamEntryPool.commitKey(offset)
+    //     except that hsyncKey only updates the key length
+    //     instead of committing it.
   }
 
   /**

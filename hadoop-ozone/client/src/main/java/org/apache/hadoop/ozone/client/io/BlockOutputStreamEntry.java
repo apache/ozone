@@ -48,7 +48,7 @@ import com.google.common.annotations.VisibleForTesting;
 public class BlockOutputStreamEntry extends OutputStream {
 
   private final OzoneClientConfig config;
-  private RatisBlockOutputStream outputStream;
+  private OutputStream outputStream;
   private BlockID blockID;
   private final String key;
   private final XceiverClientFactory xceiverClientManager;
