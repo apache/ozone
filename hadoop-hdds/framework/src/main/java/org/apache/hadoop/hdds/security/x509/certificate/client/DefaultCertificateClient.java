@@ -1244,9 +1244,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       String msg = "Failed to move " + newCertDir.getAbsolutePath() +
           " to " + currentCertDir.getAbsolutePath() +
           " during certificate renew.";
-      // delete new key directory
+      // delete currentKeyDir which is moved from new key directory
       try {
-        Files.createDirectories(currentKeyDir.toPath());
+        FileUtils.deleteDirectory(new File(currentKeyDir.toString()));
       } catch (IOException e1) {
         getLogger().error("Failed to delete current KeyDir {} which is moved " +
             " from the newly generated KeyDir {}", currentKeyDir, newKeyDir, e);
