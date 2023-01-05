@@ -391,12 +391,7 @@ public final class OzoneManagerDoubleBuffer {
       } catch (IOException ex) {
         terminate(ex, omResponse.get());
       } catch (Throwable t) {
-        StringBuilder s = new StringBuilder("OMDoubleBuffer flush thread " +
-            Thread.currentThread().getName() + " encountered Throwable error");
-        if (omResponse.get() != null) {
-          s.append(" when handling OMRequest: ").append(omResponse.get());
-        }
-        ExitUtils.terminate(2, s.toString(), t, LOG);
+        terminate(t, omResponse.get(), 2);
       }
     }
   }
@@ -486,14 +481,17 @@ public final class OzoneManagerDoubleBuffer {
 
   }
 
-  private void terminate(IOException ex, OMResponse omResponse) {
+  private void terminate(Throwable t, OMResponse omResponse) {
+    terminate(t, omResponse, 1);
+  }
+  private void terminate(Throwable t, OMResponse omResponse, int status) {
     StringBuilder message = new StringBuilder(
         "During flush to DB encountered error in " +
         "OMDoubleBuffer flush thread " + Thread.currentThread().getName());
     if (omResponse != null) {
       message.append(" when handling OMRequest: ").append(omResponse);
     }
-    ExitUtils.terminate(1, message.toString(), ex, LOG);
+    ExitUtils.terminate(status, message.toString(), t, LOG);
   }
 
   /**
