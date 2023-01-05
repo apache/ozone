@@ -165,38 +165,41 @@ public class SnapshotDiffManager {
   private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
       Table<String, ? extends WithObjectID> tsTable, Set<String> deltaFiles,
       Map<Long, String> oldObjIdToKeyMap, Map<Long, String> newObjIdToKeyMap,
-      Set<Long> objectIDsToCheck, boolean isDirectoryTable)
-      throws RocksDBException {
+      Set<Long> objectIDsToCheck, boolean isDirectoryTable) {
+
     if (deltaFiles.isEmpty()) {
       return;
     }
-    final Stream<String> keysToCheck =
-        new ManagedSstFileReader(deltaFiles).getKeyStream();
-    keysToCheck.forEach(key -> {
-      try {
-        final WithObjectID oldKey = fsTable.get(key);
-        final WithObjectID newKey = tsTable.get(key);
-        if (areKeysEqual(oldKey, newKey)) {
-          // We don't have to do anything.
-          return;
+    try (Stream<String> keysToCheck = new ManagedSstFileReader(deltaFiles)
+            .getKeyStream()) {
+      keysToCheck.forEach(key -> {
+        try {
+          final WithObjectID oldKey = fsTable.get(key);
+          final WithObjectID newKey = tsTable.get(key);
+          if (areKeysEqual(oldKey, newKey)) {
+            // We don't have to do anything.
+            return;
+          }
+          if (oldKey != null) {
+            final long oldObjId = oldKey.getObjectID();
+            oldObjIdToKeyMap.put(oldObjId,
+                    getKeyOrDirectoryName(isDirectoryTable, oldKey));
+            objectIDsToCheck.add(oldObjId);
+          }
+          if (newKey != null) {
+            final long newObjId = newKey.getObjectID();
+            newObjIdToKeyMap.put(newObjId,
+                    getKeyOrDirectoryName(isDirectoryTable, newKey));
+            objectIDsToCheck.add(newObjId);
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
         }
-        if (oldKey != null) {
-          final long oldObjId = oldKey.getObjectID();
-          oldObjIdToKeyMap
-              .put(oldObjId, getKeyOrDirectoryName(isDirectoryTable, oldKey));
-          objectIDsToCheck.add(oldObjId);
-        }
-        if (newKey != null) {
-          final long newObjId = newKey.getObjectID();
-          newObjIdToKeyMap
-              .put(newObjId, getKeyOrDirectoryName(isDirectoryTable, newKey));
-          objectIDsToCheck.add(newObjId);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
-    keysToCheck.close();
+      });
+    } catch (RocksDBException rocksDBException) {
+      // TODO: Gracefully handle exception e.g. when input files do not exist
+      throw new RuntimeException(rocksDBException);
+    }
   }
 
   private String getKeyOrDirectoryName(boolean isDirectory,
@@ -230,9 +233,24 @@ public class SnapshotDiffManager {
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
       List<String> sstDiffList =
-              differ.getSSTDiffList(fromDSI /* src */, toDSI /* dest */);
+              differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
       LOG.debug("SST diff list: {}", sstDiffList);
-      deltaFiles.addAll(sstDiffList);
+      deltaFiles.addAll(sstDiffList);  // TODO: Uncomment this.
+
+      // TODO: Remove the workaround below when the SnapDiff logic can read
+      //  tombstones in SST files.
+      // Workaround: Append "From DB" SST files to the deltaFiles list so that
+      //  the current SnapDiff logic can
+      if (!deltaFiles.isEmpty()) {
+        Set<String> fromSnapshotFiles =
+                RdbUtil.getSSTFilesForComparison(
+                        fromSnapshot.getMetadataManager().getStore()
+                                .getDbLocation().getPath(),
+                        tablesToLookUp);
+        deltaFiles.addAll(fromSnapshotFiles);
+      }
+      // End of Workaround
+
     }
 
     if (deltaFiles.isEmpty()) {
