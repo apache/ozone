@@ -24,6 +24,8 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * This class is to keep the required EC reconstruction info.
@@ -77,16 +79,24 @@ public class ECReconstructionCommandInfo {
 
   @Override
   public String toString() {
+    String src = sources.stream()
+        .map(Objects::toString)
+        .collect(Collectors.joining(", "));
+    String target = targetDatanodes.stream()
+        .map(DatanodeDetails::getUuidString)
+        .collect(Collectors.joining(", "));
+
     return "ECReconstructionCommandInfo{"
         + "containerID=" + containerID
-        + ", ecReplicationConfig=" + ecReplicationConfig
+        + ", replication=" + ecReplicationConfig
         + ", missingContainerIndexes=" + Arrays
         .toString(missingContainerIndexes)
-        + ", sources=" + sources
-        + ", targetDatanodes=" + targetDatanodes + '}';
+        + ", sources={" + src + "}"
+        + ", targets=[" + target + "]}";
   }
 
   public long getTerm() {
     return term;
   }
+
 }

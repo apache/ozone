@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.ec.reconstruction;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +70,7 @@ public class ECReconstructionCoordinatorTask implements Runnable {
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
     long containerID = this.reconstructionCommandInfo.getContainerID();
+    long start = Time.monotonicNow();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Starting the EC reconstruction of the container {}",
           containerID);
@@ -88,7 +90,7 @@ public class ECReconstructionCoordinatorTask implements Runnable {
       final long taskTerm = reconstructionCommandInfo.getTerm();
       if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
         LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
-            this, taskTerm, currentTerm.getAsLong());
+            reconstructionCommandInfo, taskTerm, currentTerm.getAsLong());
         return;
       }
 
@@ -108,12 +110,10 @@ public class ECReconstructionCoordinatorTask implements Runnable {
           reconstructionCommandInfo.getContainerID(),
           reconstructionCommandInfo.getEcReplicationConfig(), sourceNodeMap,
           targetNodeMap);
-      LOG.info("Completed the EC reconstruction of the container {}",
-          reconstructionCommandInfo.getContainerID());
+      long elapsed = Time.monotonicNow() - start;
+      LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
     } catch (IOException e) {
-      LOG.warn(
-          "Failed to complete the reconstruction task for the container: "
-              + reconstructionCommandInfo.getContainerID(), e);
+      LOG.warn("Failed {}", reconstructionCommandInfo, e);
     } finally {
       this.inprogressCounter.remove(containerID);
     }
@@ -121,7 +121,6 @@ public class ECReconstructionCoordinatorTask implements Runnable {
 
   @Override
   public String toString() {
-    return "ECReconstructionCoordinatorTask{" + "reconstructionCommandInfo="
-        + reconstructionCommandInfo + '}';
+    return "ECReconstructionTask{info=" + reconstructionCommandInfo + '}';
   }
 }
