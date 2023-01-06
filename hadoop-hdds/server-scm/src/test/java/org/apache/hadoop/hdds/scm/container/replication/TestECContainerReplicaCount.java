@@ -42,6 +42,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 
 /**
@@ -107,7 +108,7 @@ public class TestECContainerReplicaCount {
   public void testUnderReplicationDueToUnhealthyReplica() {
     Set<ContainerReplica> replicas =
         ReplicationTestUtil.createReplicas(container.containerID(),
-            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+            CLOSED, 1, 2, 3, 4);
     ContainerReplica unhealthyIndex5 =
         createContainerReplica(container.containerID(), 5,
             IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
@@ -571,5 +572,44 @@ public class TestECContainerReplicaCount {
         rcnt.decommissioningOnlyIndexes(false));
     Assertions
         .assertEquals(ImmutableSet.of(), rcnt.decommissioningOnlyIndexes(true));
+  }
+
+  @Test
+  public void testSufficientlyReplicatedForOffline() {
+    Set<ContainerReplica> replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 2));
+
+    ContainerReplica inServiceReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            1, IN_SERVICE, CLOSED);
+    replica.add(inServiceReplica);
+
+    ContainerReplica offlineReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            1, DECOMMISSIONING, CLOSED);
+    replica.add(offlineReplica);
+
+    ContainerReplica offlineNotReplicated =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            3, DECOMMISSIONING, CLOSED);
+    replica.add(offlineNotReplicated);
+
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, replica, Collections.emptyList(),
+            1);
+    Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
+    Assertions.assertTrue(rcnt.isSufficientlyReplicatedForOffline(
+        offlineReplica.getDatanodeDetails()));
+    Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
+        offlineNotReplicated.getDatanodeDetails()));
+
+    // A random DN not hosting a replica for this container should return false.
+    Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
+        MockDatanodeDetails.randomDatanodeDetails()));
+
+    // Passing the IN_SERVICE node should return false even though the
+    // replica is on a healthy node
+    Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
+        inServiceReplica.getDatanodeDetails()));
   }
 }

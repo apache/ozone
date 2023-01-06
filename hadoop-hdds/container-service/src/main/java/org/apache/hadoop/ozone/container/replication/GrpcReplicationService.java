@@ -49,11 +49,15 @@ public class GrpcReplicationService extends
   public void download(CopyContainerRequestProto request,
       StreamObserver<CopyContainerResponseProto> responseObserver) {
     long containerID = request.getContainerID();
-    LOG.info("Streaming container data ({}) to other datanode", containerID);
+    String compression = request.hasCompression() ?
+        request.getCompression().toString() : CopyContainerCompression
+        .getDefaultCompression().toString();
+    LOG.info("Streaming container data ({}) to other datanode " +
+        "with compression {}", containerID, compression);
     try {
       GrpcOutputStream outputStream =
           new GrpcOutputStream(responseObserver, containerID, BUFFER_SIZE);
-      source.copyData(containerID, outputStream);
+      source.copyData(containerID, outputStream, compression);
     } catch (IOException e) {
       LOG.error("Error streaming container {}", containerID, e);
       responseObserver.onError(e);

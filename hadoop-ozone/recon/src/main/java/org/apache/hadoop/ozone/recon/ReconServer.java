@@ -25,9 +25,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -48,22 +45,18 @@ import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.security.cert.CertificateException;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -102,8 +95,7 @@ public class ReconServer extends GenericCli {
     configuration = createOzoneConfiguration();
     ConfigurationProvider.setConfiguration(configuration);
 
-    injector =  Guice.createInjector(new
-        ReconControllerModule(),
+    injector = Guice.createInjector(new ReconControllerModule(),
         new ReconRestServletModule(configuration),
         new ReconSchemaGenerationModule());
 
@@ -124,7 +116,6 @@ public class ReconServer extends GenericCli {
               "Initializing certificate.");
           initializeCertificateClient(configuration);
         }
-        reconStorage.persistCurrentState();
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
@@ -172,9 +163,9 @@ public class ReconServer extends GenericCli {
   private void initializeCertificateClient(OzoneConfiguration conf)
       throws IOException {
     LOG.info("Initializing secure Recon.");
-    certClient = new ReconCertificateClient(
-        new SecurityConfig(configuration),
-        reconStorage.getReconCertSerialId());
+    certClient = new ReconCertificateClient(new SecurityConfig(configuration),
+        reconStorage.getReconCertSerialId(), reconStorage.getClusterID(),
+        reconStorage.getReconId(), this::saveNewCertId, null);
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
@@ -182,7 +173,8 @@ public class ReconServer extends GenericCli {
       reconStorage.unsetReconCertSerialId();
       reconStorage.persistCurrentState();
       certClient = new ReconCertificateClient(new SecurityConfig(configuration),
-          reconStorage.getReconCertSerialId());
+          reconStorage.getReconCertSerialId(), reconStorage.getClusterID(),
+          reconStorage.getReconId(), this::saveNewCertId, this::terminateRecon);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -191,7 +183,12 @@ public class ReconServer extends GenericCli {
       LOG.info("Initialization successful, case:{}.", response);
       break;
     case GETCERT:
-      getSCMSignedCert(conf);
+      String certId = certClient.signAndStoreCertificate(
+          certClient.getCSRBuilder().build());
+      reconStorage.setReconCertSerialId(certId);
+      reconStorage.persistCurrentState();
+      // set new certificate ID
+      certClient.setCertificateId(certId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
@@ -209,51 +206,21 @@ public class ReconServer extends GenericCli {
     }
   }
 
-  /**
-   * Get SCM signed certificate and store it using certificate client.
-   * @param config
-   * */
-  private void getSCMSignedCert(OzoneConfiguration config) {
+  public void saveNewCertId(String newCertId) {
     try {
-      PKCS10CertificationRequest csr = ReconUtils.getCSR(config, certClient);
-      LOG.info("Creating CSR for Recon.");
-
-      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClientWithMaxRetry(config);
-      HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
-          HddsProtos.NodeDetailsProto.newBuilder()
-              .setHostName(InetAddress.getLocalHost().getHostName())
-              .setClusterId(reconStorage.getClusterID())
-              .setUuid(reconStorage.getReconId())
-              .setNodeType(HddsProtos.NodeType.RECON);
-
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
-          secureScmClient.getCertificateChain(
-              reconDetailsProtoBuilder.build(),
-              getEncodedString(csr));
-      // Persist certificates.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedCert = response.getX509Certificate();
-        certClient.storeCertificate(pemEncodedCert, true);
-        certClient.storeCertificate(response.getX509CACertificate(), true,
-            true);
-
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          certClient.storeRootCACertificate(
-              response.getX509RootCACertificate(), true);
-        }
-        String reconCertSerialId = getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString();
-        reconStorage.setReconCertSerialId(reconCertSerialId);
-      } else {
-        throw new RuntimeException("Unable to retrieve recon certificate " +
-            "chain");
-      }
-    } catch (IOException | CertificateException e) {
-      LOG.error("Error while storing SCM signed certificate.", e);
-      throw new RuntimeException(e);
+      reconStorage.setReconCertSerialId(newCertId);
+      reconStorage.persistCurrentState();
+    } catch (IOException ex) {
+      // New cert ID cannot be persisted into VERSION file.
+      LOG.error("Failed to persist new cert ID {} to VERSION file." +
+          "Terminating OzoneManager...", newCertId, ex);
+      terminateRecon();
     }
+  }
+
+  public void terminateRecon() {
+    stop();
+    terminate(1);
   }
 
   /**
@@ -278,17 +245,26 @@ public class ReconServer extends GenericCli {
     }
   }
 
-  public void stop() throws Exception {
+  public void stop() {
     if (isStarted) {
       LOG.info("Stopping Recon server");
       if (httpServer != null) {
-        httpServer.stop();
+        try {
+          httpServer.stop();
+        } catch (Exception e) {
+          LOG.error("Stopping HttpServer is failed.", e);
+        }
       }
+
       if (reconStorageContainerManager != null) {
         reconStorageContainerManager.stop();
       }
       if (ozoneManagerServiceProvider != null) {
-        ozoneManagerServiceProvider.stop();
+        try {
+          ozoneManagerServiceProvider.stop();
+        } catch (Exception e) {
+          LOG.error("Stopping ozoneManagerServiceProvider is failed.", e);
+        }
       }
       if (reconTaskStatusMetrics != null) {
         reconTaskStatusMetrics.unregister();
