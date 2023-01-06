@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BUCKET;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILE_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CONTAINER_SIZE;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
