@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -37,11 +39,16 @@ public class OnDemandContainerReplicationSource
 
   private final ContainerController controller;
 
-  private final TarContainerPacker packer = new TarContainerPacker();
+  private Map<String, TarContainerPacker> packer = new HashMap<>();
 
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
     this.controller = controller;
+    for (Map.Entry<CopyContainerCompression, String> entry :
+        CopyContainerCompression.getCompressionMapping().entrySet()) {
+      packer.put(
+          entry.getKey().toString(), new TarContainerPacker(entry.getValue()));
+    }
   }
 
   @Override
@@ -50,7 +57,8 @@ public class OnDemandContainerReplicationSource
   }
 
   @Override
-  public void copyData(long containerId, OutputStream destination)
+  public void copyData(long containerId, OutputStream destination,
+                       String compression)
       throws IOException {
 
     Container container = controller.getContainer(containerId);
@@ -60,8 +68,13 @@ public class OnDemandContainerReplicationSource
           " is not found.", CONTAINER_NOT_FOUND);
     }
 
+    if (!packer.containsKey(compression)) {
+      throw new IOException("Can't compress the container. Compression " +
+          compression + " is not found.");
+    }
     controller.exportContainer(
-        container.getContainerType(), containerId, destination, packer);
+        container.getContainerType(), containerId, destination,
+        packer.get(compression));
 
   }
 }
