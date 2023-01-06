@@ -15,11 +15,14 @@
    limitations under the License.
 -->
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="StorageContainerManager" type="Application" factoryName="Application" nameIsGenerated="false">
-    <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter" />
-    <module name="hdds-server-scm" />
-    <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site.xml" />
-    <option name="VM_PARAMETERS" value="-Dlog4j.configuration=file:hadoop-ozone/dev-support/intellij/log4j.properties" />
+  <configuration default="false" name="OzoneFsShell-ha" type="Application" factoryName="Application">
+    <envs>
+      <env name="OZONE_CONF_DIR" value="$PROJECT_DIR$/hadoop-ozone/dev-support/intellij" />
+    </envs>
+    <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.fs.ozone.OzoneFsShell" />
+    <module name="ozone-tools" />
+    <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site-ha.xml -ls -R o3fs://bucket1.vol1/" />
+    <option name="VM_PARAMETERS" value="-Dlog4j.configuration=file:hadoop-ozone/dev-support/intellij/log4j.properties -Xbootclasspath/a:$PROJECT_DIR$/hadoop-ozone/dev-support/intellij" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="org.apache.hadoop.ozone.*" />
