@@ -264,7 +264,6 @@ public final class OzoneManagerDoubleBuffer {
    */
   private void flushTransactions() {
     while (isRunning.get()) {
-      AtomicReference<OMResponse> omResponse = new AtomicReference<>();
       try {
         if (canFlush()) {
           Map<String, List<Long>> cleanupEpochs = new HashMap<>();
@@ -275,6 +274,7 @@ public final class OzoneManagerDoubleBuffer {
               .initBatchOperation()) {
 
             AtomicReference<String> lastTraceId = new AtomicReference<>();
+            AtomicReference<OMResponse> omResponse = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
                 omResponse.set(entry.getResponse().getOMResponse());
@@ -292,6 +292,8 @@ public final class OzoneManagerDoubleBuffer {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
                 terminate(ex, omResponse.get());
+              } catch (Throwable t) {
+                terminate(t, omResponse.get(), 2);
               }
             });
             // Finished omResponse processing, set omResponse to null;
@@ -389,9 +391,9 @@ public final class OzoneManagerDoubleBuffer {
               + "exit.", Thread.currentThread().getName());
         }
       } catch (IOException ex) {
-        terminate(ex, omResponse.get());
+        terminate(ex, 1);
       } catch (Throwable t) {
-        terminate(t, omResponse.get(), 2);
+        terminate(t, 2);
       }
     }
   }
@@ -479,6 +481,10 @@ public final class OzoneManagerDoubleBuffer {
       LOG.info("OMDoubleBuffer flush thread is not running.");
     }
 
+  }
+
+  private void terminate(Throwable t, int status) {
+    terminate(t, null, status);
   }
 
   private void terminate(Throwable t, OMResponse omResponse) {
