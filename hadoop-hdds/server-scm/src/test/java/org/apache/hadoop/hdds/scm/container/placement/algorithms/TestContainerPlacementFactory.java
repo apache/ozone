@@ -205,8 +205,7 @@ public class TestContainerPlacementFactory {
 
     @Override
     public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
-            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-            int expectedUniqueGroups) {
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
       return null;
     }
 

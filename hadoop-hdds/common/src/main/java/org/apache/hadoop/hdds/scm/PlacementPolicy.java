@@ -83,8 +83,9 @@ public interface PlacementPolicy<Replica> {
    * return a set of replicas to delete to fix overreplication.
    * @param replicas: Map of replicas with value signifying if
    *                  replica can be copied
+   * @param expectedCountPerUniqueReplica: Replication factor of each
+   *                                     unique replica
    */
   Set<Replica> replicasToRemoveToFixOverreplication(
-          Set<Replica> replicas, int expectedCountPerUniqueReplica,
-          int expectedUniqueGroups);
+          Set<Replica> replicas, int expectedCountPerUniqueReplica);
 }

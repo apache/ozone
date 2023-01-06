@@ -37,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.mockito.Mockito;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -288,18 +289,13 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToRemove() {
+  public void testReplicasToRemoveWithOneOverreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list = nodeManager.getAllNodes();
-    Set<ContainerReplica> replicas =
-            IntStream.range(1, 6).mapToObj(i ->
-                            ContainerReplica.newBuilder()
-                                    .setContainerID(new ContainerID(1))
-                                    .setContainerState(CLOSED)
-                                    .setReplicaIndex(i)
-                                    .setDatanodeDetails(list.get(i)).build())
-                    .collect(Collectors.toSet());
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
     ContainerReplica replica = ContainerReplica.newBuilder()
             .setContainerID(new ContainerID(1))
             .setContainerState(CLOSED)
@@ -308,10 +304,84 @@ public class TestSCMCommonPlacementPolicy {
     replicas.add(replica);
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
-            .replicasToRemoveToFixOverreplication(replicas, 1, 5);
+            .replicasToRemoveToFixOverreplication(replicas, 1);
     Assertions.assertEquals(replicasToRemove.size(), 1);
     Assertions.assertEquals(replicasToRemove.stream().findFirst().get(),
             replica);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithTwoOverreplication() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 5);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+
+    Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(7, 9)));
+    replicas.addAll(replicasToBeRemoved);
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    Assertions.assertEquals(replicasToRemove.size(), 2);
+    Assertions.assertEquals(replicasToRemove, replicasToBeRemoved);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithOverreplicationWithinSameRack() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 3);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+
+    ContainerReplica replica1 = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(6)).build();
+    replicas.add(replica1);
+    ContainerReplica replica2 = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(0)).build();
+    replicas.add(replica2);
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    Map<Node, Long> removedReplicasRackCntMap = replicasToRemove.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .map(dummyPlacementPolicy::getPlacementGroup)
+            .collect(Collectors.groupingBy(Function.identity(),
+                    Collectors.counting()));
+    Assertions.assertEquals(replicasToRemove.size(), 2);
+    Assertions.assertTrue(Sets.newHashSet(1L, 2L).contains(
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))));
+    Assertions.assertEquals(
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(1)),
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))
+                    == 2 ? 0 : 1);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithNoOverreplication() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 5);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    Assertions.assertEquals(replicasToRemove.size(), 0);
   }
 
 

@@ -509,10 +509,33 @@ public abstract class SCMCommonPlacementPolicy implements
     return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
   }
 
+  /**
+   * Given a set of replicas, expectedCount for Each replica,
+   * number of unique replica indexes. Replicas to be deleted for fixing over
+   * replication is computed.
+   * The algorithm starts with creating a replicaIdMap which contains the
+   * replicas grouped by replica Index. A placementGroup Map is created which
+   * groups replicas based on their rack & the replicas within the rack
+   * are further grouped based on the replica Index.
+   * A placement Group Count Map is created which keeps
+   * track of the count of replicas in each rack.
+   * We iterate through overreplicated replica indexes sorted in descending
+   * order based on their current replication factor in a descending factor.
+   * For each replica Index the replica is removed from the rack which contains
+   * the most replicas, in order to achieve this the racks are put
+   * into priority queue & are based on the number of replicas they have.
+   * The replica is removed from the rack with maximum replicas & the replica
+   * to be removed is also removed from the maps created above &
+   * the count for rack is reduced.
+   * The set of replicas computed are then returned by the function.
+   * @param replicas: Map of replicas with value signifying if
+   *                  replica can be copied
+   * @param expectedCountPerUniqueReplica
+   * @return Set of replicas to be removed are computed.
+   */
   @Override
   public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
-          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica,
-          int expectedUniqueGroups) {
+          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
     Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
     Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
             = new HashMap<>();
@@ -544,8 +567,13 @@ public abstract class SCMCommonPlacementPolicy implements
     Set<ContainerReplica> replicasToRemove = new HashSet<>();
     List<Integer> sortedRIDList = replicaIdMap.keySet().stream()
             .sorted((o1, o2) -> Integer.compare(replicaIdMap.get(o2).size(),
-                    replicaIdMap.get(o1).size())).collect(Collectors.toList());
+                    replicaIdMap.get(o1).size()))
+            .filter(rid -> replicaIdMap.get(rid).size() >
+                    expectedCountPerUniqueReplica).collect(Collectors.toList());
     for (Integer rid : sortedRIDList) {
+      if (replicaIdMap.get(rid).size() <= expectedCountPerUniqueReplica) {
+        break;
+      }
       Queue<Node> pq = new PriorityQueue<>((o1, o2) ->
               Integer.compare(placementGroupCntMap.get(o2),
                       placementGroupCntMap.get(o1)));
