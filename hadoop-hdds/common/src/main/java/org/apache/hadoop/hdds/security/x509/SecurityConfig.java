@@ -228,36 +228,35 @@ public class SecurityConfig {
    */
   private void validateCertificateValidityConfig() {
     if (maxCertDuration.isNegative() || maxCertDuration.isZero()) {
-      LOG.error("Certificate maxDuration {} should not be zero or negative",
-              maxCertDuration);
-      throw new IllegalArgumentException("Certificate maxDuration should not " +
-              "be zero or negative");
+      String msg = "Property " + HDDS_X509_MAX_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
     }
     if (defaultCertDuration.isNegative() || defaultCertDuration.isZero()) {
-      LOG.error("Certificate duration {} should not be Zero or negative",
-              defaultCertDuration);
-      throw new IllegalArgumentException("Certificate duration should not be " +
-              "negative or zero");
+      String msg = "Property " + HDDS_X509_DEFAULT_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
     }
     if (renewalGracePeriod.isNegative() || renewalGracePeriod.isZero()) {
-      LOG.error("Certificate grace duration {} should not be Zero or negative",
-              renewalGracePeriod);
-      throw new IllegalArgumentException("Certificate grace duration should " +
-              "not be negative or zero");
+      String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
     }
 
     if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
-      LOG.error("Certificate duration {} should not be greater than Maximum " +
-              "Certificate duration {}", defaultCertDuration, maxCertDuration);
-      throw new IllegalArgumentException("Certificate duration should not " +
-              "be greater than maximum Certificate duration");
+      String msg = "Property " + HDDS_X509_DEFAULT_DURATION +
+              " should not be greater than Property " + HDDS_X509_MAX_DURATION;
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
     }
     if (defaultCertDuration.compareTo(renewalGracePeriod) < 0) {
-      LOG.error("Grace Certificate duration {} should not be greater than " +
-              "Certificate duration {}", renewalGracePeriod,
-              defaultCertDuration);
-      throw new IllegalArgumentException("Grace Certificate duration should " +
-              "not be greater than Certificate duration");
+      String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
+              " should not be greater than Property " + HDDS_X509_DEFAULT_DURATION;
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
     }
   }
 
