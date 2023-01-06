@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
@@ -455,6 +456,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
     eventQueue.addHandler(SCMEvents.COMMAND_QUEUE_REPORT,
         commandQueueReportHandler);
+    eventQueue.addHandler(SCMEvents.DATANODE_COMMAND_COUNT_UPDATED,
+        new DatanodeCommandCountUpdatedHandler(replicationManager));
 
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
