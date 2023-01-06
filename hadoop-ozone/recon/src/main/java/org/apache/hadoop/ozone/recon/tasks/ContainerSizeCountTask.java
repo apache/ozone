@@ -291,7 +291,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     for (Map.Entry<ContainerID, Long> containerId :
         deletedContainers.entrySet()) {
-      long containerSize = deletedContainers.get(containerId);
+      long containerSize = deletedContainers.get(containerId.getKey());
       decrementContainerSizeCount(containerSize, containerSizeCountMap);
     }
   }
