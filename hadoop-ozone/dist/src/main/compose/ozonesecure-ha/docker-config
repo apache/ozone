@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For HttpFS it is required to enable impersonating users as root, because the httpfs is mapped to root as a result of the auth_to_local rules.
-CORE-SITE.XML_hadoop.proxyuser.root.hosts=*
-CORE-SITE.XML_hadoop.proxyuser.root.groups=*
+# For HttpFS service it is required to enable proxying users.
+CORE-SITE.XML_hadoop.proxyuser.httpfs.hosts=*
+CORE-SITE.XML_hadoop.proxyuser.httpfs.groups=*
 
 CORE-SITE.XML_fs.defaultFS=ofs://id1
 
