@@ -180,7 +180,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     omKeyInfo =
         omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
             .get(ozoneKey);
-
     Assert.assertNotNull(omKeyInfo);
     // DB keyInfo format
     verifyKeyName(omKeyInfo);
