@@ -53,6 +53,7 @@ public final class ReconConstants {
   public static final String RECON_QUERY_VOLUME = "volume";
   public static final String RECON_QUERY_BUCKET = "bucket";
   public static final String RECON_QUERY_FILE_SIZE = "fileSize";
+  public static final String RECON_QUERY_CONTAINER_SIZE = "containerSize";
 
   public static final String RECON_SCM_CONTAINER_DB =
       "recon-" + CONTAINER_DB_SUFFIX;

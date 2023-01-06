@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
@@ -146,6 +147,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
+  private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
@@ -233,13 +235,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     Configuration sqlConfiguration =
         reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
-        fileCountBySizeDao, utilizationSchemaDefinition);
+            fileCountBySizeDao, containerCountBySizeDao,
+        utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
     tableCountTask = new TableCountTask(

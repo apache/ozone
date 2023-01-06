@@ -21,9 +21,12 @@ package org.apache.hadoop.ozone.recon.api;
 import javax.inject.Inject;
 
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerCountBySize;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
+import org.jooq.Record1;
 import org.jooq.Record3;
 
 import javax.ws.rs.GET;
@@ -34,10 +37,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BUCKET;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILE_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
+import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
 /**
@@ -49,13 +54,16 @@ public class UtilizationEndpoint {
 
   private FileCountBySizeDao fileCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
+  private ContainerCountBySizeDao containerCountBySizeDao;
 
   @Inject
   public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
+                             ContainerCountBySizeDao containerCountBySizeDao,
                              UtilizationSchemaDefinition
                                  utilizationSchemaDefinition) {
     this.utilizationSchemaDefinition = utilizationSchemaDefinition;
     this.fileCountBySizeDao = fileCountBySizeDao;
+    this.containerCountBySizeDao = containerCountBySizeDao;
   }
 
   /**
@@ -98,4 +106,37 @@ public class UtilizationEndpoint {
     }
     return Response.ok(resultSet).build();
   }
+
+  /**
+   * Return the container size counts from Recon DB.
+   *
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/containerCount")
+  public Response getContainerCounts(
+      @QueryParam(RECON_QUERY_CONTAINER_SIZE)
+          long containerSize
+  ) {
+    DSLContext dslContext = utilizationSchemaDefinition.getDSLContext();
+    List<ContainerCountBySize> resultSet;
+    if (containerSize > 0) {
+      // Get the current count from database and update
+      Record1<Long> recordToFind =
+          dslContext.newRecord(
+                  CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
+              .value1(containerSize);
+      ContainerCountBySize record =
+          containerCountBySizeDao.findById(recordToFind.value1());
+      resultSet = record != null ?
+          Collections.singletonList(record) : Collections.emptyList();
+    } else {
+      // fetch all records having values greater than zero
+      resultSet = containerCountBySizeDao.findAll().stream()
+          .filter(record -> record.getCount() > 0)
+          .collect(Collectors.toList());
+    }
+    return Response.ok(resultSet).build();
+  }
+
 }

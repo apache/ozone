@@ -86,20 +86,24 @@ public class ContainerSizeCountTask extends ReconScmTask {
     try {
       while (canRun()) {
         wait(interval);
-
+        long startTime, endTime, duration, durationMilliseconds;
         final List<ContainerInfo> containers = containerManager.getContainers();
         if (processedContainers.isEmpty()) {
-          long start = System.currentTimeMillis();
+          startTime = System.nanoTime();
           reprocess(containers);
-          long end = System.currentTimeMillis();
+          endTime = System.nanoTime();
+          duration = endTime - startTime;
+          durationMilliseconds = duration / 1_000_000;
           LOG.info("Elapsed Time in milli seconds for Reprocess() execution: ",
-              (end - start));
+              (durationMilliseconds));
         } else {
-          long start = System.currentTimeMillis();
+          startTime = System.nanoTime();
           process(containers);
-          long end = System.currentTimeMillis();
-          LOG.info("Elapsed Time in milli seconds for Process() execution: ",
-              (end - start));
+          endTime = System.nanoTime();
+          duration = endTime - startTime;
+          durationMilliseconds = duration / 1_000_000;
+          LOG.info("Elapsed Time in milli seconds for Reprocess() execution: ",
+              (durationMilliseconds));
         }
       }
     } catch (Throwable t) {
@@ -137,9 +141,11 @@ public class ContainerSizeCountTask extends ReconScmTask {
    */
 
   private void process(List<ContainerInfo> containers) {
-    Map<ContainerSizeCountKey, Long> containerSizeCountMap = new HashMap<>();
-    Map<ContainerID, Long> deletedContainers = new HashMap<>();
+    HashMap<ContainerSizeCountKey, Long> containerSizeCountMap =
+        new HashMap<>();
+    HashMap<ContainerID, Long> deletedContainers = new HashMap<>();
     deletedContainers.putAll(processedContainers);
+
     // Loop to handle container create and size-update operations
     for (ContainerInfo container : containers) {
       // The containers present in both the processed containers map and
@@ -147,46 +153,64 @@ public class ContainerSizeCountTask extends ReconScmTask {
       deletedContainers.remove(container.containerID());
       // For New Container being created
       if (!processedContainers.containsKey(container.containerID())) {
+        incrementContainerSizeCount(container.getUsedBytes(),
+            containerSizeCountMap);
         processedContainers.put(container.containerID(),
             container.getUsedBytes());
-        handlePutKeyEvent(container.getUsedBytes(),
-            containerSizeCountMap);
       } else if (processedContainers.get(container.containerID()) !=
           container.getUsedBytes()) { // If the Container Size is Updated
+        decrementContainerSizeCount(
+            processedContainers.get(container.containerID()),
+            containerSizeCountMap);
+        incrementContainerSizeCount(container.getUsedBytes(),
+            containerSizeCountMap);
         processedContainers.put(container.containerID(),
             container.getUsedBytes());
-        handleDeleteKeyEvent(container.getUsedBytes(),
-            containerSizeCountMap);
-        handlePutKeyEvent(container.getUsedBytes(),
-            containerSizeCountMap);
       }
     }
-    // Loop to handle Container delete operations
-    for (Map.Entry<ContainerID, Long> containerId :
-        deletedContainers.entrySet()) {
-      // The containers which were not present in cache but were still there
-      // in the processed containers map are the ones that have been deleted
-      processedContainers.remove(containerId);
-      handleDeleteKeyEvent(deletedContainers.get(containerId),
-          containerSizeCountMap); // Decreases the old value of range by one
-    }
+
+    // Method to handle Container delete operations
+    handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
+
+    // Write to the database
     writeCountsToDB(false, containerSizeCountMap);
+    containerSizeCountMap.clear();
     LOG.info("Completed a 'process' run of ContainerSizeCountTask.");
   }
 
+
+  /**
+   * The method reprocess() is used to update the container size counts in the
+   * containerSizeCountMap based on the containers list passed as an argument.
+   * It will be implemented in cases when recon abruptly Restarts due to which
+   * the data in the processed containers cache will be lost. Hence we truncate
+   * the CONTAINER_COUNT_BY_SIZE table and populate it with fresh data
+   */
+
   public void reprocess(List<ContainerInfo> containers) {
+
+    if (containers.isEmpty()) {
+      LOG.warn("The list of containers is empty. Nothing to reprocess.");
+      return;
+    }
     Map<ContainerSizeCountKey, Long> containerSizeCountMap = new HashMap<>();
     // Truncate table before inserting new rows
-    int execute = dslContext.delete(CONTAINER_COUNT_BY_SIZE).execute();
-    LOG.info("Deleted {} records from {}", execute,
-        CONTAINER_COUNT_BY_SIZE);
-    for (int i = 0; i < containers.size(); i++) {
-      processedContainers.put(containers.get(i).containerID(),
-          containers.get(i).getUsedBytes());
-      handlePutKeyEvent(containers.get(i).getUsedBytes(),
+    try {
+      int execute = dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
+      LOG.info("Deleted {} records from {}", execute, CONTAINER_COUNT_BY_SIZE);
+    } catch (Exception e) {
+      LOG.error("An error occurred while truncating the table {}: {}",
+          CONTAINER_COUNT_BY_SIZE, e.getMessage(), e);
+      return;
+    }
+    for (ContainerInfo container : containers) {
+      processedContainers.put(container.containerID(),
+          container.getUsedBytes());
+      incrementContainerSizeCount(container.getUsedBytes(),
           containerSizeCountMap);
     }
     writeCountsToDB(true, containerSizeCountMap);
+    containerSizeCountMap.clear();
     LOG.info("Completed a 'reprocess' run of ContainerSizeCountTask.");
   }
 
@@ -251,6 +275,28 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
   /**
+   *
+   * The handleContainerDeleteOperations() function loops through the entries
+   * in the deletedContainers map and calls the handleDeleteKeyEvent() function
+   * for each one. This will decrement the size counts of those containers by
+   * one which are no longer present in the cluster
+   *
+   * Used by process()
+   *
+   * @param deletedContainers  Map that stores the info of deleted containers
+   * @param containerSizeCountMap Map that stores the counts of container sizes
+   */
+  private void handleContainerDeleteOperations(
+      Map<ContainerID, Long> deletedContainers,
+      Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+    for (Map.Entry<ContainerID, Long> containerId :
+        deletedContainers.entrySet()) {
+      long containerSize = deletedContainers.get(containerId);
+      decrementContainerSizeCount(containerSize, containerSizeCountMap);
+    }
+  }
+
+  /**
    * Calculate and update the count of containers being tracked by
    * containerSizeCountMap.
    *
@@ -266,8 +312,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private void handlePutKeyEvent(long containerSize,
-                     Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+  private void incrementContainerSizeCount(long containerSize,
+                   Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     Long count = containerSizeCountMap.containsKey(key) ?
         containerSizeCountMap.get(key) + 1L : 1L;
@@ -290,8 +336,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private void handleDeleteKeyEvent(long containerSize,
-                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+  private void decrementContainerSizeCount(long containerSize,
+                   Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     Long count = containerSizeCountMap.containsKey(key) ?
         containerSizeCountMap.get(key) - 1L : -1L;
