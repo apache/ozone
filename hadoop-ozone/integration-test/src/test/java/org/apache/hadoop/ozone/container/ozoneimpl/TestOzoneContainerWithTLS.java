@@ -74,6 +74,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -131,9 +132,11 @@ public class TestOzoneContainerWithTLS {
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
     conf.setInt(HDDS_KEY_LEN, 1024);
+
     // certificate lives for 10s
     conf.set(HDDS_X509_DEFAULT_DURATION,
         Duration.ofMillis(certLifetime).toString());
+    conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT2S");
     conf.set(HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL, "1s");
     conf.set(HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL, "1s");
 
