@@ -244,8 +244,8 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries(1000);
 
     // Two Delete and Replication command should be timeout
-    Assertions.assertEquals(metrics.getEcReplicationCmdsTimeoutTotal(), 2);
-    Assertions.assertEquals(metrics.getEcDeletionCmdsTimeoutTotal(), 2);
+    Assertions.assertEquals(metrics.getEcReplicaCreateTimeoutTotal(), 2);
+    Assertions.assertEquals(metrics.getEcReplicaDeleteTimeoutTotal(), 2);
 
     pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2);
     pendingOps.scheduleAddReplica(new ContainerID(3), dn1, 3);
@@ -262,8 +262,8 @@ public class TestContainerReplicaPendingOps {
     pendingOps.completeDeleteReplica(new ContainerID(4), dn2, 2);
     pendingOps.completeAddReplica(new ContainerID(4), dn3, 4);
 
-    Assertions.assertEquals(metrics.getEcReplicationCmdsCompletedTotal(), 2);
-    Assertions.assertEquals(metrics.getEcDeletionCmdsCompletedTotal(), 2);
+    Assertions.assertEquals(metrics.getEcReplicasCreatedTotal(), 2);
+    Assertions.assertEquals(metrics.getEcReplicasDeletedTotal(), 2);
 
     pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
     pendingOps.completeAddReplica(new ContainerID(2), dn1, 3);
