@@ -454,7 +454,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
     omStorage = new OMStorage(conf);
-    omStorage.setOmNodeId(omNodeDetails.getNodeId(), true);
+    omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
@@ -1248,7 +1248,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
 
       if (state != StorageState.INITIALIZED) {
-        omStorage.setOmNodeId(nodeId, false);
+        omStorage.setOmNodeId(nodeId);
         omStorage.setClusterId(clusterId);
         omStorage.initialize();
         System.out.println(
