@@ -83,7 +83,6 @@ public class TestOzoneManagerConfiguration {
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
-    omStore.setOmNodeId(OzoneConsts.OM_DEFAULT_NODE_ID);
     // writes the version file properties
     omStore.initialize();
   }
