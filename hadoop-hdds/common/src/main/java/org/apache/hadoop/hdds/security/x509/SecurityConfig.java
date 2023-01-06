@@ -186,12 +186,7 @@ public class SecurityConfig {
         HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
     renewalGracePeriod = Duration.parse(renewalGraceDurationString);
 
-    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
-      LOG.error("Certificate duration {} should not be greater than Maximum " +
-          "Certificate duration {}", maxCertDuration, defaultCertDuration);
-      throw new IllegalArgumentException("Certificate duration should not be " +
-          "greater than maximum Certificate duration");
-    }
+    validateCertificateValidityConfig();
 
     this.externalRootCaCert = this.configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
@@ -226,6 +221,44 @@ public class SecurityConfig {
         HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
         HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Check for certificate validity configuration.
+   */
+  private void validateCertificateValidityConfig() {
+    if (maxCertDuration.isNegative() || maxCertDuration.isZero()) {
+      LOG.error("Certificate maxDuration {} should not be zero or negative",
+              maxCertDuration);
+      throw new IllegalArgumentException("Certificate maxDuration should not " +
+              "be zero or negative");
+    }
+    if (defaultCertDuration.isNegative() || defaultCertDuration.isZero()) {
+      LOG.error("Certificate duration {} should not be Zero or negative",
+              defaultCertDuration);
+      throw new IllegalArgumentException("Certificate duration should not be " +
+              "negative or zero");
+    }
+    if (renewalGracePeriod.isNegative() || renewalGracePeriod.isZero()) {
+      LOG.error("Certificate grace duration {} should not be Zero or negative",
+              renewalGracePeriod);
+      throw new IllegalArgumentException("Certificate grace duration should " +
+              "not be negative or zero");
+    }
+
+    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
+      LOG.error("Certificate duration {} should not be greater than Maximum " +
+              "Certificate duration {}", defaultCertDuration, maxCertDuration);
+      throw new IllegalArgumentException("Certificate duration should not " +
+              "be greater than maximum Certificate duration");
+    }
+    if (defaultCertDuration.compareTo(renewalGracePeriod) < 0) {
+      LOG.error("Grace Certificate duration {} should not be greater than " +
+              "Certificate duration {}", renewalGracePeriod,
+              defaultCertDuration);
+      throw new IllegalArgumentException("Grace Certificate duration should " +
+              "not be greater than Certificate duration");
+    }
   }
 
   /**
