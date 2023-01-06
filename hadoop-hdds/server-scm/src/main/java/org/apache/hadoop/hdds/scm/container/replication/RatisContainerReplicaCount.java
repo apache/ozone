@@ -94,11 +94,22 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   public int getHealthyReplicaCount() {
-    return healthyReplicaCount;
+    return healthyReplicaCount + healthyReplicaCountAdapter();
   }
 
   public int getUnhealthyReplicaCount() {
     return unhealthyReplicaCount;
+  }
+
+  /**
+   * The new replication manager currently counts unhealthy and healthy
+   * replicas together. This should be updated when changes from HDDS-6447
+   * are integrated into the new replication manager. See
+   * {@link LegacyRatisContainerReplicaCount}, which overrides this method, for
+   * details.
+   */
+  protected int healthyReplicaCountAdapter() {
+    return getUnhealthyReplicaCount();
   }
 
   @Override

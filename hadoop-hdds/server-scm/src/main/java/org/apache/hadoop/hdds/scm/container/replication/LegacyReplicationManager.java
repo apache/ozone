@@ -1002,7 +1002,7 @@ public class LegacyReplicationManager {
    */
   private RatisContainerReplicaCount getContainerReplicaCount(
       ContainerInfo container, Set<ContainerReplica> replica) {
-    return new RatisContainerReplicaCount(
+    return new LegacyRatisContainerReplicaCount(
         container,
         replica,
         getInflightAdd(container.containerID()),
