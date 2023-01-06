@@ -254,7 +254,8 @@ public class SecurityConfig {
     }
     if (defaultCertDuration.compareTo(renewalGracePeriod) < 0) {
       String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
-              " should not be greater than Property " + HDDS_X509_DEFAULT_DURATION;
+              " should not be greater than Property "
+              + HDDS_X509_DEFAULT_DURATION;
       LOG.error(msg);
       throw new IllegalArgumentException(msg);
     }
