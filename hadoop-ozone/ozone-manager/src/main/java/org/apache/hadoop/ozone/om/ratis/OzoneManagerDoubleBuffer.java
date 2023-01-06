@@ -291,9 +291,9 @@ public final class OzoneManagerDoubleBuffer {
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
-                terminate(ex, omResponse.get());
+                terminate(ex, 1, omResponse.get());
               } catch (Throwable t) {
-                terminate(t, omResponse.get(), 2);
+                terminate(t, 2, omResponse.get());
               }
             });
             // Finished omResponse processing, set omResponse to null;
@@ -484,13 +484,10 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   private void terminate(Throwable t, int status) {
-    terminate(t, null, status);
+    terminate(t, status, null);
   }
 
-  private void terminate(Throwable t, OMResponse omResponse) {
-    terminate(t, omResponse, 1);
-  }
-  private void terminate(Throwable t, OMResponse omResponse, int status) {
+  private void terminate(Throwable t, int status, OMResponse omResponse) {
     StringBuilder message = new StringBuilder(
         "During flush to DB encountered error in " +
         "OMDoubleBuffer flush thread " + Thread.currentThread().getName());
