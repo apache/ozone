@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,17 +24,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.OptionalLong;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * This is the actual EC reconstruction coordination task.
  */
 public class ECReconstructionCoordinatorTask implements Runnable {
-  static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
   private final ECReconstructionCoordinator reconstructionCoordinator;
@@ -94,22 +88,11 @@ public class ECReconstructionCoordinatorTask implements Runnable {
         return;
       }
 
-      SortedMap<Integer, DatanodeDetails> sourceNodeMap =
-          reconstructionCommandInfo.getSources().stream().collect(Collectors
-              .toMap(DatanodeDetailsAndReplicaIndex::getReplicaIndex,
-                  DatanodeDetailsAndReplicaIndex::getDnDetails, (v1, v2) -> v1,
-                  TreeMap::new));
-      SortedMap<Integer, DatanodeDetails> targetNodeMap = IntStream
-          .range(0, reconstructionCommandInfo.getTargetDatanodes().size())
-          .boxed().collect(Collectors.toMap(i -> (int) reconstructionCommandInfo
-                  .getMissingContainerIndexes()[i],
-              i -> reconstructionCommandInfo.getTargetDatanodes().get(i),
-              (v1, v2) -> v1, TreeMap::new));
-
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
-          reconstructionCommandInfo.getEcReplicationConfig(), sourceNodeMap,
-          targetNodeMap);
+          reconstructionCommandInfo.getEcReplicationConfig(),
+          reconstructionCommandInfo.getSourceNodeMap(),
+          reconstructionCommandInfo.getTargetNodeMap());
       long elapsed = Time.monotonicNow() - start;
       LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
     } catch (IOException e) {
