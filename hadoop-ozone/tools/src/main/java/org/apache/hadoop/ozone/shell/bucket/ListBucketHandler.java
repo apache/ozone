@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.shell.volume.VolumeHandler;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 
 /**
  * Executes List Bucket.
@@ -43,6 +44,10 @@ public class ListBucketHandler extends VolumeHandler {
 
   @CommandLine.Mixin
   private ListOptions listOptions;
+
+  @Option(names = {"--encrypted", "-e"},
+          description = "List all buckets with encryption enabled.")
+  private boolean encryptedBuckets;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -56,12 +61,15 @@ public class ListBucketHandler extends VolumeHandler {
     int counter = 0;
     while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
       OzoneBucket bucket = bucketIterator.next();
-      if (bucket.isLink()) {
-        bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
-      } else {
-        bucketList.add(bucket);
+      if (!encryptedBuckets ||
+              (encryptedBuckets && (bucket.getEncryptionKeyName() != null))) {
+        if (bucket.isLink()) {
+          bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
+        } else {
+          bucketList.add(bucket);
+        }
+        counter++;
       }
-      counter++;
     }
     printAsJsonArray(bucketList.iterator(), listOptions.getLimit());
     if (isVerbose()) {
