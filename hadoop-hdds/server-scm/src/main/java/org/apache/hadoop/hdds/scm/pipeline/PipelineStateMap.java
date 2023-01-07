@@ -106,13 +106,9 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (pipeline.isClosed()) {
-      /*
-       * It should be fine to add a container to a CLOSED pipeline as pipeline
-       * state can be changed while the container creating transaction is
-       * waiting to be processed by SCM.
-       */
-      LOG.info("Container {} in open state for pipeline={} in closed state",
-          containerID, pipelineID);
+      LOG.warn("Adding container {} to pipeline={} in CLOSED state." +
+          "  This happens only for some exceptional cases." +
+          "  Check for the previous exceptions.", containerID, pipelineID);
     }
     pipeline2container.get(pipelineID).add(containerID);
   }
