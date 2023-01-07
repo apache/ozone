@@ -1,13 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -23,6 +40,9 @@ import org.jooq.Record1;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Class to test a process and reprocess methods of ContainerSizeCountTask.
+ */
 public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
   private ContainerManager containerManager;
@@ -68,7 +88,8 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
     ContainerInfo omContainerInfo3 = mock(ContainerInfo.class);
     given(omContainerInfo3.containerID()).willReturn(new ContainerID(3));
-    given(omContainerInfo3.getUsedBytes()).willReturn(1125899906842624L * 4); // 4PB
+    given(omContainerInfo3.getUsedBytes()).willReturn(
+        1125899906842624L * 4); // 4PB
 
     // mock getContainers method to return a list of containers
     List<ContainerInfo> containers = new ArrayList<>();
@@ -84,15 +105,18 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
                 CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
             .value1(1024L);
     assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount().longValue());
-    // container size upper bound for 100000L is 131072L (next highest power of 2)
+        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
+            .longValue());
+    // container size upper bound for 100000L is 131072L
     recordToFind.value1(131072L);
     assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount().longValue());
+        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
+            .longValue());
     // container size upper bound for 4PB is Long.MAX_VALUE
     recordToFind.value1(Long.MAX_VALUE);
     assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount().longValue());
+        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
+            .longValue());
   }
 
 
