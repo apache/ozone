@@ -71,6 +71,9 @@ public class OFSPath {
   // Hard-code the volume name to tmp for the first implementation
   @VisibleForTesting
   public static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
+  private static final String OFS_SHARED_TMP_BUCKETNAME = "tmp";
+  // Hard-coded bucket name to use when OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR
+  // enabled;  HDDS-7746 to make this name configurable.
 
   public OFSPath(Path path, OzoneConfiguration conf) {
     this.conf = conf;
@@ -110,7 +113,7 @@ public class OFSPath {
         try {
           if (conf.getBoolean(OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR,
               OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT)) {
-            bucketName = OFS_MOUNT_NAME_TMP;
+            bucketName = OFS_SHARED_TMP_BUCKETNAME;
           } else {
             bucketName = getTempMountBucketNameOfCurrentUser();
           }
