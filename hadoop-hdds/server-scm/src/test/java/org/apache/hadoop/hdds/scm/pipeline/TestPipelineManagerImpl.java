@@ -807,7 +807,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.addContainerToPipeline(pipelineID,
         ContainerID.valueOf(2));
     assertTrue(logCapturer.getOutput().contains(
-        "Adding container #2 to pipeline=" + pipelineID +" in CLOSED state."));
+        "Adding container #2 to pipeline=" + pipelineID + " in CLOSED state."));
   }
 
   @Test
