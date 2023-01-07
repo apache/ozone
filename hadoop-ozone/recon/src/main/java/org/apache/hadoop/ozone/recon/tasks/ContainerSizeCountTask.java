@@ -140,7 +140,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * writeCountsToDB() function.
    */
 
-  private void process(List<ContainerInfo> containers) {
+  public void process(List<ContainerInfo> containers) {
     HashMap<ContainerSizeCountKey, Long> containerSizeCountMap =
         new HashMap<>();
     HashMap<ContainerID, Long> deletedContainers = new HashMap<>();
