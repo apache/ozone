@@ -548,8 +548,8 @@ public abstract class SCMCommonPlacementPolicy implements
       placementGroupCntMap.compute(placementGroup,
               (group, cnt) -> (cnt == null ? 0 : cnt) + 1);
       placementGroupReplicaIdMap.computeIfAbsent(placementGroup,
-              (pg) -> Maps.newHashMap()).computeIfAbsent(replicaId,
-              (rid) -> Sets.newHashSet()).add(replica);
+              (pg) -> Maps.newHashMap()).computeIfAbsent(replicaId, (rid) ->
+                      Sets.newHashSet()).add(replica);
     }
 
     Set<ContainerReplica> replicasToRemove = new HashSet<>();
