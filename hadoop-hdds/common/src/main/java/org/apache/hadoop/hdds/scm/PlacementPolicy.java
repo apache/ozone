@@ -81,8 +81,7 @@ public interface PlacementPolicy<Replica> {
   /**
    * Given a set of replicas of a container which are overreplicated,
    * return a set of replicas to delete to fix overreplication.
-   * @param replicas: Map of replicas with value signifying if
-   *                  replica can be copied
+   * @param replicas: Set of existing replicas of the container
    * @param expectedCountPerUniqueReplica: Replication factor of each
    *                                     unique replica
    */

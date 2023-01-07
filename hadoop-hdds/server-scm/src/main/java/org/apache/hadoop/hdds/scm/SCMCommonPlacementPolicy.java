@@ -528,9 +528,9 @@ public abstract class SCMCommonPlacementPolicy implements
    * to be removed is also removed from the maps created above &
    * the count for rack is reduced.
    * The set of replicas computed are then returned by the function.
-   * @param replicas: Map of replicas with value signifying if
-   *                  replica can be copied
-   * @param expectedCountPerUniqueReplica
+   * @param replicas: Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica: Replication factor of each
+   *    *                                     unique replica
    * @return Set of replicas to be removed are computed.
    */
   @Override
@@ -543,33 +543,22 @@ public abstract class SCMCommonPlacementPolicy implements
     for (ContainerReplica replica:replicas) {
       Integer replicaId = replica.getReplicaIndex();
       Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
-      if (!replicaIdMap.containsKey(replicaId)) {
-        replicaIdMap.put(replicaId, Sets.newHashSet());
-      }
-      if (!placementGroupReplicaIdMap.containsKey(placementGroup)) {
-        placementGroupReplicaIdMap.put(placementGroup, Maps.newHashMap());
-      }
+      replicaIdMap.computeIfAbsent(replicaId, (rid) -> Sets.newHashSet())
+              .add(replica);
       placementGroupCntMap.compute(placementGroup,
               (group, cnt) -> (cnt == null ? 0 : cnt) + 1);
-      replicaIdMap.get(replicaId).add(replica);
-      Map<Integer, Set<ContainerReplica>> placementGroupReplicaIDMap =
-              placementGroupReplicaIdMap.get(placementGroup);
-      placementGroupReplicaIDMap.compute(replicaId,
-              (rid, placementGroupReplicas) -> {
-                if (placementGroupReplicas == null) {
-                  placementGroupReplicas = Sets.newHashSet();
-                }
-                placementGroupReplicas.add(replica);
-                return placementGroupReplicas;
-              });
+      placementGroupReplicaIdMap.computeIfAbsent(placementGroup,
+              (pg) -> Maps.newHashMap()).computeIfAbsent(replicaId,
+              (rid) -> Sets.newHashSet()).add(replica);
     }
 
     Set<ContainerReplica> replicasToRemove = new HashSet<>();
     List<Integer> sortedRIDList = replicaIdMap.keySet().stream()
+            .filter(rid -> replicaIdMap.get(rid).size() >
+                    expectedCountPerUniqueReplica)
             .sorted((o1, o2) -> Integer.compare(replicaIdMap.get(o2).size(),
                     replicaIdMap.get(o1).size()))
-            .filter(rid -> replicaIdMap.get(rid).size() >
-                    expectedCountPerUniqueReplica).collect(Collectors.toList());
+            .collect(Collectors.toList());
     for (Integer rid : sortedRIDList) {
       if (replicaIdMap.get(rid).size() <= expectedCountPerUniqueReplica) {
         break;
