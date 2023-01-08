@@ -31,7 +31,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.stream.Stream;
 import java.util.Objects;
-import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 
