@@ -30,12 +30,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.stream.Stream;
+import java.util.Objects;
+import java.util.stream.Stream;
 
-import org.apache.commons.io.FileUtils;
+import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
+
 
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
@@ -44,6 +48,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
@@ -62,6 +67,18 @@ public class TarContainerPacker
   static final String DB_DIR_NAME = "db";
 
   private static final String CONTAINER_FILE_NAME = "container.yaml";
+
+  private final String compression;
+
+  private static final String NO_COMPRESSION = "no_compression";
+
+  public TarContainerPacker() {
+    this.compression = NO_COMPRESSION;
+  }
+
+  public TarContainerPacker(String compression) {
+    this.compression = compression;
+  }
 
   /**
    * Given an input stream (tar file) extract the data to the specified
@@ -167,7 +184,7 @@ public class TarContainerPacker
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
     try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+        ArchiveInputStream archiveInput = untar(decompressed)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -273,16 +290,20 @@ public class TarContainerPacker
     return new TarArchiveOutputStream(output);
   }
 
-  private static InputStream decompress(InputStream input)
+  @VisibleForTesting
+  InputStream decompress(InputStream input)
       throws CompressorException {
-    return new CompressorStreamFactory()
-        .createCompressorInputStream(CompressorStreamFactory.GZIP, input);
+    return Objects.equals(compression, NO_COMPRESSION) ?
+        input : new CompressorStreamFactory()
+        .createCompressorInputStream(compression, input);
   }
 
-  private static OutputStream compress(OutputStream output)
+  @VisibleForTesting
+  OutputStream compress(OutputStream output)
       throws CompressorException {
-    return new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP, output);
+    return Objects.equals(compression, NO_COMPRESSION) ?
+        output : new CompressorStreamFactory()
+        .createCompressorOutputStream(compression, output);
   }
 
   private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)

@@ -64,15 +64,13 @@ public class MonitoringTimerTask extends TimerTask {
 
   @Override
   public void run() {
-    if (caClient.isCertificateRenewed()) {
-      try {
-        onReload.accept(caClient);
-      } catch (Throwable t) {
-        if (onReloadFailure != null) {
-          onReloadFailure.accept(t);
-        } else {
-          LOG.error(PROCESS_ERROR_MESSAGE, t);
-        }
+    try {
+      onReload.accept(caClient);
+    } catch (Throwable t) {
+      if (onReloadFailure != null) {
+        onReloadFailure.accept(t);
+      } else {
+        LOG.error(PROCESS_ERROR_MESSAGE, t);
       }
     }
   }

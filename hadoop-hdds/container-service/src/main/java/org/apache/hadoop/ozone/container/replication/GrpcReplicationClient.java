@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
@@ -61,8 +62,12 @@ public class GrpcReplicationClient implements AutoCloseable {
 
   private final Path workingDirectory;
 
-  public GrpcReplicationClient(String host, int port, Path workingDir,
-      SecurityConfig secConfig, CertificateClient certClient)
+  private final ContainerProtos.CopyContainerCompressProto compression;
+
+  public GrpcReplicationClient(
+      String host, int port, Path workingDir,
+      SecurityConfig secConfig, CertificateClient certClient,
+      String compression)
       throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
@@ -88,6 +93,8 @@ public class GrpcReplicationClient implements AutoCloseable {
     channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
     workingDirectory = workingDir;
+    this.compression =
+        ContainerProtos.CopyContainerCompressProto.valueOf(compression);
   }
 
   public CompletableFuture<Path> download(long containerId) {
@@ -96,6 +103,7 @@ public class GrpcReplicationClient implements AutoCloseable {
             .setContainerID(containerId)
             .setLen(-1)
             .setReadOffset(0)
+            .setCompression(compression)
             .build();
 
     CompletableFuture<Path> response = new CompletableFuture<>();

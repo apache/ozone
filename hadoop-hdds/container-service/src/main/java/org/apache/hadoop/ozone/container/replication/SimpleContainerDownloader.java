@@ -37,6 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
  * from the first available datanode.
@@ -52,12 +53,14 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   private ConfigurationSource conf;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
+  private final String compression;
 
   public SimpleContainerDownloader(
       ConfigurationSource conf, CertificateClient certClient) {
     this.conf = conf;
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
+    this.compression = CopyContainerCompression.getConf(conf).toString();
   }
 
   @Override
@@ -115,7 +118,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            downloadDir, securityConfig, certClient);
+            downloadDir, securityConfig, certClient, compression);
+
     result = grpcReplicationClient.download(containerId)
         .whenComplete((r, ex) -> {
           try {
