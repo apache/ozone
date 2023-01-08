@@ -274,12 +274,12 @@ public final class OzoneManagerDoubleBuffer {
               .initBatchOperation()) {
 
             AtomicReference<String> lastTraceId = new AtomicReference<>();
-            AtomicReference<OMResponse> omResponse = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
+              OMResponse omResponse = null;
               try {
-                omResponse.set(entry.getResponse().getOMResponse());
-                lastTraceId.set(omResponse.get().getTraceID());
-                addToBatchWithTrace(omResponse.get(),
+                omResponse = entry.getResponse().getOMResponse();
+                lastTraceId.set(omResponse.getTraceID());
+                addToBatchWithTrace(omResponse,
                     (SupplierWithIOException<Void>) () -> {
                       entry.getResponse().checkAndUpdateDB(omMetadataManager,
                           batchOperation);
@@ -291,13 +291,11 @@ public final class OzoneManagerDoubleBuffer {
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
-                terminate(ex, 1, omResponse.get());
+                terminate(ex, 1, omResponse);
               } catch (Throwable t) {
-                terminate(t, 2, omResponse.get());
+                terminate(t, 2, omResponse);
               }
             });
-            // Finished omResponse processing, set omResponse to null;
-            omResponse.set(null);
 
             // Commit transaction info to DB.
             flushedEpochs = readyBuffer.stream().map(
