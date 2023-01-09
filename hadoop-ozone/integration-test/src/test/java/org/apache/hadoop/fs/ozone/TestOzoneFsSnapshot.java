@@ -49,6 +49,25 @@ public class TestOzoneFsSnapshot {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private OzoneConfiguration clientConf;
   private static OzoneManager ozoneManager;
+  private static OzoneFsShell shell;
+  private static final String VOLUME_ONE = "vol1";
+  private static final String BUCKET_ONE = "bucket1";
+  private static final String KEY_ONE = "key1";
+  private static final String KEY_TWO = "key2";
+  private static final String SNAPSHOT_ONE = "snap1";
+  private static final String SNAPSHOT_TWO = "snap2";
+  private static final String BUCKET_ONE_PATH =
+      OM_KEY_PREFIX + VOLUME_ONE +
+          OM_KEY_PREFIX + BUCKET_ONE;
+  private static final String
+      BUCKET_ONE_WITH_SNAPSHOT_PREFIX_PATH =
+      OM_KEY_PREFIX + VOLUME_ONE +
+          OM_KEY_PREFIX + BUCKET_ONE +
+          OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR;
+  private static final String KEY_ONE_PATH =
+      BUCKET_ONE_PATH + OM_KEY_PREFIX + KEY_ONE;
+  private static final String KEY_TWO_PATH =
+      BUCKET_ONE_PATH + OM_KEY_PREFIX + KEY_TWO;
 
   @BeforeClass
   public static void initClass() throws Exception {
