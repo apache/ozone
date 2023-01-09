@@ -309,11 +309,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
-  public synchronized long getRemaining() {
-    return blockInfo.getLength() - position;
-  }
-
-  @Override
   public synchronized long getLength() {
     return blockInfo.getLength();
   }

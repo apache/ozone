@@ -25,9 +25,11 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.ratis.statemachine.StateMachine;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -102,6 +104,17 @@ public interface ChunkManager {
   default void finishWriteChunks(KeyValueContainer kvContainer,
       BlockData blockData) throws IOException {
     // no-op
+  }
+
+  default String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
+    return null;
+  }
+
+  default StateMachine.DataChannel getStreamDataChannel(
+          Container container, BlockID blockID, ContainerMetrics metrics)
+          throws StorageContainerException {
+    return null;
   }
 
   static long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,

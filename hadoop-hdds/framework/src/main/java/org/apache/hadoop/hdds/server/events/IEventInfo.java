@@ -15,27 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.hadoop.ozone.om.request;
-
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+package org.apache.hadoop.hdds.server.events;
 
 /**
- * Handles EchoRPCRequest.
+ * Get various information of event fired.
  */
-public class OMEchoRPCRequest extends OMClientRequest {
-  public OMEchoRPCRequest(OMRequest omRequest) {
-    super(omRequest);
+public interface IEventInfo {
+  long getCreateTime();
+  default String getEventId() {
+    return "";
   }
-
-  @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-         long transactionLogIndex,
-         OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-    return null;
-  }
-
 }

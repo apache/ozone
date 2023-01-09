@@ -292,6 +292,66 @@ public class TestHddsDispatcher {
     }
   }
 
+  @Test
+  public void testDuplicateWriteChunkAndPutBlockRequest() throws  IOException {
+    String testDir = GenericTestUtils.getTempPath(
+        TestHddsDispatcher.class.getSimpleName());
+    try {
+      UUID scmId = UUID.randomUUID();
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+      ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
+          dd.getUuidString(), 1L, 1L);
+      //Send same WriteChunkRequest
+      ContainerCommandResponseProto response;
+      hddsDispatcher.dispatch(writeChunkRequest, null);
+      hddsDispatcher.dispatch(writeChunkRequest, null);
+      response = hddsDispatcher.dispatch(writeChunkRequest, null);
+
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      // Send Read Chunk request for written chunk.
+      response =
+          hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      ByteString responseData = BufferUtils.concatByteStrings(
+          response.getReadChunk().getDataBuffers().getBuffersList());
+      Assert.assertEquals(writeChunkRequest.getWriteChunk().getData(),
+          responseData);
+
+      // Put Block
+      ContainerCommandRequestProto putBlockRequest =
+          ContainerTestHelper.getPutBlockRequest(writeChunkRequest);
+
+      //Send same PutBlockRequest
+      hddsDispatcher.dispatch(putBlockRequest, null);
+      hddsDispatcher.dispatch(putBlockRequest, null);
+      response =  hddsDispatcher.dispatch(putBlockRequest, null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      // Check PutBlock Data
+      ContainerCommandRequestProto listBlockRequest =
+          ContainerTestHelper.getListBlockRequest(writeChunkRequest);
+      response =  hddsDispatcher.dispatch(listBlockRequest, null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assert.assertEquals(1, response.getListBlock().getBlockDataList().size());
+      for (ContainerProtos.BlockData blockData :
+          response.getListBlock().getBlockDataList()) {
+        Assert.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+            blockData.getBlockID());
+        Assert.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
+            .getLen(), blockData.getSize());
+        Assert.assertEquals(1, blockData.getChunksCount());
+      }
+    } finally {
+      ContainerMetrics.remove();
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
   /**
    * Creates HddsDispatcher instance with given infos.
    * @param dd datanode detail info.

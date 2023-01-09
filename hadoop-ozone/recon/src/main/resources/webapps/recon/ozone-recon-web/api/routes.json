@@ -23,6 +23,5 @@
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota",
   "/task/status": "/taskStatus",
-  "/containers/missing": "/missingContainers",
   "/containers/unhealthy": "/unhealthyContainers"
 }

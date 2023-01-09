@@ -23,60 +23,86 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.stream.IntStream;
+
+import static java.util.Collections.unmodifiableSortedMap;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * This class is to keep the required EC reconstruction info.
  */
 public class ECReconstructionCommandInfo {
-  private long containerID;
-  private ECReplicationConfig ecReplicationConfig;
-  private byte[] missingContainerIndexes;
-  private List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
-      sources;
-  private List<DatanodeDetails> targetDatanodes;
+  private final SortedMap<Integer, DatanodeDetails> sourceNodeMap;
+  private final SortedMap<Integer, DatanodeDetails> targetNodeMap;
+  private final long containerID;
+  private final ECReplicationConfig ecReplicationConfig;
+  private final byte[] missingContainerIndexes;
+  private final long deadlineMsSinceEpoch;
+  private final long term;
 
-  public ECReconstructionCommandInfo(long containerID,
-      ECReplicationConfig ecReplicationConfig, byte[] missingContainerIndexes,
-      List<DatanodeDetailsAndReplicaIndex> sources,
-      List<DatanodeDetails> targetDatanodes) {
-    this.containerID = containerID;
-    this.ecReplicationConfig = ecReplicationConfig;
+  public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
+    this.containerID = cmd.getContainerID();
+    this.ecReplicationConfig = cmd.getEcReplicationConfig();
     this.missingContainerIndexes =
-        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
-    this.sources = sources;
-    this.targetDatanodes = targetDatanodes;
+        Arrays.copyOf(cmd.getMissingContainerIndexes(),
+            cmd.getMissingContainerIndexes().length);
+    this.deadlineMsSinceEpoch = cmd.getDeadline();
+    this.term = cmd.getTerm();
+
+    sourceNodeMap = cmd.getSources().stream()
+        .collect(toMap(
+            DatanodeDetailsAndReplicaIndex::getReplicaIndex,
+            DatanodeDetailsAndReplicaIndex::getDnDetails,
+            (v1, v2) -> v1, TreeMap::new));
+    targetNodeMap = IntStream.range(0, cmd.getTargetDatanodes().size())
+        .boxed()
+        .collect(toMap(
+            i -> (int) missingContainerIndexes[i],
+            i -> cmd.getTargetDatanodes().get(i),
+            (v1, v2) -> v1, TreeMap::new));
+  }
+
+  public long getDeadline() {
+    return deadlineMsSinceEpoch;
   }
 
   public long getContainerID() {
     return containerID;
   }
 
-  public byte[] getMissingContainerIndexes() {
-    return Arrays
-        .copyOf(missingContainerIndexes, missingContainerIndexes.length);
-  }
-
   public ECReplicationConfig getEcReplicationConfig() {
     return ecReplicationConfig;
   }
 
-  public List<DatanodeDetailsAndReplicaIndex> getSources() {
-    return sources;
+  SortedMap<Integer, DatanodeDetails> getSourceNodeMap() {
+    return unmodifiableSortedMap(sourceNodeMap);
   }
 
-  public List<DatanodeDetails> getTargetDatanodes() {
-    return targetDatanodes;
+  SortedMap<Integer, DatanodeDetails> getTargetNodeMap() {
+    return unmodifiableSortedMap(targetNodeMap);
   }
 
   @Override
   public String toString() {
-    return "ECReconstructionCommandInfo{"
+    return "ECReconstructionCommand{"
         + "containerID=" + containerID
-        + ", ecReplicationConfig=" + ecReplicationConfig
-        + ", missingContainerIndexes=" + Arrays
-        .toString(missingContainerIndexes)
-        + ", sources=" + sources
-        + ", targetDatanodes=" + targetDatanodes + '}';
+        + ", replication=" + ecReplicationConfig.getReplication()
+        + ", missingIndexes=" + Arrays.toString(missingContainerIndexes)
+        + ", sources={" + toString(sourceNodeMap) + "}"
+        + ", targets={" + toString(targetNodeMap) + "}}";
   }
+
+  private String toString(SortedMap<Integer, DatanodeDetails> nodeMap) {
+    return nodeMap.entrySet().stream()
+        .map(e -> e.getKey() + ":" + e.getValue().getHostNameAndIP())
+        .collect(joining(","));
+  }
+
+  public long getTerm() {
+    return term;
+  }
+
 }

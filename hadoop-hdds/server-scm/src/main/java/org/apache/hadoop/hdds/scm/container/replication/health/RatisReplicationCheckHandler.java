@@ -66,6 +66,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
     ContainerHealthResult health = checkHealth(request);
+    LOG.debug("Checking container {} in RatisReplicationCheckHandler",
+        container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
       // If the container is healthy, there is nothing else to do in this
       // handler so return as unhandled so any further handlers will be tried.
@@ -82,18 +84,16 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         report.incrementAndSample(ReplicationManagerReport.HealthState.MISSING,
             container.containerID());
       }
-      if (underHealth.isMisReplicated()) {
-        report.incrementAndSample(
-            ReplicationManagerReport.HealthState.MIS_REPLICATED,
-            container.containerID());
-      }
       // TODO - if it is unrecoverable, should we return false to other
       //        handlers can be tried?
       if (!underHealth.isUnrecoverable() &&
-          (underHealth.isMisReplicatedAfterPending() ||
-              !underHealth.isSufficientlyReplicatedAfterPending())) {
+          !underHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending" +
+          " is [{}]. isUnrecoverable is [{}]", container,
+          underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable());
       return true;
     }
 
@@ -104,11 +104,31 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           container.containerID());
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
+      LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +
+              " is [{}]", container, overHealth.isReplicatedOkAfterPending());
       return true;
     }
+    if (health.getHealthState() ==
+        ContainerHealthResult.HealthState.MIS_REPLICATED) {
+      report.incrementAndSample(
+          ReplicationManagerReport.HealthState.MIS_REPLICATED,
+          container.containerID());
+      ContainerHealthResult.MisReplicatedHealthResult misRepHealth
+          = ((ContainerHealthResult.MisReplicatedHealthResult) health);
+      if (!misRepHealth.isReplicatedOkAfterPending()) {
+        request.getReplicationQueue().enqueue(misRepHealth);
+      }
+      LOG.debug("Container {} is Mid Replicated. isReplicatedOkAfterPending" +
+          " is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
+      return true;
+    }
+    // Should not get here, but in case it does the container is not healthy,
+    // but is also not under, over or mis replicated.
+    LOG.warn("Container {} is not healthy but is not under, over or "
+        + " mis-replicated. Should not happen.", container);
     return false;
   }
 
@@ -136,30 +156,15 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         new RatisContainerReplicaCount(container, replicas, pendingAdd,
             pendingDelete, requiredNodes, minReplicasForMaintenance);
 
-    ContainerPlacementStatus placementStatus =
-        getPlacementStatus(replicas, requiredNodes, Collections.emptyList());
-
-    ContainerPlacementStatus placementStatusWithPending = placementStatus;
-    if (replicaPendingOps.size() > 0) {
-      placementStatusWithPending =
-          getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
-    }
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
-    boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
-    if (!sufficientlyReplicated || !isPolicySatisfied) {
+    if (!sufficientlyReplicated) {
       ContainerHealthResult.UnderReplicatedHealthResult result =
           new ContainerHealthResult.UnderReplicatedHealthResult(
           container, replicaCount.getRemainingRedundancy(),
-          isPolicySatisfied
-              && replicas.size() - pendingDelete >= requiredNodes,
+          replicas.size() - pendingDelete >= requiredNodes,
           replicaCount.isSufficientlyReplicated(true),
           replicaCount.isUnrecoverable());
-      result.setMisReplicated(!isPolicySatisfied)
-          .setMisReplicatedAfterPending(
-              !placementStatusWithPending.isPolicySatisfied())
-          .setDueToMisReplication(
-              !isPolicySatisfied && replicaCount.isSufficientlyReplicated());
       return result;
     }
 
@@ -169,6 +174,19 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       return new ContainerHealthResult.OverReplicatedHealthResult(
           container, replicaCount.getExcessRedundancy(false), repOkWithPending);
     }
+
+    ContainerPlacementStatus placementStatus =
+        getPlacementStatus(replicas, requiredNodes, Collections.emptyList());
+    ContainerPlacementStatus placementStatusWithPending = placementStatus;
+    if (!placementStatus.isPolicySatisfied()) {
+      if (replicaPendingOps.size() > 0) {
+        placementStatusWithPending =
+            getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
+      }
+      return new ContainerHealthResult.MisReplicatedHealthResult(
+          container, placementStatusWithPending.isPolicySatisfied());
+    }
+
     // No issues detected, just return healthy.
     return new ContainerHealthResult.HealthyResult(container);
   }
