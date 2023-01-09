@@ -97,7 +97,7 @@ public class ECReconstructionCommandInfo {
 
   private String toString(SortedMap<Integer, DatanodeDetails> nodeMap) {
     return nodeMap.entrySet().stream()
-        .map(e -> e.getKey() + ":" + e.getValue().getUuidString())
+        .map(e -> e.getKey() + ":" + e.getValue().getHostNameAndIP())
         .collect(joining(","));
   }
 
