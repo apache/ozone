@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -432,7 +434,7 @@ public class TestContainerEndpoint {
     MissingContainerMetadata containerWithLimit =
             responseWithLimitObject.getContainers().stream().findFirst()
                     .orElse(null);
-    Assert.assertNotNull(containerWithLimit);
+    assertNotNull(containerWithLimit);
 
     Collection<MissingContainerMetadata> recordsWithLimit
             = responseWithLimitObject.getContainers();
@@ -448,7 +450,7 @@ public class TestContainerEndpoint {
     assertEquals(5, responseObject.getTotalCount());
     MissingContainerMetadata container =
         responseObject.getContainers().stream().findFirst().orElse(null);
-    Assert.assertNotNull(container);
+    assertNotNull(container);
 
     assertEquals(containerID.getId(), container.getContainerID());
     assertEquals(keyCount, container.getKeys());

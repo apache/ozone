@@ -45,17 +45,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
+import org.apache.hadoop.ozone.recon.api.types.*;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
-import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
-import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -98,7 +89,7 @@ public class ContainerEndpoint {
   }
 
   /**
-   * Return @{@link org.apache.hadoop.ozone.recon.api.types.ContainerMetadata}
+   * Return @{@link org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
    *
@@ -107,21 +98,24 @@ public class ContainerEndpoint {
    * @return {@link Response}
    */
   @GET
+  @Path("/containers")
   public Response getContainers(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
           int limit,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
-    Map<Long, ContainerMetadata> containersMap;
+    List<ContainerInfo> containers;
+    Map<Long, ContainerMetadata> containersMap = null;
     long containersCount;
-    try {
-      containersMap =
-              reconContainerMetadataManager.getContainers(limit, prevKey);
-      containersCount = reconContainerMetadataManager.getCountForContainers();
-    } catch (IOException ioEx) {
-      throw new WebApplicationException(ioEx,
-          Response.Status.INTERNAL_SERVER_ERROR);
+    containers =
+        containerManager.getContainers(ContainerID.valueOf(prevKey),limit);
+    if (containers != null){
+      for (ContainerInfo container : containers) {
+        containersMap.put(container.getContainerID(),new ContainerMetadata(container.getContainerID()));
+        container.setNumberOfKeys(container.getNumberOfKeys());
+      }
     }
+    containersCount = containers.size();
     ContainersResponse containersResponse =
         new ContainersResponse(containersCount, containersMap.values());
     return Response.ok(containersResponse).build();
