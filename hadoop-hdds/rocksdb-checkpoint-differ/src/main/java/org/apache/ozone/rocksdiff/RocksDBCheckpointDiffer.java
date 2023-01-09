@@ -73,7 +73,7 @@ import static java.util.Arrays.asList;
 //      - This bootstrapping should also receive the compaction-DAG information
 //  9. Handle rebuilding the DAG for a lagging follower. There are two cases
 //      - receive RATIS transactions to replay. Nothing needs to be done in
-//      these case.
+//      these cases.
 //      - Getting the DB sync. This case needs to handle getting the
 //      compaction-DAG information as well.
 

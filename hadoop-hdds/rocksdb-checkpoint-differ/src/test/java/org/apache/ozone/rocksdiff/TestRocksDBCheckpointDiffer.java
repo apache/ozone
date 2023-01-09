@@ -459,10 +459,10 @@ public class TestRocksDBCheckpointDiffer {
     return rocksDB;
   }
 
-  private boolean deleteDirectory(java.io.File directoryToBeDeleted) {
+  private boolean deleteDirectory(File directoryToBeDeleted) {
     File[] allContents = directoryToBeDeleted.listFiles();
     if (allContents != null) {
-      for (java.io.File file : allContents) {
+      for (File file : allContents) {
         if (!deleteDirectory(file)) {
           return false;
         }
@@ -473,8 +473,10 @@ public class TestRocksDBCheckpointDiffer {
 
   // Read from a given RocksDB instance and optionally write all the
   // keys to a given file.
-  private void readRocksDBInstance(String dbPathArg, RocksDB rocksDB, FileWriter file,
-      RocksDBCheckpointDiffer differ) {
+  private void readRocksDBInstance(String dbPathArg,
+                                   RocksDB rocksDB,
+                                   FileWriter file,
+                                   RocksDBCheckpointDiffer differ) {
 
     LOG.debug("Reading RocksDB: " + dbPathArg);
     boolean createdDB = false;
@@ -1212,8 +1214,8 @@ public class TestRocksDBCheckpointDiffer {
 
   private void createFileWithContext(String fileName, String context)
       throws IOException {
-    FileOutputStream fileOutputStream = new FileOutputStream(fileName);
-    fileOutputStream.write(context.getBytes(UTF_8));
-    fileOutputStream.close();
+    try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+      fileOutputStream.write(context.getBytes(UTF_8));
+    }
   }
 }
