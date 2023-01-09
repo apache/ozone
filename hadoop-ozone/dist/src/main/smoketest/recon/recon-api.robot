@@ -59,7 +59,11 @@ Check http return code
 
 *** Test Cases ***
 Check if Recon picks up OM data
-    [Setup]    Freon OCKG    n=10    args=-s 1025 -v recon -b api
+    Execute    ozone sh volume create recon
+    # TODO: HDDS-7763
+    #   Recon's container ID to key mapping does not yet support FSO buckets.
+    Execute    ozone sh bucket create recon/api --layout=OBJECT_STORE
+    Freon OCKG    n=10    args=-s 1025 -v recon -b api
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM
 
 Check if Recon picks up DN heartbeats

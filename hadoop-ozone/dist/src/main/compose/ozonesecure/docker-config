@@ -19,6 +19,11 @@ CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
+# TODO: HDDS-7495
+# S3 security tests need object store layout from s3 gateway. The config to do
+# this from only S3 gateway will be added in HDDS-7495. Until then, the server
+# side default must be changed for the tests to work.
+OZONE-SITE.XML_ozone.default.bucket.layout=OBJECT_STORE
 OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
