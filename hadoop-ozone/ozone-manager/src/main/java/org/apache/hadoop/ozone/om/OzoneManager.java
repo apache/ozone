@@ -1515,6 +1515,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
+    // Snapshot metrics
+    updateActiveSnapshotMetrics();
+
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
         OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -1584,6 +1587,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
+    // Snapshot metrics
+    updateActiveSnapshotMetrics();
+
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
         OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -1620,6 +1626,51 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+  }
+
+  /**
+   * Iterate the Snapshot table, check the status
+   * for every snapshot and update OMMetrics.
+   */
+  private void updateActiveSnapshotMetrics()
+      throws IOException {
+
+    long activeGauge = 0;
+    long deletedGauge = 0;
+    long reclaimedGauge = 0;
+
+    try (TableIterator<String, ? extends
+        KeyValue<String, SnapshotInfo>> keyIter =
+             metadataManager.getSnapshotInfoTable().iterator()) {
+      Table.KeyValue<String, SnapshotInfo> keyValue;
+
+      List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
+
+      while (keyIter.hasNext()) {
+        keyValue = keyIter.next();
+        snapshotInfoList.add(keyValue.getValue());
+      }
+
+      for (SnapshotInfo info : snapshotInfoList) {
+        SnapshotInfo.SnapshotStatus snapshotStatus =
+            info.getSnapshotStatus();
+
+        if (snapshotStatus.equals(SnapshotInfo
+            .SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          activeGauge++;
+        } else if (snapshotStatus.equals(SnapshotInfo
+            .SnapshotStatus.SNAPSHOT_DELETED)) {
+          deletedGauge++;
+        } else if (snapshotStatus.equals(SnapshotInfo
+            .SnapshotStatus.SNAPSHOT_RECLAIMED)) {
+          reclaimedGauge++;
+        }
+      }
+    }
+
+    metrics.setNumSnapshotActive(activeGauge);
+    metrics.setNumSnapshotDeleted(deletedGauge);
+    metrics.setNumSnapshotDeleted(reclaimedGauge);
   }
 
   private void checkConfigBeforeBootstrap() throws IOException {
@@ -3610,6 +3661,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
+
+    // Snapshot metrics
+    updateActiveSnapshotMetrics();
 
     // Delete the omMetrics file if it exists and save the a new metrics file
     // with new data

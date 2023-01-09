@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
+import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -382,6 +383,67 @@ public class TestOmMetrics {
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);
 
+  }
+
+  @Test
+  public void testSnapshotOps() throws Exception {
+    // This tests needs enough datanodes to allocate the
+    // blocks for the keys.
+    clusterBuilder.setNumDatanodes(3);
+    startCluster();
+
+    OmBucketInfo omBucketInfo = createBucketInfo();
+
+    String volumeName = omBucketInfo.getVolumeName();
+    String bucketName = omBucketInfo.getBucketName();
+    String snapshot1 = "snap1";
+    String snapshot2 = "snap2";
+
+    writeClient.createBucket(omBucketInfo);
+
+    // Create first key
+    OmKeyArgs keyArgs1 = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    OpenKeySession keySession = writeClient.openKey(keyArgs1);
+    writeClient.commitKey(keyArgs1, keySession.getId());
+
+    // Create first snapshot
+    writeClient.createSnapshot(volumeName, bucketName, snapshot1);
+
+    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+
+    assertCounter("NumSnapshotCreateFails", 0L, omMetrics);
+    assertCounter("NumSnapshotCreates", 1L, omMetrics);
+    assertCounter("NumSnapshotListFails", 0L, omMetrics);
+    assertCounter("NumSnapshotLists", 0L, omMetrics);
+
+    assertGauge("NumSnapshotActive", 1L, omMetrics);
+    assertGauge("NumSnapshotDeleted", 0L, omMetrics);
+    assertGauge("NumSnapshotReclaimed", 0L, omMetrics);
+
+    // Create second key
+    OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    OpenKeySession keySession2 = writeClient.openKey(keyArgs2);
+    writeClient.commitKey(keyArgs2, keySession2.getId());
+
+    // Create second snapshot
+    writeClient.createSnapshot(volumeName, bucketName, snapshot2);
+
+    // List snapshots
+    writeClient.listSnapshot(volumeName, bucketName);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertGauge("NumSnapshotActive", 2L, omMetrics);
+    assertCounter("NumSnapshotCreates", 2L, omMetrics);
+    assertCounter("NumSnapshotLists", 1L, omMetrics);
+
+    // restart OM
+    cluster.restartOzoneManager();
+
+    // Check number of active snapshots in the snapshot table
+    // is the same after OM restart
+    assertGauge("NumSnapshotActive", 2L, omMetrics);
   }
 
   private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {
