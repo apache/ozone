@@ -476,26 +476,23 @@ public final class KeyValueContainerUtil {
         // Get container file and check Schema version. If Schema is V3
         // then remove the container from RocksDB.
         File containerFile = ContainerUtils.getContainerFile(file);
+        
+        ContainerData containerData = ContainerDataYaml
+            .readContainerFile(containerFile);
+        KeyValueContainerData keyValueContainerData =
+            (KeyValueContainerData) containerData;
 
-        // If file exists
-        if (containerFile != null) {
-          ContainerData containerData = ContainerDataYaml
-              .readContainerFile(containerFile);
-          KeyValueContainerData keyValueContainerData =
-              (KeyValueContainerData) containerData;
-
-          if (keyValueContainerData.getSchemaVersion()
-              .equals(OzoneConsts.SCHEMA_V3)) {
-            // Container file doesn't include the volume
-            // so we need to set it here in order to get the db file.
-            keyValueContainerData.setVolume(hddsVolume);
-            File dbFile = KeyValueContainerLocationUtil
-                .getContainerDBFile(keyValueContainerData);
-            keyValueContainerData.setDbFile(dbFile);
-            // Remove container from Rocks DB
-            BlockUtils.removeContainerFromDB(keyValueContainerData,
-                hddsVolume.getConf());
-          }
+        if (keyValueContainerData.getSchemaVersion()
+            .equals(OzoneConsts.SCHEMA_V3)) {
+          // Container file doesn't include the volume
+          // so we need to set it here in order to get the db file.
+          keyValueContainerData.setVolume(hddsVolume);
+          File dbFile = KeyValueContainerLocationUtil
+              .getContainerDBFile(keyValueContainerData);
+          keyValueContainerData.setDbFile(dbFile);
+          // Remove container from Rocks DB
+          BlockUtils.removeContainerFromDB(keyValueContainerData,
+              hddsVolume.getConf());
         }
 
         try {
@@ -549,14 +546,8 @@ public final class KeyValueContainerUtil {
       File container = new File(containerPath);
       String containerDirName = container.getName();
 
-      if (!hddsVolume.getClusterID().isEmpty()) {
-        // Initialize delete directory
-        hddsVolume.createDeleteServiceDir(hddsVolume.getClusterID());
-      } else {
-        LOG.error("Volume hasn't been formatted " +
-            "properly and has no ClusterId. " +
-            "Unable to initialize delete service directory.");
-      }
+      // Initialize delete directory
+      hddsVolume.createDeleteServiceDir(hddsVolume.getClusterID());
 
       String destinationDirPath = hddsVolume.getDeleteServiceDirPath()
           .resolve(Paths.get(containerDirName)).toString();
