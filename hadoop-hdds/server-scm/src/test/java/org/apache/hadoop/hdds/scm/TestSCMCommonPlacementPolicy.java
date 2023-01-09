@@ -306,8 +306,7 @@ public class TestSCMCommonPlacementPolicy {
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
     Assertions.assertEquals(replicasToRemove.size(), 1);
-    Assertions.assertEquals(replicasToRemove.stream().findFirst().get(),
-            replica);
+    Assertions.assertEquals(replicasToRemove.toArray()[0], replica);
   }
 
   @Test
