@@ -343,8 +343,12 @@ public class TestSCMCommonPlacementPolicy {
     replicas.addAll(HddsTestUtils.getReplicasWithReplicaIndex(
             new ContainerID(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
     Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
-            HddsTestUtils.getReplicas(new ContainerID(1), CLOSED, 0,
-                    list.subList(7, 9)));
+            HddsTestUtils.getReplicaBuilder(new ContainerID(1), CLOSED, 0, 0, 0,
+                    list.get(7).getUuid(), list.get(7))
+                    .setReplicaIndex(1).build(),
+            HddsTestUtils.getReplicaBuilder(new ContainerID(1), CLOSED, 0, 0, 0,
+                    list.get(8).getUuid(), list.get(8)).setReplicaIndex(1)
+                    .build());
     replicas.addAll(replicasToBeRemoved);
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
@@ -354,7 +358,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testReplicasToRemoveWith3CountPerUniqueReplica() {
+  public void testReplicasToRemoveWithoutReplicaIndex() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 3);
     List<DatanodeDetails> list = nodeManager.getAllNodes();
