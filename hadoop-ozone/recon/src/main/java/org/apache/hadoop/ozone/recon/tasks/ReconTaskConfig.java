@@ -72,7 +72,7 @@ public class ReconTaskConfig {
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval to wait for starting container " +
           "health task and pipeline sync task before recon " +
-          "emit out of safe or warmup mode. "
+          "exits out of safe or warmup mode. "
   )
   private long safeModeWaitThreshold = Duration.ofMinutes(5).toMillis();
 
