@@ -96,7 +96,8 @@ public class ECReconstructionCoordinatorTask implements Runnable {
       long elapsed = Time.monotonicNow() - start;
       LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
     } catch (IOException e) {
-      LOG.warn("Failed {}", reconstructionCommandInfo, e);
+      long elapsed = Time.monotonicNow() - start;
+      LOG.warn("Failed {} after {} ms", reconstructionCommandInfo, elapsed, e);
     } finally {
       this.inprogressCounter.remove(containerID);
     }
