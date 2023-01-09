@@ -18,12 +18,14 @@
 FairCallQueue
 ===
 
-This document contains information for setting up the `FairCallQueue` feature with Ozone 
-and testing it in a docker based dev cluster. In order for `FairCallQueue` to be enabled and used, 
-Hadoop RPC must be used as transport protocol for OM - S3G communication. There is no implementation for gRPC.
+This document contains information for setting up the `FairCallQueue` feature with Ozone. 
+In order for `FairCallQueue` to be enabled and used, 
+Hadoop RPC must be used as transport protocol for OM - S3G communication. 
+There is no implementation for gRPC yet.
 
 There is a custom `IdentityProvider` implementation for Ozone that must be specified in the configuration, otherwise
-there is no S3G impersonation which makes the `FairCallQueue` ineffective since it's only reading one user.
+there is no S3G impersonation which makes the `FairCallQueue` ineffective since it's only reading one user, 
+the Ozone super user instead of the S3G client user.
 
 ## Configuration
 
@@ -76,25 +78,4 @@ Port used for below examples : 9862
     <name>ipc.9862.decay-scheduler.thresholds</name>
     <value>90</value>
 </property>
-```
-
-## Configuration for Ozone in Docker
-
-Under `hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone` 
-
-edit `docker-config` file and add the following
-
-```
-CORE-SITE.XML_ipc.9862.callqueue.impl=org.apache.hadoop.ipc.FairCallQueue
-CORE-SITE.XML_ipc.9862.scheduler.impl=org.apache.hadoop.ipc.DecayRpcScheduler
-CORE-SITE.XML_ipc.9862.identity-provider.impl=org.apache.hadoop.ozone.om.OzoneIdentityProvider
-CORE-SITE.XML_ipc.9862.scheduler.priority.levels=2
-CORE-SITE.XML_ipc.9862.backoff.enable=true
-CORE-SITE.XML_ipc.9862.faircallqueue.multiplexer.weights=99,1
-CORE-SITE.XML_ipc.9862.decay-scheduler.thresholds=90
-
-OZONE-SITE.XML_ozone.om.address=0.0.0.0:9862
-
-OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=false
-OZONE-SITE.XML_ozone.om.transport.class=org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory
 ```
