@@ -305,10 +305,16 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
+      if (omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+        continue;
+      }
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
-          !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
+      } else {
+        // consider used space for bucket where quota is not set
+        // This quota will be part of volume quota
+        totalBucketQuota += bucketInfo.getUsedBytes();
       }
     }
 
