@@ -95,7 +95,7 @@ public class TarContainerPacker
 
     Path containerUntarDir = tmpDir.resolve(String.valueOf(containerId));
     if (containerUntarDir.toFile().exists()) {
-      Files.delete(containerUntarDir);
+      FileUtils.deleteDirectory(containerUntarDir.toFile());
     }
 
     Path dbRoot = getDbPath(containerUntarDir, containerData);
