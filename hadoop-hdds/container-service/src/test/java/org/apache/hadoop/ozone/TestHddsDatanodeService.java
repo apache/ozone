@@ -27,22 +27,16 @@ import java.util.UUID;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
@@ -148,12 +142,11 @@ public class TestHddsDatanodeService {
         volumeSet.getVolumesList());
 
     for (HddsVolume volume : volumes) {
-      volume.format(clusterId);
-      volume.createWorkingDir(clusterId, null);
-      volume.createDeleteServiceDir(clusterId);
-
+      StorageVolumeUtil.checkVolume(volume, clusterId,
+          clusterId, conf, LOG, null);
       // Create a container and move it under the tmp delete dir.
-      KeyValueContainer container = setUpTestContainer(volume, schemaVersion);
+      KeyValueContainer container = ContainerTestUtils
+          .setUpTestContainer(volume, clusterId, conf, schemaVersion);
       assertTrue(container.getContainerFile().exists());
     }
 
@@ -168,36 +161,6 @@ public class TestHddsDatanodeService {
     }
 
     volumeSet.shutdown();
-  }
-
-  private KeyValueContainer setUpTestContainer(
-      HddsVolume volume, String schemaVersion) throws IOException {
-    ContainerSet containerSet = new ContainerSet(1000);
-    VolumeChoosingPolicy volumeChoosingPolicy =
-        new RoundRobinVolumeChoosingPolicy();
-    long containerId = HddsUtils.getTime();
-    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-
-    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
-        containerId, layout,
-        ContainerTestHelper.CONTAINER_MAX_SIZE,
-        UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    keyValueContainerData.setSchemaVersion(schemaVersion);
-
-    KeyValueContainer container =
-        new KeyValueContainer(keyValueContainerData, conf);
-    container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
-
-    containerSet.addContainer(container);
-
-    // For testing, we are moving the container
-    // under the tmp directory, in order to delete
-    // it during datanode shutdown
-    KeyValueContainerUtil.ContainerDeleteDirectory
-        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
-
-    return container;
   }
 
   static class MockService implements ServicePlugin {

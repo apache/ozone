@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.container.common;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
@@ -25,7 +24,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,10 +47,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -62,9 +56,7 @@ import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointT
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -148,6 +140,10 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+          true);
+      conf.setBoolean(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
@@ -190,13 +186,13 @@ public class TestEndPoint {
       MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
           volumeSet.getVolumesList())) {
-        hddsVolume.format(clusterId);
-        hddsVolume.createWorkingDir(clusterId, null);
-        hddsVolume.createDeleteServiceDir(clusterId);
+        StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
+            clusterId, conf, null, null);
 
         // Create a container and move it under the tmp delete dir.
-        KeyValueContainer container =
-            setUpTestContainer(hddsVolume, clusterId, conf);
+        KeyValueContainer container = ContainerTestUtils.
+            setUpTestContainer(hddsVolume, clusterId,
+                conf, OzoneConsts.SCHEMA_V3);
         assertTrue(container.getContainerFile().exists());
       }
 
@@ -216,37 +212,6 @@ public class TestEndPoint {
     }
   }
 
-  private KeyValueContainer setUpTestContainer(
-      HddsVolume volume, String clusterId,
-      OzoneConfiguration conf) throws IOException {
-    ContainerSet containerSet = new ContainerSet(1000);
-    VolumeChoosingPolicy volumeChoosingPolicy =
-        new RoundRobinVolumeChoosingPolicy();
-    long containerId = HddsUtils.getTime();
-    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-
-    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
-        containerId, layout,
-        ContainerTestHelper.CONTAINER_MAX_SIZE,
-        UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    keyValueContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V3);
-
-    KeyValueContainer container =
-        new KeyValueContainer(keyValueContainerData, conf);
-    container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
-
-    containerSet.addContainer(container);
-
-    // For testing, we are moving the container
-    // under the tmp directory, in order to delete
-    // it during versionTask.call()
-    KeyValueContainerUtil.ContainerDeleteDirectory
-        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
-
-    return container;
-  }
-
   @Test
   public void testCheckVersionResponse() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
@@ -254,6 +219,8 @@ public class TestEndPoint {
         true);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {

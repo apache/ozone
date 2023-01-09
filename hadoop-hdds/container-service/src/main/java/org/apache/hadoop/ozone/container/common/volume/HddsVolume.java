@@ -70,10 +70,9 @@ public class HddsVolume extends StorageVolume {
   private static final Logger LOG = LoggerFactory.getLogger(HddsVolume.class);
 
   public static final String HDDS_VOLUME_DIR = "hdds";
-  private static final String FILE_SEPARATOR = File.separator;
-  private static final String TMP_DIR = FILE_SEPARATOR + "tmp";
-  private static final String TMP_DELETE_SERVICE_DIR =
-      FILE_SEPARATOR + "container_delete_service";
+  private static final Path TMP_DIR = Paths.get("tmp");
+  private static final Path TMP_DELETE_SERVICE_DIR =
+      Paths.get("container_delete_service");
 
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
@@ -355,32 +354,26 @@ public class HddsVolume extends StorageVolume {
    * @param id clusterId or scmId
    */
   public void checkTmpDirPaths(String id) {
-    String tmpPath = createTmpPath(id);
-    String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
-    deleteServiceDirPath = Paths.get(deleteServicePath);
+    Path tmpPath = createTmpPath(id);
+    deleteServiceDirPath = tmpPath.resolve(TMP_DELETE_SERVICE_DIR);
   }
 
-  private String createTmpPath(String id) {
-    StringBuilder stringBuilder = new StringBuilder();
+  private Path createTmpPath(String id) {
 
     // HddsVolume root directory path
     String hddsRoot = getHddsRootDir().toString();
 
     // HddsVolume path
-    String volPath = HddsVolumeUtil.getHddsRoot(hddsRoot);
+    String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
 
-    stringBuilder.append(volPath);
-    stringBuilder.append(FILE_SEPARATOR);
+    Path volPath = Paths.get(vol);
+    Path idPath = Paths.get(id);
 
-    stringBuilder.append(id);
-    stringBuilder.append(TMP_DIR);
-
-    return stringBuilder.toString();
+    return volPath.resolve(idPath).resolve(TMP_DIR);
   }
 
-
   private void createTmpDir(String id) {
-    tmpDirPath = Paths.get(createTmpPath(id));
+    tmpDirPath = createTmpPath(id);
 
     if (Files.notExists(tmpDirPath)) {
       try {
@@ -395,10 +388,9 @@ public class HddsVolume extends StorageVolume {
     if (tmpDirPath == null) {
       createTmpDir(id);
     }
-    String tmpPath = tmpDirPath.toString();
-    String deleteServicePath = tmpPath + TMP_DELETE_SERVICE_DIR;
 
-    deleteServiceDirPath = Paths.get(deleteServicePath);
+    deleteServiceDirPath =
+        tmpDirPath.resolve(TMP_DELETE_SERVICE_DIR);
 
     if (Files.notExists(deleteServiceDirPath)) {
       try {
