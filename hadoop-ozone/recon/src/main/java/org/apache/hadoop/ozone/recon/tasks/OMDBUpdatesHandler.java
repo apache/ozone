@@ -93,6 +93,18 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
+    // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
+    // and assuming to typecast as String while de-serializing will throw error.
+    // omdbLatestUpdateEvents defines map key as String type to store in its map
+    // and to change to Object as key will have larger impact considering all
+    // ReconOmTasks. Currently, this table is not needed to sync in Recon OM DB
+    // snapshot as this table data not being used currently in Recon.
+    // When this table data will be needed, all events for this table will be
+    // saved using Object as key and new task will also retrieve using Object
+    // as key.
+    if (OMDBDefinition.DTOKEN_TABLE.getName().equalsIgnoreCase(tableName)) {
+      return;
+    }
     Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
     Optional<Class> valueType = omdbDefinition.getValueType(tableName);
     if (keyType.isPresent() && valueType.isPresent()) {
@@ -114,7 +126,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
       } else {
-        // Recon does not add entries to cache and it is safer to always use
+        // Recon does not add entries to cache, and it is safer to always use
         // getSkipCache in Recon.
         oldValue = table.getSkipCache(key);
       }
