@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 
 import org.mockito.Mockito;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -331,6 +332,48 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
+  public void testReplicasToRemoveWith2CountPerUniqueReplica() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 3);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(0, 3)));
+    replicas.addAll(HddsTestUtils.getReplicasWithReplicaIndex(
+            new ContainerID(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
+    Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
+            HddsTestUtils.getReplicas(new ContainerID(1), CLOSED, 0,
+                    list.subList(7, 9)));
+    replicas.addAll(replicasToBeRemoved);
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 2);
+    Assertions.assertEquals(replicasToRemove.size(), 2);
+    Assertions.assertEquals(replicasToRemove, replicasToBeRemoved);
+  }
+
+  @Test
+  public void testReplicasToRemoveWith3CountPerUniqueReplica() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 3);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(HddsTestUtils.getReplicas(
+                    new ContainerID(1), CLOSED, 0, list.subList(0, 5)));
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 3);
+    Assertions.assertEquals(replicasToRemove.size(), 2);
+    Set<Node> racksToBeRemoved = Arrays.asList(0, 1).stream()
+            .map(dummyPlacementPolicy.racks::get).collect(Collectors.toSet());
+    Assertions.assertEquals(replicasToRemove.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .map(dummyPlacementPolicy::getPlacementGroup)
+            .collect(Collectors.toSet()), racksToBeRemoved);
+  }
+
+  @Test
   public void testReplicasToRemoveWithOverreplicationWithinSameRack() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 3);
@@ -390,6 +433,14 @@ public class TestSCMCommonPlacementPolicy {
     private List<Node> racks;
     private int rackCnt;
 
+
+    /**
+     * Creates Dummy Placement Policy with dn index to rack Mapping
+     * in round robin fashion (rack Index = dn Index % total number of racks).
+     * @param nodeManager
+     * @param conf
+     * @param rackCnt
+     */
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
         int rackCnt) {
       this(nodeManager, conf,
@@ -398,6 +449,12 @@ public class TestSCMCommonPlacementPolicy {
                    idx -> idx % rackCnt)), rackCnt);
     }
 
+    /**
+     * Creates Dummy Placement Policy with dn index -> rack index mapping.
+     * @param nodeManager
+     * @param conf
+     * @param rackCnt
+     */
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
             Map<Integer, Integer> datanodeRackMap, int rackCnt) {
       super(nodeManager, conf);
