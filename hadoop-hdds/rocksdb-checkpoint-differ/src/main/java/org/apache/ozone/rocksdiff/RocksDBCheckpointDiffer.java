@@ -711,12 +711,63 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   }
 
   /**
-   * Get a list of SST files that differs between src and destination snapshots.
-   * <p>
-   * Expected input: src is a snapshot taken AFTER the dest.
+   * Helper function that prepends SST file name with SST backup directory path,
+   * and appends the extension '.sst'.
+   */
+  private String getSSTFullPathInBackupDir(String sstFilenameWithoutExtension,
+                                           String dbPath) {
+
+    // Try to locate the SST in the backup dir first
+    final Path sstPathInBackupDir = Paths.get(sstBackupDir,
+            sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+    if (Files.exists(sstPathInBackupDir)) {
+      return sstPathInBackupDir.toString();
+    }
+
+    // SST file does not exist in the SST backup dir, this means the SST file
+    // has not gone through any compactions yet and is only available in the
+    // src DB directory
+    final Path sstPathInDBDir = Paths.get(dbPath,
+            sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+    if (Files.exists(sstPathInDBDir)) {
+      return sstPathInDBDir.toString();
+    }
+
+    // TODO: More graceful error handling?
+    throw new RuntimeException("Unable to locate SST file: " +
+            sstFilenameWithoutExtension);
+  }
+
+  /**
+   * A wrapper of getSSTDiffList() that returns the absolute path of SST files,
+   * rather than SST file names without extension.
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @return A list of SST files without extension.
+   *         e.g. ["/path/to/sstBackupDir/000050.sst",
+   *               "/path/to/sstBackupDir/000060.sst"]
+   */
+  public List<String> getSSTDiffListWithFullPath(
+          DifferSnapshotInfo src, DifferSnapshotInfo dest) {
+
+    List<String> sstDiffList = getSSTDiffList(src, dest);
+
+    return sstDiffList.stream()
+            .map(sst -> getSSTFullPathInBackupDir(sst, src.getDbPath()))
+            .collect(Collectors.toList());
+  }
+
+  /**
+   * Get a list of SST files that differs between src and destination snapshots.
+   * <p>
+   * Expected input: src is a snapshot taken AFTER the dest.
+   * <p>
+   * Use getSSTDiffListWithFullPath() instead if you need the full path to SSTs.
+   *
+   * @param src source snapshot
+   * @param dest destination snapshot
+   * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized List<String> getSSTDiffList(
       DifferSnapshotInfo src, DifferSnapshotInfo dest) {
@@ -1255,6 +1306,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     String[] outputFiles = io[1].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
 
     return asList(outputFiles);
+  }
+
+  public String getSSTBackupDir() {
+    return sstBackupDir;
   }
 
   private static final class SnapshotLogInfo {
