@@ -1520,7 +1520,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.glassfish.hk2.external</groupId>
         <artifactId>jakarta.inject</artifactId>
-        <version>${jakarta.inject.version</version>
+        <version>${jakarta.inject.version}</version>
       </dependency>
       <dependency>
         <groupId>jakarta.annotation</groupId>
