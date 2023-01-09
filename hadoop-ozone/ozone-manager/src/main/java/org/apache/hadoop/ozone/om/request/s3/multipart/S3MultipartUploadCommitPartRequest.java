@@ -234,7 +234,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
         correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
       }
-      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          correctedSpace);
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omResponse.setCommitMultiPartUploadResponse(
