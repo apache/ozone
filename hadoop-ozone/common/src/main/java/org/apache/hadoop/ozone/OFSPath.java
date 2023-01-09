@@ -269,7 +269,7 @@ public class OFSPath {
    * only contains the snapshot indicator, then return true.
    * e.g. /vol/bucket/.snapshot is a snapshot prefix.
    */
-  public boolean isSnapshotPrefix() {
+  public boolean isSnapshotIndicator() {
     if (keyName.contains(OM_SNAPSHOT_INDICATOR)) {
       String[] keyNames = keyName.split(OZONE_URI_DELIMITER);
 

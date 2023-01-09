@@ -25,6 +25,9 @@ Test Timeout        5 minutes
 ${SNAPSHOT_PREFIX}      .snapshot
 ${VOLUME}
 ${BUCKET}
+${KEY_ONE}
+${KEY_TWO}
+${DIR_ONE}
 ${SNAPSHOT_ONE}
 
 *** Keywords ***
@@ -44,9 +47,15 @@ Create bucket
                     Should not contain  ${result}       Failed
 
 Create keys
-    ${result} =     Execute             ozone sh key put /${VOLUME}/${BUCKET}/key1 README.md
+    ${random} =     Generate Random String  5  [LOWER]
+                    Set Suite Variable     ${KEY_ONE}    key-${random}
+    ${result} =     Execute             ozone sh key put /${VOLUME}/${BUCKET}/${KEY_ONE} README.md
                     Should not contain  ${result}       Failed
-    ${result} =     Execute             ozone sh key put /${VOLUME}/${BUCKET}/dir1/key2 HISTORY.md
+    ${random} =     Generate Random String  5  [LOWER]
+                    Set Suite Variable     ${DIR_ONE}    dir-${random}
+    ${random} =     Generate Random String  5  [LOWER]
+                    Set Suite Variable     ${KEY_TWO}    key-${random}
+    ${result} =     Execute             ozone sh key put /${VOLUME}/${BUCKET}/${DIR_ONE}/${KEY_TWO} HISTORY.md
                     Should not contain  ${result}       Failed
 
 Create snapshot
@@ -56,8 +65,14 @@ Create snapshot
                     Should not contain  ${result}       Failed
 
 List snapshots with fs -ls
-    ${result}       Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}
+    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}
                     Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}
+
+List snapshot keys with fs -ls
+    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}
+                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}/${KEY_ONE}
+    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}/${KEY_ONE}
+                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}/${KEY_ONE}
 
 Setup Snapshot Paths
     Execute         kdestroy
@@ -76,3 +91,5 @@ Test create snapshot
 Test list snapshots with fs -ls
     List snapshots with fs -ls
 
+Test list snapshot keys with fs -ls
+    List snapshot keys with fs -ls

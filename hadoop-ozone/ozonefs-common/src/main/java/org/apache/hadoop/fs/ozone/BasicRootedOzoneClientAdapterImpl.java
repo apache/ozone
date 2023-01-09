@@ -640,21 +640,17 @@ public class BasicRootedOzoneClientAdapterImpl
       return getFileStatusAdapterForRoot(uri);
     }
 
-    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-
     if (ofsPath.isVolume()) {
+      OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
       return getFileStatusAdapterForVolume(volume, uri);
     }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
 
-      if (ofsPath.isSnapshotPrefix()) {
-        UserGroupInformation ugi =
-            UserGroupInformation.createRemoteUser(volume.getOwner());
-        String owner = ugi.getShortUserName();
-        String group = getGroupName(ugi);
+      if (ofsPath.isSnapshotIndicator()) {
+        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
         return getFileStatusAdapterWithSnapshotPrefix(
-            bucket, uri, owner, group);
+            volume, bucket, uri);
       }
 
       OzoneFileStatus status = bucket.getFileStatus(key);
@@ -875,7 +871,7 @@ public class BasicRootedOzoneClientAdapterImpl
           recursive, startBucket, numEntries, uri, workingDir, username);
     }
 
-    if (ofsPath.isSnapshotPrefix()) {
+    if (ofsPath.isSnapshotIndicator()) {
       return listStatusBucketSnapshot(ofsPath.getVolumeName(),
           ofsPath.getBucketName(), uri);
     }
@@ -1202,7 +1198,12 @@ public class BasicRootedOzoneClientAdapterImpl
    * @return FileStatusAdapter for a snapshot prefix.
    */
   private static FileStatusAdapter getFileStatusAdapterWithSnapshotPrefix(
-      OzoneBucket ozoneBucket, URI uri, String owner, String group) {
+      OzoneVolume ozoneVolume, OzoneBucket ozoneBucket, URI uri) {
+    UserGroupInformation ugi =
+        UserGroupInformation.createRemoteUser(ozoneVolume.getOwner());
+    String owner = ugi.getShortUserName();
+    String group = getGroupName(ugi);
+
     String pathStr = uri.toString() +
         OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
         OZONE_URI_DELIMITER + ozoneBucket.getName() +
