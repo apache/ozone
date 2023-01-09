@@ -196,6 +196,15 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Returns the Hostname and IP of the datanode separated by a slash.
+   *
+   * Eg: datanode001.corp/192.168.0.123
+   */
+  public String getHostNameAndIP() {
+    return getHostName() + "/" + getIpAddress();
+  }
+
+  /**
    * Sets a DataNode Port.
    *
    * @param port DataNode port
