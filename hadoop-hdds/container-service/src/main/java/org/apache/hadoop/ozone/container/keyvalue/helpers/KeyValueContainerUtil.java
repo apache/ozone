@@ -448,14 +448,8 @@ public final class KeyValueContainerUtil {
         return;
       }
 
-      if (!hddsVolume.getClusterID().isEmpty()) {
-        // Initialize tmp and delete service directories
-        hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
-      } else {
-        LOG.error("Volume hasn't been formatted " +
-            "properly and has no ClusterId. " +
-            "Unable to initialize tmp and delete service directories.");
-      }
+      // Initialize tmp and delete service directories
+      hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
 
       ListIterator<File> leftoversListIt = getDeleteLeftovers(hddsVolume);
 
@@ -526,14 +520,8 @@ public final class KeyValueContainerUtil {
     public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume) {
       List<File> leftovers = new ArrayList<>();
 
-      if (!hddsVolume.getClusterID().isEmpty()) {
-        // Initialize tmp and delete service directories
-        hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
-      } else {
-        LOG.error("Volume hasn't been formatted " +
-            "properly and has no ClusterId. " +
-            "Unable to initialize tmp and delete service directories.");
-      }
+      // Initialize tmp and delete service directories
+      hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
 
       File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
 
