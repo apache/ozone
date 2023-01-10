@@ -388,6 +388,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
     long quotaInBytes = omBucketInfo.getQuotaInBytes();
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
 
+    // When volume quota is set, then its mandatory to have bucket quota
+    if (volumeQuotaInBytes > 0) {
+      if (quotaInBytes <= 0) {
+        throw new OMException("Buckets quota in this volume " +
+            "should be set as volume space quota is set to : "
+            + volumeQuotaInBytes, OMException.ResultCodes.QUOTA_ERROR);
+      }
+    }
+
     long totalBucketQuota = 0;
     if (quotaInBytes > 0) {
       totalBucketQuota = quotaInBytes;

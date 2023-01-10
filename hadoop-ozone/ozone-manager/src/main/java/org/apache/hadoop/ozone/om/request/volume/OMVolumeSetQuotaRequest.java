@@ -195,14 +195,24 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       return false;
     }
 
+    boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         volumeName, null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
+      } else {
+        isBucketQuotaSet = false;
       }
     }
+    
+    if (!isBucketQuotaSet) {
+      throw new OMException("Can not set volume quota as some of bucket " +
+          "do not have space quota set in this volume.",
+          OMException.ResultCodes.QUOTA_ERROR);
+    }
+    
     if (volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
       throw new OMException("Total buckets quota in this volume " +
