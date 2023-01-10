@@ -23,9 +23,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -35,6 +38,9 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.FileOutputStream;
@@ -48,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 /**
@@ -59,6 +66,9 @@ import java.util.concurrent.Callable;
 )
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
+
+  public static final Logger LOG =
+      LoggerFactory.getLogger(DBScanner.class);
 
   @CommandLine.Option(names = {"--column_family"},
       required = true,
@@ -80,6 +90,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private static String fileName;
 
+  @CommandLine.Option(names = {"--startkey", "-sk"},
+      description = "Key from which to iterate the DB")
+  private static String startKey;
+
   @CommandLine.Option(names = {"--dnSchema", "-d"},
       description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
@@ -90,6 +104,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       defaultValue = "-1")
   private static long containerId;
 
+  @CommandLine.Option(names = { "--show-count",
+      "-count" }, description = "Get estimated key count for a"
+      + " given column family in the db",
+      defaultValue = "false",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private static boolean showCount;
+
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
@@ -97,9 +119,31 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private List<Object> scannedObjects;
 
+  public static byte[] getValueObject(
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+    Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
+    if (keyType.equals(String.class)) {
+      return startKey.getBytes(StandardCharsets.UTF_8);
+    } else if (keyType.equals(ContainerID.class)) {
+      return new ContainerID(Long.parseLong(startKey)).getBytes();
+    } else if (keyType.equals(Long.class)) {
+      return Longs.toByteArray(Long.parseLong(startKey));
+    } else if (keyType.equals(PipelineID.class)) {
+      return PipelineID.valueOf(UUID.fromString(startKey)).getProtobuf()
+          .toByteArray();
+    } else {
+      throw new IllegalArgumentException(
+          "StartKey is not supported for this table.");
+    }
+  }
+
   private static List<Object> displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
+
+    if (startKey != null) {
+      iterator.get().seek(getValueObject(dbColumnFamilyDefinition));
+    }
 
     Writer fileWriter = null;
     PrintWriter printWriter = null;
@@ -193,6 +237,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBScanner.withKey = withKey;
   }
 
+  public static void setShowCount(boolean showCount) {
+    DBScanner.showCount = showCount;
+  }
+
   private static ColumnFamilyHandle getColumnFamilyHandle(
             byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
@@ -218,8 +266,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
     for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
-      System.out.println("Added definition for table:" +
-          definition.getTableName());
+      LOG.info("Added definition for table: {}", definition.getTableName());
       this.columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
@@ -240,7 +287,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          ManagedRocksDB rocksDB, String dbPath) throws IOException {
+          ManagedRocksDB rocksDB, String dbPath)
+      throws IOException, RocksDBException {
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
               "List length should be a positive number. Only allowed negative" +
@@ -262,6 +310,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 columnFamilyHandleList);
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
+        }
+        if (showCount) {
+          long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
+              RocksDatabase.ESTIMATE_NUM_KEYS);
+          System.out.println(keyCount);
+          return;
         }
         ManagedRocksIterator iterator;
         if (containerId > 0 && dnDBSchemaVersion != null &&
@@ -298,6 +352,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return RDBParser.class;
+  }
+
+  public static void setStartKey(String startKey) {
+    DBScanner.startKey = startKey;
   }
 }
 

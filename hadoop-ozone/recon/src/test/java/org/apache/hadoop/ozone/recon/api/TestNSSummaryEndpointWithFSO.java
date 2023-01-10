@@ -1,4 +1,4 @@
-/*'
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
+
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -26,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -46,6 +51,7 @@ import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -75,6 +81,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -107,6 +114,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
+  private OzoneConfiguration ozoneConfiguration;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -209,46 +217,47 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_FOUR_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_FIVE_SIZE = 100L; // bin 0
   private static final long KEY_SIX_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_SEVEN_SIZE = 4 * OzoneConsts.KB + 1;
   private static final long KEY_EIGHT_SIZE = OzoneConsts.KB + 1; // bin 1
   private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
-  private static final long LOCATION_INFO_GROUP_ONE_SIZE
-          = CONTAINER_ONE_REPLICA_COUNT * BLOCK_ONE_LENGTH
-          + CONTAINER_TWO_REPLICA_COUNT * BLOCK_TWO_LENGTH
-          + CONTAINER_THREE_REPLICA_COUNT * BLOCK_THREE_LENGTH;
-
-  private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
-          = LOCATION_INFO_GROUP_ONE_SIZE;
-
-  private static final long LOCATION_INFO_GROUP_TWO_SIZE
-      = CONTAINER_FOUR_REPLICA_COUNT * BLOCK_FOUR_LENGTH
-      + CONTAINER_FIVE_REPLICA_COUNT * BLOCK_FIVE_LENGTH
-      + CONTAINER_SIX_REPLICA_COUNT * BLOCK_SIX_LENGTH;
 
   private static final long FILE1_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_ONE_SIZE;
+      getReplicatedSize(KEY_ONE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE2_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_TWO_SIZE;
+      getReplicatedSize(KEY_TWO_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE3_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_ONE_SIZE;
+      getReplicatedSize(KEY_THREE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE4_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_TWO_SIZE;
+      getReplicatedSize(KEY_FOUR_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE5_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_ONE_SIZE;
+      getReplicatedSize(KEY_FIVE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE6_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_TWO_SIZE;
+      getReplicatedSize(KEY_SIX_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE7_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_ONE_SIZE;
+      getReplicatedSize(KEY_SEVEN_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE8_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_TWO_SIZE;
+      getReplicatedSize(KEY_EIGHT_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE9_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_ONE_SIZE;
+      getReplicatedSize(KEY_NINE_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE10_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_TWO_SIZE;
+      getReplicatedSize(KEY_TEN_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
   private static final long FILE11_SIZE_WITH_REPLICA =
-      LOCATION_INFO_GROUP_ONE_SIZE;
-
+      getReplicatedSize(KEY_ELEVEN_SIZE,
+              StandaloneReplicationConfig.getInstance(ONE));
+  private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
+          = FILE7_SIZE_WITH_REPLICA;
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT
       = FILE1_SIZE_WITH_REPLICA
@@ -341,6 +350,9 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Before
   public void setUp() throws Exception {
+    ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.newFolder());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -367,8 +379,9 @@ public class TestNSSummaryEndpointWithFSO {
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager);
-    nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, ozoneConfiguration);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
   @Test
@@ -841,7 +854,6 @@ public class TestNSSummaryEndpointWithFSO {
           getBucketLayout());
   }
 
-
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two
    * buckets.
@@ -943,7 +955,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_SEVEN_SIZE);
   }
 
   private OmKeyLocationInfoGroup getLocationInfoGroup1() {
@@ -1036,7 +1049,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_ONE_SIZE);
 
     //vol/bucket1/dir1/dir2/file2
     writeKeyToOm(reconOMMetadataManager,
@@ -1049,7 +1063,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_TWO_SIZE);
 
     //vol/bucket1/dir1/dir3/file3
     writeKeyToOm(reconOMMetadataManager,
@@ -1062,7 +1077,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_THREE_SIZE);
 
     //vol/bucket2/file4
     writeKeyToOm(reconOMMetadataManager,
@@ -1075,7 +1091,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_FOUR_SIZE);
 
     //vol/bucket2/file5
     writeKeyToOm(reconOMMetadataManager,
@@ -1088,7 +1105,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_TWO_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_FIVE_SIZE);
 
     //vol/bucket1/dir1/dir4/file6
     writeKeyToOm(reconOMMetadataManager,
@@ -1101,7 +1119,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_SIX_SIZE);
 
     //vol/bucket1/dir1/file7
     writeKeyToOm(reconOMMetadataManager,
@@ -1114,7 +1133,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_ONE_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_SEVEN_SIZE);
 
     //vol2/bucket3/file8
     writeKeyToOm(reconOMMetadataManager,
@@ -1127,7 +1147,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_EIGHT_SIZE);
 
     //vol2/bucket3/dir5/file9
     writeKeyToOm(reconOMMetadataManager,
@@ -1140,7 +1161,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_NINE_SIZE);
 
     //vol2/bucket3/dir5/file10
     writeKeyToOm(reconOMMetadataManager,
@@ -1153,7 +1175,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_THREE_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup2),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_TEN_SIZE);
 
     //vol2/bucket4/file11
     writeKeyToOm(reconOMMetadataManager,
@@ -1166,7 +1189,8 @@ public class TestNSSummaryEndpointWithFSO {
         BUCKET_FOUR_OBJECT_ID,
         VOL_TWO_OBJECT_ID,
         Collections.singletonList(locationInfoGroup1),
-        getBucketLayout());
+        getBucketLayout(),
+        KEY_ELEVEN_SIZE);
   }
 
   /**
@@ -1240,10 +1264,18 @@ public class TestNSSummaryEndpointWithFSO {
         .thenReturn(containerReplicas6);
 
     when(reconSCM.getContainerManager()).thenReturn(containerManager);
+    ReconNodeManager mockReconNodeManager = mock(ReconNodeManager.class);
+    when(mockReconNodeManager.getStats()).thenReturn(getMockSCMRootStat());
+    when(reconSCM.getScmNodeManager()).thenReturn(mockReconNodeManager);
     return reconSCM;
   }
 
   private static BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  private static SCMNodeStat getMockSCMRootStat() {
+    return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE, 
+        ROOT_QUOTA - ROOT_DATA_SIZE);
   }
 }

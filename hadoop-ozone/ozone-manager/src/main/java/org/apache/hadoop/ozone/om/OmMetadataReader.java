@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
 import java.util.List;
@@ -46,6 +47,9 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
 import static org.apache.hadoop.ozone.om.KeyManagerImpl.getRemoteUser;
 import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -58,6 +62,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * OM Metadata Reading class for the OM and Snapshot managers.
@@ -77,13 +82,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private final OmMetadataReaderMetrics metrics;
   private final Logger log;
   private final AuditLogger audit;
+  private OMPerformanceMetrics perfMetrics;
 
   public OmMetadataReader(KeyManager keyManager,
-                   PrefixManager prefixManager,
-                   OzoneManager ozoneManager,
-                   Logger log,
-                   AuditLogger audit,
-                   OmMetadataReaderMetrics omMetadataReaderMetrics) {
+                          PrefixManager prefixManager,
+                          OzoneManager ozoneManager,
+                          Logger log,
+                          AuditLogger audit,
+                          OmMetadataReaderMetrics omMetadataReaderMetrics) {
     this.keyManager = keyManager;
     this.bucketManager = ozoneManager.getBucketManager();
     this.volumeManager = ozoneManager.getVolumeManager();
@@ -94,7 +100,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     this.log = log;
     this.audit = audit;
     boolean allowListAllVolumes = ozoneManager.getAllowListAllVolumes();
-    metrics = omMetadataReaderMetrics;
+    this.metrics = omMetadataReaderMetrics;
+    this.perfMetrics = ozoneManager.getPerfMetrics();
     if (isAclEnabled) {
       accessAuthorizer = getACLAuthorizerInstance(configuration);
       if (accessAuthorizer instanceof OzoneNativeAuthorizer) {
@@ -126,21 +133,25 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
-
-    if (isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-    }
-
+    long start = Time.monotonicNowNanos();
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getLookupResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(args));
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
-    args = bucket.update(args);
+    OmKeyArgs resolvedArgs = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
+            () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
+                ACLType.READ, bucket.realVolume(), bucket.realBucket(),
+                args.getKeyName())
+        );
+      }
       metrics.incNumKeyLookups();
-      return keyManager.lookupKey(args, getClientAddress());
+      return keyManager.lookupKey(resolvedArgs, getClientAddress());
     } catch (Exception ex) {
       metrics.incNumKeyLookupFails();
       auditSuccess = false;
@@ -152,6 +163,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         audit.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_KEY,
             auditMap));
       }
+
+      perfMetrics.addLookupLatency(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -160,12 +173,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
 
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
+    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
+        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
 
-    if (isAclEnabled) {
-      checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-    }
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
@@ -173,9 +188,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      }
       metrics.incNumListStatus();
-      return keyManager.listStatus(args, recursive, startKey, numEntries,
-              getClientAddress(), allowPartialPrefixes);
+      return keyManager.listStatus(args, recursive, startKey,
+          maxListingPageSize, getClientAddress(), allowPartialPrefixes);
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;
@@ -220,17 +239,16 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
-    if (isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
+            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+      }
       metrics.incNumLookupFile();
       return keyManager.lookupFile(args, getClientAddress());
     } catch (Exception ex) {
@@ -254,11 +272,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(
         Pair.of(volumeName, bucketName));
 
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-          bucket.realVolume(), bucket.realBucket(), keyPrefix);
-    }
-
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.START_KEY, startKey);
@@ -266,6 +279,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+            bucket.realVolume(), bucket.realBucket(), keyPrefix);
+      }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
           startKey, keyPrefix, maxKeys);
@@ -442,7 +459,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return ReflectionUtils.newInstance(clazz, conf);
   }
 
-  private static String getClientAddress() {
+  static String getClientAddress() {
     String clientMachine = Server.getRemoteAddress();
     if (clientMachine == null) { //not a RPC client
       clientMachine = "";

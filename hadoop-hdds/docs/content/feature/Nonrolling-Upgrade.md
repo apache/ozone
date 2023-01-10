@@ -62,15 +62,15 @@ Starting with your current version of Ozone, complete the following steps to upg
 4. Start the components
     1. Start the SCM and datanodes as usual:
         ```
-        ozone --daemon scm start
+        ozone --daemon start scm
         ```
         ```
-        ozone --daemon datanode start
+        ozone --daemon start datanode
         ```
 
     2. Start the Ozone Manager using the `--upgrade` flag to take it out of prepare mode.
         ```
-        ozone --daemon om start --upgrade
+        ozone --daemon start om --upgrade
         ```
         - There also exists a `--downgrade` flag which is an alias of `--upgrade`. The name used does not matter.
 

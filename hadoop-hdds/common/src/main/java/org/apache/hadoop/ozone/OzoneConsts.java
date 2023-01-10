@@ -97,6 +97,7 @@ public final class OzoneConsts {
   public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
+  public static final String OZONE_O3TRASH_URI_SCHEME = "o3trash";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
@@ -390,6 +391,8 @@ public final class OzoneConsts {
   public static final int S3_BUCKET_MAX_LENGTH = 64;
 
   public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
+
+  public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";

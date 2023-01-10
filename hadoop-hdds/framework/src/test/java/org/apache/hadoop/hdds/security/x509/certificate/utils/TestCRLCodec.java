@@ -43,8 +43,7 @@ import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -247,13 +246,15 @@ public class TestCRLCodec {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
     keyPair = keyGenerator.generateKey();
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                                   .getConfiguration())
             .setKey(keyPair)

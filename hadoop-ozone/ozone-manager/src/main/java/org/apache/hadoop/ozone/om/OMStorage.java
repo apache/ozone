@@ -55,6 +55,10 @@ public class OMStorage extends Storage {
     getStorageInfo().setProperty(OM_CERT_SERIAL_ID, certSerialId);
   }
 
+  public void unsetOmCertSerialId() throws IOException {
+    getStorageInfo().unsetProperty(OM_CERT_SERIAL_ID);
+  }
+
   public void setOmId(String omId) throws IOException {
     if (getState() == StorageState.INITIALIZED) {
       throw new IOException("OM is already initialized.");

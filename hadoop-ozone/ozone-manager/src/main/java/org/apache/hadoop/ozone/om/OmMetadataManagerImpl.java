@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
@@ -273,6 +275,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private final long omEpoch;
 
   private Map<String, Table> tableMap = new HashMap<>();
+  private List<TableCacheMetrics> tableCacheMetrics = new LinkedList<>();
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
@@ -401,6 +404,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       throw new IOException(String.format(errMsg, name));
     }
     this.tableMap.put(name, table);
+    tableCacheMetrics.add(table.createCacheMetrics());
   }
 
   /**
@@ -546,7 +550,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     checkTableStatus(deletedTable, DELETED_TABLE);
 
     openKeyTable =
-        this.store.getTable(OPEN_KEY_TABLE, String.class, OmKeyInfo.class);
+        this.store.getTable(OPEN_KEY_TABLE, String.class,
+            OmKeyInfo.class);
     checkTableStatus(openKeyTable, OPEN_KEY_TABLE);
 
     multipartInfoTable = this.store.getTable(MULTIPARTINFO_TABLE,
@@ -619,6 +624,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     if (store != null) {
       store.close();
       store = null;
+    }
+    for (TableCacheMetrics metrics : tableCacheMetrics) {
+      metrics.unregister();
     }
     // OzoneManagerLock cleanup
     lock.cleanup();
@@ -1028,7 +1036,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-      getKeyIterator() {
+      getKeyIterator() throws IOException {
     return keyTable.iterator();
   }
 
@@ -1572,6 +1580,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             .append(OM_KEY_PREFIX)
             .append(pathComponentName);
     return builder.toString();
+  }
+
+  @Override
+  public String getOzoneDeletePathKey(long objectId, String pathKey) {
+    return pathKey + OM_KEY_PREFIX + objectId;
   }
 
   @Override

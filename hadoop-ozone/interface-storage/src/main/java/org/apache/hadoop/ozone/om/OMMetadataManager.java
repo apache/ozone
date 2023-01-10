@@ -445,7 +445,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
       getBucketIterator();
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator();
+      getKeyIterator() throws IOException;
 
   /**
    * Given parent object id and path component name, return the corresponding
@@ -459,6 +459,16 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOzonePathKey(long volumeId, long bucketId,
                          long parentObjectId, String pathComponentName);
+
+  /**
+   * Given ozone path key, component id, return the corresponding 
+   * DB path key for delete table.
+   *
+   * @param objectId - object Id
+   * @param pathKey   - path key of component
+   * @return DB Delete directory key as String.
+   */
+  String getOzoneDeletePathKey(long objectId, String pathKey);
 
   /**
    * Returns DB key name of an open file in OM metadata store. Should be

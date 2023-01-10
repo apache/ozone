@@ -39,18 +39,16 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -83,6 +81,9 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -129,6 +130,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -326,10 +328,36 @@ public class KeyManagerImpl implements KeyManager {
   public OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress)
       throws IOException {
     Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getLookupGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
+      // value won't be null as the check is done inside try/catch block.
+      captureLatencyNs(metrics.getLookupRefreshLocationLatencyNs(),
+          () -> refresh(value));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+
+    return value;
+  }
+
+  private OmKeyInfo readKeyInfo(OmKeyArgs args) throws IOException {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    long start = Time.monotonicNowNanos();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
 
@@ -345,7 +373,7 @@ public class KeyManagerImpl implements KeyManager {
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
-        value = getOmKeyInfo(volumeName, bucketName, keyName);
+        value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -360,49 +388,40 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-    metrics.addLookupReadKeyInfoLatency(Time.monotonicNowNanos() - start);
 
     if (value == null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
-                bucketName, keyName);
+            bucketName, keyName);
       }
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
-
-
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
-
-    // If operation is head, do not perform any additional steps based on flags.
-    // As head operation does not need any of those details.
-    if (!args.isHeadOp()) {
-
-      // add block token for read.
-      start = Time.monotonicNowNanos();
-      addBlockToken4Read(value);
-      metrics.addLookupGenerateBlockTokenLatency(
-          Time.monotonicNowNanos() - start);
-
-      // Refresh container pipeline info from SCM
-      // based on OmKeyArgs.refreshPipeline flag
-      // value won't be null as the check is done inside try/catch block.
-      start = Time.monotonicNowNanos();
-      refresh(value);
-      metrics.addLookupRefreshLocationLatency(Time.monotonicNowNanos() - start);
-
-      if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
-      }
-
-    }
-
     return value;
   }
 
+  private OmKeyInfo getOmKeyInfoDirectoryAware(String volumeName,
+            String bucketName, String keyName) throws IOException {
+    OmKeyInfo keyInfo = getOmKeyInfo(volumeName, bucketName, keyName);
+
+    // Check if the key is a directory.
+    if (keyInfo != null) {
+      keyInfo.setFile(true);
+      return keyInfo;
+    }
+
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    OmKeyInfo dirKeyInfo = getOmKeyInfo(volumeName, bucketName, dirKey);
+    if (dirKeyInfo != null) {
+      dirKeyInfo.setFile(false);
+    }
+    return dirKeyInfo;
+  }
+
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-      String keyName) throws IOException {
+                                 String keyName) throws IOException {
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
     BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
@@ -430,6 +449,7 @@ public class KeyManagerImpl implements KeyManager {
           fileStatus.getKeyInfo().getKeyName());
       fileStatus.getKeyInfo().setKeyName(keyPath);
     }
+    fileStatus.getKeyInfo().setFile(fileStatus.isFile());
     return fileStatus.getKeyInfo();
   }
 
@@ -1069,6 +1089,8 @@ public class KeyManagerImpl implements KeyManager {
     final String keyName = args.getKeyName();
 
     OmKeyInfo fileKeyInfo = null;
+    OmKeyInfo dirKeyInfo = null;
+    OmKeyInfo fakeDirKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1081,28 +1103,27 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      fileKeyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
-          .get(fileKeyBytes);
+      BucketLayout layout =
+          getBucketLayout(metadataManager, volumeName, bucketName);
+      fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
+      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
       // Check if the key is a directory.
       if (fileKeyInfo == null) {
-        String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
-        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable(
-                getBucketLayout(metadataManager, volumeName, bucketName))
-            .get(dirKeyBytes);
-        if (dirKeyInfo != null) {
-          return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+        dirKeyInfo = metadataManager.getKeyTable(layout).get(dirKeyBytes);
+        if (dirKeyInfo == null) {
+          fakeDirKeyInfo =
+              createFakeDirIfShould(volumeName, bucketName, keyName, layout);
         }
       }
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
-
-      // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
+        // if the key is a file
+        // then do refresh pipeline info in OM by asking SCM
         if (args.getLatestVersionLocation()) {
           slimLocationVersion(fileKeyInfo);
         }
@@ -1117,8 +1138,19 @@ public class KeyManagerImpl implements KeyManager {
             sortDatanodes(clientAddress, fileKeyInfo);
           }
         }
-        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
+    }
+
+    if (fileKeyInfo != null) {
+      return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+    }
+
+    if (dirKeyInfo != null) {
+      return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+    }
+
+    if (fakeDirKeyInfo != null) {
+      return new OzoneFileStatus(fakeDirKeyInfo, scmBlockSize, true);
     }
 
     // Key is not found, throws exception
@@ -1130,6 +1162,41 @@ public class KeyManagerImpl implements KeyManager {
     throw new OMException("Unable to get file status: volume: " +
             volumeName + " bucket: " + bucketName + " key: " + keyName,
             FILE_NOT_FOUND);
+  }
+
+  /**
+   * Create a fake directory if the key is a path prefix,
+   * otherwise returns null.
+   * Some keys may contain '/' Ozone will treat '/' as directory separator
+   * such as : key name is 'a/b/c', 'a' and 'b' may not really exist,
+   * but Ozone treats 'a' and 'b' as a directory.
+   * we need create a fake directory 'a' or 'a/b'
+   *
+   * @return OmKeyInfo if the key is a path prefix, otherwise returns null.
+   */
+  private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
+      String keyName, BucketLayout layout) throws IOException {
+    OmKeyInfo fakeDirKeyInfo = null;
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
+      Table.KeyValue<String, OmKeyInfo> keyValue =
+          keyTblItr
+              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+
+      if (keyValue != null) {
+        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+        Path subPath = Paths.get(dirKey);
+        OmKeyInfo omKeyInfo = keyValue.getValue();
+        if (fullPath.startsWith(subPath)) {
+          // create fake directory
+          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+        }
+      }
+    }
+
+    return fakeDirKeyInfo;
   }
 
 
@@ -1197,26 +1264,27 @@ public class KeyManagerImpl implements KeyManager {
             FILE_NOT_FOUND);
   }
 
-  private OmKeyInfo createDirectoryKey(String volumeName, String bucketName,
-      String keyName, List<OzoneAcl> acls) throws IOException {
+  private OmKeyInfo createDirectoryKey(OmKeyInfo keyInfo, String keyName)
+          throws IOException {
     // verify bucket exists
-    OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
+    OmBucketInfo bucketInfo = getBucketInfo(keyInfo.getVolumeName(),
+            keyInfo.getBucketName());
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
     return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
+        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(ReplicationFactor.ONE))
+        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(acls)
+        .setAcls(keyInfo.getAcls())
         .build();
   }
   /**
@@ -1430,7 +1498,7 @@ public class KeyManagerImpl implements KeyManager {
       getIteratorForKeyInTableCache(
       boolean recursive, String startKey, String volumeName, String bucketName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
-      Table<String, OmKeyInfo> keyTable) {
+      Table<String, OmKeyInfo> keyTable) throws IOException {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     try {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
@@ -1502,8 +1570,7 @@ public class KeyManagerImpl implements KeyManager {
               if (!isKeyDeleted(entryInDb, keyTable)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
-                      omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-                      immediateChild, omKeyInfo.getAcls());
+                      omKeyInfo, immediateChild);
                   cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
@@ -1787,5 +1854,61 @@ public class KeyManagerImpl implements KeyManager {
       return buckInfo.getBucketLayout().isFileSystemOptimized();
     }
     return false;
+  }
+
+  @Override
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress)
+      throws IOException {
+    Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(
+        metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getGetKeyInfoGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // get container pipeline info from cache.
+      captureLatencyNs(metrics.getGetKeyInfoRefreshLocationLatencyNs(),
+          () -> refreshPipelineFromCache(value,
+              args.isForceUpdateContainerCacheFromSCM()));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+    return value;
+  }
+
+  protected void refreshPipelineFromCache(OmKeyInfo keyInfo,
+                                          boolean forceRefresh)
+      throws IOException {
+    Set<Long> containerIds = keyInfo.getKeyLocationVersions().stream()
+        .flatMap(v -> v.getLocationList().stream())
+        .map(BlockLocationInfo::getContainerID)
+        .collect(Collectors.toSet());
+
+    metrics.setForceContainerCacheRefresh(forceRefresh);
+    Map<Long, Pipeline> containerLocations =
+        scmClient.getContainerLocations(containerIds, forceRefresh);
+
+    for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
+      for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+          key.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+          Pipeline pipeline = containerLocations.get(
+              omKeyLocationInfo.getContainerID());
+          if (pipeline != null &&
+              !pipeline.equals(omKeyLocationInfo.getPipeline())) {
+            omKeyLocationInfo.setPipeline(pipeline);
+          }
+        }
+      }
+    }
   }
 }

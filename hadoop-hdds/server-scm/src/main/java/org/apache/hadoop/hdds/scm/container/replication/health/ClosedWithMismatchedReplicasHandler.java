@@ -23,11 +23,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Handler to process containers which are closed, but some replicas are still
@@ -36,6 +35,9 @@ import java.util.stream.Collectors;
  */
 public class ClosedWithMismatchedReplicasHandler extends AbstractCheck {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ClosedWithMismatchedReplicasHandler.class);
+
   private ReplicationManager replicationManager;
 
   public ClosedWithMismatchedReplicasHandler(
@@ -43,6 +45,13 @@ public class ClosedWithMismatchedReplicasHandler extends AbstractCheck {
     this.replicationManager = replicationManager;
   }
 
+  /**
+   * Handles CLOSED EC or RATIS container. If some replicas are CLOSING or
+   * OPEN, this sends a force-close command for them.
+   * @param request ContainerCheckRequest object representing the container
+   * @return always returns true so that other handlers in the chain can fix
+   * issues such as under replication
+   */
   @Override
   public boolean handle(ContainerCheckRequest request) {
     ContainerInfo containerInfo = request.getContainerInfo();
@@ -51,39 +60,34 @@ public class ClosedWithMismatchedReplicasHandler extends AbstractCheck {
       // Handler is only relevant for CLOSED containers.
       return false;
     }
-    List<ContainerReplica> unhealthyReplicas = replicas.stream()
-        .filter(r -> !ReplicationManager
-            .compareState(containerInfo.getState(), r.getState()))
-        .collect(Collectors.toList());
+    LOG.debug("Checking container {} in ClosedWithMismatchedReplicasHandler",
+        containerInfo);
 
-    if (unhealthyReplicas.size() > 0) {
-      handleUnhealthyReplicas(containerInfo, unhealthyReplicas);
-      return true;
+    // close replica if its state is OPEN or CLOSING
+    for (ContainerReplica replica : replicas) {
+      if (isMismatched(replica)) {
+        LOG.debug("Sending close command for mismatched replica {} of " +
+            "container {}.", replica, containerInfo);
+        replicationManager.sendCloseContainerReplicaCommand(
+            containerInfo, replica.getDatanodeDetails(), true);
+      }
     }
+
+    /*
+     This handler is unique because it always returns false. This allows
+     handlers further in the chain to fix issues such as under replication.
+     */
     return false;
   }
 
   /**
-   * Handles unhealthy container.
-   * A container is inconsistent if any of the replica state doesn't
-   * match the container state. We have to take appropriate action
-   * based on state of the replica.
-   *
-   * @param container ContainerInfo
-   * @param unhealthyReplicas List of ContainerReplica
+   * If a CLOSED container has an OPEN or CLOSING replica, there is a state
+   * mismatch.
+   * @param replica replica to check for mismatch
+   * @return true if the replica is in CLOSING or OPEN state, else false
    */
-  private void handleUnhealthyReplicas(final ContainerInfo container,
-      List<ContainerReplica> unhealthyReplicas) {
-    Iterator<ContainerReplica> iterator = unhealthyReplicas.iterator();
-    while (iterator.hasNext()) {
-      final ContainerReplica replica = iterator.next();
-      final ContainerReplicaProto.State state = replica.getState();
-      if (state == ContainerReplicaProto.State.OPEN
-          || state == ContainerReplicaProto.State.CLOSING) {
-        replicationManager.sendCloseContainerReplicaCommand(
-            container, replica.getDatanodeDetails(), true);
-        iterator.remove();
-      }
-    }
+  private boolean isMismatched(ContainerReplica replica) {
+    return replica.getState() == ContainerReplicaProto.State.OPEN ||
+        replica.getState() == ContainerReplicaProto.State.CLOSING;
   }
 }

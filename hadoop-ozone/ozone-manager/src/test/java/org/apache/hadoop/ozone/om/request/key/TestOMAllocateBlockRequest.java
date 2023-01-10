@@ -188,6 +188,30 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   }
 
+  @Test
+  public void testValidateAndUpdateCacheOnlyVolumeQuotaExceeded()
+      throws Exception {
+    // Add volume, bucket entries to DB.
+    // add volume and create bucket with quota limit 1
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager, 1L);
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    addKeyToOpenKeyTable(volumeName, bucketName);
+
+    OMRequest modifiedOmRequest =
+        doPreExecute(createAllocateBlockRequest());
+
+    OMAllocateBlockRequest omAllocateBlockRequest =
+        getOmAllocateBlockRequest(modifiedOmRequest);
+
+    OMClientResponse omAllocateBlockResponse =
+        omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOMRequest

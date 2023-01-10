@@ -20,12 +20,17 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
@@ -39,7 +44,7 @@ import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes
  * Certificate client provides and interface to certificate operations that
  * needs to be performed by all clients in the Ozone eco-system.
  */
-public interface CertificateClient {
+public interface CertificateClient extends Closeable {
 
   /**
    * Returns the private key of the specified component if it exists on the
@@ -89,6 +94,12 @@ public interface CertificateClient {
   boolean verifyCertificate(X509Certificate certificate);
 
   /**
+   * Set the serial ID of default certificate for the specified component.
+   * @param certSerialId - certificate ID.
+   * */
+  void setCertificateId(String certSerialId);
+
+  /**
    * Creates digital signature over the data stream using the components private
    * key.
    *
@@ -130,7 +141,35 @@ public interface CertificateClient {
    *
    * @return CertificateSignRequest.Builder
    */
-  CertificateSignRequest.Builder getCSRBuilder() throws CertificateException;
+   CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+       throws IOException;
+
+  /**
+   * Returns a CSR builder that can be used to create a Certificate sigining
+   * request.
+   *
+   * @return CertificateSignRequest.Builder
+   */
+  CertificateSignRequest.Builder getCSRBuilder()
+      throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException;
 
   /**
    * Get the certificate of well-known entity from SCM.
@@ -203,7 +242,8 @@ public interface CertificateClient {
     SUCCESS,
     FAILURE,
     GETCERT,
-    RECOVER
+    RECOVER,
+    REINIT
   }
 
   /**
@@ -313,4 +353,13 @@ public interface CertificateClient {
    */
   boolean processCrl(CRLInfo crl);
 
+  /**
+   * Return the store factory for key manager and trust manager for server.
+   */
+  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
+
+  /**
+   * Return the store factory for key manager and trust manager for client.
+   */
+  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
 }

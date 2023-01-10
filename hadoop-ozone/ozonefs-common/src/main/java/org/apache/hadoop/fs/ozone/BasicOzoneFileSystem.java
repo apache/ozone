@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -67,11 +68,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
@@ -102,6 +105,9 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   private OzoneClientAdapter adapter;
 
+  private int listingPageSize =
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+
   private static final Pattern URL_SCHEMA_PATTERN =
       Pattern.compile("([^\\.]+)\\.([^\\.]+)\\.{0,1}(.*)");
 
@@ -115,6 +121,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
+    listingPageSize = conf.getInt(
+        OZONE_FS_LISTING_PAGE_SIZE,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
+        OZONE_FS_LISTING_PAGE_SIZE,
+        OZONE_FS_MAX_LISTING_PAGE_SIZE);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -260,6 +272,13 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   private FSDataOutputStream createOutputStream(String key, short replication,
       boolean overwrite, boolean recursive) throws IOException {
+    boolean isRatisStreamingEnabled = getConf().getBoolean(
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
+    if (isRatisStreamingEnabled) {
+      return new FSDataOutputStream(adapter.createStreamFile(key,
+          replication, overwrite, recursive), statistics);
+    }
     return new FSDataOutputStream(adapter.createFile(key,
         replication, overwrite, recursive), statistics);
   }
@@ -606,7 +625,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-    int numEntries = LISTING_PAGE_SIZE;
+    int numEntries = listingPageSize;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
     String startKey = "";
@@ -620,7 +639,8 @@ public class BasicOzoneFileSystem extends FileSystem {
               .collect(Collectors.toList());
 
       if (!tmpStatusList.isEmpty()) {
-        if (startKey.isEmpty()) {
+        if (startKey.isEmpty() || !statuses.getLast().getPath().toString()
+            .equals(tmpStatusList.get(0).getPath().toString())) {
           statuses.addAll(tmpStatusList);
         } else {
           statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
@@ -763,7 +783,6 @@ public class BasicOzoneFileSystem extends FileSystem {
           throw new FileNotFoundException("File not found. path:" + f);
         }
       }
-      LOG.warn("GetFileStatus failed for path {}", f, ex);
       throw ex;
     }
     return fileStatus;
@@ -939,8 +958,8 @@ public class BasicOzoneFileSystem extends FileSystem {
         return false;
       }
       if (i >= thisListing.size()) {
-        if (startPath != null && (thisListing.size() == LISTING_PAGE_SIZE ||
-            thisListing.size() == LISTING_PAGE_SIZE - 1)) {
+        if (startPath != null && (thisListing.size() == listingPageSize ||
+            thisListing.size() == listingPageSize - 1)) {
           // current listing is exhausted & fetch a new listing
           thisListing = listFileStatus(p, startPath);
           if (thisListing != null && !thisListing.isEmpty()) {
@@ -988,7 +1007,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     List<FileStatus> statusList;
     statusList =
         adapter.listStatus(pathToKey(f), false, startPath,
-            LISTING_PAGE_SIZE, uri, workingDir, getUsername())
+                listingPageSize, uri, workingDir, getUsername())
             .stream()
             .map(this::convertFileStatus)
             .collect(Collectors.toList());
@@ -1162,29 +1181,28 @@ public class BasicOzoneFileSystem extends FileSystem {
     return true;
   }
 
+  protected FileStatus constructFileStatus(
+          FileStatusAdapter fileStatusAdapter) {
+    return new FileStatus(fileStatusAdapter.getLength(),
+            fileStatusAdapter.isDir(),
+            fileStatusAdapter.getBlockReplication(),
+            fileStatusAdapter.getBlocksize(),
+            fileStatusAdapter.getModificationTime(),
+            fileStatusAdapter.getAccessTime(),
+            new FsPermission(fileStatusAdapter.getPermission()),
+            fileStatusAdapter.getOwner(),
+            fileStatusAdapter.getGroup(),
+            fileStatusAdapter.getSymlink(),
+            fileStatusAdapter.getPath(),
+            false,
+            fileStatusAdapter.isEncrypted(),
+            fileStatusAdapter.isErasureCoded()
+    );
+  }
+
   private FileStatus convertFileStatus(
       FileStatusAdapter fileStatusAdapter) {
-
-    Path symLink = null;
-    try {
-      fileStatusAdapter.getSymlink();
-    } catch (Exception ex) {
-      //NOOP: If not symlink symlink remains null.
-    }
-
-    FileStatus fileStatus =  new FileStatus(
-        fileStatusAdapter.getLength(),
-        fileStatusAdapter.isDir(),
-        fileStatusAdapter.getBlockReplication(),
-        fileStatusAdapter.getBlocksize(),
-        fileStatusAdapter.getModificationTime(),
-        fileStatusAdapter.getAccessTime(),
-        new FsPermission(fileStatusAdapter.getPermission()),
-        fileStatusAdapter.getOwner(),
-        fileStatusAdapter.getGroup(),
-        symLink,
-        fileStatusAdapter.getPath()
-    );
+    FileStatus fileStatus = constructFileStatus(fileStatusAdapter);
 
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
     if (blockLocations == null || blockLocations.length == 0) {

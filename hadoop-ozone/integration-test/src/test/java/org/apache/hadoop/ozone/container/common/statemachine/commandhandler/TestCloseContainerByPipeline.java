@@ -120,7 +120,7 @@ public class TestCloseContainerByPipeline {
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
-            .setKeyName(keyName).setRefreshPipeline(true).build();
+            .setKeyName(keyName).build();
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
@@ -178,7 +178,6 @@ public class TestCloseContainerByPipeline {
             .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("standalone")
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -236,7 +235,7 @@ public class TestCloseContainerByPipeline {
         setBucketName("test")
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setDataSize(1024)
-        .setKeyName("ratis").setRefreshPipeline(true).build();
+        .setKeyName("ratis").build();
 
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
@@ -302,7 +301,6 @@ public class TestCloseContainerByPipeline {
             .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName(keyName)
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =

@@ -17,21 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,120 +28,32 @@ import java.util.Map;
  * queue, calculate the reconstruction commands and assign to the datanodes
  * via the eventQueue.
  */
-public class UnderReplicatedProcessor implements Runnable {
-
-  private static final Logger LOG = LoggerFactory
-      .getLogger(UnderReplicatedProcessor.class);
-  private final ReplicationManager replicationManager;
-  private final ContainerReplicaPendingOps pendingOps;
-  private final EventPublisher eventPublisher;
-  private volatile boolean runImmediately = false;
-  private final long intervalInMillis;
+public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
+        <ContainerHealthResult.UnderReplicatedHealthResult> {
 
   public UnderReplicatedProcessor(ReplicationManager replicationManager,
-      ContainerReplicaPendingOps pendingOps,
-      EventPublisher eventPublisher, long intervalInMillis) {
-    this.replicationManager = replicationManager;
-    this.pendingOps = pendingOps;
-    this.eventPublisher = eventPublisher;
-    this.intervalInMillis = intervalInMillis;
-  }
-
-  /**
-   * Read messages from the ReplicationManager under replicated queue and,
-   * form commands to correct the under replication. The commands are added
-   * to the event queue and the PendingReplicaOps are adjusted.
-   *
-   * Note: this is a temporary implementation of this feature. A future
-   * version will need to limit the amount of messages assigned to each
-   * datanode, so they are not assigned too much work.
-   */
-  public void processAll() {
-    int processed = 0;
-    int failed = 0;
-    while (true) {
-      if (!replicationManager.shouldRun()) {
-        break;
-      }
-      ContainerHealthResult.UnderReplicatedHealthResult underRep =
-          replicationManager.dequeueUnderReplicatedContainer();
-      if (underRep == null) {
-        break;
-      }
-      try {
-        processContainer(underRep);
-        processed++;
-      } catch (Exception e) {
-        LOG.error("Error processing under replicated container {}",
-            underRep.getContainerInfo(), e);
-        failed++;
-        replicationManager.requeueUnderReplicatedContainer(underRep);
-      }
-    }
-    LOG.info("Processed {} under replicated containers, failed processing {}",
-        processed, failed);
-  }
-
-  protected void processContainer(ContainerHealthResult
-      .UnderReplicatedHealthResult underRep) throws IOException {
-    Map<DatanodeDetails, SCMCommand<?>> cmds = replicationManager
-        .processUnderReplicatedContainer(underRep);
-    for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
-      SCMCommand<?> scmCmd = cmd.getValue();
-      scmCmd.setTerm(replicationManager.getScmTerm());
-      final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(cmd.getKey().getUuid(), scmCmd);
-      eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-      adjustPendingOps(underRep.getContainerInfo().containerID(),
-          scmCmd, cmd.getKey());
-    }
-  }
-
-  private void adjustPendingOps(ContainerID containerID, SCMCommand<?> cmd,
-      DatanodeDetails targetDatanode)
-      throws IOException {
-    if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.reconstructECContainersCommand) {
-      ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
-      List<DatanodeDetails> targets = rcc.getTargetDatanodes();
-      byte[] targetIndexes = rcc.getMissingContainerIndexes();
-      for (int i = 0; i < targetIndexes.length; i++) {
-        pendingOps.scheduleAddReplica(containerID, targets.get(i),
-            targetIndexes[i]);
-      }
-    } else if (cmd.getType() == StorageContainerDatanodeProtocolProtos
-        .SCMCommandProto.Type.replicateContainerCommand) {
-      ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
-      pendingOps.scheduleAddReplica(
-          containerID, targetDatanode, rcc.getReplicaIndex());
-    } else {
-      throw new IOException("Unexpected command type " + cmd.getType());
-    }
+                                  long intervalInMillis) {
+    super(replicationManager, intervalInMillis);
   }
 
   @Override
-  public void run() {
-    try {
-      while (!Thread.currentThread().isInterrupted()) {
-        if (replicationManager.shouldRun()) {
-          processAll();
-        }
-        synchronized (this) {
-          if (!runImmediately) {
-            wait(intervalInMillis);
-          }
-          runImmediately = false;
-        }
-      }
-    } catch (InterruptedException e) {
-      LOG.warn("{} interrupted. Exiting...", Thread.currentThread().getName());
-      Thread.currentThread().interrupt();
-    }
+  protected ContainerHealthResult.UnderReplicatedHealthResult
+      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
+    return replicationManager.dequeueUnderReplicatedContainer();
   }
 
-  @VisibleForTesting
-  synchronized void runImmediately() {
-    runImmediately = true;
-    notify();
+  @Override
+  protected void requeueHealthResultFromQueue(
+          ReplicationManager replicationManager,
+          ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
+    replicationManager.requeueUnderReplicatedContainer(healthResult);
+  }
+
+  @Override
+  protected Map<DatanodeDetails, SCMCommand<?>> getDatanodeCommands(
+          ReplicationManager replicationManager,
+          ContainerHealthResult.UnderReplicatedHealthResult healthResult)
+          throws IOException {
+    return replicationManager.processUnderReplicatedContainer(healthResult);
   }
 }
