@@ -2140,7 +2140,8 @@ public class RpcClient implements ClientProtocol {
           );
           gk.getCipher().init(Cipher.ENCRYPT_MODE, gk.getSecretKey());
           return new OzoneOutputStream(
-              new CipherOutputStream(keyOutputStream, gk.getCipher()));
+              new CipherOutputStream(keyOutputStream, gk.getCipher()),
+              keyOutputStream);
         }
       }  catch (Exception ex) {
         throw new IOException(ex);
