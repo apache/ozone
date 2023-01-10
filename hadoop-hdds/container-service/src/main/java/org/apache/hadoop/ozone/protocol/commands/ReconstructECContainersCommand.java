@@ -141,12 +141,10 @@ public class ReconstructECContainersCommand
         .append(": containerID: ").append(containerID)
         .append(", replicationConfig: ").append(ecReplicationConfig)
         .append(", sources: [").append(getSources().stream()
-            .map(a -> a.dnDetails.getHostNameAndIP()
+            .map(a -> a.dnDetails
                 + " replicaIndex: " + a.getReplicaIndex())
             .collect(Collectors.joining(", "))).append("]")
-        .append(", targets: [").append(getTargetDatanodes().stream()
-            .map(DatanodeDetails::getHostNameAndIP)
-        .collect(Collectors.joining(", "))).append("]")
+        .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
             Arrays.toString(missingContainerIndexes));
     return sb.toString();

@@ -116,10 +116,7 @@ public class ReplicateContainerCommand
     sb.append(getType());
     sb.append(": containerId: ").append(getContainerID());
     sb.append(", replicaIndex: ").append(getReplicaIndex());
-    sb.append(", sourceNodes: [");
-    sb.append(sourceDatanodes.stream()
-        .map(DatanodeDetails::getHostNameAndIP)
-        .collect(Collectors.joining(", "))).append("]");
+    sb.append(", sourceNodes: ").append(sourceDatanodes);
     return sb.toString();
   }
 }
