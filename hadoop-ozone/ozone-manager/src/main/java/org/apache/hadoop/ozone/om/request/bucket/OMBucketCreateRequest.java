@@ -159,7 +159,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // When the value is not specified in the proto, OM will use
     // "ozone.default.bucket.layout".
     if (!bucketInfo.hasBucketLayout()) {
-      BucketLayout defaultBucketLayout = ozoneManager.getOMDefaultBucketLayout();
+      BucketLayout defaultBucketLayout =
+          ozoneManager.getOMDefaultBucketLayout();
       omBucketInfo =
           OmBucketInfo.getFromProtobuf(bucketInfo, defaultBucketLayout);
     } else {
