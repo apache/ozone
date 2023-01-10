@@ -196,7 +196,7 @@ services:
       - ./docker-config
     command: [ "/opt/hadoop/bin/ozone","httpfs" ]
     environment:
-      OZONE_CLASSPATH: "/opt/hadoop/share/ozone/lib/ozone-filesystem-1.3.0-SNAPSHOT.jar:/opt/hadoop/share/ozone/lib/ozone-filesystem-common-1.3.0-SNAPSHOT.jar:/opt/hadoop/share/ozone/lib/ozone-filesystem-hadoop3-1.3.0-SNAPSHOT.jar"
+      OZONE_CLASSPATH: "/opt/hadoop/share/ozone/lib/ozone-filesystem-hadoop3-${ozone.version}.jar"
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
     networks:

@@ -54,8 +54,7 @@ execute_robot_test scm recon
 execute_robot_test scm admincli
 execute_robot_test scm spnego
 
-# commented out until httpfs user and group is added to ozone-docker-runner
-# execute_robot_test scm -v SECURITY_ENABLED:${SECURITY_ENABLED} httpfs
+execute_robot_test scm httpfs
 
 # test replication
 docker-compose up -d --scale datanode=2
