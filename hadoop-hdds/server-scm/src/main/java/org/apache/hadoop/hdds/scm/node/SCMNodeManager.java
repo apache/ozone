@@ -543,9 +543,11 @@ public class SCMNodeManager implements NodeManager {
     if (opStateDiffers(reportedDn, scmStatus)) {
       if (scmContext.isLeader()) {
         LOG.info("Scheduling a command to update the operationalState " +
-                "persisted on {} as the reported value does not " +
+                "persisted on {} as the reported value ({}, {}) does not " +
                 "match the value stored in SCM ({}, {})",
             reportedDn,
+            reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
 
@@ -563,9 +565,11 @@ public class SCMNodeManager implements NodeManager {
         }
       } else {
         LOG.info("Update the operationalState saved in follower SCM " +
-                "for {} as the reported value does not " +
+                "for {} as the reported value ({}, {}) does not " +
                 "match the value stored in SCM ({}, {})",
             reportedDn,
+            reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
 
