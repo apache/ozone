@@ -394,16 +394,16 @@ public class SCMNodeManager implements NodeManager {
         addEntryToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
-        LOG.info("Registered Data node : {}", datanodeDetails);
+        LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
         scmNodeEventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
       } catch (NodeAlreadyExistsException e) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Datanode is already registered. Datanode: {}",
-              datanodeDetails.toString());
+              datanodeDetails);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
-            datanodeDetails.toString());
+            datanodeDetails);
       }
     } else {
       // Update datanode if it is registered but the ip or hostname changes
