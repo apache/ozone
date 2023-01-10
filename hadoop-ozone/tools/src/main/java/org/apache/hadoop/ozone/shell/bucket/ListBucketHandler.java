@@ -46,7 +46,7 @@ public class ListBucketHandler extends VolumeHandler {
   private ListOptions listOptions;
 
   @Option(names = {"--encrypted", "-e"},
-          description = "List all buckets with encryption enabled.")
+          description = "Only list buckets with encryption enabled.")
   private boolean encryptedBuckets;
 
   @Override
