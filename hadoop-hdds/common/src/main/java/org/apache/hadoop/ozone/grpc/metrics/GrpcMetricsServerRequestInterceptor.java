@@ -17,13 +17,20 @@
  */
 package org.apache.hadoop.ozone.grpc.metrics;
 
+import com.google.protobuf.AbstractMessage;
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
+import org.apache.commons.io.IOUtils;
 
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * Interceptor to gather metrics based on grpc server request.
@@ -59,10 +66,36 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
         // start time
         startTime = System.nanoTime();
 
-        final byte[] messageBytes =
-            message.toString().getBytes(StandardCharsets.UTF_8);
+        long messageSize = 0;
+        // message is always an instance of AbstractMessage
+        if (message instanceof AbstractMessage) {
+          AbstractMessage parsedMessage = (AbstractMessage) message;
+          messageSize += parsedMessage.getSerializedSize();
+        } else {
+          ByteArrayOutputStream byteArrayOutputStream =
+              new ByteArrayOutputStream();
+          try {
+            ObjectOutputStream outputStream =
+                new ObjectOutputStream(byteArrayOutputStream);
+            outputStream.writeObject(message);
+            outputStream.flush();
+            outputStream.close();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
 
-        bytesReceived += messageBytes.length;
+          InputStream inputStream = new ByteArrayInputStream(
+              byteArrayOutputStream.toByteArray());
+          ByteBuffer buffer;
+          try {
+            buffer = ByteBuffer.wrap(IOUtils.toByteArray(inputStream));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          messageSize += buffer.remaining();
+        }
+
+        bytesReceived += messageSize;
 
         if (bytesReceived > 0) {
           grpcMetrics.setReceivedBytes(bytesReceived);
