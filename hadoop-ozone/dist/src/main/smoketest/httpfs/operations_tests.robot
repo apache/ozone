@@ -32,7 +32,7 @@ Generate volume
    Set Suite Variable  ${volume}  ${random}
 
 Kinit admin
-    Wait Until Keyword Succeeds      2min       10sec      Execute      kinit -k httpfs/httpfs@EXAMPLE.COM -t /etc/security/keytabs/httpfs.keytab
+    Wait Until Keyword Succeeds      2min       10sec      Execute      kinit -k om/om@EXAMPLE.COM -t /etc/security/keytabs/om.keytab
 
 *** Test Cases ***
 Kinit admin user
