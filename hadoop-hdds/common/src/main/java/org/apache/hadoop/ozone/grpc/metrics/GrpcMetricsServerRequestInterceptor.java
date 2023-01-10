@@ -23,19 +23,17 @@ import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
-import org.apache.commons.io.IOUtils;
-
-import java.io.InputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ObjectOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Interceptor to gather metrics based on grpc server request.
  */
 public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(
+          GrpcMetricsServerRequestInterceptor.class);
 
   private final GrpcMetrics grpcMetrics;
   private long bytesReceived;
@@ -67,32 +65,12 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
         startTime = System.nanoTime();
 
         long messageSize = 0;
-        // message is always an instance of AbstractMessage
         if (message instanceof AbstractMessage) {
           AbstractMessage parsedMessage = (AbstractMessage) message;
           messageSize += parsedMessage.getSerializedSize();
         } else {
-          ByteArrayOutputStream byteArrayOutputStream =
-              new ByteArrayOutputStream();
-          try {
-            ObjectOutputStream outputStream =
-                new ObjectOutputStream(byteArrayOutputStream);
-            outputStream.writeObject(message);
-            outputStream.flush();
-            outputStream.close();
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-
-          InputStream inputStream = new ByteArrayInputStream(
-              byteArrayOutputStream.toByteArray());
-          ByteBuffer buffer;
-          try {
-            buffer = ByteBuffer.wrap(IOUtils.toByteArray(inputStream));
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-          messageSize += buffer.remaining();
+          LOG.error("Unable to register number of bytes received. " +
+              "Message is not an instance of AbstractMessage.");
         }
 
         bytesReceived += messageSize;
