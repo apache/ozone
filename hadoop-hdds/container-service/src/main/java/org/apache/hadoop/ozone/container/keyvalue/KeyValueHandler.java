@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -31,6 +33,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.Striped;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -101,6 +104,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -108,6 +112,7 @@ import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkV
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,6 +187,25 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+      Container container, ContainerCommandRequestProto msg)
+      throws StorageContainerException {
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    checkContainerOpen(kvContainer);
+
+    if (msg.hasWriteChunk()) {
+      BlockID blockID =
+          BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+
+      return chunkManager.getStreamDataChannel(kvContainer,
+          blockID, metrics);
+    } else {
+      throw new StorageContainerException("Malformed request.",
+          ContainerProtos.Result.IO_EXCEPTION);
+    }
+  }
+
+  @Override
   public void stop() {
     chunkManager.shutdown();
     blockManager.shutdown();
@@ -230,6 +254,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleDeleteChunk(request, kvContainer);
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
+    case StreamInit:
+      return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
     case CompactChunk:
@@ -254,6 +280,35 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public BlockManager getBlockManager() {
     return this.blockManager;
+  }
+
+  ContainerCommandResponseProto handleStreamInit(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
+    final BlockID blockID;
+    if (request.hasWriteChunk()) {
+      WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed {} request. trace ID: {}",
+            request.getCmdType(), request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    String path = null;
+    try {
+      checkContainerOpen(kvContainer);
+      path = chunkManager
+          .streamInit(kvContainer, blockID);
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    }
+
+    return getSuccessResponseBuilder(request)
+        .setMessage(path)
+        .build();
   }
 
   /**
@@ -1108,6 +1163,55 @@ public class KeyValueHandler extends Handler {
         LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
     }
+  }
+
+  @Override
+  public void deleteUnreferenced(Container container, long localID)
+      throws IOException {
+    // Since the block/chunk is already checked that is unreferenced, no
+    // need to lock the container here.
+    StringBuilder prefixBuilder = new StringBuilder();
+    ContainerLayoutVersion layoutVersion = container.getContainerData().
+        getLayoutVersion();
+    long containerID = container.getContainerData().getContainerID();
+    // Only supports the default chunk/block name format now
+    switch (layoutVersion) {
+    case FILE_PER_BLOCK:
+      prefixBuilder.append(localID).append(".block");
+      break;
+    case FILE_PER_CHUNK:
+      prefixBuilder.append(localID).append("_chunk_");
+      break;
+    default:
+      throw new IOException("Unsupported container layout version " +
+          layoutVersion + " for the container " + containerID);
+    }
+    String prefix = prefixBuilder.toString();
+    File chunkDir = ContainerUtils.getChunkDir(container.getContainerData());
+    // chunkNames here is an array of file/dir name, so if we cannot find any
+    // matching one, it means the client did not write any chunk into the block.
+    // Since the putBlock request may fail, we don't know if the chunk exists,
+    // thus we need to check it when receiving the request to delete such blocks
+    String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
+    if (chunkNames.length == 0) {
+      LOG.warn("Missing delete block(Container = {}, Block = {}",
+          containerID, localID);
+      return;
+    }
+    for (String name: chunkNames) {
+      File file = new File(chunkDir, name);
+      if (!file.isFile()) {
+        continue;
+      }
+      FileUtil.fullyDelete(file);
+      LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
+          containerID);
+    }
+  }
+
+  private String[] getFilesWithPrefix(String prefix, File chunkDir) {
+    FilenameFilter filter = (dir, name) -> name.startsWith(prefix);
+    return chunkDir.list(filter);
   }
 
   private void deleteInternal(Container container, boolean force)

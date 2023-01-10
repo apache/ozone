@@ -20,14 +20,22 @@ package org.apache.hadoop.ozone.om;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
@@ -46,6 +54,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -224,14 +233,62 @@ public class TestSstFilteringService {
       String keyName =
           String.format("key%s", RandomStringUtils.randomAlphanumeric(5));
       // Create Volume and Bucket
-      TestKeyDeletingService
-          .createVolumeAndBucket(keyManager, volumeName, bucketName, false);
+      createVolumeAndBucket(keyManager, volumeName, bucketName, false);
 
       // Create the key
-      TestKeyDeletingService
-          .createAndCommitKey(writeClient, keyManager, volumeName, bucketName,
+      createAndCommitKey(writeClient, keyManager, volumeName, bucketName,
               keyName, numBlocks);
     }
+  }
+
+  private static void createVolumeAndBucket(KeyManager keyManager,
+                                            String volumeName,
+                                            String bucketName,
+                                            boolean isVersioningEnabled)
+      throws IOException {
+    // cheat here, just create a volume and bucket entry so that we can
+    // create the keys, we put the same data for key and value since the
+    // system does not decode the object
+    OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+        OmVolumeArgs.newBuilder()
+            .setOwnerName("o")
+            .setAdminName("a")
+            .setVolume(volumeName)
+            .build());
+
+    OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setIsVersionEnabled(isVersioningEnabled)
+            .build());
+  }
+
+  private static OmKeyArgs createAndCommitKey(OzoneManagerProtocol writeClient,
+                                              KeyManager keyManager,
+                                              String volumeName,
+                                              String bucketName,
+                                              String keyName,
+                                              int numBlocks)
+      throws IOException {
+
+    OmKeyArgs keyArg =
+        new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+    //Open and Commit the Key in the Key Manager.
+    OpenKeySession session = writeClient.openKey(keyArg);
+    for (int i = 0; i < numBlocks; i++) {
+      keyArg.addLocationInfo(writeClient.allocateBlock(keyArg, session.getId(),
+          new ExcludeList()));
+    }
+    writeClient.commitKey(keyArg, session.getId());
+    return keyArg;
   }
 
 }

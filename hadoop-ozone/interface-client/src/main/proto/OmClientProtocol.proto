@@ -124,10 +124,11 @@ enum Type {
   RangerBGSync = 109;
 
   EchoRPC = 110;
+  GetKeyInfo = 111;
 
-  CreateSnapshot = 111;
-  ListSnapshot = 112;
-  SnapshotDiff = 113;
+  CreateSnapshot = 112;
+  ListSnapshot = 113;
+  SnapshotDiff = 114;
 }
 
 message OMRequest {
@@ -234,10 +235,11 @@ message OMRequest {
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
 
   optional EchoRPCRequest                   EchoRPCRequest                 = 110;
+  optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
 
-  optional CreateSnapshotRequest            CreateSnapshotRequest          = 111;
-  optional ListSnapshotRequest              ListSnapshotRequest            = 112;
-  optional SnapshotDiffRequest              snapshotDiffRequest            = 113;
+  optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 113;
+  optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
 
 }
 
@@ -338,10 +340,11 @@ message OMResponse {
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
 
   optional EchoRPCResponse                   EchoRPCResponse               = 110;
+  optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
 
-  optional CreateSnapshotResponse            CreateSnapshotResponse        = 111;
-  optional ListSnapshotResponse              ListSnapshotResponse          = 112;
-  optional SnapshotDiffResponse              snapshotDiffResponse          = 113;
+  optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
+  optional ListSnapshotResponse              ListSnapshotResponse          = 113;
+  optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
 }
 
 enum Status {
@@ -913,6 +916,8 @@ message KeyArgs {
     // When it is a head operation which is to check whether key exist
     optional bool headOp = 18;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
+    // Force OM to update container cache location from SCL
+    optional bool forceUpdateContainerCacheFromSCM = 20;
 }
 
 message KeyLocation {
@@ -994,6 +999,7 @@ message KeyInfo {
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
+    optional bool isFile = 19;
 }
 
 message DirectoryInfo {
@@ -1097,6 +1103,17 @@ message LookupKeyResponse {
     optional uint64 ID = 3;
     // TODO : allow specifying a particular version to read.
     optional uint64 openVersion = 4;
+}
+
+message GetKeyInfoRequest {
+  required KeyArgs keyArgs = 1;
+  optional bool assumeS3Context = 2;
+}
+
+message GetKeyInfoResponse {
+  optional KeyInfo keyInfo = 1;
+  optional VolumeInfo volumeInfo = 2;
+  optional string UserPrincipal = 3;
 }
 
 message RenameKeysRequest {

@@ -26,6 +26,7 @@ import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -46,12 +47,17 @@ public class TestContainerReplicaPendingOps {
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
+  private ReplicationManager rm;
+  private ReplicationManagerMetrics metrics;
 
   @BeforeEach
   public void setup() {
     config = new OzoneConfiguration();
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     pendingOps = new ContainerReplicaPendingOps(config, clock);
+    rm = Mockito.mock(ReplicationManager.class);
+    metrics = ReplicationManagerMetrics.create(rm);
+    pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
@@ -223,4 +229,125 @@ public class TestContainerReplicaPendingOps {
     Assertions.assertEquals(0, ops.size());
   }
 
+  @Test
+  public void testReplicationMetrics() {
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 1);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 2);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn2, 1);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn3, 1);
+
+    // InFlight Replication and Deletion
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(DELETE));
+    clock.fastForward(1500);
+
+    pendingOps.removeExpiredEntries(1000);
+
+    // Two Delete and Replication command should be timeout
+    Assertions.assertEquals(metrics.getEcReplicaCreateTimeoutTotal(), 2);
+    Assertions.assertEquals(metrics.getEcReplicaDeleteTimeoutTotal(), 2);
+
+    pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2);
+    pendingOps.scheduleAddReplica(new ContainerID(3), dn1, 3);
+    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn2, 2);
+    pendingOps.scheduleAddReplica(new ContainerID(4), dn3, 4);
+
+    // InFlight Replication and Deletion. Previous Inflight should be
+    // removed as they were timed out.
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(2, pendingOps.getPendingOpCount(DELETE));
+
+    pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
+    pendingOps.completeAddReplica(new ContainerID(3), dn1, 3);
+    pendingOps.completeDeleteReplica(new ContainerID(4), dn2, 2);
+    pendingOps.completeAddReplica(new ContainerID(4), dn3, 4);
+
+    Assertions.assertEquals(metrics.getEcReplicasCreatedTotal(), 2);
+    Assertions.assertEquals(metrics.getEcReplicasDeletedTotal(), 2);
+
+    pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
+    pendingOps.completeAddReplica(new ContainerID(2), dn1, 3);
+
+    // Checking pendingOpCount doesn't go below zero
+    Assertions.assertEquals(0, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(0, pendingOps.getPendingOpCount(DELETE));
+  }
+
+  /**
+   * Tests that registered subscribers are notified about completed and expired
+   * ops.
+   */
+  @Test
+  public void testNotifySubscribers() {
+    // register subscribers
+    ContainerReplicaPendingOpsSubscriber subscriber1 = Mockito.mock(
+        ContainerReplicaPendingOpsSubscriber.class);
+    ContainerReplicaPendingOpsSubscriber subscriber2 = Mockito.mock(
+        ContainerReplicaPendingOpsSubscriber.class);
+    pendingOps.registerSubscriber(subscriber1);
+    pendingOps.registerSubscriber(subscriber2);
+
+    // schedule an ADD and a DELETE
+    ContainerID containerID = new ContainerID(1);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0);
+    ContainerReplicaOp addOp = pendingOps.getPendingOps(containerID).get(0);
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0);
+
+    // complete the ADD and verify that subscribers were notified
+    pendingOps.completeAddReplica(containerID, dn1, 0);
+    Mockito.verify(subscriber1, Mockito.times(1)).opCompleted(addOp,
+        containerID, false);
+    Mockito.verify(subscriber2, Mockito.times(1)).opCompleted(addOp,
+        containerID, false);
+
+    // complete the DELETE and verify subscribers were notified
+    ContainerReplicaOp deleteOp = pendingOps.getPendingOps(containerID).get(0);
+    pendingOps.completeDeleteReplica(containerID, dn1, 0);
+    Mockito.verify(subscriber1, Mockito.times(1)).opCompleted(deleteOp,
+        containerID, false);
+    Mockito.verify(subscriber2, Mockito.times(1)).opCompleted(deleteOp,
+        containerID, false);
+
+    // now, test notification on expiration
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0);
+    for (ContainerReplicaOp op : pendingOps.getPendingOps(containerID)) {
+      if (op.getOpType() == ADD) {
+        addOp = op;
+      } else {
+        deleteOp = op;
+      }
+    }
+    clock.fastForward(1000);
+    pendingOps.removeExpiredEntries(500);
+    // the clock is at 1000 and commands expired at 500
+    Mockito.verify(subscriber1, Mockito.times(1)).opCompleted(addOp,
+        containerID, true);
+    Mockito.verify(subscriber1, Mockito.times(1)).opCompleted(deleteOp,
+        containerID, true);
+    Mockito.verify(subscriber2, Mockito.times(1)).opCompleted(addOp,
+        containerID, true);
+    Mockito.verify(subscriber2, Mockito.times(1)).opCompleted(deleteOp,
+        containerID, true);
+  }
+
+  @Test
+  public void subscribersShouldNotBeNotifiedWhenOpsHaveNotExpired() {
+    ContainerID containerID = new ContainerID(1);
+
+    // schedule ops
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0);
+
+    // register subscriber
+    ContainerReplicaPendingOpsSubscriber subscriber1 = Mockito.mock(
+        ContainerReplicaPendingOpsSubscriber.class);
+    pendingOps.registerSubscriber(subscriber1);
+
+    clock.fastForward(1000);
+    pendingOps.removeExpiredEntries(5000);
+    // no entries have expired, so there should be zero interactions with the
+    // subscriber
+    Mockito.verifyZeroInteractions(subscriber1);
+  }
 }

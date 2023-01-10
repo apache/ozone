@@ -24,9 +24,9 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.HashSet;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
@@ -54,8 +54,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -98,7 +98,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private OzoneConfiguration config;
   private long nextReplicationConfigRefreshTime;
   private long bucketRepConfigRefreshPeriodMS;
-  private java.time.Clock clock = new MonotonicClock(ZoneOffset.UTC);
+  private java.time.Clock clock = Clock.system(ZoneOffset.UTC);
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -220,6 +220,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
+          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
         throw new FileNotFoundException(
             ex.getResult().name() + ": " + ex.getMessage());
@@ -243,7 +244,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
               this.clientConfiguredReplicationConfig,
               getReplicationConfigWithRefreshCheck(), config), overWrite,
           recursive);
-      return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
+      return new OzoneFSOutputStream(ozoneOutputStream);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
@@ -264,6 +265,29 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           clock.millis() + bucketRepConfigRefreshPeriodMS;
     }
     return this.bucketReplicationConfig;
+  }
+
+  @Override
+  public OzoneFSDataStreamOutput createStreamFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException {
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
+    try {
+      final ReplicationConfig replicationConfig
+          = OzoneClientUtils.resolveClientSideReplicationConfig(
+          replication, clientConfiguredReplicationConfig,
+          getReplicationConfigWithRefreshCheck(), config);
+      final OzoneDataStreamOutput out = bucket.createStreamFile(
+          key, 0, replicationConfig, overWrite, recursive);
+      return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
+          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+        throw new FileAlreadyExistsException(
+            ex.getResult().name() + ": " + ex.getMessage());
+      } else {
+        throw ex;
+      }
+    }
   }
 
   @Override
@@ -524,6 +548,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         .getRequiredNodes();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
             .makeQualified(defaultUri, workingDir),
         status.isDirectory(),
@@ -535,7 +560,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         owner,
         owner,
         null,
-        getBlockLocations(status)
+        getBlockLocations(status),
+        OzoneClientUtils.isKeyEncrypted(keyInfo),
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
 

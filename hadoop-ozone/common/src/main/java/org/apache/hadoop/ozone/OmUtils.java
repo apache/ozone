@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -279,6 +278,7 @@ public final class OmUtils {
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
       // Although indirectly the Ranger sync service task could invoke write
       // operation SetRangerServiceVersion.
+    case GetKeyInfo:
     case SnapshotDiff:
       return true;
     case CreateVolume:
@@ -329,16 +329,6 @@ public final class OmUtils {
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
-    }
-  }
-
-  public static byte[] getMD5Digest(String input) throws IOException {
-    try {
-      MessageDigest md = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
-      return md.digest(input.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException ex) {
-      throw new IOException("Error creating an instance of MD5 digest.\n" +
-          "This could possibly indicate a faulty JRE");
     }
   }
 

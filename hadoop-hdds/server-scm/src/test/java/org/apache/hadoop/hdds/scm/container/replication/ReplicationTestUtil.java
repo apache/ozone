@@ -84,6 +84,19 @@ public final class ReplicationTestUtil {
     return replicas;
   }
 
+  public static Set<ContainerReplica> createReplicas(ContainerID containerID,
+      ContainerReplicaProto.State replicaState, long keyCount, long bytesUsed,
+      int... indexes) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i : indexes) {
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      replicas.add(createContainerReplica(containerID, i, IN_SERVICE,
+          replicaState, keyCount, bytesUsed,
+          dn, dn.getUuid()));
+    }
+    return replicas;
+  }
+
   public static Set<ContainerReplica> createReplicasWithSameOrigin(
       ContainerID containerID, ContainerReplicaProto.State replicaState,
       int... indexes) {
@@ -91,7 +104,7 @@ public final class ReplicationTestUtil {
     UUID originNodeId = MockDatanodeDetails.randomDatanodeDetails().getUuid();
     for (int i : indexes) {
       replicas.add(createContainerReplica(
-          containerID, i, IN_SERVICE, replicaState,
+          containerID, i, IN_SERVICE, replicaState, 123L, 1234L,
           MockDatanodeDetails.randomDatanodeDetails(), originNodeId));
     }
     return replicas;
@@ -103,20 +116,22 @@ public final class ReplicationTestUtil {
     DatanodeDetails datanodeDetails
         = MockDatanodeDetails.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
-        replicaState, datanodeDetails, datanodeDetails.getUuid());
+        replicaState, 123L, 1234L,
+        datanodeDetails, datanodeDetails.getUuid());
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
-      ContainerReplicaProto.State replicaState,
+      ContainerReplicaProto.State replicaState, long keyCount, long bytesUsed,
       DatanodeDetails datanodeDetails, UUID originNodeId) {
     ContainerReplica.ContainerReplicaBuilder builder
         = ContainerReplica.newBuilder();
     datanodeDetails.setPersistedOpState(opState);
     builder.setContainerID(containerID);
     builder.setReplicaIndex(replicaIndex);
-    builder.setKeyCount(123);
-    builder.setBytesUsed(1234);
+    builder.setKeyCount(keyCount);
+    builder.setBytesUsed(bytesUsed);
     builder.setContainerState(replicaState);
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
@@ -138,6 +153,20 @@ public final class ReplicationTestUtil {
     builder.setPipelineID(PipelineID.randomId());
     builder.setReplicationConfig(replicationConfig);
     builder.setState(containerState);
+    return builder.build();
+  }
+
+  public static ContainerInfo createContainerInfo(
+      ReplicationConfig replicationConfig, long containerID,
+      HddsProtos.LifeCycleState containerState, long keyCount, long bytesUsed) {
+    ContainerInfo.Builder builder = new ContainerInfo.Builder();
+    builder.setContainerID(containerID);
+    builder.setOwner("Ozone");
+    builder.setPipelineID(PipelineID.randomId());
+    builder.setReplicationConfig(replicationConfig);
+    builder.setState(containerState);
+    builder.setNumberOfKeys(keyCount);
+    builder.setUsedBytes(bytesUsed);
     return builder.build();
   }
 

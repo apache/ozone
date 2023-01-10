@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
@@ -106,7 +106,7 @@ public class TestOzoneBlockTokenSecretManager {
     omCertSerialId = x509Certificate.getSerialNumber().toString();
     secretManager = new OzoneBlockTokenSecretManager(securityConfig,
         TimeUnit.HOURS.toMillis(1), omCertSerialId);
-    client = Mockito.mock(OMCertificateClient.class);
+    client = Mockito.mock(DefaultCertificateClient.class);
     when(client.getCertificate()).thenReturn(x509Certificate);
     when(client.getCertificate(anyString())).
         thenReturn(x509Certificate);

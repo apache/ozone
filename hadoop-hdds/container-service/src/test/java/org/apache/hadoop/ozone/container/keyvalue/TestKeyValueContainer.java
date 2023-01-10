@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
@@ -57,6 +59,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
+import org.rocksdb.ColumnFamilyOptions;
 
 import java.io.File;
 
@@ -71,6 +74,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -217,83 +221,85 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = folder.newFile("exported.tar.gz");
+    for (Map.Entry<CopyContainerCompression, String> entry :
+        CopyContainerCompression.getCompressionMapping().entrySet()) {
+      TarContainerPacker packer = new TarContainerPacker(entry.getValue());
 
-    TarContainerPacker packer = new TarContainerPacker();
+      //export the container
+      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+        keyValueContainer
+            .exportContainerData(fos, packer);
+      }
 
-    //export the container
-    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
-      keyValueContainer
-          .exportContainerData(fos, packer);
-    }
+      //delete the original one
+      keyValueContainer.delete();
 
-    //delete the original one
-    keyValueContainer.delete();
+      //create a new one
+      KeyValueContainerData containerData =
+          new KeyValueContainerData(containerId,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
-    //create a new one
-    KeyValueContainerData containerData =
-        new KeyValueContainerData(containerId,
-            keyValueContainerData.getLayoutVersion(),
-            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
-            datanodeId.toString());
-    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
-    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
-    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-
-    container.populatePathFields(scmId, containerVolume);
-    try (FileInputStream fis = new FileInputStream(folderToExport)) {
-      container.importContainerData(fis, packer);
-    }
-
-    assertEquals("value1", containerData.getMetadata().get("key1"));
-    assertEquals(keyValueContainerData.getContainerDBType(),
-        containerData.getContainerDBType());
-    assertEquals(keyValueContainerData.getState(),
-        containerData.getState());
-    assertEquals(numberOfKeysToWrite,
-        containerData.getBlockCount());
-    assertEquals(keyValueContainerData.getLayoutVersion(),
-        containerData.getLayoutVersion());
-    assertEquals(keyValueContainerData.getMaxSize(),
-        containerData.getMaxSize());
-    assertEquals(keyValueContainerData.getBytesUsed(),
-        containerData.getBytesUsed());
-
-    //Can't overwrite existing container
-    try {
+      container.populatePathFields(scmId, containerVolume);
       try (FileInputStream fis = new FileInputStream(folderToExport)) {
         container.importContainerData(fis, packer);
       }
-      fail("Container is imported twice. Previous files are overwritten");
-    } catch (IOException ex) {
-      //all good
-      assertTrue(container.getContainerFile().exists());
-    }
 
-    //Import failure should cleanup the container directory
-    containerData =
-        new KeyValueContainerData(containerId + 1,
-            keyValueContainerData.getLayoutVersion(),
-            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
-            datanodeId.toString());
-    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
-    container = new KeyValueContainer(containerData, CONF);
+      assertEquals("value1", containerData.getMetadata().get("key1"));
+      assertEquals(keyValueContainerData.getContainerDBType(),
+          containerData.getContainerDBType());
+      assertEquals(keyValueContainerData.getState(),
+          containerData.getState());
+      assertEquals(numberOfKeysToWrite,
+          containerData.getBlockCount());
+      assertEquals(keyValueContainerData.getLayoutVersion(),
+          containerData.getLayoutVersion());
+      assertEquals(keyValueContainerData.getMaxSize(),
+          containerData.getMaxSize());
+      assertEquals(keyValueContainerData.getBytesUsed(),
+          containerData.getBytesUsed());
 
-    containerVolume = volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
-    container.populatePathFields(scmId, containerVolume);
-    try {
-      FileInputStream fis = new FileInputStream(folderToExport);
-      fis.close();
-      container.importContainerData(fis, packer);
-      fail("Container import should fail");
-    } catch (Exception ex) {
-      assertTrue(ex instanceof IOException);
-    } finally {
-      File directory =
-          new File(container.getContainerData().getContainerPath());
-      assertFalse(directory.exists());
+      //Can't overwrite existing container
+      try {
+        try (FileInputStream fis = new FileInputStream(folderToExport)) {
+          container.importContainerData(fis, packer);
+        }
+        fail("Container is imported twice. Previous files are overwritten");
+      } catch (IOException ex) {
+        //all good
+        assertTrue(container.getContainerFile().exists());
+      }
+
+      //Import failure should cleanup the container directory
+      containerData =
+          new KeyValueContainerData(containerId + 1,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      container = new KeyValueContainer(containerData, CONF);
+
+      containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+      container.populatePathFields(scmId, containerVolume);
+      try {
+        FileInputStream fis = new FileInputStream(folderToExport);
+        fis.close();
+        container.importContainerData(fis, packer);
+        fail("Container import should fail");
+      } catch (Exception ex) {
+        assertTrue(ex instanceof IOException);
+      } finally {
+        File directory =
+            new File(container.getContainerData().getContainerPath());
+        assertFalse(directory.exists());
+      }
     }
   }
 
@@ -531,6 +537,40 @@ public class TestKeyValueContainer {
   }
 
   @Test
+  public void testContainersShareColumnFamilyOptions() {
+    ConfigurationSource conf = new OzoneConfiguration();
+
+    // Make sure ColumnFamilyOptions are same for a particular db profile
+    for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
+        DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
+      // ColumnFamilyOptions should be same across configurations
+      ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(new OzoneConfiguration());
+      ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(new OzoneConfiguration());
+      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
+
+      // ColumnFamilyOptions should be same when queried multiple times
+      // for a particulat configuration
+      columnFamilyOptions1 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(conf);
+      columnFamilyOptions2 = dbProfileSupplier.get()
+          .getColumnFamilyOptions(conf);
+      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
+    }
+
+    // Make sure ColumnFamilyOptions are different for different db profile
+    DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
+    DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
+    Assert.assertNotEquals(
+        diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
+        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
+    Assert.assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
+        ssdProfile.getColumnFamilyOptions(conf));
+  }
+
+
+  @Test
   public void testDBProfileAffectsDBOptions() throws Exception {
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -545,6 +585,7 @@ public class TestKeyValueContainer {
 
     // Create Container 2 with different DBProfile in otherConf
     OzoneConfiguration otherConf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, otherConf);
     // Use a dedicated profile for test
     otherConf.setEnum(HDDS_DB_PROFILE, DBProfile.SSD);
 
@@ -563,9 +604,16 @@ public class TestKeyValueContainer {
       outProfile2 = ((AbstractDatanodeStore) store2).getDbProfile();
     }
 
-    // DBOtions should be different
-    Assert.assertNotEquals(outProfile1.getDBOptions().compactionReadaheadSize(),
-        outProfile2.getDBOptions().compactionReadaheadSize());
+    // DBOtions should be different, except SCHEMA-V3
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+      Assert.assertEquals(
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
+    } else {
+      Assert.assertNotEquals(
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
+    }
   }
 
   @Test

@@ -242,6 +242,7 @@ public class ContainerEndpoint {
    */
   @GET
   @Path("/missing")
+  @Deprecated
   public Response getMissingContainers(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit

@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 
@@ -29,8 +29,11 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfig
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test for {@link ContainerScannerConfiguration}.
@@ -39,7 +42,7 @@ public class TestContainerScannerConfiguration {
 
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() {
     this.conf = new OzoneConfiguration();
   }
@@ -48,10 +51,12 @@ public class TestContainerScannerConfiguration {
   public void acceptsValidValues() {
     long validInterval = Duration.ofHours(1).toMillis();
     long validBandwidth = (long) StorageUnit.MB.toBytes(1);
+    long validOnDemandBandwidth = (long) StorageUnit.MB.toBytes(2);
 
     conf.setLong(METADATA_SCAN_INTERVAL_KEY, validInterval);
     conf.setLong(DATA_SCAN_INTERVAL_KEY, validInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, validBandwidth);
+    conf.setLong(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY, validOnDemandBandwidth);
 
     ContainerScannerConfiguration csConf =
         conf.getObject(ContainerScannerConfiguration.class);
@@ -59,6 +64,8 @@ public class TestContainerScannerConfiguration {
     assertEquals(validInterval, csConf.getMetadataScanInterval());
     assertEquals(validInterval, csConf.getDataScanInterval());
     assertEquals(validBandwidth, csConf.getBandwidthPerVolume());
+    assertEquals(validOnDemandBandwidth,
+        csConf.getOnDemandBandwidthPerVolume());
   }
 
   @Test
@@ -69,6 +76,7 @@ public class TestContainerScannerConfiguration {
     conf.setLong(METADATA_SCAN_INTERVAL_KEY, invalidInterval);
     conf.setLong(DATA_SCAN_INTERVAL_KEY, invalidInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, invalidBandwidth);
+    conf.setLong(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY, invalidBandwidth);
 
     ContainerScannerConfiguration csConf =
         conf.getObject(ContainerScannerConfiguration.class);
@@ -79,6 +87,8 @@ public class TestContainerScannerConfiguration {
         csConf.getDataScanInterval());
     assertEquals(BANDWIDTH_PER_VOLUME_DEFAULT,
         csConf.getBandwidthPerVolume());
+    assertEquals(ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT,
+        csConf.getOnDemandBandwidthPerVolume());
   }
 
   @Test
@@ -86,12 +96,14 @@ public class TestContainerScannerConfiguration {
     ContainerScannerConfiguration csConf =
         conf.getObject(ContainerScannerConfiguration.class);
 
-    assertEquals(false, csConf.isEnabled());
+    assertFalse(csConf.isEnabled());
     assertEquals(METADATA_SCAN_INTERVAL_DEFAULT,
         csConf.getMetadataScanInterval());
     assertEquals(DATA_SCAN_INTERVAL_DEFAULT,
         csConf.getDataScanInterval());
     assertEquals(BANDWIDTH_PER_VOLUME_DEFAULT,
         csConf.getBandwidthPerVolume());
+    assertEquals(ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT,
+        csConf.getOnDemandBandwidthPerVolume());
   }
 }

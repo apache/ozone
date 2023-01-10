@@ -85,6 +85,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSetAcl;
   private @Metric MutableCounterLong numGetAcl;
   private @Metric MutableCounterLong numRemoveAcl;
+  private @Metric MutableCounterLong numGetKeyInfo;
 
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
@@ -154,6 +155,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
+  private @Metric MutableCounterLong getNumGetKeyInfoFails;
 
   // Metrics for total amount of data written
   private @Metric MutableCounterLong totalDataCommitted;
@@ -198,6 +200,12 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   //FSO Metrics
   private @Metric MutableCounterLong numDirs;
   private @Metric MutableCounterLong numFiles;
+
+  //EC Metrics
+  private @Metric MutableCounterLong ecKeyCreateTotal;
+  private @Metric MutableCounterLong ecKeyCreateFailsTotal;
+  private @Metric MutableCounterLong ecBucketCreateTotal;
+  private @Metric MutableCounterLong ecBucketCreateFailsTotal;
 
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
@@ -752,6 +760,15 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numRemoveAcl.incr();
   }
 
+  public void incNumGetKeyInfo() {
+    numGetKeyInfo.incr();
+    numKeyOps.incr();
+  }
+
+  public void incNumGetKeyInfoFails() {
+    getNumGetKeyInfoFails.incr();
+  }
+
   @VisibleForTesting
   public long getNumVolumeCreates() {
     return numVolumeCreates.value();
@@ -1207,6 +1224,22 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumTrashAtomicDirDeletes() {
     numTrashAtomicDirDeletes.incr();
+  }
+
+  public void incEcKeysTotal() {
+    ecKeyCreateTotal.incr();
+  }
+
+  public void incEcBucketsTotal() {
+    ecBucketCreateTotal.incr();
+  }
+
+  public void incEcKeyCreateFailsTotal() {
+    ecKeyCreateFailsTotal.incr();
+  }
+
+  public void incEcBucketCreateFailsTotal() {
+    ecBucketCreateFailsTotal.incr();
   }
 
   public void unRegister() {

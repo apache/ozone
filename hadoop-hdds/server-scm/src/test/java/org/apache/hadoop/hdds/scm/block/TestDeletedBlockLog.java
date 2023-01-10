@@ -335,10 +335,19 @@ public class TestDeletedBlockLog {
     // This will return all TXs, total num 30.
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
     List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
-        .collect(Collectors.toList());
+        .distinct().collect(Collectors.toList());
+    Assertions.assertEquals(30, txIDs.size());
+
+    for (DeletedBlocksTransaction block : blocks) {
+      Assertions.assertEquals(0, block.getCount());
+    }
 
     for (int i = 0; i < maxRetry; i++) {
       incrementCount(txIDs);
+    }
+    blocks = getAllTransactions();
+    for (DeletedBlocksTransaction block : blocks) {
+      Assertions.assertEquals(maxRetry, block.getCount());
     }
 
     // Increment another time so it exceed the maxRetry.
@@ -388,6 +397,14 @@ public class TestDeletedBlockLog {
     for (DeletedBlocksTransaction block : blocks) {
       Assertions.assertEquals(0, block.getCount());
     }
+
+    // Increment for the reset transactions.
+    incrementCount(txIDs);
+    blocks = getAllTransactions();
+    for (DeletedBlocksTransaction block : blocks) {
+      Assertions.assertEquals(1, block.getCount());
+    }
+
     Assertions.assertEquals(30 * THREE, blocks.size());
   }
 
