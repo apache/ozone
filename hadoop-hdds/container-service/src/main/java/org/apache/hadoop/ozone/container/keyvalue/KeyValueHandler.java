@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -386,11 +385,6 @@ public class KeyValueHandler extends Handler {
     volumeSet.readLock();
     HddsVolume containerVolume = hddsVolume;
     try {
-      if (hddsVolume == null) {
-        containerVolume = volumeChoosingPolicy.chooseVolume(
-            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-            container.getContainerData().getMaxSize());
-      }
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
       container.populatePathFields(idDir, containerVolume);

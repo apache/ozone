@@ -538,31 +538,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           (KeyValueContainerData) ContainerDataYaml
               .readContainer(descriptorContent);
       importContainerData(originalContainerData);
-    } finally {
-      writeUnlock();
-    }
-  }
-
-  public void importContainerData(KeyValueContainerData originalContainerData)
-      throws IOException {
-    writeLock();
-    try {
-      containerData.setState(originalContainerData.getState());
-      containerData
-          .setContainerDBType(originalContainerData.getContainerDBType());
-      containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
-
-      //rewriting the yaml file with new checksum calculation.
-      update(originalContainerData.getMetadata(), true);
-
-      if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-        // load metadata from received dump files before we try to parse kv
-        BlockUtils.loadKVContainerDataFromFiles(containerData, config);
-      }
-
-      //fill in memory stat counter (keycount, byte usage)
-      KeyValueContainerUtil.parseKVContainerData(containerData, config);
-
     } catch (Exception ex) {
       if (ex instanceof StorageContainerException &&
           ((StorageContainerException) ex).getResult() ==
@@ -589,6 +564,25 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
+  }
+
+  public void importContainerData(KeyValueContainerData originalContainerData)
+      throws IOException {
+    containerData.setState(originalContainerData.getState());
+    containerData
+        .setContainerDBType(originalContainerData.getContainerDBType());
+    containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
+
+    //rewriting the yaml file with new checksum calculation.
+    update(originalContainerData.getMetadata(), true);
+
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      // load metadata from received dump files before we try to parse kv
+      BlockUtils.loadKVContainerDataFromFiles(containerData, config);
+    }
+
+    //fill in memory stat counter (keycount, byte usage)
+    KeyValueContainerUtil.parseKVContainerData(containerData, config);
   }
 
   @Override

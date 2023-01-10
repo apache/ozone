@@ -37,6 +37,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator.CONTAINER_COPY_DIR;
+
 
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
@@ -50,14 +52,12 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   public static final Logger LOG =
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
-  private ConfigurationSource conf;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
   private final String compression;
 
   public SimpleContainerDownloader(
       ConfigurationSource conf, CertificateClient certClient) {
-    this.conf = conf;
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
     this.compression = CopyContainerCompression.getConf(conf).toString();
@@ -70,7 +70,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
     if (downloadDir == null) {
       downloadDir = Paths.get(System.getProperty("java.io.tmpdir"))
-              .resolve("container-copy");
+              .resolve(CONTAINER_COPY_DIR);
     }
 
     final List<DatanodeDetails> shuffledDatanodes =

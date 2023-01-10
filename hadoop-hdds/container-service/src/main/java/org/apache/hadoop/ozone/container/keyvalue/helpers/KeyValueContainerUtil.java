@@ -172,6 +172,7 @@ public final class KeyValueContainerUtil {
 
     long containerID = kvContainerData.getContainerID();
 
+    // Verify Checksum
     ContainerUtils.verifyChecksum(kvContainerData, config);
 
     if (kvContainerData.getSchemaVersion() == null) {

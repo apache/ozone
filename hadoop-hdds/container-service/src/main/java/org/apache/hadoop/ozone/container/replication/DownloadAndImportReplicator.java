@@ -60,7 +60,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   public static final String CONTAINER_COPY_DIR = "container-copy";
   public static final String CONTAINER_COPY_TMP_DIR = "tmp";
 
-  private final ConfigurationSource conf;
   private final ContainerSet containerSet;
   private final ContainerController controller;
   private final ContainerDownloader downloader;
@@ -76,7 +75,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       ContainerDownloader downloader,
       TarContainerPacker packer,
       MutableVolumeSet volumeSet) {
-    this.conf = conf;
     this.containerSet = containerSet;
     this.controller = controller;
     this.downloader = downloader;
@@ -168,6 +166,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   }
 
   private HddsVolume chooseNextVolume() throws IOException {
+    // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
         containerSize * 2);
