@@ -35,6 +35,7 @@ import java.util.Objects;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocat
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
@@ -110,8 +112,8 @@ public class TarContainerPacker
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
     } else {
-      throw new IOException("Unpack destination directory " + destContainerDir
-              + " is not empty.");
+      throw new StorageContainerException("Container unpack failed because " +
+          "ContainerFile already exists", CONTAINER_ALREADY_EXISTS);
     }
     return descriptorFileContent;
   }
