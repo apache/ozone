@@ -68,7 +68,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Test cases for mini ozone cluster.
@@ -188,7 +190,7 @@ public class TestMiniOzoneCluster {
     ContainerUtils.writeDatanodeDetailsTo(details, file);
 
     // Validate using yaml parser
-    Yaml yaml = new Yaml();
+    Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
     try {
       yaml.load(new InputStreamReader(new FileInputStream(file),
           StandardCharsets.UTF_8));
