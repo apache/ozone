@@ -61,8 +61,7 @@ public class ListBucketHandler extends VolumeHandler {
     int counter = 0;
     while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
       OzoneBucket bucket = bucketIterator.next();
-      if (!encryptedBuckets ||
-              (encryptedBuckets && (bucket.getEncryptionKeyName() != null))) {
+      if (!encryptedBuckets || bucket.getEncryptionKeyName() != null) {
         if (bucket.isLink()) {
           bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
         } else {
