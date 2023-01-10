@@ -20,13 +20,7 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
-import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
@@ -37,13 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetOmReconfigurationStatusRequestProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetOmReconfigurationStatusResponseProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetOmReconfigurationStatusConfigChangeProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.StartOmReconfigurationRequestProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.StartOmReconfigurationResponseProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.ListOmReconfigurablePropertiesRequestProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.ListOmReconfigurablePropertiesResponseProto;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -52,9 +39,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.Li
 public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
 
   private final OzoneManager ozoneManager;
-
-  private static final StartOmReconfigurationResponseProto START_RECONFIG_RESP =
-      StartOmReconfigurationResponseProto.newBuilder().build();
 
   public OMAdminProtocolServerSideImpl(OzoneManager om) {
     this.ozoneManager = om;
@@ -122,83 +106,5 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     return DecommissionOMResponse.newBuilder()
         .setSuccess(true)
         .build();
-  }
-
-  @Override
-  public GetOmReconfigurationStatusResponseProto getOmReconfigurationStatus(
-      RpcController controller, GetOmReconfigurationStatusRequestProto request)
-      throws ServiceException {
-    String operation = "getOmReconfigurationStatus";
-    checkAdminUserPrivilege(operation);
-
-    ReconfigurationTaskStatus status =
-        ozoneManager.getReconfigurationTaskStatus();
-    GetOmReconfigurationStatusResponseProto.Builder builder =
-        GetOmReconfigurationStatusResponseProto.newBuilder();
-
-    builder.setStartTime(status.getStartTime());
-    if (status.stopped()) {
-      builder.setEndTime(status.getEndTime());
-      assert status.getStatus() != null;
-      for (Map.Entry<ReconfigurationUtil.PropertyChange, Optional<String>>
-          result : status.getStatus().entrySet()) {
-        GetOmReconfigurationStatusConfigChangeProto.Builder changeBuilder = 
-            GetOmReconfigurationStatusConfigChangeProto.newBuilder();
-        ReconfigurationUtil.PropertyChange change = result.getKey();
-        changeBuilder.setName(change.prop);
-        changeBuilder.setOldValue(change.oldVal != null ? change.oldVal : "");
-        if (change.newVal != null) {
-          changeBuilder.setNewValue(change.newVal);
-        }
-        if (result.getValue().isPresent()) {
-          // Get full stack trace.
-          changeBuilder.setErrorMessage(result.getValue().get());
-        }
-        builder.addChanges(changeBuilder);
-      }
-    }
-    return builder.build();
-  }
-
-  @Override
-  public StartOmReconfigurationResponseProto startOmReconfiguration(
-      RpcController controller, StartOmReconfigurationRequestProto request)
-      throws ServiceException {
-    String operation = "startOmReconfiguration";
-    checkAdminUserPrivilege(operation);
-
-    try {
-      ozoneManager.startReconfigurationTask();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-    return START_RECONFIG_RESP;
-  }
-
-  @Override
-  public ListOmReconfigurablePropertiesResponseProto
-      listOmReconfigurableProperties(RpcController controller,
-      ListOmReconfigurablePropertiesRequestProto request)
-      throws ServiceException {
-    String operation = "listOmReconfigurableProperties";
-    checkAdminUserPrivilege(operation);
-
-    Collection<String> properties = ozoneManager.getReconfigurableProperties();
-    ListOmReconfigurablePropertiesResponseProto.Builder builder =
-        ListOmReconfigurablePropertiesResponseProto.newBuilder();
-    builder.addAllName(properties);
-    return builder.build();
-  }
-
-  /**
-   * Check ozone admin privilege, throws exception if not admin.
-   */
-  private void checkAdminUserPrivilege(String operation)
-      throws ServiceException {
-    try {
-      ozoneManager.checkAdminUserPrivilege(operation);
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
   }
 }

@@ -17,17 +17,12 @@
  */
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import com.google.common.collect.Maps;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
-import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -45,12 +40,6 @@ import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetOmReconfigurationStatusRequestProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetOmReconfigurationStatusResponseProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.StartOmReconfigurationRequestProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetOmReconfigurationStatusConfigChangeProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.ListOmReconfigurablePropertiesRequestProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.ListOmReconfigurablePropertiesResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
@@ -76,15 +65,6 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   private final OMAdminProtocolPB rpcProxy;
   private final String omPrintInfo; // For targeted OM proxy
 
-  private static final GetOmReconfigurationStatusRequestProto
-      VOID_GET_RECONFIG_STATUS =
-      GetOmReconfigurationStatusRequestProto.newBuilder().build();
-  private static final StartOmReconfigurationRequestProto VOID_START_RECONFIG =
-      StartOmReconfigurationRequestProto.newBuilder().build();
-  private static final ListOmReconfigurablePropertiesRequestProto
-      VOID_LIST_RECONFIGURABLE_PROPERTIES = 
-      ListOmReconfigurablePropertiesRequestProto.newBuilder().build();
-  
   private OMAdminProtocolClientSideImpl(OMAdminProtocolPB proxy,
       String printInfo) {
     this.rpcProxy = proxy;
@@ -229,62 +209,6 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
       throwException("Request to decommission" + removeOMNode.getOMPrintInfo() +
           ", sent to " + omPrintInfo + " failed with error: " +
           response.getErrorMsg());
-    }
-  }
-
-  @Override
-  public void startOmReconfiguration() throws IOException {
-    try {
-      rpcProxy.startOmReconfiguration(NULL_RPC_CONTROLLER, VOID_START_RECONFIG);
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
-    }
-  }
-
-  @Override
-  public ReconfigurationTaskStatus getOmReconfigurationStatus()
-      throws IOException {
-    GetOmReconfigurationStatusResponseProto response;
-    Map<ReconfigurationUtil.PropertyChange, java.util.Optional<String>>
-        statusMap = null;
-    long startTime;
-    long endTime = 0;
-    try {
-      response = rpcProxy.getOmReconfigurationStatus(NULL_RPC_CONTROLLER,
-          VOID_GET_RECONFIG_STATUS);
-      startTime = response.getStartTime();
-      if (response.hasEndTime()) {
-        endTime = response.getEndTime();
-      }
-      if (response.getChangesCount() > 0) {
-        statusMap = Maps.newHashMap();
-        for (GetOmReconfigurationStatusConfigChangeProto change :
-            response.getChangesList()) {
-          ReconfigurationUtil.PropertyChange pc =
-              new ReconfigurationUtil.PropertyChange(change.getName(),
-                  change.getNewValue(), change.getOldValue());
-          String errorMessage = null;
-          if (change.hasErrorMessage()) {
-            errorMessage = change.getErrorMessage();
-          }
-          statusMap.put(pc, Optional.ofNullable(errorMessage));
-        }
-      }
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
-    }
-    return new ReconfigurationTaskStatus(startTime, endTime, statusMap);
-  }
-
-  @Override
-  public List<String> listOmReconfigurableProperties() throws IOException {
-    ListOmReconfigurablePropertiesResponseProto response;
-    try {
-      response = rpcProxy.listOmReconfigurableProperties(NULL_RPC_CONTROLLER,
-          VOID_LIST_RECONFIGURABLE_PROPERTIES);
-      return response.getNameList();
-    } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
     }
   }
 

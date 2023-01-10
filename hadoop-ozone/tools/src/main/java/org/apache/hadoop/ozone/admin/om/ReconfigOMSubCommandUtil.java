@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,28 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.protocol;
+package org.apache.hadoop.ozone.admin.om;
 
-import java.io.Closeable;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
+import org.apache.hadoop.hdds.protocolPB.ReconfigProtocolClientSideTranslatorPB;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+
 import java.io.IOException;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.security.KerberosInfo;
+import java.net.InetSocketAddress;
 
-/**
- * Protocol for performing admin operations such as getting OM metadata.
- */
-@KerberosInfo(
-    serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
-public interface OMAdminProtocol extends Closeable {
+public class ReconfigOMSubCommandUtil {
 
-  /**
-   * Get the OM configuration.
-   */
-  OMConfiguration getOMConfiguration() throws IOException;
+  public static ReconfigProtocol getSingleOMReconfigProxy(String address)
+      throws IOException {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration();
+    UserGroupInformation user = UserGroupInformation.getCurrentUser();
+    InetSocketAddress nodeAddr = NetUtils.createSocketAddr(address);
+    return new ReconfigProtocolClientSideTranslatorPB(
+        nodeAddr, user, ozoneConf);
+  }
 
-  /**
-   * Remove OM from HA ring.
-   */
-  void decommission(OMNodeDetails removeOMNode) throws IOException;
 }

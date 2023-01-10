@@ -34,28 +34,28 @@ key | description
 ozone.administrators | OM startup user will be added to admin by default
 
 ```shell
-ozone admin om reconfig -address=<ip:port> -op=start|status|properties
+ozone admin om reconfig -address=<ip:port> start|status|properties
 ```
 
 The meaning of command options:
 - **-address**: RPC address for one OM machine
-- **-op**: Three operations are provided:
+- Three operations are provided:
   - `start`:      Execute the reconfig operation asynchronously
   - `status`:     Check reconfiguration status
   - `properties`: List reconfigurable properties
 
 >For example, modify `ozone.administrators` in ozone-site.xml and execute:
 >
-> $ `ozone admin om reconfig -address=hadoop1:9862 -op=start`<br>
+> $ `ozone admin om reconfig -address=hadoop1:9862 start`<br>
 Started OM reconfiguration task on node [hadoop1:9862].
 >
->$ `ozone admin om reconfig -address=hadoop1:9862 -op=status`<br>
+>$ `ozone admin om reconfig -address=hadoop1:9862 status`<br>
 Reconfiguring status for node [hadoop1:9862]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
 SUCCESS: Changed OM property ozone.administrators<br>
 From: "hadoop"<br>
 To: "hadoop,bigdata"
 >
-> $ `ozone admin om reconfig -address=hadoop1:9862 -op=properties`<br>
+> $ `ozone admin om reconfig -address=hadoop1:9862 properties`<br>
 OM Node [hadoop1:9862] Reconfigurable properties:<br>
 ozone.administrators
 

@@ -33,28 +33,28 @@ Ozone支持在不重启服务的情况下动态加载某些配置。如果某个
 ozone.administrators | OM启动用户将默认成为一个管理员
 
 ```shell
-ozone admin om reconfig -address=<ip:port> -op=start|status|properties
+ozone admin om reconfig -address=<ip:port> start|status|properties
 ```
 
 命令项的含义:
 - **-address**: 一台OM服务所在的主机与客户端通信的RPC地址
-- **-op**: 提供3中操作:
+- 提供3中操作:
     - `start`:      开始异步执行动态加载配置
     - `status`:     查看最近一次动态加载的状态
     - `properties`: 列出支持动态加载的配置项
 
 >例如, 在`ozone-site.xml`文件中修改`ozone.administrators`的值并执行:
 >
-> $ `ozone admin om reconfig -address=hadoop1:9862 -op=start`<br>
+> $ `ozone admin om reconfig -address=hadoop1:9862 start`<br>
 Started OM reconfiguration task on node [hadoop1:9862].
 >
->$ `ozone admin om reconfig -address=hadoop1:9862 -op=status`<br>
+>$ `ozone admin om reconfig -address=hadoop1:9862 status`<br>
 Reconfiguring status for node [hadoop1:9862]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
 SUCCESS: Changed OM property ozone.administrators<br>
 From: "hadoop"<br>
 To: "hadoop,bigdata"
 >
-> $ `ozone admin om reconfig -address=hadoop1:9862 -op=properties`<br>
+> $ `ozone admin om reconfig -address=hadoop1:9862 properties`<br>
 OM Node [hadoop1:9862] Reconfigurable properties:<br>
 ozone.administrators
 

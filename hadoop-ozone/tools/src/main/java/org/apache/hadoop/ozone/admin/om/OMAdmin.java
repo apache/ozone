@@ -58,8 +58,7 @@ import java.util.Collection;
         CancelPrepareSubCommand.class,
         FinalizationStatusSubCommand.class,
         DecommissionOMSubcommand.class,
-        UpdateRangerSubcommand.class,
-        ReconfigOMSubcommand.class
+        UpdateRangerSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class OMAdmin extends GenericCli implements SubcommandWithParent {

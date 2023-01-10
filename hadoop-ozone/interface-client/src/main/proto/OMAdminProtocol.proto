@@ -69,58 +69,16 @@ message DecommissionOMResponse {
     optional string errorMsg = 3;
 }
 
-/** Asks OM to reload configuration file. */
-message StartOmReconfigurationRequestProto {
-}
-
-message StartOmReconfigurationResponseProto {
-}
-
-/** Query the running status of reconfiguration process */
-message GetOmReconfigurationStatusRequestProto {
-}
-
-message GetOmReconfigurationStatusConfigChangeProto {
-  required string name = 1;
-  required string oldValue = 2;
-  optional string newValue = 3;
-  optional string errorMessage = 4;  // It is empty if success.
-}
-
-message GetOmReconfigurationStatusResponseProto {
-  required int64 startTime = 1;
-  optional int64 endTime = 2;
-  repeated GetOmReconfigurationStatusConfigChangeProto changes = 3;
-}
-
-/** Query the reconfigurable properties on OM. */
-message ListOmReconfigurablePropertiesRequestProto {
-}
-
-message ListOmReconfigurablePropertiesResponseProto {
-  repeated string name = 1;
-}
-
 /**
  The service for OM admin operations.
 */
 service OzoneManagerAdminService {
-  // RPC request to OM to return its confugration -  in memory OM nodes list
-  // and the anticipated nodes list from the config files (upon reloading).
-  rpc getOMConfiguration(OMConfigurationRequest)
-      returns(OMConfigurationResponse);
+    // RPC request to OM to return its confugration -  in memory OM nodes list
+    // and the anticipated nodes list from the config files (upon reloading).
+    rpc getOMConfiguration(OMConfigurationRequest)
+    returns(OMConfigurationResponse);
 
-  // RPC request from admin to remove an OM from the cluster
-  rpc decommission(DecommissionOMRequest)
-      returns(DecommissionOMResponse);
-
-  rpc getOmReconfigurationStatus(GetOmReconfigurationStatusRequestProto)
-      returns(GetOmReconfigurationStatusResponseProto);
-
-  rpc startOmReconfiguration(StartOmReconfigurationRequestProto)
-      returns(StartOmReconfigurationResponseProto);
-
-  rpc listOmReconfigurableProperties(
-      ListOmReconfigurablePropertiesRequestProto)
-      returns(ListOmReconfigurablePropertiesResponseProto);
+    // RPC request from admin to remove an OM from the cluster
+    rpc decommission(DecommissionOMRequest)
+    returns(DecommissionOMResponse);
 }

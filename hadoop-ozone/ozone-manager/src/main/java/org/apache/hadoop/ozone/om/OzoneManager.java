@@ -44,17 +44,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -68,8 +69,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ReconfigProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocolPB.ReconfigProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.ReconfigProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -305,7 +310,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class OzoneManager extends ServiceRuntimeInfoImpl
-    implements OzoneManagerProtocol, OMInterServiceProtocol,
+    implements OzoneManagerProtocol, OMInterServiceProtocol, ReconfigProtocol,
     OMMXBean, Auditor {
   public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManager.class);
@@ -450,13 +455,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final boolean isSecurityEnabled;
 
-
   /** A list of property that are reconfigurable at runtime. */
-  private final TreeSet<String> reconfigurableProperties = Sets.newTreeSet(
-      Lists.newArrayList(
+  private final SortedSet<String> reconfigurableProperties =
+      ImmutableSortedSet.of(
           OZONE_ADMINISTRATORS
-  ));
-  
+      );
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -1152,8 +1156,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneManagerAdminService.newReflectiveBlockingService(
             omMetadataServerProtocol);
 
+    ReconfigProtocolServerSideTranslatorPB reconfigServerProtocol
+        = new ReconfigProtocolServerSideTranslatorPB(this);
+    BlockingService reconfigService =
+        ReconfigProtocolService.newReflectiveBlockingService(
+            reconfigServerProtocol);
+
     return startRpcServer(configuration, omNodeRpcAddr, omService,
-        omInterService, omAdminService, handlerCount);
+        omInterService, omAdminService, reconfigService, handlerCount);
   }
 
   /**
@@ -1172,6 +1182,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       InetSocketAddress addr, BlockingService clientProtocolService,
       BlockingService interOMProtocolService,
       BlockingService omAdminProtocolService,
+      BlockingService reconfigProtocolService,
       int handlerCount)
       throws IOException {
     RPC.Server rpcServer = new RPC.Builder(conf)
@@ -1188,6 +1199,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         interOMProtocolService, rpcServer);
     HddsServerUtil.addPBProtocol(conf, OMAdminProtocolPB.class,
         omAdminProtocolService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, ReconfigProtocolPB.class,
+        reconfigProtocolService, rpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
@@ -4614,12 +4627,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return BucketLayout.DEFAULT;
   }
 
-  @Override
+
+  @Override // ReconfigProtocol
+  public void startReconfig() throws IOException {
+    String operationName = "startOmReconfiguration";
+    checkAdminUserPrivilege(operationName);
+    startReconfigurationTask();
+  }
+
+  @Override // ReconfigProtocol
+  public ReconfigurationTaskStatus getReconfigStatus()
+      throws IOException {
+    String operationName = "getOmReconfigurationStatus";
+    checkAdminUserPrivilege(operationName);
+    return getReconfigurationTaskStatus();
+  }
+
+  @Override // ReconfigProtocol
+  public List<String> listReconfigProperties() throws IOException {
+    String operationName = "listOmReconfigurableProperties";
+    checkAdminUserPrivilege(operationName);
+    return Lists.newArrayList(getReconfigurableProperties());
+  }
+
+  @Override // ReconfigurableBase
   public Collection<String> getReconfigurableProperties() {
     return reconfigurableProperties;
   }
 
-  @Override
+  @Override // ReconfigurableBase
   protected String reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
     if (property.equals(OZONE_ADMINISTRATORS)) {

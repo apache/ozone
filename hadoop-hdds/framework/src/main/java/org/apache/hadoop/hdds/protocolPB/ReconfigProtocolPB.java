@@ -6,37 +6,31 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.protocol;
+package org.apache.hadoop.hdds.protocolPB;
 
-import java.io.Closeable;
-import java.io.IOException;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ReconfigProtocolService;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol for performing admin operations such as getting OM metadata.
+ * Protocol that clients use to communicate with the OM/SCM to do
+ * reconfiguration on the fly.
  */
-@KerberosInfo(
-    serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
-public interface OMAdminProtocol extends Closeable {
-
-  /**
-   * Get the OM configuration.
-   */
-  OMConfiguration getOMConfiguration() throws IOException;
-
-  /**
-   * Remove OM from HA ring.
-   */
-  void decommission(OMNodeDetails removeOMNode) throws IOException;
+@ProtocolInfo(
+    protocolName = "org.apache.hadoop.hdds.protocol.ReconfigProtocol",
+    protocolVersion = 1)
+@KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings
+    .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
+public interface ReconfigProtocolPB extends
+    ReconfigProtocolService.BlockingInterface {
 }
