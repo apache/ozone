@@ -39,7 +39,7 @@ execute_robot_test ${SCM} s3
 
 execute_robot_test ${SCM} admincli
 
-execute_robot_test ${SCM} -v SECURITY_ENABLED:${SECURITY_ENABLED} httpfs
+execute_robot_test ${SCM} httpfs
 
 export SCM=scm2.org
 execute_robot_test ${SCM} admincli
