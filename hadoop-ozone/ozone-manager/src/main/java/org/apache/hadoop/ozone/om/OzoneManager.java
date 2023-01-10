@@ -454,6 +454,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
     omStorage = new OMStorage(conf);
+    // validate if the stored one is the same we get in the OMNodeDetails
+    // if not, fails the start. If the VERSION file does not contain the node
+    // id yet, it stores it to the VERSION file and skips validation for the
+    // that case.
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
 

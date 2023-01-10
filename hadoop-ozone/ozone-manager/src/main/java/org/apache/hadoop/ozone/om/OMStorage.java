@@ -37,7 +37,11 @@ import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_
  * functionality to hold Ozone Manager related data in its VERSION file.
  * The additional values stored:
  * - Ozone Manager ID - a UUID that identifies this Ozone Manager.
- *                      The value can not be changed once initialized.
+ *                      The value can not be changed once initialized, and
+ *                      it is initialized automatically in this class.
+ *                      The value itself is not used anymore, it is part of the
+ *                      {@link org.apache.hadoop.hdds.protocol.proto.HddsProtos
+ *                      .OzoneManagerDetailsProto} hence not removed yet.
  * - Ozone Manager Node Id - the node id defined for this Ozone manager in the
  *                           configuration. The value can not be changed after
  *                           it was set.
@@ -49,7 +53,7 @@ public class OMStorage extends Storage {
   static final String ERROR_OM_IS_ALREADY_INITIALIZED =
       "OM is already initialized.";
   static final String ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE =
-      "OM NodeId: {} does not match existing nodeId from VERSION file: {}";
+      "OM NodeId: %s does not match existing nodeId from VERSION file: %s";
   static final String ERROR_STORAGE_NOT_INITIALIZED =
       "OM Storage is not initialized yet.";
 

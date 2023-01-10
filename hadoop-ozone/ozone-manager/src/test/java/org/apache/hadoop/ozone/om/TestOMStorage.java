@@ -235,7 +235,7 @@ public class TestOMStorage {
 
     thrown.expect(IOException.class);
     String expectedMsg =
-        String.format(ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE, nodeId, newId);
+        String.format(ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE, newId, nodeId);
     thrown.expectMessage(expectedMsg);
 
     storage.validateOrPersistOmNodeId(newId);
@@ -281,12 +281,12 @@ public class TestOMStorage {
     return ret;
   }
 
-  private OMStorage setupAPersistedVersionFile(OzoneConfiguration conf)
+  private void setupAPersistedVersionFile(OzoneConfiguration conf)
       throws IOException {
-    return setupAPersistedVersionFileWithNodeId(conf, null);
+    setupAPersistedVersionFileWithNodeId(conf, null);
   }
 
-  private OMStorage setupAPersistedVersionFileWithNodeId(
+  private void setupAPersistedVersionFileWithNodeId(
       OzoneConfiguration conf, String nodeId) throws IOException {
     OMStorage storage = new OMStorage(conf);
     storage.setClusterId("clusterId");
@@ -297,7 +297,6 @@ public class TestOMStorage {
     }
     storage.initialize();
     storage.persistCurrentState();
-    return storage;
   }
 
   private OzoneConfiguration configWithOMDBDir() throws IOException {
