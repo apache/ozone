@@ -338,7 +338,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
     LOG.warn("Moving container {} to state {} from state:{} Trace:{}",
             containerData.getContainerPath(), containerData.getState(),
-            prevState, StringUtils.getStackTrace(Thread.currentThread()));
+            prevState);
   }
 
   @Override

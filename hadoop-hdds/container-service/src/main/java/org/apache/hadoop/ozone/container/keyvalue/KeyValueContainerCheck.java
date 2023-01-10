@@ -401,6 +401,6 @@ public class KeyValueContainerCheck {
     String errStr =
         "Corruption detected in container: [" + containerID + "] ";
     String logMessage = errStr + "Exception: [" + e.getMessage() + "]";
-    LOG.error(logMessage);
+    LOG.error(logMessage, e);
   }
 }
