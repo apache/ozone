@@ -62,6 +62,8 @@ execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-buck
 
 execute_robot_test scm ec/basic.robot
 
+execute_robot_test scm snapshot/basic.robot
+
 stop_docker_env
 
 generate_report
