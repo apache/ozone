@@ -456,11 +456,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotActive.incr(num - currVal);
   }
 
-  public void incrNumSnapshotActive() {
+  public void incNumSnapshotActive() {
     numSnapshotActive.incr();
   }
 
-  public void decrNumSnapshotActive() {
+  public void decNumSnapshotActive() {
     numSnapshotActive.incr(-1);
   }
 
@@ -469,11 +469,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotDeleted.incr(num - currVal);
   }
 
-  public void incrNumSnapshotDeleted() {
+  public void incNumSnapshotDeleted() {
     numSnapshotDeleted.incr();
   }
 
-  public void decrNumSnapshotDeleted() {
+  public void decNumSnapshotDeleted() {
     numSnapshotDeleted.incr(-1);
   }
 
@@ -482,11 +482,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotReclaimed.incr(num - currVal);
   }
 
-  public void incrNumSnapshotReclaimed() {
+  public void incNumSnapshotReclaimed() {
     numSnapshotReclaimed.incr();
   }
 
-  public void decrNumSnapshotReclaimed() {
+  public void decNumSnapshotReclaimed() {
     numSnapshotReclaimed.incr(-1);
   }
 
