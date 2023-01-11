@@ -42,9 +42,7 @@ import java.util.List;
 import java.util.Map;
 
 import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
-import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import static org.apache.commons.collections.EnumerationUtils.toList;
 
@@ -229,7 +227,7 @@ public final class NodeSchemaLoader {
     NodeSchemaLoadResult finalSchema;
 
     try {
-      Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
+      Yaml yaml = new Yaml();
       NodeSchema nodeTree;
 
       nodeTree = yaml.loadAs(schemaFile, NodeSchema.class);

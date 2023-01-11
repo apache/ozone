@@ -33,10 +33,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
-import org.yaml.snakeyaml.representer.Representer;
 
 /**
  * Class for creating datanode.id file in yaml format.
@@ -59,7 +56,7 @@ public final class DatanodeIdYaml {
     DumperOptions options = new DumperOptions();
     options.setPrettyFlow(true);
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
-    Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()), new Representer(options), options);
+    Yaml yaml = new Yaml(options);
 
     try (Writer writer = new OutputStreamWriter(
         new FileOutputStream(path), StandardCharsets.UTF_8)) {
@@ -74,7 +71,7 @@ public final class DatanodeIdYaml {
       throws IOException {
     DatanodeDetails datanodeDetails;
     try (FileInputStream inputFileStream = new FileInputStream(path)) {
-      Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
+      Yaml yaml = new Yaml();
       DatanodeDetailsYaml datanodeDetailsYaml;
       try {
         datanodeDetailsYaml =
