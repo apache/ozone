@@ -207,8 +207,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       //Check quotaInBytes to update
-      checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
-          volumeKey);
+      if (!bucketInfo.hasSourceBucket()) {
+        checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
+            volumeKey);
+      }
 
       // Add objectID and updateID
       omBucketInfo.setObjectID(
