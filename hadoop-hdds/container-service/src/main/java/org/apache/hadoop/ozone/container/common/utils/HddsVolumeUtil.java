@@ -41,9 +41,6 @@ import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.o
  */
 public final class HddsVolumeUtil {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(HddsVolumeUtil.class);
-
   // Private constructor for Utility class. Unused.
   private HddsVolumeUtil() {
   }

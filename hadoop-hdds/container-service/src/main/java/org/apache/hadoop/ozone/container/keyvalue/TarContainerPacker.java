@@ -112,8 +112,11 @@ public class TarContainerPacker
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
     } else {
-      throw new StorageContainerException("Container unpack failed because " +
-          "ContainerFile already exists", CONTAINER_ALREADY_EXISTS);
+      String errorMessage = "Container " + containerId +
+          " unpack failed because ContainerFile " +
+          destContainerDir.toAbsolutePath() + " already exists";
+      throw new StorageContainerException(errorMessage,
+          CONTAINER_ALREADY_EXISTS);
     }
     return descriptorFileContent;
   }

@@ -515,10 +515,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     HddsVolume hddsVolume = containerData.getVolume();
     String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
         hddsVolume, hddsVolume.getClusterID());
+    long containerId = containerData.getContainerID();
     Path destContainerDir =
         Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
-            hddsVolume.getHddsRootDir().toString(), idDir,
-            containerData.getContainerID()));
+            hddsVolume.getHddsRootDir().toString(), idDir, containerId));
     Path tmpDir = DownloadAndImportReplicator.getUntarDirectory(hddsVolume);
     writeLock();
     try {
@@ -539,12 +539,26 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
               .readContainer(descriptorContent);
       importContainerData(originalContainerData);
     } catch (Exception ex) {
+      // clean data under tmp directory
+      try {
+        Path containerUntarDir = tmpDir.resolve(String.valueOf(containerId));
+        if (containerUntarDir.toFile().exists()) {
+          FileUtils.deleteDirectory(containerUntarDir.toFile());
+        }
+      } catch (Exception deleteex) {
+        LOG.error(
+            "Can not cleanup container directory under {} for container {}",
+            tmpDir, containerId, deleteex);
+      }
+
+      // Throw exception for existed containers
       if (ex instanceof StorageContainerException &&
           ((StorageContainerException) ex).getResult() ==
               CONTAINER_ALREADY_EXISTS) {
         throw ex;
       }
-      //delete all the temporary data in case of any exception.
+
+      // delete all other temporary data in case of any exception.
       try {
         if (containerData.getSchemaVersion() != null &&
             containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
@@ -557,8 +571,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       } catch (Exception deleteex) {
         LOG.error(
             "Can not cleanup destination directories after a container import"
-                + " error (cid" +
-                containerData.getContainerID() + ")", deleteex);
+                + " error (cid: {}", containerId, deleteex);
       }
       throw ex;
     } finally {
