@@ -649,7 +649,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
       if (ofsPath.isSnapshotIndicator()) {
         OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-        return getFileStatusAdapterWithSnapshotPrefix(
+        return getFileStatusAdapterWithSnapshotIndicator(
             volume, bucket, uri);
       }
 
@@ -1190,14 +1190,13 @@ public class BasicRootedOzoneClientAdapterImpl
 
   /**
    * Generate a FileStatusAdapter for a bucket
-   * followed by a snapshot prefix.
+   * followed by a snapshot indicator.
+   * @param ozoneVolume OzoneVolume object.
    * @param ozoneBucket OzoneBucket object.
    * @param uri Full URI to OFS root.
-   * @param owner Owner of the parent volume of the bucket.
-   * @param group Group of the parent volume of the bucket.
-   * @return FileStatusAdapter for a snapshot prefix.
+   * @return FileStatusAdapter for a snapshot indicator.
    */
-  private static FileStatusAdapter getFileStatusAdapterWithSnapshotPrefix(
+  private static FileStatusAdapter getFileStatusAdapterWithSnapshotIndicator(
       OzoneVolume ozoneVolume, OzoneBucket ozoneBucket, URI uri) {
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(ozoneVolume.getOwner());
@@ -1209,7 +1208,7 @@ public class BasicRootedOzoneClientAdapterImpl
         OZONE_URI_DELIMITER + ozoneBucket.getName() +
         OZONE_URI_DELIMITER + OM_SNAPSHOT_INDICATOR;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getFileStatusAdapterWithSnapshotPrefix: " +
+      LOG.debug("getFileStatusAdapterWithSnapshotIndicator: " +
               "ozoneBucket={}, pathStr={}",
           ozoneBucket.getVolumeName() + OZONE_URI_DELIMITER +
               ozoneBucket.getName(), pathStr);

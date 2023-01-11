@@ -22,7 +22,7 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${SNAPSHOT_PREFIX}      .snapshot
+${SNAPSHOT_INDICATOR}      .snapshot
 ${VOLUME}
 ${BUCKET}
 ${KEY_ONE}
@@ -65,14 +65,14 @@ Create snapshot
                     Should not contain  ${result}       Failed
 
 List snapshots with fs -ls
-    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}
-                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}
+    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}
+                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}
 
 List snapshot keys with fs -ls
-    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}
-                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}/${KEY_ONE}
-    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}/${KEY_ONE}
-                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_PREFIX}/${SNAPSHOT_ONE}/${KEY_ONE}
+    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}
+                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}
+    ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}
+                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}
 
 Setup Snapshot Paths
     Execute         kdestroy

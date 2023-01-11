@@ -267,7 +267,7 @@ public class OFSPath {
   /**
    * If volume and bucket names are not empty and the key name
    * only contains the snapshot indicator, then return true.
-   * e.g. /vol/bucket/.snapshot is a snapshot prefix.
+   * e.g. /vol/bucket/.snapshot is a snapshot indicator.
    */
   public boolean isSnapshotIndicator() {
     if (keyName.contains(OM_SNAPSHOT_INDICATOR)) {
