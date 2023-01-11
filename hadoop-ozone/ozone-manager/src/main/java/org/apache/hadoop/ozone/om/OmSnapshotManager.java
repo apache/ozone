@@ -64,9 +64,9 @@ public final class OmSnapshotManager {
 
     // Pass in the differ
     final RocksDBCheckpointDiffer differ = ozoneManager
-            .getMetadataManager()
-            .getStore()
-            .getRocksDBCheckpointDiffer();
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer();
     this.snapshotDiffManager = new SnapshotDiffManager(differ);
 
     // size of lru cache
@@ -248,7 +248,7 @@ public final class OmSnapshotManager {
       final OmSnapshot fs = snapshotCache.get(fsKey);
       final OmSnapshot ts = snapshotCache.get(tsKey);
       return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
-              fsInfo, tsInfo);
+          fsInfo, tsInfo);
     } catch (ExecutionException | RocksDBException e) {
       throw new IOException(e.getCause());
     }
