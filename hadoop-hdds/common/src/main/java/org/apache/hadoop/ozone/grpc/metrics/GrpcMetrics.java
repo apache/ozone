@@ -21,8 +21,7 @@ package org.apache.hadoop.ozone.grpc.metrics;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -60,11 +59,11 @@ public class GrpcMetrics {
         int interval = intervals[i];
         grpcProcessingTimeMillisQuantiles[i] = registry
             .newQuantiles("grpcQueueTime" + interval
-                    + "s", "grpc queue time in milli second", "ops",
+                    + "s", "grpc queue time in millisecond", "ops",
                 "latency", interval);
         grpcProcessingTimeMillisQuantiles[i] = registry.newQuantiles(
             "grpcProcessingTime" + interval + "s",
-            "grpc processing time in milli second",
+            "grpc processing time in millisecond",
             "ops", "latency", interval);
       }
     }
@@ -90,10 +89,16 @@ public class GrpcMetrics {
   }
 
   @Metric("Number of sent bytes")
-  private MutableGaugeLong sentBytes;
+  private MutableCounterLong sentBytes;
 
   @Metric("Number of received bytes")
-  private MutableGaugeLong receivedBytes;
+  private MutableCounterLong receivedBytes;
+
+  @Metric("Number of unknown messages sent")
+  private MutableCounterLong unknownMessagesSent;
+
+  @Metric("Number of unknown messages received")
+  private MutableCounterLong unknownMessagesReceived;
 
   @Metric("Queue time")
   private MutableRate grpcQueueTime;
@@ -110,14 +115,22 @@ public class GrpcMetrics {
   private MutableQuantiles[] grpcProcessingTimeMillisQuantiles;
 
   @Metric("Number of active clients connected")
-  private MutableGaugeInt numOpenClientConnections;
+  private MutableCounterLong numOpenClientConnections;
 
-  public void setSentBytes(long byteCount) {
-    sentBytes.set(byteCount);
+  public void incrSentBytes(long byteCount) {
+    sentBytes.incr(byteCount);
   }
 
-  public void setReceivedBytes(long byteCount) {
-    receivedBytes.set(byteCount);
+  public void incrReceivedBytes(long byteCount) {
+    receivedBytes.incr(byteCount);
+  }
+
+  public void incrUnknownMessagesSent() {
+    unknownMessagesSent.incr();
+  }
+
+  public void incrUnknownMessagesReceived() {
+    unknownMessagesReceived.incr();
   }
 
   public void addGrpcQueueTime(int queueTime) {
@@ -142,18 +155,30 @@ public class GrpcMetrics {
     }
   }
 
-  public void setNumOpenClientConnections(int activeClients) {
-    numOpenClientConnections.set(activeClients);
+  public void inrcNumOpenClientConnections() {
+    numOpenClientConnections.incr();
   }
 
-  public MutableGaugeLong getSentBytes() {
-    return sentBytes;
+  public void decrNumOpenClientConnections() {
+    numOpenClientConnections.incr(-1);
   }
 
-  public MutableGaugeLong getReceivedBytes() {
-    return receivedBytes;
+  public long getSentBytes() {
+    return sentBytes.value();
   }
 
+  public long getReceivedBytes() {
+    return receivedBytes.value();
+  }
+
+  public long getUnknownMessagesSent() {
+    return unknownMessagesSent.value();
+  }
+
+  public long getUnknownMessagesReceived() {
+    return unknownMessagesReceived.value();
+  }
+  
   public MutableRate getGrpcQueueTime() {
     return grpcQueueTime;
   }
@@ -162,7 +187,7 @@ public class GrpcMetrics {
     return grpcProcessingTime;
   }
 
-  public MutableGaugeInt getNumActiveClientConnections() {
-    return numOpenClientConnections;
+  public long getNumActiveClientConnections() {
+    return numOpenClientConnections.value();
   }
 }

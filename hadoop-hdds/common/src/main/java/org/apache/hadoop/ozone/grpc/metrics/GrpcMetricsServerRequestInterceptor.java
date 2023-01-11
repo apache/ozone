@@ -23,20 +23,13 @@ import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Interceptor to gather metrics based on grpc server request.
  */
 public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(
-          GrpcMetricsServerRequestInterceptor.class);
-
   private final GrpcMetrics grpcMetrics;
-  private long bytesReceived;
   private long receivedTime;
   private long startTime;
   private long endTime;
@@ -45,7 +38,6 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
       GrpcMetrics grpcMetrics) {
     super();
     this.grpcMetrics = grpcMetrics;
-    this.bytesReceived = 0;
   }
 
   @Override
@@ -69,15 +61,10 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
           AbstractMessage parsedMessage = (AbstractMessage) message;
           messageSize += parsedMessage.getSerializedSize();
         } else {
-          LOG.error("Unable to register number of bytes received. " +
-              "Message is not an instance of AbstractMessage.");
+          grpcMetrics.incrUnknownMessagesReceived();
         }
 
-        bytesReceived += messageSize;
-
-        if (bytesReceived > 0) {
-          grpcMetrics.setReceivedBytes(bytesReceived);
-        }
+        grpcMetrics.incrReceivedBytes(messageSize);
         super.onMessage(message);
       }
 

@@ -23,26 +23,18 @@ import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.ForwardingServerCall;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Interceptor to gather metrics based on grpc server response.
  */
 public class GrpcMetricsServerResponseInterceptor implements ServerInterceptor {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(
-          GrpcMetricsServerResponseInterceptor.class);
-
   private final GrpcMetrics grpcMetrics;
-  private long bytesSent;
 
   public GrpcMetricsServerResponseInterceptor(
       GrpcMetrics grpcMetrics) {
     super();
     this.grpcMetrics = grpcMetrics;
-    this.bytesSent = 0;
   }
 
   @Override
@@ -61,15 +53,10 @@ public class GrpcMetricsServerResponseInterceptor implements ServerInterceptor {
               AbstractMessage parsedMessage = (AbstractMessage) message;
               messageSize += parsedMessage.getSerializedSize();
             } else {
-              LOG.error("Unable to register number of bytes sent. " +
-                  "Message is not an instance of AbstractMessage.");
+              grpcMetrics.incrUnknownMessagesSent();
             }
 
-            bytesSent += messageSize;
-
-            if (bytesSent > 0) {
-              grpcMetrics.setSentBytes(bytesSent);
-            }
+            grpcMetrics.incrSentBytes(messageSize);
             super.sendMessage(message);
           }
         }, headers);

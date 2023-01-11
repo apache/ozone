@@ -26,26 +26,22 @@ import io.grpc.ServerTransportFilter;
 public class GrpcMetricsServerTransportFilter extends ServerTransportFilter {
 
   private GrpcMetrics grpcMetrics;
-  private int activeClientCount;
 
   public GrpcMetricsServerTransportFilter(
       GrpcMetrics grpcMetrics) {
     super();
     this.grpcMetrics = grpcMetrics;
-    this.activeClientCount = 0;
   }
 
   @Override
   public Attributes transportReady(Attributes transportAttrs) {
-    activeClientCount++;
-    grpcMetrics.setNumOpenClientConnections(activeClientCount);
+    grpcMetrics.inrcNumOpenClientConnections();
     return super.transportReady(transportAttrs);
   }
 
   @Override
   public void transportTerminated(Attributes transportAttrs) {
-    activeClientCount--;
-    grpcMetrics.setNumOpenClientConnections(activeClientCount);
+    grpcMetrics.decrNumOpenClientConnections();
     super.transportTerminated(transportAttrs);
   }
 }
