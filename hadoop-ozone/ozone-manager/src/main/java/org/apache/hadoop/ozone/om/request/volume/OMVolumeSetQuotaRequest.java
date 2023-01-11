@@ -209,12 +209,13 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         totalBucketQuota += nextQuotaInBytes;
       } else {
         isBucketQuotaSet = false;
+        break;
       }
     }
     
     if (!isBucketQuotaSet) {
-      throw new OMException("Can not set volume space quota as some of " +
-          "bucket do not have space quota set in this volume.",
+      throw new OMException("Can not set volume space quota on volume " +
+          "as some of buckets in this volume have no quota set.",
           OMException.ResultCodes.QUOTA_ERROR);
     }
     
