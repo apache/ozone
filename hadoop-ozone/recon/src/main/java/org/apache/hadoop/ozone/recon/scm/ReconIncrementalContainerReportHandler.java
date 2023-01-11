@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +45,13 @@ public class ReconIncrementalContainerReportHandler
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ReconIncrementalContainerReportHandler.class);
+  private ContainerSizeCountTask containerSizeCountTask;
 
   public ReconIncrementalContainerReportHandler(NodeManager nodeManager,
-             ContainerManager containerManager, SCMContext scmContext) {
+                    ContainerManager containerManager, SCMContext scmContext,
+                    ContainerSizeCountTask containerSizeCountTask) {
     super(nodeManager, containerManager, scmContext);
+    this.containerSizeCountTask = containerSizeCountTask;
   }
 
   @Override
@@ -99,5 +103,6 @@ public class ReconIncrementalContainerReportHandler
       }
     }
     containerManager.notifyContainerReportProcessing(false, success);
+    containerSizeCountTask.process(containerManager.getContainers());
   }
 }

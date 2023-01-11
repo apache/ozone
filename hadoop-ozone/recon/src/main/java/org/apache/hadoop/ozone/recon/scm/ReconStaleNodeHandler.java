@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +37,16 @@ public class ReconStaleNodeHandler extends StaleNodeHandler {
   private static final Logger LOG =
         LoggerFactory.getLogger(ReconStaleNodeHandler.class);
   private PipelineSyncTask pipelineSyncTask;
-
+  private ContainerSizeCountTask containerSizeCountTask;
+  private ContainerManager containerManager;
   public ReconStaleNodeHandler(NodeManager nodeManager,
-                                 PipelineManager pipelineManager,
-                                 OzoneConfiguration conf,
-                                 PipelineSyncTask pipelineSyncTask) {
+                               PipelineManager pipelineManager,
+                               OzoneConfiguration conf,
+                               PipelineSyncTask pipelineSyncTask,
+                               ContainerSizeCountTask containerSizeCountTask) {
     super(nodeManager, pipelineManager, conf);
     this.pipelineSyncTask = pipelineSyncTask;
+    this.containerSizeCountTask = containerSizeCountTask;
   }
 
   @Override
@@ -50,6 +55,7 @@ public class ReconStaleNodeHandler extends StaleNodeHandler {
     super.onMessage(datanodeDetails, publisher);
     try {
       pipelineSyncTask.triggerPipelineSyncTask();
+      containerSizeCountTask.process(containerManager.getContainers());
     } catch (Exception exp) {
       LOG.error("Error trying to trigger pipeline sync task..",
           exp);

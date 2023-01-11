@@ -239,16 +239,17 @@ public class ReconStorageContainerManagerFacade
         utilizationSchemaDefinition);
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager,
-            conf, pipelineSyncTask);
+            conf, pipelineSyncTask, containerSizeCountTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
         pipelineManager, containerManager,
-        scmServiceProvider, containerHealthTask, pipelineSyncTask);
+        scmServiceProvider, containerHealthTask, pipelineSyncTask,
+        containerSizeCountTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager, scmContext);
+            containerManager, scmContext, containerSizeCountTask);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
             pipelineManager, containerManager, scmContext,

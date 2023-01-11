@@ -72,7 +72,7 @@ public class UtilizationEndpoint {
    * @return {@link Response}
    */
   @GET
-  @Path("/fileCount")
+  @Path("/pop")
   public Response getFileCounts(
       @QueryParam(RECON_QUERY_VOLUME)
           String volume,

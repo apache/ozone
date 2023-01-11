@@ -76,49 +76,6 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     dslContext.truncate(CONTAINER_COUNT_BY_SIZE);
   }
 
-  @Test
-  public void testReprocess() {
-    ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
-    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
-    given(omContainerInfo1.getUsedBytes()).willReturn(1000L);
-
-    ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
-    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
-    given(omContainerInfo2.getUsedBytes()).willReturn(100000L);
-
-    ContainerInfo omContainerInfo3 = mock(ContainerInfo.class);
-    given(omContainerInfo3.containerID()).willReturn(new ContainerID(3));
-    given(omContainerInfo3.getUsedBytes()).willReturn(
-        1125899906842624L * 4); // 4PB
-
-    // mock getContainers method to return a list of containers
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(omContainerInfo1);
-    containers.add(omContainerInfo2);
-    containers.add(omContainerInfo3);
-
-    task.reprocess(containers);
-    assertEquals(3, containerCountBySizeDao.count());
-
-    Record1<Long> recordToFind =
-        dslContext.newRecord(
-                CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
-            .value1(1024L);
-    assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
-            .longValue());
-    // container size upper bound for 100000L is 131072L
-    recordToFind.value1(131072L);
-    assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
-            .longValue());
-    // container size upper bound for 4PB is Long.MAX_VALUE
-    recordToFind.value1(Long.MAX_VALUE);
-    assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
-            .longValue());
-  }
-
 
   @Test
   public void testProcess() {
