@@ -150,15 +150,14 @@ public class OMStorage extends Storage {
   }
 
   /**
-   * Validates if the provided value is saved to the VERSION file.
-   * As this property was added to the VERSION file later on, this method
-   * provides a convenience to check if the configured value and the one that
-   * was stored in the VERSION file are matching, and to make it easy to ensure
-   * that the VERSION file contains this value when starting Ozone Manager for
-   * the first time after the code changes have been applied.
+   * Validates if the provided value is the one saved in the VERSION file.
+   * This method provides a convenience to check if the configured value and
+   * the one that was stored in the VERSION file are matching.
    *
-   * This method persist the value provided if it is not present in the
-   * VERSION file already, and in this case does not throw an exception.
+   * As a VERSION file that was created by an older version of OM might not
+   * contain the value, if the VERSION file does not have this property, the
+   * method persists the provided expectedNodeId into the VERSION file
+   * and skips the validation.
    *
    * @param expectedNodeId the nodeId read from configuration, that has to be
    *                       matched against what we have saved in the VERSION
@@ -169,6 +168,20 @@ public class OMStorage extends Storage {
    *                     - if the VERSION file contains a different value than
    *                        the expectedNodeId provided
    *                     - if reading/writing the VERSION file fails
+   */
+  /* Note that we have other options as well to handle this case, but at this
+   * time this seemed to be a good tradeoff.
+   * Other options:
+   *   1. Use the Upgrade framework and bump Layout version.
+   *     Excessive work, and the addition, with that the verification happens
+   *     too late, after a bunch of things has been initialized, and there
+   *     might be possible problems from the late validation.
+   *   2. Write the value during omInit only as with anything added earlier
+   *     Seems to be error-prone, as without re-initializing the OM, the value
+   *     will not get to the VERSION file, and validation will fail.
+   * This approach has the potential to scatter OzoneManager constructor call,
+   *   so if anything like this one is to be implemented, try to figure out
+   *   a better way, or switch to another approach if feasible.
    */
   public void validateOrPersistOmNodeId(String expectedNodeId)
       throws IOException {
