@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -326,6 +327,11 @@ public class LegacyBucketHandler extends BucketHandler {
 
   @Override
   public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
+    String path = OM_KEY_PREFIX;
+    path += String.join(OM_KEY_PREFIX, names);
+    Preconditions.checkArgument(
+        names.length >= 3,
+        "Path should be a directory: %s", path);
     return OmDirectoryInfo.newBuilder()
         .setName(names[2])
         .build();
