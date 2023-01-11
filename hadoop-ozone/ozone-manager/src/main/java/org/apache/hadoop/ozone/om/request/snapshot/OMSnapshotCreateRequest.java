@@ -109,10 +109,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
-    // get current number of active snapshot and increment by 1
-    long activeSnapshots = omMetrics.getNumSnapshotActive() + 1;
-    // update number of active snapshots
-    omMetrics.setNumSnapshotActive(activeSnapshots);
+    omMetrics.incrNumSnapshotActive();
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;

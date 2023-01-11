@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -417,9 +416,9 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotListFails", 0L, omMetrics);
     assertCounter("NumSnapshotLists", 0L, omMetrics);
 
-    assertGauge("NumSnapshotActive", 1L, omMetrics);
-    assertGauge("NumSnapshotDeleted", 0L, omMetrics);
-    assertGauge("NumSnapshotReclaimed", 0L, omMetrics);
+    assertCounter("NumSnapshotActive", 1L, omMetrics);
+    assertCounter("NumSnapshotDeleted", 0L, omMetrics);
+    assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
 
     // Create second key
     OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
@@ -434,7 +433,7 @@ public class TestOmMetrics {
     writeClient.listSnapshot(volumeName, bucketName);
 
     omMetrics = getMetrics("OMMetrics");
-    assertGauge("NumSnapshotActive", 2L, omMetrics);
+    assertCounter("NumSnapshotActive", 2L, omMetrics);
     assertCounter("NumSnapshotCreates", 2L, omMetrics);
     assertCounter("NumSnapshotLists", 1L, omMetrics);
 
@@ -443,7 +442,7 @@ public class TestOmMetrics {
 
     // Check number of active snapshots in the snapshot table
     // is the same after OM restart
-    assertGauge("NumSnapshotActive", 2L, omMetrics);
+    assertCounter("NumSnapshotActive", 2L, omMetrics);
   }
 
   private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {

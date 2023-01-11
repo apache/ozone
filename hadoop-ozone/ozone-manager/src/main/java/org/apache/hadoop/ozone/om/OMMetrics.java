@@ -26,7 +26,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -121,9 +120,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
   private @Metric MutableCounterLong numSnapshotCreateFails;
   private @Metric MutableCounterLong numSnapshotListFails;
-  private @Metric MutableGaugeLong numSnapshotActive;
-  private @Metric MutableGaugeLong numSnapshotDeleted;
-  private @Metric MutableGaugeLong numSnapshotReclaimed;
+  private @Metric MutableCounterLong numSnapshotActive;
+  private @Metric MutableCounterLong numSnapshotDeleted;
+  private @Metric MutableCounterLong numSnapshotReclaimed;
 
   // Number of tenant operations attempted
   private @Metric MutableCounterLong numTenantOps;
@@ -453,15 +452,42 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void setNumSnapshotActive(long num) {
-    numSnapshotActive.set(num);
+    long currVal = numSnapshotActive.value();
+    numSnapshotActive.incr(num - currVal);
+  }
+
+  public void incrNumSnapshotActive() {
+    numSnapshotActive.incr();
+  }
+
+  public void decrNumSnapshotActive() {
+    numSnapshotActive.incr(-1);
   }
 
   public void setNumSnapshotDeleted(long num) {
-    numSnapshotDeleted.set(num);
+    long currVal = numSnapshotDeleted.value();
+    numSnapshotDeleted.incr(num - currVal);
+  }
+
+  public void incrNumSnapshotDeleted() {
+    numSnapshotDeleted.incr();
+  }
+
+  public void decrNumSnapshotDeleted() {
+    numSnapshotDeleted.incr(-1);
   }
 
   public void setNumSnapshotReclaimed(long num) {
-    numSnapshotReclaimed.set(num);
+    long currVal = numSnapshotReclaimed.value();
+    numSnapshotReclaimed.incr(num - currVal);
+  }
+
+  public void incrNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr();
+  }
+
+  public void decrNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr(-1);
   }
 
   public void incNumCompleteMultipartUploadFails() {
