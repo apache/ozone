@@ -391,9 +391,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // When volume quota is set, then its mandatory to have bucket quota
     if (volumeQuotaInBytes > 0) {
       if (quotaInBytes <= 0) {
-        throw new OMException("Buckets quota in this volume " +
-            "should be set as volume space quota is set to : "
-            + volumeQuotaInBytes, OMException.ResultCodes.QUOTA_ERROR);
+        throw new OMException("Bucket space quota in this volume " +
+            "should be set as volume space quota is already set.",
+            OMException.ResultCodes.QUOTA_ERROR);
       }
     }
 

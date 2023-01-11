@@ -194,6 +194,11 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         || volumeQuotaInBytes == 0) {
       return false;
     }
+    
+    // if volume quota is for reset, no need further check
+    if (volumeQuotaInBytes == OzoneConsts.QUOTA_RESET) {
+      return true;
+    }
 
     boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
@@ -208,8 +213,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     }
     
     if (!isBucketQuotaSet) {
-      throw new OMException("Can not set volume quota as some of bucket " +
-          "do not have space quota set in this volume.",
+      throw new OMException("Can not set volume space quota as some of " +
+          "bucket do not have space quota set in this volume.",
           OMException.ResultCodes.QUOTA_ERROR);
     }
     
