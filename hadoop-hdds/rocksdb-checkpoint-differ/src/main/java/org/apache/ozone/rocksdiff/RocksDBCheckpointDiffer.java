@@ -711,15 +711,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   }
 
   /**
-   * Helper function that prepends SST file name with SST backup directory path,
+   * Helper function that prepends SST file name with SST backup directory path
+   * (or DB checkpoint path if compaction hasn't happened yet as SST files won't
+   * exist in backup directory before being involved in compactions),
    * and appends the extension '.sst'.
    */
-  private String getSSTFullPathInBackupDir(String sstFilenameWithoutExtension,
-                                           String dbPath) {
+  private String getSSTFullPath(String sstFilenameWithoutExtension,
+      String dbPath) {
 
     // Try to locate the SST in the backup dir first
     final Path sstPathInBackupDir = Paths.get(sstBackupDir,
-            sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+        sstFilenameWithoutExtension + SST_FILE_EXTENSION);
     if (Files.exists(sstPathInBackupDir)) {
       return sstPathInBackupDir.toString();
     }
@@ -728,14 +730,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     // has not gone through any compactions yet and is only available in the
     // src DB directory
     final Path sstPathInDBDir = Paths.get(dbPath,
-            sstFilenameWithoutExtension + SST_FILE_EXTENSION);
+        sstFilenameWithoutExtension + SST_FILE_EXTENSION);
     if (Files.exists(sstPathInDBDir)) {
       return sstPathInDBDir.toString();
     }
 
     // TODO: More graceful error handling?
     throw new RuntimeException("Unable to locate SST file: " +
-            sstFilenameWithoutExtension);
+        sstFilenameWithoutExtension);
   }
 
   /**
@@ -749,13 +751,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public List<String> getSSTDiffListWithFullPath(
-          DifferSnapshotInfo src, DifferSnapshotInfo dest) {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) {
 
     List<String> sstDiffList = getSSTDiffList(src, dest);
 
     return sstDiffList.stream()
-            .map(sst -> getSSTFullPathInBackupDir(sst, src.getDbPath()))
-            .collect(Collectors.toList());
+        .map(sst -> getSSTFullPath(sst, src.getDbPath()))
+        .collect(Collectors.toList());
   }
 
   /**

@@ -58,29 +58,27 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 public class SnapshotDiffManager {
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(SnapshotDiffManager.class);
+      LoggerFactory.getLogger(SnapshotDiffManager.class);
   private RocksDBCheckpointDiffer differ;
 
   public SnapshotDiffManager(RocksDBCheckpointDiffer differ) {
     this.differ = differ;
   }
 
-  /**
-   * Copied straight from TestOMSnapshotDAG. TODO: Dedup. Move this to util.
-   */
   private Map<String, String> getTablePrefixes(
-          OMMetadataManager omMetadataManager,
-          String volumeName, String bucketName) throws IOException {
-    HashMap<String, String> tablePrefixes = new HashMap<>();
+      OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName) throws IOException {
+    // Copied straight from TestOMSnapshotDAG. TODO: Dedup. Move this to util.
+    Map<String, String> tablePrefixes = new HashMap<>();
     String volumeId = String.valueOf(omMetadataManager.getVolumeId(volumeName));
     String bucketId = String.valueOf(
-            omMetadataManager.getBucketId(volumeName, bucketName));
+        omMetadataManager.getBucketId(volumeName, bucketName));
     tablePrefixes.put(OmMetadataManagerImpl.KEY_TABLE,
-            OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
+        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
     tablePrefixes.put(OmMetadataManagerImpl.FILE_TABLE,
-            OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
     tablePrefixes.put(OmMetadataManagerImpl.DIRECTORY_TABLE,
-            OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
     return tablePrefixes;
   }
 
@@ -88,23 +86,20 @@ public class SnapshotDiffManager {
    * Convert from SnapshotInfo to DifferSnapshotInfo.
    */
   private DifferSnapshotInfo getDSIFromSI(SnapshotInfo snapshotInfo,
-                                          OmSnapshot omSnapshot,
-                                          final String volumeName,
-                                          final String bucketName)
-          throws IOException {
+      OmSnapshot omSnapshot, final String volumeName, final String bucketName)
+      throws IOException {
 
     final OMMetadataManager snapshotOMMM = omSnapshot.getMetadataManager();
     final String checkpointPath =
-            snapshotOMMM.getStore().getDbLocation().getPath();
+        snapshotOMMM.getStore().getDbLocation().getPath();
     final String snapshotId = snapshotInfo.getSnapshotID();
     final long dbTxSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
 
-    DifferSnapshotInfo dsi = new DifferSnapshotInfo(
-            checkpointPath,
-            snapshotId,
-            dbTxSequenceNumber,
-            getTablePrefixes(snapshotOMMM, volumeName, bucketName));
-    return dsi;
+    return new DifferSnapshotInfo(
+        checkpointPath,
+        snapshotId,
+        dbTxSequenceNumber,
+        getTablePrefixes(snapshotOMMM, volumeName, bucketName));
   }
 
   public SnapshotDiffReport getSnapshotDiffReport(final String volume,
@@ -138,7 +133,7 @@ public class SnapshotDiffManager {
     final Set<String> deltaFilesForKeyOrFileTable =
         getDeltaFiles(fromSnapshot, toSnapshot,
             Collections.singletonList(fsKeyTable.getName()),
-                fsInfo, tsInfo, volume, bucket);
+            fsInfo, tsInfo, volume, bucket);
 
     addToObjectIdMap(fsKeyTable, tsKeyTable, deltaFilesForKeyOrFileTable,
         oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, false);
@@ -152,7 +147,7 @@ public class SnapshotDiffManager {
       final Set<String> deltaFilesForDirTable =
           getDeltaFiles(fromSnapshot, toSnapshot,
               Collections.singletonList(fsDirTable.getName()),
-                  fsInfo, tsInfo, volume, bucket);
+              fsInfo, tsInfo, volume, bucket);
       addToObjectIdMap(fsDirTable, tsDirTable, deltaFilesForDirTable,
           oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, true);
     }
@@ -183,13 +178,13 @@ public class SnapshotDiffManager {
           if (oldKey != null) {
             final long oldObjId = oldKey.getObjectID();
             oldObjIdToKeyMap.put(oldObjId,
-                    getKeyOrDirectoryName(isDirectoryTable, oldKey));
+                getKeyOrDirectoryName(isDirectoryTable, oldKey));
             objectIDsToCheck.add(oldObjId);
           }
           if (newKey != null) {
             final long newObjId = newKey.getObjectID();
             newObjIdToKeyMap.put(newObjId,
-                    getKeyOrDirectoryName(isDirectoryTable, newKey));
+                getKeyOrDirectoryName(isDirectoryTable, newKey));
             objectIDsToCheck.add(newObjId);
           }
         } catch (IOException e) {
@@ -218,7 +213,7 @@ public class SnapshotDiffManager {
       OmSnapshot toSnapshot, List<String> tablesToLookUp,
       SnapshotInfo fsInfo, SnapshotInfo tsInfo,
       String volume, String bucket)
-          throws RocksDBException, IOException {
+      throws RocksDBException, IOException {
     // TODO: Refactor the parameter list
 
     final Set<String> deltaFiles = new HashSet<>();
@@ -227,14 +222,13 @@ public class SnapshotDiffManager {
     if (differ != null && fsInfo != null && tsInfo != null) {
       // Construct DifferSnapshotInfo
       final DifferSnapshotInfo fromDSI =
-              getDSIFromSI(fsInfo, fromSnapshot, volume, bucket);
+          getDSIFromSI(fsInfo, fromSnapshot, volume, bucket);
       final DifferSnapshotInfo toDSI =
-              getDSIFromSI(tsInfo, toSnapshot, volume, bucket);
+          getDSIFromSI(tsInfo, toSnapshot, volume, bucket);
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
       List<String> sstDiffList =
-              differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
-      LOG.debug("SST diff list: {}", sstDiffList);
+          differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
       deltaFiles.addAll(sstDiffList);
 
       // TODO: Remove the workaround below when the SnapDiff logic can read
@@ -242,11 +236,10 @@ public class SnapshotDiffManager {
       // Workaround: Append "From DB" SST files to the deltaFiles list so that
       //  the current SnapDiff logic correctly handles deleted keys.
       if (!deltaFiles.isEmpty()) {
-        Set<String> fromSnapshotFiles =
-                RdbUtil.getSSTFilesForComparison(
-                        fromSnapshot.getMetadataManager().getStore()
-                                .getDbLocation().getPath(),
-                        tablesToLookUp);
+        Set<String> fromSnapshotFiles = RdbUtil.getSSTFilesForComparison(
+            fromSnapshot.getMetadataManager()
+                .getStore().getDbLocation().getPath(),
+            tablesToLookUp);
         deltaFiles.addAll(fromSnapshotFiles);
       }
       // End of Workaround
@@ -257,17 +250,17 @@ public class SnapshotDiffManager {
       // If compaction DAG is not available (already cleaned up), fall back to
       //  the slower approach.
       LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
-              " slow path");
+          " slow path");
 
       Set<String> fromSnapshotFiles =
-              RdbUtil.getSSTFilesForComparison(
-                      fromSnapshot.getMetadataManager().getStore()
-                              .getDbLocation().getPath(),
+          RdbUtil.getSSTFilesForComparison(
+              fromSnapshot.getMetadataManager().getStore()
+                  .getDbLocation().getPath(),
               tablesToLookUp);
       Set<String> toSnapshotFiles =
-              RdbUtil.getSSTFilesForComparison(
-                      toSnapshot.getMetadataManager().getStore()
-                              .getDbLocation().getPath(),
+          RdbUtil.getSSTFilesForComparison(
+              toSnapshot.getMetadataManager().getStore()
+                  .getDbLocation().getPath(),
               tablesToLookUp);
 
       deltaFiles.addAll(fromSnapshotFiles);
