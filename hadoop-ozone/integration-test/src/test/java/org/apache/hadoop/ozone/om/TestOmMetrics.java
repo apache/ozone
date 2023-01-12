@@ -391,7 +391,7 @@ public class TestOmMetrics {
     clusterBuilder.setNumDatanodes(3);
     startCluster();
 
-    OmBucketInfo omBucketInfo = createBucketInfo();
+    OmBucketInfo omBucketInfo = createBucketInfo(false);
 
     String volumeName = omBucketInfo.getVolumeName();
     String bucketName = omBucketInfo.getBucketName();
