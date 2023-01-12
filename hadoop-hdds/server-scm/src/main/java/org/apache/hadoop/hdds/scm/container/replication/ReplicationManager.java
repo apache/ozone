@@ -408,14 +408,15 @@ public class ReplicationManager implements SCMService {
    * @param container Container to be deleted
    * @param replicaIndex Index of the container replica to be deleted
    * @param datanode  The datanode on which the replica should be deleted
+   * @param force true to force delete a container that is open or not empty
    * @throws NotLeaderException when this SCM is not the leader
    */
   public void sendDeleteCommand(final ContainerInfo container, int replicaIndex,
-      final DatanodeDetails datanode) throws NotLeaderException {
+      final DatanodeDetails datanode, boolean force) throws NotLeaderException {
     LOG.debug("Sending delete command for container {} and index {} on {}",
         container, replicaIndex, datanode);
     final DeleteContainerCommand deleteCommand =
-        new DeleteContainerCommand(container.containerID(), false);
+        new DeleteContainerCommand(container.containerID(), force);
     deleteCommand.setReplicaIndex(replicaIndex);
     sendDatanodeCommand(deleteCommand, container, datanode);
   }
