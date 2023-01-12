@@ -538,40 +538,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
             + allocateSize) + " Bytes.",
             OMException.ResultCodes.QUOTA_EXCEEDED);
       }
-    } else {
-      checkVolumeQuotaInBytes(metadataManager, omBucketInfo.getVolumeName(),
-          allocateSize);
-    }
-  }
-
-  private void checkVolumeQuotaInBytes(
-      OMMetadataManager metadataManager, String volumeName,
-      long allocateSize) throws IOException {
-    String volumeKey = metadataManager.getVolumeKey(volumeName);
-    OmVolumeArgs omVolumeArgs = metadataManager.getVolumeTable()
-        .get(volumeKey);
-    if (omVolumeArgs.getQuotaInBytes() <= OzoneConsts.QUOTA_RESET) {
-      return;
-    }
-
-    long totalBucketQuota = 0L;
-    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
-        volumeName, null, null, Integer.MAX_VALUE);
-    for (OmBucketInfo bucketInfo : bucketList) {
-      long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
-        totalBucketQuota += nextQuotaInBytes;
-      } else {
-        totalBucketQuota += bucketInfo.getUsedBytes();
-      }
-    }
-
-    if (omVolumeArgs.getQuotaInBytes() - totalBucketQuota < allocateSize) {
-      throw new OMException("The DiskSpace quota of volume:"
-          + volumeName + " exceeded: quotaInBytes: "
-          + omVolumeArgs.getQuotaInBytes() + " Bytes but diskspace consumed: "
-          + (totalBucketQuota + allocateSize) + " Bytes.",
-          OMException.ResultCodes.QUOTA_EXCEEDED);
     }
   }
 
