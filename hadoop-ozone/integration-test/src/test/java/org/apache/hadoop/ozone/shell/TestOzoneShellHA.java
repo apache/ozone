@@ -590,14 +590,14 @@ public class TestOzoneShellHA {
     final String strKey1 = strDir1 + "/key1";
     final Path pathKey1 = new Path(strKey1);
     final Path trashPathKey1 = Path.mergePaths(
-        new Path(new OFSPath(strKey1).getTrashRoot(), trashCurrent),
-        new Path(dir1, "key1"));
+        new Path(new OFSPath(strKey1, clientConf).getTrashRoot(),
+            trashCurrent), new Path(dir1, "key1"));
 
     final String strKey2 = strDir1 + "/key2";
     final Path pathKey2 = new Path(strKey2);
     final Path trashPathKey2 = Path.mergePaths(
-        new Path(new OFSPath(strKey2).getTrashRoot(), trashCurrent),
-        new Path(dir1, "key2"));
+        new Path(new OFSPath(strKey2, clientConf).getTrashRoot(),
+            trashCurrent), new Path(dir1, "key2"));
 
     int res;
     try {
@@ -694,8 +694,8 @@ public class TestOzoneShellHA {
     final String[] rmTrashArgs = new String[] {"-rm", "-R",
                                                testVolBucket + "/.Trash"};
     final Path trashPathKey1 = Path.mergePaths(new Path(
-            new OFSPath(testKey).getTrashRoot(), new Path("Current")),
-            new Path(keyName));
+            new OFSPath(testKey, clientConf).getTrashRoot(),
+            new Path("Current")), new Path(keyName));
     FileSystem fs = FileSystem.get(clientConf);
 
     try {
