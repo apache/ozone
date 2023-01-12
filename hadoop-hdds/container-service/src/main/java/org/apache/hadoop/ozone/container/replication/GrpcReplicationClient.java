@@ -74,7 +74,7 @@ public class GrpcReplicationClient implements AutoCloseable {
             .usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    if (secConfig.isSecurityEnabled()) {
+    if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
