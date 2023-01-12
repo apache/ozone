@@ -353,9 +353,8 @@ public class OzoneAddress {
    * Similar to #ensureBucketAddress()
    * but also accepting a snapshot
    * indicator and a snapshot name.
-   * If the keyName contains
-   * can't be considered a valid snapshot,
-   * an exception is thrown.
+   * If the keyName can't be considered
+   * a valid snapshot, an exception is thrown.
    *
    * @throws OzoneClientException
    */
