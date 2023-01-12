@@ -350,32 +350,32 @@ public class OzoneAddress {
   }
 
   /**
-   * Currently, we are only checking for the
-   * snapshot indicator and the snapshot name.
-   * It could be modified in the future to
-   * check for keys as well under the snapshot
-   * prefix, if needed.
+   * Similar to #ensureBucketAddress()
+   * but also accepting a snapshot
+   * indicator and a snapshot name.
+   * If the keyName contains
+   * can't be considered a valid snapshot,
+   * an exception is thrown.
    *
    * @throws OzoneClientException
    */
   public void ensureSnapshotAddress()
       throws OzoneClientException {
-    if (keyName.length() == 0) {
-      throw new OzoneClientException(
-          "Snapshot name is missing.");
+    if (keyName.length() > 0) {
+      if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+        snapshotName += keyName;
+      } else {
+        throw new OzoneClientException(
+            "Delimiters (/) not allowed following " +
+                "a bucket name. Only a snapshot name with " +
+                "a snapshot indicator are accepted");
+      }
     } else if (volumeName.length() == 0) {
       throw new OzoneClientException(
           "Volume name is missing.");
     } else if (bucketName.length() == 0) {
       throw new OzoneClientException(
           "Bucket name is missing.");
-    }
-
-    if (OmUtils.isBucketSnapshotIndicator(keyName)) {
-      snapshotName += keyName;
-    } else {
-      throw new OzoneClientException(
-          "Invalid snapshot address.");
     }
   }
 

@@ -130,10 +130,15 @@ public class TestOzoneAddress {
     Assert.assertEquals(".snapshot/snap1", address.getSnapshotName());
     Assert.assertEquals(".snapshot/snap1", address.getKeyName());
 
-    address = new OzoneAddress(prefix + "vol1/bucket/.snapshot/snap1/key1");
+
+    String message ="Delimiters (/) not allowed following " +
+        "a bucket name. Only a snapshot name with " +
+        "a snapshot indicator are accepted";
+
+    address = new OzoneAddress(prefix + "vol1/bucket/.snapshot");
 
     exception.expect(OzoneClientException.class);
-    exception.expectMessage("Invalid snapshot address.");
+    exception.expectMessage(message);
 
     address.ensureSnapshotAddress();
   }
