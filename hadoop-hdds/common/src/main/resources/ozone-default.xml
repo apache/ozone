@@ -3467,6 +3467,16 @@
   </property>
 
   <property>
+    <name>ozone.om.enable.ofs.shared.tmp.dir</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable shared ofs tmp directory ofs://tmp.  Allows a root tmp
+      directory with sticky-bit behaviour.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.listing.page.size</name>
     <value>1024</value>
     <tag>OZONE, CLIENT</tag>
