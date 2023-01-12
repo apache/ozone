@@ -131,7 +131,7 @@ public class TestOzoneAddress {
     Assert.assertEquals(".snapshot/snap1", address.getKeyName());
 
 
-    String message ="Delimiters (/) not allowed following " +
+    String message = "Delimiters (/) not allowed following " +
         "a bucket name. Only a snapshot name with " +
         "a snapshot indicator are accepted";
 
