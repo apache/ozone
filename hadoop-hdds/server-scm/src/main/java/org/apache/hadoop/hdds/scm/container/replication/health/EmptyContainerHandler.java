@@ -112,7 +112,7 @@ public class EmptyContainerHandler extends AbstractCheck {
 
       try {
         replicationManager.sendDeleteCommand(containerInfo,
-            rp.getReplicaIndex(), rp.getDatanodeDetails());
+            rp.getReplicaIndex(), rp.getDatanodeDetails(), false);
       } catch (NotLeaderException e) {
         LOG.warn("Failed to delete empty replica with index {} for container" +
                 " {} on datanode {}",
