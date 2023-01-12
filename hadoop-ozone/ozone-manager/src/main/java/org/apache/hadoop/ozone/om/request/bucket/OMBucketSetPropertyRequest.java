@@ -302,6 +302,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.QUOTA_ERROR);
       }
     }
+    
+    // avoid iteration of other bucket if quota set is less than previous set
+    if (quotaInBytes < dbBucketInfo.getQuotaInBytes()) {
+      return true;
+    }
+    
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
@@ -311,10 +317,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
-      } else {
-        // consider used space for bucket where quota is not set
-        // This quota will be part of volume quota
-        totalBucketQuota += bucketInfo.getUsedBytes();
       }
     }
 

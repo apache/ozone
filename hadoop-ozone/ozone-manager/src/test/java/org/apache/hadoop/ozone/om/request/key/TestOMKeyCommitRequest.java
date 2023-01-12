@@ -401,37 +401,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithOnlyVolumeQuotaExceeds()
-      throws Exception {
-    OMRequest modifiedOmRequest =
-        doPreExecute(createCommitKeyRequest());
-
-    OMKeyCommitRequest omKeyCommitRequest =
-        getOmKeyCommitRequest(modifiedOmRequest);
-
-    KeyArgs keyArgs = modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
-
-    // Append new blocks
-    List<OmKeyLocationInfo> allocatedLocationList =
-        keyArgs.getKeyLocationsList().stream()
-            .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.toList());
-
-    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager, 1L);
-    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
-        omMetadataManager, omKeyCommitRequest.getBucketLayout());
-
-    addKeyToOpenKeyTable(allocatedLocationList);
-
-    OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
-
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
-        omClientResponse.getOMResponse().getStatus());
-  }
-
-  @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
