@@ -856,8 +856,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             reservedSpaceString);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
-        dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
-            workDir.toString());
         if (reconServer != null) {
           OzoneStorageContainerManager reconScm =
               reconServer.getReconStorageContainerManager();
