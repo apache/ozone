@@ -50,7 +50,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private Map<String, OMDBUpdateEvent> omdbLatestUpdateEvents
+  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
       = new HashMap<>();
   private OMDBDefinition omdbDefinition;
 
@@ -102,9 +102,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
     // When this table data will be needed, all events for this table will be
     // saved using Object as key and new task will also retrieve using Object
     // as key.
-    if (OMDBDefinition.DTOKEN_TABLE.getName().equalsIgnoreCase(tableName)) {
-      return;
-    }
     Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
     Optional<Class> valueType = omdbDefinition.getValueType(tableName);
     if (keyType.isPresent() && valueType.isPresent()) {
@@ -112,7 +109,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
       builder.setAction(action);
-      String key = (String) codecRegistry.asObject(keyBytes, keyType.get());
+      Object key = codecRegistry.asObject(keyBytes, keyType.get());
       builder.setKey(key);
 
       // Put new
