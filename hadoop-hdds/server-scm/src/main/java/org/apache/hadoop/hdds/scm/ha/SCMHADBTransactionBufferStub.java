@@ -67,7 +67,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public <KEY, VALUE> TableIterator<KEY, ? extends Table.KeyValue<KEY, VALUE>>
       getIterator(Table<KEY, VALUE> table) throws IOException {
-    return table.iterator(currentBatchOperation);
+    return table.iterator(getCurrentBatchOperation());
   }
 
   @Override
