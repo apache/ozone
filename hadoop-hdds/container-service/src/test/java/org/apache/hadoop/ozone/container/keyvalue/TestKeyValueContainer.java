@@ -333,14 +333,14 @@ public class TestKeyValueContainer {
               metadataStore.getStore().getBlockDataTable();
 
       for (long i = 0; i < numberOfKeysToWrite; i++) {
-        blockDataTable.put(cData.blockKey(i),
+        blockDataTable.put(cData.getBlockKey(i),
             new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
       metadataStore.getStore().getMetadataTable()
-              .put(cData.blockCountKey(), numberOfKeysToWrite);
+              .put(cData.getBlockCountKey(), numberOfKeysToWrite);
     }
 
     Map<String, String> metadata = new HashMap<>();
