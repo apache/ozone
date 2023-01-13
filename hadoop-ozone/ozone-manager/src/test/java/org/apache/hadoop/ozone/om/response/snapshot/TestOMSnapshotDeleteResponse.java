@@ -19,11 +19,16 @@
 
 package org.apache.hadoop.ozone.om.response.snapshot;
 
-import java.io.File;
-import java.util.UUID;
-
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -31,25 +36,18 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateSnapshotResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import java.io.File;
+import java.util.UUID;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
-
 /**
- * This class tests OMSnapshotCreateResponse.
+ * This class tests OMSnapshotDeleteResponse.
+ * TODO: WIP
  */
-public class TestOMSnapshotCreateResponse {
+public class TestOMSnapshotDeleteResponse {
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -57,6 +55,7 @@ public class TestOMSnapshotCreateResponse {
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
   private String fsPath;
+
   @Before
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -90,7 +89,7 @@ public class TestOMSnapshotCreateResponse {
         omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
-    // commit to table
+    // Prepare the table, write an entry with SnapshotCreate
     OMSnapshotCreateResponse omSnapshotCreateResponse =
         new OMSnapshotCreateResponse(OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateSnapshot)
@@ -118,5 +117,9 @@ public class TestOMSnapshotCreateResponse {
     SnapshotInfo storedInfo = keyValue.getValue();
     Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
     Assert.assertEquals(snapshotInfo, storedInfo);
+
+    // TODO: OMSnapshotDeleteResponse
+    // Confirm that the snapshot directory is gone
+    // Confirm that the table still has 1 entry, and its content
   }
 }
