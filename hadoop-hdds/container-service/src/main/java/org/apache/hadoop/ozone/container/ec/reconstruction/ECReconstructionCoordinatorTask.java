@@ -17,25 +17,20 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Clock;
 import java.util.OptionalLong;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * This is the actual EC reconstruction coordination task.
  */
 public class ECReconstructionCoordinatorTask implements Runnable {
-  static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
   private final ECReconstructionCoordinator reconstructionCoordinator;
@@ -69,6 +64,7 @@ public class ECReconstructionCoordinatorTask implements Runnable {
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
     long containerID = this.reconstructionCommandInfo.getContainerID();
+    long start = Time.monotonicNow();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Starting the EC reconstruction of the container {}",
           containerID);
@@ -88,32 +84,20 @@ public class ECReconstructionCoordinatorTask implements Runnable {
       final long taskTerm = reconstructionCommandInfo.getTerm();
       if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
         LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
-            this, taskTerm, currentTerm.getAsLong());
+            reconstructionCommandInfo, taskTerm, currentTerm.getAsLong());
         return;
       }
 
-      SortedMap<Integer, DatanodeDetails> sourceNodeMap =
-          reconstructionCommandInfo.getSources().stream().collect(Collectors
-              .toMap(DatanodeDetailsAndReplicaIndex::getReplicaIndex,
-                  DatanodeDetailsAndReplicaIndex::getDnDetails, (v1, v2) -> v1,
-                  TreeMap::new));
-      SortedMap<Integer, DatanodeDetails> targetNodeMap = IntStream
-          .range(0, reconstructionCommandInfo.getTargetDatanodes().size())
-          .boxed().collect(Collectors.toMap(i -> (int) reconstructionCommandInfo
-                  .getMissingContainerIndexes()[i],
-              i -> reconstructionCommandInfo.getTargetDatanodes().get(i),
-              (v1, v2) -> v1, TreeMap::new));
-
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
-          reconstructionCommandInfo.getEcReplicationConfig(), sourceNodeMap,
-          targetNodeMap);
-      LOG.info("Completed the EC reconstruction of the container {}",
-          reconstructionCommandInfo.getContainerID());
+          reconstructionCommandInfo.getEcReplicationConfig(),
+          reconstructionCommandInfo.getSourceNodeMap(),
+          reconstructionCommandInfo.getTargetNodeMap());
+      long elapsed = Time.monotonicNow() - start;
+      LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
     } catch (IOException e) {
-      LOG.warn(
-          "Failed to complete the reconstruction task for the container: "
-              + reconstructionCommandInfo.getContainerID(), e);
+      long elapsed = Time.monotonicNow() - start;
+      LOG.warn("Failed {} after {} ms", reconstructionCommandInfo, elapsed, e);
     } finally {
       this.inprogressCounter.remove(containerID);
     }
@@ -121,7 +105,6 @@ public class ECReconstructionCoordinatorTask implements Runnable {
 
   @Override
   public String toString() {
-    return "ECReconstructionCoordinatorTask{" + "reconstructionCommandInfo="
-        + reconstructionCommandInfo + '}';
+    return "ECReconstructionTask{info=" + reconstructionCommandInfo + '}';
   }
 }

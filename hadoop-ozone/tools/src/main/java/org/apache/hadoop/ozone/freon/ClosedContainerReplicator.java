@@ -203,10 +203,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerController(containerSet, handlers);
 
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(containerSet,
+        new DownloadAndImportReplicator(conf, containerSet,
             controller,
             new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+            new TarContainerPacker(), null);
 
     ReplicationServer.ReplicationConfig replicationConfig
         = conf.getObject(ReplicationServer.ReplicationConfig.class);

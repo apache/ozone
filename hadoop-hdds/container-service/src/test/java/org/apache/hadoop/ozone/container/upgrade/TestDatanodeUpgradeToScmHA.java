@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
@@ -666,15 +667,17 @@ public class TestDatanodeUpgradeToScmHA {
    */
   public void importContainer(long containerID, File source) throws Exception {
     DownloadAndImportReplicator replicator =
-        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
+        new DownloadAndImportReplicator(dsm.getConf(),
+            dsm.getContainer().getContainerSet(),
             dsm.getContainer().getController(),
             new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+            new TarContainerPacker(), dsm.getContainer().getVolumeSet());
 
-    File tempFile = tempFolder.newFile();
+    File tempFile = tempFolder.newFile(
+        ContainerUtils.getContainerTarGzName(containerID));
     Files.copy(source.toPath(), tempFile.toPath(),
         StandardCopyOption.REPLACE_EXISTING);
-    replicator.importContainer(containerID, tempFile.toPath());
+    replicator.importContainer(containerID, tempFile.toPath(), null);
   }
 
   public void dispatchRequest(
