@@ -17,15 +17,11 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ipc.Schedulable;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
-import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-
-import static org.mockito.Mockito.when;
 
 /**
  * Tests for OzoneIdentityProvider.
@@ -42,25 +38,10 @@ public class TestOzoneIdentityProvider {
   }
 
   @Test
-  public void testGetUserFromS3Auth() {
-    S3Authentication s3Authentication = Mockito.mock(S3Authentication.class);
-    when(s3Authentication.getAccessId()).thenReturn("s3ClientUser");
-
-    OzoneManagerProtocolServerSideTranslatorPB.setS3Auth(s3Authentication);
-
-    String identity = identityProvider.makeIdentity(schedulable);
-    Assertions.assertEquals(s3Authentication.getAccessId(), identity);
-
-    // reset the value
-    OzoneManagerProtocolServerSideTranslatorPB.setS3Auth(null);
-  }
-
-  @Test
   public void testGetUserFromUgi() {
-    UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
-    when(schedulable.getUserGroupInformation()).thenReturn(ugi);
-    when(schedulable.getUserGroupInformation().getShortUserName())
-        .thenReturn("ugiUser");
+    UserGroupInformation ugi =
+        UserGroupInformation.createRemoteUser("testUser");
+    UserGroupInformation.setLoginUser(ugi);
 
     String identity = identityProvider.makeIdentity(schedulable);
 
