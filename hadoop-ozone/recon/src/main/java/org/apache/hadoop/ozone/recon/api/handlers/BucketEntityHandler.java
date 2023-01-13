@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -32,7 +35,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
 
 /**
  * Class for handling bucket entity type.
@@ -50,23 +52,39 @@ public class BucketEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.BUCKET);
+
     String[] names = getNames();
     assert (names.length == 2);
     long bucketObjectId = getBucketHandler().getBucketObjectId(names);
     OmBucketInfo omBucketInfo = getBucketHandler().getOmBucketInfo(names);
-    namespaceSummaryResponse
-      .setNumTotalDir(getTotalDirCount(bucketObjectId));
-    namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(bucketObjectId));
-    namespaceSummaryResponse.setCreateTime(omBucketInfo
-        .getCreationTime());
-    namespaceSummaryResponse.setLastModified(omBucketInfo
-        .getModificationTime());
-    return namespaceSummaryResponse;
+    CountStats countStats = new CountStats(
+        -1, -1,
+        getTotalDirCount(bucketObjectId), getTotalKeyCount(bucketObjectId),
+        omBucketInfo.getCreationTime(), omBucketInfo.getModificationTime());
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.BUCKET)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getBucketObjDbInfo(names))
+        .setStatus(ResponseStatus.OK)
+        .build();
   }
 
-
+  private BucketObjectDBInfo getBucketObjDbInfo(String[] names)
+      throws IOException {
+    String volName = names[0];
+    String bucketName = names[1];
+    String bucketKey = getOmMetadataManager().
+        getBucketKey(volName, bucketName);
+    if (null == bucketKey) {
+      return new BucketObjectDBInfo();
+    }
+    OmBucketInfo omBucketInfo = getOmMetadataManager()
+        .getBucketTable().getSkipCache(bucketKey);
+    if (null == omBucketInfo) {
+      return new BucketObjectDBInfo();
+    }
+    return new BucketObjectDBInfo(omBucketInfo);
+  }
 
   @Override
   public DUResponse getDuResponse(

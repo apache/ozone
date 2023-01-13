@@ -1123,6 +1123,20 @@ public class SCMClientProtocolServer implements
     return scm.getContainerManager().getContainers().size();
   }
 
+  @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(state).size();
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(
+        ContainerID.valueOf(startContainerID), count, state);
+  }
+
   /**
    * Queries a list of Node that match a set of statuses.
    *

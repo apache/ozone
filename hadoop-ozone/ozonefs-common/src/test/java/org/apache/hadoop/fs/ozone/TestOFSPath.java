@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OFSPath;
 import org.junit.Assert;
 import org.junit.Test;
@@ -28,10 +29,12 @@ import java.io.IOException;
  */
 public class TestOFSPath {
 
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
   @Test
   public void testParsingPathWithSpace() {
     // Two most common cases: file key and dir key inside a bucket
-    OFSPath ofsPath = new OFSPath("/volume1/bucket2/dir3/key4 space");
+    OFSPath ofsPath = new OFSPath("/volume1/bucket2/dir3/key4 space", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
@@ -44,7 +47,7 @@ public class TestOFSPath {
   @Test
   public void testParsingVolumeBucketWithKey() {
     // Two most common cases: file key and dir key inside a bucket
-    OFSPath ofsPath = new OFSPath("/volume1/bucket2/dir3/key4");
+    OFSPath ofsPath = new OFSPath("/volume1/bucket2/dir3/key4", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
@@ -54,7 +57,7 @@ public class TestOFSPath {
     Assert.assertEquals("/volume1/bucket2/dir3/key4", ofsPath.toString());
 
     // The ending '/' matters for key inside a bucket, indicating directory
-    ofsPath = new OFSPath("/volume1/bucket2/dir3/dir5/");
+    ofsPath = new OFSPath("/volume1/bucket2/dir3/dir5/", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
@@ -68,7 +71,7 @@ public class TestOFSPath {
   @Test
   public void testParsingVolumeBucketOnly() {
     // Volume and bucket only
-    OFSPath ofsPath = new OFSPath("/volume1/bucket2/");
+    OFSPath ofsPath = new OFSPath("/volume1/bucket2/", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
@@ -79,7 +82,7 @@ public class TestOFSPath {
     Assert.assertEquals("/volume1/bucket2/", ofsPath.toString());
 
     // The trailing '/' doesn't matter when parsing a bucket path
-    ofsPath = new OFSPath("/volume1/bucket2");
+    ofsPath = new OFSPath("/volume1/bucket2", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
@@ -93,7 +96,7 @@ public class TestOFSPath {
   @Test
   public void testParsingVolumeOnly() {
     // Volume only
-    OFSPath ofsPath = new OFSPath("/volume1/");
+    OFSPath ofsPath = new OFSPath("/volume1/", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("", ofsPath.getBucketName());
@@ -104,7 +107,7 @@ public class TestOFSPath {
     Assert.assertEquals("/volume1/", ofsPath.toString());
 
     // The trailing '/' doesn't matter when parsing a volume path
-    ofsPath = new OFSPath("/volume1");
+    ofsPath = new OFSPath("/volume1", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("", ofsPath.getBucketName());
@@ -120,7 +123,7 @@ public class TestOFSPath {
 
   @Test
   public void testParsingEmptyInput() {
-    OFSPath ofsPath = new OFSPath("");
+    OFSPath ofsPath = new OFSPath("", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("", ofsPath.getVolumeName());
     Assert.assertEquals("", ofsPath.getBucketName());
@@ -133,7 +136,8 @@ public class TestOFSPath {
 
   @Test
   public void testParsingWithAuthority() {
-    OFSPath ofsPath = new OFSPath("ofs://svc1:9876/volume1/bucket2/dir3/");
+    OFSPath ofsPath = new OFSPath("ofs://svc1:9876/volume1/bucket2/dir3/",
+        conf);
     Assert.assertEquals("svc1:9876", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
@@ -155,7 +159,7 @@ public class TestOFSPath {
       bucketName = "";  // Make javac happy
     }
     // Mount only
-    OFSPath ofsPath = new OFSPath("/tmp/");
+    OFSPath ofsPath = new OFSPath("/tmp/", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals(
         OFSPath.OFS_MOUNT_TMP_VOLUMENAME, ofsPath.getVolumeName());
@@ -167,7 +171,7 @@ public class TestOFSPath {
     Assert.assertEquals("/tmp/", ofsPath.toString());
 
     // Mount with key
-    ofsPath = new OFSPath("/tmp/key1");
+    ofsPath = new OFSPath("/tmp/key1", conf);
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals(
         OFSPath.OFS_MOUNT_TMP_VOLUMENAME, ofsPath.getVolumeName());

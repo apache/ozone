@@ -163,6 +163,9 @@ public class DUResponse {
     @JsonProperty("lastModified")
     private long lastModified;
 
+    @JsonProperty("objectInfo")
+    private ObjectDBInfo objectDBInfo;
+
     public DiskUsage() {
       this.sizeWithReplica = -1L;
       this.isKey = false;
@@ -254,6 +257,14 @@ public class DUResponse {
 
     public void setLastModified(long lastModified) {
       this.lastModified = lastModified;
+    }
+
+    public ObjectDBInfo getObjectDBInfo() {
+      return objectDBInfo;
+    }
+
+    public void setObjectDBInfo(ObjectDBInfo objectDBInfo) {
+      this.objectDBInfo = objectDBInfo;
     }
   }
 }

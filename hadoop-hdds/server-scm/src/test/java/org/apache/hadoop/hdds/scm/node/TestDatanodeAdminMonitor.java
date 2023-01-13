@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -36,6 +38,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -198,6 +201,63 @@ public class TestDatanodeAdminMonitor {
                     IN_SERVICE,
                     IN_SERVICE,
                     IN_SERVICE);
+
+    monitor.run();
+
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  @Test
+  public void testDecommissionNodeWithUnrecoverableECContainer()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(1));
+    // Mock Replication Manager to return ContainerReplicaCount's which
+    // always have a DECOMMISSIONED replica.
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCountForEC(
+            repManager,
+            HddsProtos.LifeCycleState.CLOSED,
+            new ECReplicationConfig(3, 2),
+            Triple.of(DECOMMISSIONING, dn1, 1),
+            Triple.of(IN_SERVICE,
+                MockDatanodeDetails.randomDatanodeDetails(), 2));
+
+    // Run the monitor for the first time and the node will transition to
+    // REPLICATE_CONTAINERS as there are no pipelines to close.
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    DatanodeDetails node = getFirstTrackedNode();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Running the monitor again causes it to remain DECOMMISSIONING
+    // as nothing has changed.
+    monitor.run();
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Now change the replicationManager mock another copy of the
+    // decommissioning replica on an IN_SERVICE node and the node should
+    // complete the REPLICATE_CONTAINERS step, moving to complete which will end
+    // the decommission workflow
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCountForEC(
+            repManager,
+            HddsProtos.LifeCycleState.CLOSED,
+            new ECReplicationConfig(3, 2),
+            Triple.of(DECOMMISSIONING, dn1, 1),
+            Triple.of(IN_SERVICE,
+                MockDatanodeDetails.randomDatanodeDetails(), 2),
+            Triple.of(IN_SERVICE,
+                MockDatanodeDetails.randomDatanodeDetails(), 1));
 
     monitor.run();
 

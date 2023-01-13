@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,9 +39,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -502,5 +507,90 @@ public abstract class SCMCommonPlacementPolicy implements
 
   protected Node getPlacementGroup(DatanodeDetails dn) {
     return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
+  }
+
+  /**
+   * Given a set of replicas, expectedCount for Each replica,
+   * number of unique replica indexes. Replicas to be deleted for fixing over
+   * replication is computed.
+   * The algorithm starts with creating a replicaIdMap which contains the
+   * replicas grouped by replica Index. A placementGroup Map is created which
+   * groups replicas based on their rack & the replicas within the rack
+   * are further grouped based on the replica Index.
+   * A placement Group Count Map is created which keeps
+   * track of the count of replicas in each rack.
+   * We iterate through overreplicated replica indexes sorted in descending
+   * order based on their current replication factor in a descending factor.
+   * For each replica Index the replica is removed from the rack which contains
+   * the most replicas, in order to achieve this the racks are put
+   * into priority queue & are based on the number of replicas they have.
+   * The replica is removed from the rack with maximum replicas & the replica
+   * to be removed is also removed from the maps created above &
+   * the count for rack is reduced.
+   * The set of replicas computed are then returned by the function.
+   * @param replicas: Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica: Replication factor of each
+   *    *                                     unique replica
+   * @return Set of replicas to be removed are computed.
+   */
+  @Override
+  public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+    Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
+    Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
+            = new HashMap<>();
+    Map<Node, Integer> placementGroupCntMap = new HashMap<>();
+    for (ContainerReplica replica:replicas) {
+      Integer replicaId = replica.getReplicaIndex();
+      Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
+      replicaIdMap.computeIfAbsent(replicaId, (rid) -> Sets.newHashSet())
+              .add(replica);
+      placementGroupCntMap.compute(placementGroup,
+              (group, cnt) -> (cnt == null ? 0 : cnt) + 1);
+      placementGroupReplicaIdMap.computeIfAbsent(placementGroup,
+              (pg) -> Maps.newHashMap()).computeIfAbsent(replicaId, (rid) ->
+                      Sets.newHashSet()).add(replica);
+    }
+
+    Set<ContainerReplica> replicasToRemove = new HashSet<>();
+    List<Integer> sortedRIDList = replicaIdMap.keySet().stream()
+            .filter(rid -> replicaIdMap.get(rid).size() >
+                    expectedCountPerUniqueReplica)
+            .sorted((o1, o2) -> Integer.compare(replicaIdMap.get(o2).size(),
+                    replicaIdMap.get(o1).size()))
+            .collect(Collectors.toList());
+    for (Integer rid : sortedRIDList) {
+      if (replicaIdMap.get(rid).size() <= expectedCountPerUniqueReplica) {
+        break;
+      }
+      Queue<Node> pq = new PriorityQueue<>((o1, o2) ->
+              Integer.compare(placementGroupCntMap.get(o2),
+                      placementGroupCntMap.get(o1)));
+      pq.addAll(placementGroupReplicaIdMap.entrySet()
+              .stream()
+              .filter(nodeMapEntry -> nodeMapEntry.getValue().containsKey(rid))
+              .map(Map.Entry::getKey)
+              .collect(Collectors.toList()));
+
+      while (replicaIdMap.get(rid).size() > expectedCountPerUniqueReplica) {
+        Node rack = pq.poll();
+        Set<ContainerReplica> replicaSet =
+                placementGroupReplicaIdMap.get(rack).get(rid);
+        if (replicaSet.size() > 0) {
+          ContainerReplica r = replicaSet.stream().findFirst().get();
+          replicasToRemove.add(r);
+          replicaSet.remove(r);
+          replicaIdMap.get(rid).remove(r);
+          placementGroupCntMap.compute(rack,
+                  (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
+          if (replicaSet.size() == 0) {
+            placementGroupReplicaIdMap.get(rack).remove(rid);
+          } else {
+            pq.add(rack);
+          }
+        }
+      }
+    }
+    return replicasToRemove;
   }
 }

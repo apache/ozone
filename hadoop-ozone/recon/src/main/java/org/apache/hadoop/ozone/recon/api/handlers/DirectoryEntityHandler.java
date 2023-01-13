@@ -18,8 +18,11 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -53,19 +56,30 @@ public class DirectoryEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    // path should exist, so we don't need any extra verification/null check
+    // path should exist so we don't need any extra verification/null check
     long dirObjectId = getBucketHandler().getDirObjectId(getNames());
     long dirCreationTime = getBucketHandler().getDirCreationTime(getNames());
     long dirLastModifiedTime = getBucketHandler().getDirLastModifiedTime(
         getNames());
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.DIRECTORY);
-    namespaceSummaryResponse
-        .setNumTotalDir(getTotalDirCount(dirObjectId));
-    namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
-    namespaceSummaryResponse.setCreateTime(dirCreationTime);
-    namespaceSummaryResponse.setLastModified(dirLastModifiedTime);
-    return namespaceSummaryResponse;
+    CountStats countStats = new CountStats(
+        -1, -1,
+        getTotalDirCount(dirObjectId), getTotalKeyCount(dirObjectId),
+        dirCreationTime, dirLastModifiedTime);
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.DIRECTORY)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getDirectoryObjDbInfo(getNames()))
+        .setStatus(ResponseStatus.OK)
+        .build();
+  }
+
+  private ObjectDBInfo getDirectoryObjDbInfo(String[] names)
+      throws IOException {
+    OmDirectoryInfo omDirectoryInfo = getBucketHandler().getDirInfo(names);
+    if (null == omDirectoryInfo) {
+      return new ObjectDBInfo();
+    }
+    return new ObjectDBInfo(omDirectoryInfo);
   }
 
   @Override

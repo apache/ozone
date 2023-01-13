@@ -18,14 +18,19 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -49,12 +54,10 @@ public class RootEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.ROOT);
+
     List<OmVolumeArgs> volumes = listVolumes();
-    namespaceSummaryResponse.setNumVolume(volumes.size());
     List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
-    namespaceSummaryResponse.setNumBucket(allBuckets.size());
+    ObjectDBInfo prefixObjDbInfo = getPrefixObjDbInfo();
     int totalNumDir = 0;
     long totalNumKey = 0L;
     for (OmBucketInfo bucket : allBuckets) {
@@ -62,11 +65,27 @@ public class RootEntityHandler extends EntityHandler {
       totalNumDir += getTotalDirCount(bucketObjectId);
       totalNumKey += getTotalKeyCount(bucketObjectId);
     }
+    CountStats countStats = new CountStats(
+        volumes.size(), allBuckets.size(), totalNumDir, totalNumKey,
+        prefixObjDbInfo.getCreationTime(),
+        prefixObjDbInfo.getModificationTime());
 
-    namespaceSummaryResponse.setNumTotalDir(totalNumDir);
-    namespaceSummaryResponse.setNumTotalKey(totalNumKey);
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.ROOT)
+        .setCountStats(countStats)
+        .setObjectDBInfo(prefixObjDbInfo)
+        .setStatus(ResponseStatus.OK)
+        .build();
+  }
 
-    return namespaceSummaryResponse;
+  private ObjectDBInfo getPrefixObjDbInfo()
+      throws IOException {
+    OmPrefixInfo omPrefixInfo = getOmMetadataManager().getPrefixTable()
+        .getSkipCache(OzoneConsts.OM_KEY_PREFIX);
+    if (null == omPrefixInfo) {
+      return new ObjectDBInfo();
+    }
+    return new ObjectDBInfo(omPrefixInfo);
   }
 
   @Override

@@ -21,11 +21,14 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -48,12 +51,10 @@ public class VolumeEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.VOLUME);
+
     String[] names = getNames();
     List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
     OmVolumeArgs volume = getVolume(getOmMetadataManager(), names[0]);
-    namespaceSummaryResponse.setNumBucket(buckets.size());
     int totalDir = 0;
     long totalKey = 0L;
 
@@ -64,12 +65,30 @@ public class VolumeEntityHandler extends EntityHandler {
       totalKey += getTotalKeyCount(bucketObjectId);
     }
 
-    namespaceSummaryResponse.setNumTotalDir(totalDir);
-    namespaceSummaryResponse.setNumTotalKey(totalKey);
-    namespaceSummaryResponse.setCreateTime(volume.getCreationTime());
-    namespaceSummaryResponse.setLastModified(volume.getModificationTime());
+    CountStats countStats = new CountStats(
+        -1, buckets.size(), totalDir, totalKey,
+        volume.getCreationTime(), volume.getModificationTime());
 
-    return namespaceSummaryResponse;
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.VOLUME)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getVolumeObjDbInfo(names))
+        .setStatus(ResponseStatus.OK)
+        .build();
+  }
+
+  private VolumeObjectDBInfo getVolumeObjDbInfo(String[] names)
+      throws IOException {
+    String dbVolumeKey = getOmMetadataManager().getVolumeKey(names[0]);
+    if (null == dbVolumeKey) {
+      return new VolumeObjectDBInfo();
+    }
+    OmVolumeArgs volumeArgs =
+        getOmMetadataManager().getVolumeTable().getSkipCache(dbVolumeKey);
+    if (null == volumeArgs) {
+      return new VolumeObjectDBInfo();
+    }
+    return new VolumeObjectDBInfo(volumeArgs);
   }
 
   @Override

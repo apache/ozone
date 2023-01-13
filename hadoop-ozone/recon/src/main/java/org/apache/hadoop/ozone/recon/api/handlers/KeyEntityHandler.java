@@ -19,8 +19,11 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
+import org.apache.hadoop.ozone.recon.api.types.KeyObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
@@ -46,13 +49,26 @@ public class KeyEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.KEY);
     OmKeyInfo keyInfo = getBucketHandler().getKeyInfo(getNames());
-    namespaceSummaryResponse.setCreateTime(keyInfo.getCreationTime());
-    namespaceSummaryResponse.setLastModified(keyInfo.getModificationTime());
+    CountStats countStats = new CountStats(
+        -1, -1,
+        -1, 0, keyInfo.getCreationTime(),
+        keyInfo.getModificationTime());
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.KEY)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getKeyDbObjectInfo(getNames()))
+        .setStatus(ResponseStatus.OK)
+        .build();
+  }
 
-    return namespaceSummaryResponse;
+  private ObjectDBInfo getKeyDbObjectInfo(String[] names)
+      throws IOException {
+    OmKeyInfo omKeyInfo = getBucketHandler().getKeyInfo(names);
+    if (null == omKeyInfo) {
+      return new KeyObjectDBInfo();
+    }
+    return new KeyObjectDBInfo(omKeyInfo);
   }
 
   @Override

@@ -21,9 +21,11 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.EntityInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
@@ -208,12 +210,13 @@ public class NSSummaryEndpoint {
           break;
         }
       }
-      entityInfoResponse.setNumVolume(nsSummaryData.getNumVolume());
-      entityInfoResponse.setNumBucket(nsSummaryData.getNumBucket());
-      entityInfoResponse.setNumTotalDir(nsSummaryData.getNumTotalDir());
-      entityInfoResponse.setNumTotalKey(nsSummaryData.getNumTotalKey());
-      entityInfoResponse.setCreateTime(nsSummaryData.getCreateTime());
-      entityInfoResponse.setLastModified(nsSummaryData.getLastModified());
+      CountStats countStats = nsSummaryData.getCountStats();
+      entityInfoResponse.setNumVolume(countStats.getNumVolume());
+      entityInfoResponse.setNumBucket(countStats.getNumBucket());
+      entityInfoResponse.setNumTotalDir(countStats.getNumTotalDir());
+      entityInfoResponse.setNumTotalKey(countStats.getNumTotalKey());
+      entityInfoResponse.setCreateTime(countStats.getCreateTime());
+      entityInfoResponse.setLastModified(countStats.getLastModified());
       entityInfoResponse.setChildMetricsListMap(childMetricsListMap);
     }
     return Response.ok(entityInfoResponse).build();
@@ -257,8 +260,10 @@ public class NSSummaryEndpoint {
     NamespaceSummaryResponse namespaceSummaryResponse;
     if (!isInitializationComplete()) {
       namespaceSummaryResponse =
-          new NamespaceSummaryResponse(EntityType.UNKNOWN);
-      namespaceSummaryResponse.setStatus(ResponseStatus.INITIALIZING);
+          NamespaceSummaryResponse.newBuilder()
+              .setEntityType(EntityType.UNKNOWN)
+              .setStatus(ResponseStatus.INITIALIZING)
+              .build();
     } else {
       EntityHandler handler = EntityHandler.getEntityHandler(
           reconNamespaceSummaryManager,
@@ -311,14 +316,18 @@ public class NSSummaryEndpoint {
               omMetadataManager, reconSCM, diskUsage.getSubpath());
           NamespaceSummaryResponse namespaceSummaryResponse =
               childEntityHandler.getSummaryResponse();
+          CountStats countStats = namespaceSummaryResponse.getCountStats();
+          ObjectDBInfo objectDBInfo =
+              namespaceSummaryResponse.getObjectDBInfo();
           diskUsage.setEntityType(namespaceSummaryResponse.getEntityType());
-          diskUsage.setKeyCount(namespaceSummaryResponse.getNumTotalKey());
-          diskUsage.setBucketCount(namespaceSummaryResponse.getNumBucket());
-          diskUsage.setVolumeCount(namespaceSummaryResponse.getNumVolume());
-          diskUsage.setDirCount(namespaceSummaryResponse.getNumTotalDir());
-          diskUsage.setCreateTime(namespaceSummaryResponse.getCreateTime());
+          diskUsage.setKeyCount(countStats.getNumTotalKey());
+          diskUsage.setBucketCount(countStats.getNumBucket());
+          diskUsage.setVolumeCount(countStats.getNumVolume());
+          diskUsage.setDirCount(countStats.getNumTotalDir());
+          diskUsage.setCreateTime(countStats.getCreateTime());
           diskUsage.setLastModified(
-              namespaceSummaryResponse.getLastModified());
+              countStats.getLastModified());
+          diskUsage.setObjectDBInfo(objectDBInfo);
         } catch (Exception exp) {
           isError.set(true);
         }
