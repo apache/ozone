@@ -109,4 +109,14 @@ public class ReplicateContainerCommand
   public int getReplicaIndex() {
     return replicaIndex;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType());
+    sb.append(": containerId: ").append(getContainerID());
+    sb.append(", replicaIndex: ").append(getReplicaIndex());
+    sb.append(", sourceNodes: ").append(sourceDatanodes);
+    return sb.toString();
+  }
 }

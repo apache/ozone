@@ -46,7 +46,7 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
                                      OzoneStorageContainerManager scm,
                                      EventPublisher eventPublisher)
       throws IOException {
-    super(conf, scm, eventPublisher);
+    super(conf, scm, eventPublisher, null);
   }
 
   @Override

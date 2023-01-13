@@ -215,7 +215,7 @@ public class TestEmptyContainerHandler {
     Assertions.assertEquals(assertion, emptyContainerHandler.handle(request));
     Mockito.verify(replicationManager, Mockito.times(times))
         .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
-            Mockito.any(DatanodeDetails.class));
+            Mockito.any(DatanodeDetails.class), Mockito.eq(false));
     Assertions.assertEquals(numEmptyExpected, request.getReport().getStat(
         ReplicationManagerReport.HealthState.EMPTY));
 

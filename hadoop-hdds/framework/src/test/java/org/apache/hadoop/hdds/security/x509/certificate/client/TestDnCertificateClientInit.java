@@ -46,29 +46,25 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
- * Test class for {@link DefaultCertificateClient}.
+ * Test class for {@link DNCertificateClient}.
  */
-public class TestCertificateClientInit {
+public class TestDnCertificateClientInit {
 
   private KeyPair keyPair;
   private String certSerialId = "3284792342234";
   private CertificateClient dnCertificateClient;
-  private CertificateClient omCertificateClient;
   private HDDSKeyGenerator keyGenerator;
   private Path metaDirPath;
   private SecurityConfig securityConfig;
   private KeyCodec dnKeyCodec;
-  private KeyCodec omKeyCodec;
   private X509Certificate x509Certificate;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
-  private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
 
   private static Stream<Arguments> parameters() {
     return Stream.of(
@@ -95,21 +91,16 @@ public class TestCertificateClientInit {
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
     certSerialId = x509Certificate.getSerialNumber().toString();
-    dnCertificateClient = new DNCertificateClient(securityConfig,
-        certSerialId);
-    omCertificateClient = new OMCertificateClient(securityConfig,
-        certSerialId);
+    dnCertificateClient =
+        new DNCertificateClient(securityConfig, null, certSerialId, null, null);
     dnKeyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
-    omKeyCodec = new KeyCodec(securityConfig, OM_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(DN_COMPONENT));
-    Files.createDirectories(securityConfig.getKeyLocation(OM_COMPONENT));
   }
 
   @AfterEach
   public void tearDown() {
     dnCertificateClient = null;
-    omCertificateClient = null;
     FileUtils.deleteQuietly(metaDirPath.toFile());
   }
 
@@ -156,56 +147,6 @@ public class TestCertificateClientInit {
           securityConfig.getPrivateKeyFileName()));
       assertTrue(OzoneSecurityUtil.checkIfFileExist(
           securityConfig.getKeyLocation(DN_COMPONENT),
-          securityConfig.getPublicKeyFileName()));
-    }
-  }
-
-  @ParameterizedTest
-  @MethodSource("parameters")
-  public void testInitOzoneManager(boolean pvtKeyPresent, boolean pubKeyPresent,
-      boolean certPresent, InitResponse expectedResult) throws Exception {
-    if (pvtKeyPresent) {
-      omKeyCodec.writePrivateKey(keyPair.getPrivate());
-    } else {
-      FileUtils.deleteQuietly(Paths.get(
-          securityConfig.getKeyLocation(OM_COMPONENT).toString(),
-          securityConfig.getPrivateKeyFileName()).toFile());
-    }
-
-    if (pubKeyPresent) {
-      if (omCertificateClient.getPublicKey() == null) {
-        omKeyCodec.writePublicKey(keyPair.getPublic());
-      }
-    } else {
-      FileUtils.deleteQuietly(Paths.get(
-          securityConfig.getKeyLocation(OM_COMPONENT).toString(),
-          securityConfig.getPublicKeyFileName()).toFile());
-    }
-
-    if (certPresent) {
-      CertificateCodec codec = new CertificateCodec(securityConfig,
-          OM_COMPONENT);
-      codec.writeCertificate(new X509CertificateHolder(
-          x509Certificate.getEncoded()));
-    } else {
-      FileUtils.deleteQuietly(Paths.get(
-          securityConfig.getKeyLocation(OM_COMPONENT).toString(),
-          securityConfig.getCertificateFileName()).toFile());
-    }
-    InitResponse response = omCertificateClient.init();
-
-    if (pvtKeyPresent && pubKeyPresent && !certPresent) {
-      assertEquals(RECOVER, response);
-    } else {
-      assertEquals(expectedResult, response);
-    }
-
-    if (!response.equals(FAILURE)) {
-      assertTrue(OzoneSecurityUtil.checkIfFileExist(
-          securityConfig.getKeyLocation(OM_COMPONENT),
-          securityConfig.getPrivateKeyFileName()));
-      assertTrue(OzoneSecurityUtil.checkIfFileExist(
-          securityConfig.getKeyLocation(OM_COMPONENT),
           securityConfig.getPublicKeyFileName()));
     }
   }

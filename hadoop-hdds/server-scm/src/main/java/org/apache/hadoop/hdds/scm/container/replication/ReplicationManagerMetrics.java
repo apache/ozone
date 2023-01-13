@@ -153,24 +153,23 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of EC Replication commands sent.")
   private MutableCounterLong ecReplicationCmdsSentTotal;
 
-  @Metric("Number of EC Deletion commands timeout.")
+  @Metric("Number of EC Replica Deletion commands sent.")
   private MutableCounterLong ecDeletionCmdsSentTotal;
 
-  @Metric("Number of EC Replication commands completed.")
-  private MutableCounterLong ecReplicationCmdsCompletedTotal;
-
-  @Metric("Number of EC Deletion commands completed.")
-  private MutableCounterLong ecDeletionCmdsCompletedTotal;
-
-  @Metric("Number of EC Deletion commands completed.")
+  @Metric("Number of EC Reconstruction commands sent.")
   private MutableCounterLong ecReconstructionCmdsSentTotal;
 
-  @Metric("Number of EC Replication commands timeout.")
-  private MutableCounterLong ecReplicationCmdsTimeoutTotal;
+  @Metric("Number of EC replicas successfully created by Replication Manager.")
+  private MutableCounterLong ecReplicasCreatedTotal;
 
-  @Metric("Number of EC Deletion commands timeout.")
-  private MutableCounterLong ecDeletionCmdsTimeoutTotal;
+  @Metric("Number of EC replicas successfully deleted by Replication Manager.")
+  private MutableCounterLong ecReplicasDeletedTotal;
 
+  @Metric("Number of EC replicas scheduled to be created which timed out.")
+  private MutableCounterLong ecReplicaCreateTimeoutTotal;
+
+  @Metric("Number of EC replicas scheduled for delete which timed out.")
+  private MutableCounterLong ecReplicaDeleteTimeoutTotal;
 
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -219,11 +218,11 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     deletionTime.snapshot(builder, all);
     ecReplicationCmdsSentTotal.snapshot(builder, all);
     ecDeletionCmdsSentTotal.snapshot(builder, all);
-    ecReplicationCmdsCompletedTotal.snapshot(builder, all);
-    ecDeletionCmdsCompletedTotal.snapshot(builder, all);
+    ecReplicasCreatedTotal.snapshot(builder, all);
+    ecReplicasDeletedTotal.snapshot(builder, all);
     ecReconstructionCmdsSentTotal.snapshot(builder, all);
-    ecReplicationCmdsTimeoutTotal.snapshot(builder, all);
-    ecDeletionCmdsTimeoutTotal.snapshot(builder, all);
+    ecReplicaCreateTimeoutTotal.snapshot(builder, all);
+    ecReplicasDeletedTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -361,12 +360,12 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.ecDeletionCmdsSentTotal.incr();
   }
 
-  public void incrEcReplicationCmdsCompletedTotal() {
-    this.ecReplicationCmdsCompletedTotal.incr();
+  public void incrEcReplicasCreatedTotal() {
+    this.ecReplicasCreatedTotal.incr();
   }
 
-  public void incrEcDeletionCmdsCompletedTotal() {
-    this.ecDeletionCmdsCompletedTotal.incr();
+  public void incrEcReplicasDeletedTotal() {
+    this.ecReplicasDeletedTotal.incr();
   }
 
   public void incrEcReconstructionCmdsSentTotal() {
@@ -383,8 +382,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE);
   }
 
-  public void incrEcReplicationCmdsTimeoutTotal() {
-    this.ecReplicationCmdsTimeoutTotal.incr();
+  public void incrEcReplicaCreateTimeoutTotal() {
+    this.ecReplicaCreateTimeoutTotal.incr();
   }
 
   public long getEcDeletionCmdsSentTotal() {
@@ -399,23 +398,23 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     return ecReplicationCmdsSentTotal.value();
   }
 
-  public void incrEcDeletionCmdsTimeoutTotal() {
-    this.ecDeletionCmdsTimeoutTotal.incr();
+  public void incrEcReplicaDeleteTimeoutTotal() {
+    this.ecReplicaDeleteTimeoutTotal.incr();
   }
 
-  public long getEcReplicationCmdsTimeoutTotal() {
-    return ecReplicationCmdsTimeoutTotal.value();
+  public long getEcReplicaCreateTimeoutTotal() {
+    return ecReplicaCreateTimeoutTotal.value();
   }
 
-  public long getEcDeletionCmdsTimeoutTotal() {
-    return ecDeletionCmdsTimeoutTotal.value();
+  public long getEcReplicaDeleteTimeoutTotal() {
+    return ecReplicaDeleteTimeoutTotal.value();
   }
 
-  public long getEcReplicationCmdsCompletedTotal() {
-    return ecReplicationCmdsCompletedTotal.value();
+  public long getEcReplicasCreatedTotal() {
+    return ecReplicasCreatedTotal.value();
   }
 
-  public long getEcDeletionCmdsCompletedTotal() {
-    return ecDeletionCmdsCompletedTotal.value();
+  public long getEcReplicasDeletedTotal() {
+    return ecReplicasDeletedTotal.value();
   }
 }

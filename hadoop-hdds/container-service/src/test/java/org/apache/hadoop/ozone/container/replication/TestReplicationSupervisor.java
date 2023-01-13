@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
@@ -34,11 +38,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -57,6 +67,8 @@ import static java.util.Collections.emptyList;
  */
 @RunWith(Parameterized.class)
 public class TestReplicationSupervisor {
+
+  private static final long CURRENT_TERM = 1;
 
   private final ContainerReplicator noopReplicator = task -> { };
   private final ContainerReplicator throwingReplicator = task -> {
@@ -77,6 +89,9 @@ public class TestReplicationSupervisor {
 
   private final ContainerLayoutVersion layout;
 
+  private StateContext context;
+  private TestClock clock;
+
   public TestReplicationSupervisor(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
@@ -88,7 +103,13 @@ public class TestReplicationSupervisor {
 
   @Before
   public void setUp() throws Exception {
+    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
+    context = new StateContext(
+        new OzoneConfiguration(),
+        DatanodeStateMachine.DatanodeStates.getInitState(),
+        Mockito.mock(DatanodeStateMachine.class));
+    context.setTermOfLeaderSCM(CURRENT_TERM);
   }
 
   @After
@@ -106,9 +127,9 @@ public class TestReplicationSupervisor {
 
     try {
       //WHEN
-      supervisor.addTask(new ReplicationTask(1L, emptyList()));
-      supervisor.addTask(new ReplicationTask(2L, emptyList()));
-      supervisor.addTask(new ReplicationTask(5L, emptyList()));
+      supervisor.addTask(createTask(1L));
+      supervisor.addTask(createTask(2L));
+      supervisor.addTask(createTask(5L));
 
       Assert.assertEquals(3, supervisor.getReplicationRequestCount());
       Assert.assertEquals(3, supervisor.getReplicationSuccessCount());
@@ -134,10 +155,10 @@ public class TestReplicationSupervisor {
 
     try {
       //WHEN
-      supervisor.addTask(new ReplicationTask(6L, emptyList()));
-      supervisor.addTask(new ReplicationTask(6L, emptyList()));
-      supervisor.addTask(new ReplicationTask(6L, emptyList()));
-      supervisor.addTask(new ReplicationTask(6L, emptyList()));
+      supervisor.addTask(createTask(6L));
+      supervisor.addTask(createTask(6L));
+      supervisor.addTask(createTask(6L));
+      supervisor.addTask(createTask(6L));
 
       //THEN
       Assert.assertEquals(4, supervisor.getReplicationRequestCount());
@@ -159,7 +180,7 @@ public class TestReplicationSupervisor {
 
     try {
       //WHEN
-      ReplicationTask task = new ReplicationTask(1L, emptyList());
+      ReplicationTask task = createTask(1L);
       supervisor.addTask(task);
 
       //THEN
@@ -183,9 +204,9 @@ public class TestReplicationSupervisor {
 
     try {
       //WHEN
-      supervisor.addTask(new ReplicationTask(1L, emptyList()));
-      supervisor.addTask(new ReplicationTask(2L, emptyList()));
-      supervisor.addTask(new ReplicationTask(3L, emptyList()));
+      supervisor.addTask(createTask(1L));
+      supervisor.addTask(createTask(2L));
+      supervisor.addTask(createTask(3L));
 
       //THEN
       Assert.assertEquals(0, supervisor.getReplicationRequestCount());
@@ -208,9 +229,9 @@ public class TestReplicationSupervisor {
 
     try {
       //WHEN
-      supervisor.addTask(new ReplicationTask(1L, emptyList()));
-      supervisor.addTask(new ReplicationTask(2L, emptyList()));
-      supervisor.addTask(new ReplicationTask(3L, emptyList()));
+      supervisor.addTask(createTask(1L));
+      supervisor.addTask(createTask(2L));
+      supervisor.addTask(createTask(3L));
 
       //THEN
       Assert.assertEquals(3, supervisor.getInFlightReplications());
@@ -228,32 +249,86 @@ public class TestReplicationSupervisor {
   }
 
   @Test
-  public void testDownloadAndImportReplicatorFailure() {
+  public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, null, mutableReplicator,
-            newDirectExecutorService());
+        new ReplicationSupervisor(set, context, mutableReplicator,
+            newDirectExecutorService(), clock);
 
+    OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
     Path res = Paths.get("file:/tmp/no-such-file");
     Mockito.when(
-        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
+        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList(),
+            Mockito.any(Path.class)))
         .thenReturn(res);
 
+    final String testDir = GenericTestUtils.getTempPath(
+        TestReplicationSupervisor.class.getSimpleName() +
+            "-" + UUID.randomUUID().toString());
+    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+    Mockito.when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(
+            new HddsVolume.Builder(testDir).conf(conf).build()));
     ContainerReplicator replicatorFactory =
-        new DownloadAndImportReplicator(set, null, moc, null);
+        new DownloadAndImportReplicator(conf, set, null, moc, null, volumeSet);
 
     replicatorRef.set(replicatorFactory);
 
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(DownloadAndImportReplicator.LOG);
 
-    supervisor.addTask(new ReplicationTask(1L, emptyList()));
+    supervisor.addTask(createTask(1L));
     Assert.assertEquals(1, supervisor.getReplicationFailureCount());
     Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
     Assert.assertTrue(logCapturer.getOutput()
         .contains("Container 1 replication was unsuccessful."));
+  }
+
+  @Test
+  public void testTaskBeyondDeadline() {
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+
+    ReplicateContainerCommand cmd = createCommand(1);
+    cmd.setDeadline(clock.millis() + 10000);
+    ReplicationTask task1 = new ReplicationTask(cmd);
+    cmd = createCommand(2);
+    cmd.setDeadline(clock.millis() + 20000);
+    ReplicationTask task2 = new ReplicationTask(cmd);
+    cmd = createCommand(3);
+    // No deadline set
+    ReplicationTask task3 = new ReplicationTask(cmd);
+    // no deadline set
+
+    clock.fastForward(15000);
+
+    supervisor.addTask(task1);
+    supervisor.addTask(task2);
+    supervisor.addTask(task3);
+
+    Assert.assertEquals(3, supervisor.getReplicationRequestCount());
+    Assert.assertEquals(2, supervisor.getReplicationSuccessCount());
+    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assert.assertEquals(0, supervisor.getInFlightReplications());
+    Assert.assertEquals(0, supervisor.getQueueSize());
+    Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
+    Assert.assertEquals(2, set.containerCount());
+
+  }
+
+  @Test
+  public void taskWithObsoleteTermIsDropped() {
+    final long newTerm = 2;
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+
+    context.setTermOfLeaderSCM(newTerm);
+    supervisor.addTask(createTask(1L));
+
+    Assert.assertEquals(1, supervisor.getReplicationRequestCount());
+    Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
   }
 
   private ReplicationSupervisor supervisorWithReplicator(
@@ -265,9 +340,22 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, null, mutableReplicator, executor);
+        new ReplicationSupervisor(set, context, mutableReplicator, executor,
+            clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
+  }
+
+  private static ReplicationTask createTask(long containerId) {
+    ReplicateContainerCommand cmd = createCommand(containerId);
+    return new ReplicationTask(cmd);
+  }
+
+  private static ReplicateContainerCommand createCommand(long containerId) {
+    ReplicateContainerCommand cmd =
+        new ReplicateContainerCommand(containerId, emptyList());
+    cmd.setTerm(CURRENT_TERM);
+    return cmd;
   }
 
   /**

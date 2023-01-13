@@ -66,6 +66,37 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int streamBufferSize = 4 * 1024 * 1024;
 
+  @Config(key = "datastream.buffer.flush.size",
+      defaultValue = "16MB",
+      type = ConfigType.SIZE,
+      description = "The boundary at which putBlock is executed",
+      tags = ConfigTag.CLIENT)
+  private long dataStreamBufferFlushSize = 16 * 1024 * 1024;
+
+  @Config(key = "datastream.min.packet.size",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      description = "The maximum size of the ByteBuffer "
+          + "(used via ratis streaming)",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamMinPacketSize = 1024 * 1024;
+
+  @Config(key = "datastream.window.size",
+      defaultValue = "64MB",
+      type = ConfigType.SIZE,
+      description = "Maximum size of BufferList(used for retry) size per " +
+          "BlockDataStreamOutput instance",
+      tags = ConfigTag.CLIENT)
+  private long streamWindowSize = 64 * 1024 * 1024;
+
+  @Config(key = "datastream.pipeline.mode",
+      defaultValue = "true",
+      description = "Streaming write support both pipeline mode(datanode1->" +
+          "datanode2->datanode3) and star mode(datanode1->datanode2, " +
+          "datanode1->datanode3). By default we use pipeline mode.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPipelineMode = true;
+
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
       type = ConfigType.SIZE,
@@ -251,6 +282,22 @@ public class OzoneClientConfig {
     this.streamBufferMaxSize = streamBufferMaxSize;
   }
 
+  public int getDataStreamMinPacketSize() {
+    return dataStreamMinPacketSize;
+  }
+
+  public void setDataStreamMinPacketSize(int dataStreamMinPacketSize) {
+    this.dataStreamMinPacketSize = dataStreamMinPacketSize;
+  }
+
+  public long getStreamWindowSize() {
+    return streamWindowSize;
+  }
+
+  public void setStreamWindowSize(long streamWindowSize) {
+    this.streamWindowSize = streamWindowSize;
+  }
+
   public int getMaxRetryCount() {
     return maxRetryCount;
   }
@@ -307,6 +354,14 @@ public class OzoneClientConfig {
     return bufferIncrement;
   }
 
+  public long getDataStreamBufferFlushSize() {
+    return dataStreamBufferFlushSize;
+  }
+
+  public void setDataStreamBufferFlushSize(long dataStreamBufferFlushSize) {
+    this.dataStreamBufferFlushSize = dataStreamBufferFlushSize;
+  }
+
   public ChecksumCombineMode getChecksumCombineMode() {
     try {
       return ChecksumCombineMode.valueOf(checksumCombineMode);
@@ -335,5 +390,13 @@ public class OzoneClientConfig {
 
   public String getFsDefaultBucketLayout() {
     return fsDefaultBucketLayout;
+  }
+
+  public boolean isDatastreamPipelineMode() {
+    return datastreamPipelineMode;
+  }
+
+  public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
+    this.datastreamPipelineMode = datastreamPipelineMode;
   }
 }

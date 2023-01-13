@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,26 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request;
+package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
- * Handles EchoRPCRequest.
+ * A subscriber can register with ContainerReplicaPendingOps to receive
+ * updates on pending ops.
  */
-public class OMEchoRPCRequest extends OMClientRequest {
-  public OMEchoRPCRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
+public interface ContainerReplicaPendingOpsSubscriber {
 
-  @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-         long transactionLogIndex,
-         OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-    return null;
-  }
-
+  /**
+   * Notifies that the specified op has been completed for the specified
+   * containerID. Might have completed normally or timed out.
+   *
+   * @param op Add or Delete op
+   * @param containerID container on which the operation is being performed
+   * @param timedOut true if the timed out, else false
+   */
+  void opCompleted(ContainerReplicaOp op, ContainerID containerID,
+      boolean timedOut);
 }

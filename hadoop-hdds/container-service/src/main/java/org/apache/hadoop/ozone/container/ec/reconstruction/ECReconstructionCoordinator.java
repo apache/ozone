@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -105,10 +108,13 @@ public class ECReconstructionCoordinator implements Closeable {
   private final TokenHelper tokenHelper;
   private final ContainerClientMetrics clientMetrics;
   private final ECReconstructionMetrics metrics;
+  private final StateContext context;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
       CertificateClient certificateClient,
+      StateContext context,
       ECReconstructionMetrics metrics) throws IOException {
+    this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -473,5 +479,11 @@ public class ECReconstructionCoordinator implements Closeable {
 
   public ECReconstructionMetrics getECReconstructionMetrics() {
     return this.metrics;
+  }
+
+  OptionalLong getTermOfLeaderSCM() {
+    return Optional.ofNullable(context)
+        .map(StateContext::getTermOfLeaderSCM)
+        .orElse(OptionalLong.empty());
   }
 }

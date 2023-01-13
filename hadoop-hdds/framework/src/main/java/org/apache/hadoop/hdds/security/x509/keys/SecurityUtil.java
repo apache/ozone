@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hdds.security.x509.keys;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -26,7 +28,11 @@ import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.ssl.PemFileBasedKeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
@@ -135,4 +141,32 @@ public final class SecurityUtil {
     return key;
   }
 
+  public static KeyStoresFactory getServerKeyStoresFactory(
+      SecurityConfig securityConfig, CertificateClient client,
+      boolean requireClientAuth) throws CertificateException {
+    PemFileBasedKeyStoresFactory factory =
+        new PemFileBasedKeyStoresFactory(securityConfig, client);
+    try {
+      factory.init(KeyStoresFactory.Mode.SERVER, requireClientAuth);
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init keyStoresFactory", e,
+          CertificateException.ErrorCode.KEYSTORE_ERROR);
+    }
+    return factory;
+  }
+
+  public static KeyStoresFactory getClientKeyStoresFactory(
+      SecurityConfig securityConfig, CertificateClient client,
+      boolean requireClientAuth) throws CertificateException {
+    PemFileBasedKeyStoresFactory factory =
+        new PemFileBasedKeyStoresFactory(securityConfig, client);
+
+    try {
+      factory.init(KeyStoresFactory.Mode.CLIENT, requireClientAuth);
+    } catch (IOException | GeneralSecurityException e) {
+      throw new CertificateException("Failed to init keyStoresFactory", e,
+          CertificateException.ErrorCode.KEYSTORE_ERROR);
+    }
+    return factory;
+  }
 }

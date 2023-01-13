@@ -186,6 +186,30 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         OMException.ResultCodes.QUOTA_EXCEEDED.toString());
   }
 
+  @Test
+  public void testValidateAndUpdateCacheBucketWithNoQuotaWhenVolumeQuotaSet()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager, 1000L);
+
+    // create a bucket with no quota
+    OMRequest originalRequest =
+        OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
+            StorageTypeProto.SSD);
+    OMBucketCreateRequest omBucketCreateRequest =
+        new OMBucketCreateRequest(originalRequest);
+    OMRequest modifiedRequest = omBucketCreateRequest.preExecute(ozoneManager);
+    OMBucketCreateRequest testRequest =
+        new OMBucketCreateRequest(modifiedRequest);
+    OMClientResponse resp = testRequest.validateAndUpdateCache(
+        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(resp.getOMResponse().getStatus().toString(),
+        OMException.ResultCodes.QUOTA_ERROR.toString());
+  }
+
   private OMBucketCreateRequest doPreExecute(String volumeName,
       String bucketName) throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
