@@ -1163,6 +1163,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   /**
    * Generate a FileStatusAdapter for a snapshot under a bucket.
+   * @param ozoneBucket OzoneBucket object.
    * @param ozoneSnapshot OzoneSnapshot object.
    * @param uri Full URI to OFS root.
    * @param owner Owner of the parent volume of the bucket.
