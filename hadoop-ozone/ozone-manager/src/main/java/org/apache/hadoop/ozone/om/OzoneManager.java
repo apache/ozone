@@ -1828,16 +1828,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-    List<ServiceInfo> serviceList = new ArrayList<>();
+    String leaderId = "";
     if (isRatisEnabled) {
+      RaftPeer leader = null;
       try {
-        serviceList = getServiceList();
+        leader = omRatisServer.getLeader();
       } catch (IOException ex) {
-        LOG.error("IOException while getting the ServiceInfo list.", ex);
+        LOG.error("IOException while getting the " +
+            "Ratis server leader.", ex);
+      }
+      if (Objects.nonNull(leader)) {
+        leaderId += leader.getId().toString();
       }
     }
-    String ratisRoles = ratisRolesToString();
-    omHAMetricsInit(serviceList, ratisRoles);
+    omHAMetricsInit(leaderId);
   }
 
   /**
@@ -2992,52 +2996,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getRatisRoles() {
-    return ratisRolesToString();
-  }
-
-  private String ratisRolesToString() {
-    List<ServiceInfo> serviceList;
+    List<ServiceInfo> serviceList = null;
     int port = omNodeDetails.getRatisPort();
-    RaftPeer leader;
+    RaftPeer leaderId;
     if (isRatisEnabled) {
       try {
-        leader = omRatisServer.getLeader();
+        leaderId = omRatisServer.getLeader();
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
         return "Exception: " + e.toString();
       }
-      String leaderId = "";
-      if (Objects.nonNull(leader)) {
-        leaderId += leader.getId().toString();
-      }
-      return OmUtils.format(serviceList, port, leaderId);
+      return OmUtils.format(serviceList, port, leaderId.getId().toString());
     } else {
       return "Ratis-Disabled";
     }
   }
 
   /**
-   * Create OMHAMetrics instance and set the number of
-   * OM nodes that are up and running.
+   * Create OMHAMetrics instance.
    */
-  private void omHAMetricsInit(List<ServiceInfo> serviceInfoList,
-                               String ratisRoles) {
+  private void omHAMetricsInit(String leaderId) {
     // unregister, in case metrics already exist
     // so that the metric tags will get updated.
     OMHAMetrics.unRegister();
     omhaMetrics = OMHAMetrics
-        .create(ratisRoles);
-
-    int omCount = 0;
-    for (ServiceInfo serviceInfo : serviceInfoList) {
-      if (serviceInfo.getNodeType().equals(HddsProtos.NodeType.OM)) {
-        omCount++;
-      }
-    }
-    omhaMetrics.setNumOfOMNodes(omCount);
+        .create(getOMNodeId(), leaderId);
   }
 
+  @VisibleForTesting
   public OMHAMetrics getOmhaMetrics() {
     return omhaMetrics;
   }

@@ -16,34 +16,103 @@
  */
 package org.apache.hadoop.ozone.om.ha;
 
-import org.apache.hadoop.metrics2.annotation.Metric;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Class to maintain metrics and info related to OM HA.
  */
-@Metrics(about = "OM HA Metrics", context = OzoneConsts.OZONE)
-public class OMHAMetrics {
+@Metrics(about = "OzoneManager HA Metrics", context = OzoneConsts.OZONE)
+public final class OMHAMetrics implements MetricsSource {
+
+  private enum OMHAMetricsInfo implements MetricsInfo {
+
+    OzoneManagerHALeaderState("Leader active state " +
+        "of OzoneManager node (1 leader, 0 follower)"),
+    State("OM State (leader or follower)"),
+    NodeId("OM node Id");
+
+    private final String description;
+
+    OMHAMetricsInfo(String description) {
+      this.description = description;
+    }
+
+    @Override
+    public String description() {
+      return description;
+    }
+  }
+
+  /**
+   * Private nested class to hold
+   * the values of OMHAMetricsInfo.
+   */
+  private static final class OMHAInfo {
+
+    private long ozoneManagerHALeaderState;
+    private String state;
+    private String nodeId;
+
+    OMHAInfo() {
+      this.ozoneManagerHALeaderState = 0L;
+      this.state = "";
+      this.nodeId = "";
+    }
+
+    public long getOzoneManagerHALeaderState() {
+      return ozoneManagerHALeaderState;
+    }
+
+    public void setOzoneManagerHALeaderState(long ozoneManagerHALeaderState) {
+      this.ozoneManagerHALeaderState = ozoneManagerHALeaderState;
+    }
+
+    public String getState() {
+      return state;
+    }
+
+    public void setState(String state) {
+      this.state = state;
+    }
+
+    public String getNodeId() {
+      return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+      this.nodeId = nodeId;
+    }
+  }
 
   public static final String SOURCE_NAME =
       OMHAMetrics.class.getSimpleName();
-  private final MetricsRegistry metricsRegistry;
+  private final OMHAInfo omhaInfo = new OMHAInfo();
+  private MetricsRegistry metricsRegistry;
 
-  public OMHAMetrics(String ratisRoles) {
-    this.metricsRegistry = new MetricsRegistry(SOURCE_NAME)
-        .tag("OMRoles", "OM roles", ratisRoles);
+  private String currNodeId;
+  private String leaderId;
+
+  public OMHAMetrics(String currNodeId, String leaderId) {
+    this.currNodeId = currNodeId;
+    this.leaderId = leaderId;
+    this.metricsRegistry = new MetricsRegistry(SOURCE_NAME);
   }
 
   /**
    * Create and return OMHAMetrics instance.
    * @return OMHAMetrics
    */
-  public static synchronized OMHAMetrics create(String ratisRoles) {
-    OMHAMetrics metrics = new OMHAMetrics(ratisRoles);
+  public static synchronized OMHAMetrics create(
+      String nodeId, String leaderId) {
+    OMHAMetrics metrics = new OMHAMetrics(nodeId, leaderId);
     return DefaultMetricsSystem.instance()
         .register(SOURCE_NAME, "Metrics for OM HA", metrics);
   }
@@ -55,18 +124,45 @@ public class OMHAMetrics {
     DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
   }
 
-  @Metric("Number of OM nodes")
-  private MutableGaugeInt numOfOMNodes;
+  @Override
+  public synchronized void getMetrics(MetricsCollector collector, boolean all) {
 
-  public void setNumOfOMNodes(int count) {
-    numOfOMNodes.set(count);
+    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
+
+    if (currNodeId.equals(leaderId)) {
+      omhaInfo.setNodeId(currNodeId);
+      omhaInfo.setState("leader");
+      omhaInfo.setOzoneManagerHALeaderState(1);
+
+      recordBuilder
+          .tag(OMHAMetricsInfo.NodeId, currNodeId)
+          .tag(OMHAMetricsInfo.State, "leader")
+          .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, 1);
+    } else {
+      omhaInfo.setNodeId(currNodeId);
+      omhaInfo.setState("follower");
+      omhaInfo.setOzoneManagerHALeaderState(0);
+
+      recordBuilder
+          .tag(OMHAMetricsInfo.NodeId, currNodeId)
+          .tag(OMHAMetricsInfo.State, "follower")
+          .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, 0);
+    }
+    recordBuilder.endRecord();
   }
 
-  public MutableGaugeInt getNumOfOMNodes() {
-    return numOfOMNodes;
+  @VisibleForTesting
+  public String getOmhaInfoNodeId() {
+    return omhaInfo.getNodeId();
   }
 
-  public MetricsRegistry getMetricsRegistry() {
-    return metricsRegistry;
+  @VisibleForTesting
+  public String getOmhaInfoState() {
+    return omhaInfo.getState();
+  }
+
+  @VisibleForTesting
+  public long getOmhaInfoOzoneManagerHALeaderState() {
+    return omhaInfo.getOzoneManagerHALeaderState();
   }
 }
