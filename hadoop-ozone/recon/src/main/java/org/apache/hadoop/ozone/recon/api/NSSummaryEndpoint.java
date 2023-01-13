@@ -73,7 +73,7 @@ public class NSSummaryEndpoint {
   @GET
   @Path("/entityinfo")
   public Response getEntityMetrics(@QueryParam("path") String path,
-                                   @DefaultValue("createTime")
+                                   @DefaultValue("size")
                                    @QueryParam("orderBy") String orderBy,
                                    @DefaultValue("10")
                                    @QueryParam("count") int count)
