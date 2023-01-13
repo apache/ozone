@@ -325,6 +325,7 @@ public final class OmUtils {
     case TenantRevokeAdmin:
     case SetRangerServiceVersion:
     case CreateSnapshot:
+    case DeleteSnapshot:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

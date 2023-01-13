@@ -27,18 +27,17 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * ozone snapshot create.
+ * ozone snapshot delete.
  */
-@CommandLine.Command(name = "create",
-    description = "create snapshot")
-public class CreateSnapshotHandler extends Handler {
+@CommandLine.Command(name = "delete",
+    description = "Delete a snapshot")
+public class DeleteSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
   private BucketUri snapshotPath;
 
-
-  @CommandLine.Parameters(description = "optional snapshot name",
-      index = "1", arity = "0..1")
+  @CommandLine.Parameters(description = "Snapshot name",
+      index = "1", arity = "1")
   private String snapshotName;
 
   @Override
@@ -52,12 +51,13 @@ public class CreateSnapshotHandler extends Handler {
 
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
-    OmUtils.validateSnapshotName(snapshotName);
-    String newName = client.getObjectStore()
-        .createSnapshot(volumeName, bucketName, snapshotName);
+    OmUtils.validateSnapshotName(snapshotName);  // TODO: Not required in this case, can remove
+
+    client.getObjectStore()
+        .deleteSnapshot(volumeName, bucketName, snapshotName);
     if (isVerbose()) {
-      out().format("created snapshot '%s/%s %s'.%n", volumeName, bucketName,
-          newName);
+      out().format("Deleted snapshot '%s' under '%s/%s'.%n",
+          snapshotName, volumeName, bucketName);
     }
   }
 }

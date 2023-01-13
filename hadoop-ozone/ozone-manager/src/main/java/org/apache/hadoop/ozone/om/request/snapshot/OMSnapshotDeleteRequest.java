@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -34,129 +33,151 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotDeleteResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
-
 /**
- * Handles CreateSnapshot Request.
+ * Handles DeleteSnapshot Request.
  */
-public class OMSnapshotCreateRequest extends OMClientRequest {
+public class OMSnapshotDeleteRequest extends OMClientRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMSnapshotCreateRequest.class);
+      LoggerFactory.getLogger(OMSnapshotDeleteRequest.class);
 
-  private final String snapshotPath;
-  private final String volumeName;
-  private final String bucketName;
-  private final String snapshotName;
-  private final String snapshotId;
-  private final SnapshotInfo snapshotInfo;
-
-  public OMSnapshotCreateRequest(OMRequest omRequest) {
+  public OMSnapshotDeleteRequest(OMRequest omRequest) {
     super(omRequest);
-    CreateSnapshotRequest createSnapshotRequest = omRequest
-        .getCreateSnapshotRequest();
-    volumeName = createSnapshotRequest.getVolumeName();
-    bucketName = createSnapshotRequest.getBucketName();
-    snapshotId = createSnapshotRequest.getSnapshotId();
-
-    String possibleName = createSnapshotRequest.getSnapshotName();
-    snapshotInfo = SnapshotInfo.newInstance(volumeName,
-        bucketName,
-        possibleName,
-        snapshotId);
-    snapshotName = snapshotInfo.getName();
-    snapshotPath = snapshotInfo.getSnapshotPath();
   }
 
   @Override
+//  @DisallowedUntilLayoutVersion(OZONE_SNAPSHOT_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
     final OMRequest omRequest = super.preExecute(ozoneManager);
-    // Verify name
+
+    final DeleteSnapshotRequest deleteSnapshotRequest =
+        omRequest.getDeleteSnapshotRequest();
+
+    final String snapshotName = deleteSnapshotRequest.getSnapshotName();
+    // Verify snapshot name. TODO: Can remove
     OmUtils.validateSnapshotName(snapshotName);
 
+    String volumeName = deleteSnapshotRequest.getVolumeName();
+    String bucketName = deleteSnapshotRequest.getBucketName();
+
+    // Permission check
     UserGroupInformation ugi = createUGI();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
     if (!ozoneManager.isAdmin(ugi) &&
         !ozoneManager.isOwner(ugi, bucketOwner)) {
       throw new OMException(
-          "Only bucket owners/admins can create snapshots",
+          "Only bucket owners and Ozone admins can delete snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-    return omRequest;
+
+    // Set deletion time here so OM leader and follower would have the
+    // exact same timestamp.
+    OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setDeleteSnapshotRequest(
+            DeleteSnapshotRequest.newBuilder()
+                .setVolumeName(volumeName)
+                .setBucketName(bucketName)
+                .setSnapshotName(snapshotName)
+                .setDeletionTime(Time.now()));
+
+    return omRequestBuilder.build();
   }
-  
+
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumSnapshotCreates();
+    omMetrics.incNumSnapshotDeletes();
 
-    boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
+//    boolean acquiredBucketLock = false;
+    boolean acquiredSnapshotLock = false;
     IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    
+
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
-    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    String key = snapshotInfo.getTableKey();
+    UserInfo userInfo = getOmRequest().getUserInfo();
+
+    final DeleteSnapshotRequest request =
+        getOmRequest().getDeleteSnapshotRequest();
+
+    final String volumeName = request.getVolumeName();
+    final String bucketName = request.getBucketName();
+    final String snapshotName = request.getSnapshotName();
+    final long deletionTime = request.getDeletionTime();
+
+    SnapshotInfo snapshotInfo = null;
+
     try {
-      // Lock bucket so it doesn't
-      //  get deleted while creating snapshot
-      acquiredBucketLock =
-          omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      // TODO: Do we need a bucket lock here? Probably not?
+//      acquiredBucketLock =
+//          omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+//              volumeName, bucketName);
 
       acquiredSnapshotLock =
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName);
 
-      //Check if snapshot already exists
-      if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
-        LOG.debug("snapshot: {} already exists ", key);
-        throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
+      // Retrieve SnapshotInfo from the table
+      String tableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
+          snapshotName);
+      snapshotInfo =
+          omMetadataManager.getSnapshotInfoTable().get(tableKey);
+
+      if (snapshotInfo == null) {
+        // Snapshot does not exist
+        throw new OMException("Snapshot does not exist", FILE_NOT_FOUND);
       }
 
-      // Note down RDB latest transaction sequence number, which is used
-      // as snapshot generation in the differ.
-      final long dbLatestSequenceNumber =
-          ((RDBStore) omMetadataManager.getStore()).getDb()
-              .getLatestSequenceNumber();
-      snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
+      if (!snapshotInfo.getSnapshotStatus().equals(
+          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+        // If the snapshot is not in active state, throw exception as well
+        throw new OMException("Snapshot exists but no longer active",
+            FILE_NOT_FOUND);
+      }
 
-      omMetadataManager.getSnapshotInfoTable()
-          .addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
+      // Mark snapshot as deleted
+      snapshotInfo.setSnapshotStatus(
+          SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+      snapshotInfo.setDeletionTime(deletionTime);
 
-      omResponse.setCreateSnapshotResponse(
-          CreateSnapshotResponse.newBuilder()
-          .setSnapshotInfo(snapshotInfo.getProtobuf()));
-      omClientResponse = new OMSnapshotCreateResponse(
-          omResponse.build(), volumeName, bucketName, snapshotName);
+      // Update table cache first
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+          new CacheKey<>(tableKey),
+          new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
+
+      omResponse.setDeleteSnapshotResponse(
+          DeleteSnapshotResponse.newBuilder());
+      omClientResponse = new OMSnapshotDeleteResponse(
+          omResponse.build(), tableKey, snapshotInfo);
+
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMSnapshotCreateResponse(
+      omClientResponse = new OMSnapshotDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
@@ -165,25 +186,32 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
             bucketName, snapshotName);
       }
-      if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-            bucketName);
-      }
+//      if (acquiredBucketLock) {
+//        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+//            bucketName);
+//      }
     }
 
-    // Performing audit logging outside the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_SNAPSHOT,
+    if (snapshotInfo == null) {
+      // Dummy SnapshotInfo for logging and audit logging when erred
+      snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+          snapshotName, null);
+    }
+
+    // Perform audit logging outside the lock
+    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_SNAPSHOT,
         snapshotInfo.toAuditMap(), exception, userInfo));
-    
+
+    final String snapshotPath = snapshotInfo.getSnapshotPath();
     if (exception == null) {
-      LOG.info("created snapshot: name {} in snapshotPath: {}", snapshotName,
-          snapshotPath);
+      LOG.info("Deleted snapshot '{}' under path '{}'",
+          snapshotName, snapshotPath);
     } else {
-      omMetrics.incNumSnapshotCreateFails();
-      LOG.error("Snapshot creation failed for name:{} in snapshotPath:{}",
+      omMetrics.incNumSnapshotDeleteFails();
+      LOG.error("Failed to delete snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
     }
     return omClientResponse;
   }
-  
+
 }
