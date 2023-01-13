@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -59,7 +60,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
@@ -163,7 +163,7 @@ public class TestContainerPlacement {
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         new ContainerReplicaPendingOps(
-            conf, new MonotonicClock(ZoneId.systemDefault())));
+            conf, Clock.system(ZoneId.systemDefault())));
   }
 
   /**

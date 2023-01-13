@@ -173,10 +173,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
 
@@ -193,7 +195,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
 
       // Add to cache of open key table and key table.
-      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
+      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbOpenFileKey,
               null, fileName, trxnLogIndex);
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,

@@ -77,7 +77,8 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
     if (containerInfo.getState() != HddsProtos.LifeCycleState.CLOSED) {
       return false;
     }
-
+    LOG.debug("Checking container {} in ClosedWithUnhealthyReplicasHandler",
+        containerInfo);
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     // create a set of indexes that are closed
     Set<Integer> closedIndexes = replicas.stream()
@@ -111,6 +112,7 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.UNHEALTHY,
           containerInfo.containerID());
     }
+    LOG.debug("Returning {} for container {}", foundUnhealthy, containerInfo);
     return foundUnhealthy;
   }
 
@@ -119,7 +121,7 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
     LOG.debug("Trying to delete UNHEALTHY replica [{}]", replica);
     try {
       replicationManager.sendDeleteCommand(containerInfo,
-          replica.getReplicaIndex(), replica.getDatanodeDetails());
+          replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
     } catch (NotLeaderException e) {
       LOG.warn("Failed to delete UNHEALTHY replica [{}]", replica, e);
     }

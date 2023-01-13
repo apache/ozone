@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.server.events;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.utils.MetricsUtil;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -126,10 +127,8 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       ++i;
     }
 
-    DefaultMetricsSystem.instance()
-        .register(EVENT_QUEUE + name,
-            "Event Executor metrics ",
-            this);
+    MetricsUtil.registerDynamic(this, EVENT_QUEUE + name,
+        "Event Executor metrics ", "EventQueue");
   }
   
   public void setQueueWaitThreshold(long queueWaitThreshold) {

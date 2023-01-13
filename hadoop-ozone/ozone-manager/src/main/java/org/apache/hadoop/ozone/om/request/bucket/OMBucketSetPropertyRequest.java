@@ -202,6 +202,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (defaultReplicationConfig != null) {
         // Resetting the default replication config.
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
+      } else if (dbBucketInfo.getDefaultReplicationConfig() != null) {
+        // Retaining existing default replication config
+        bucketInfoBuilder.setDefaultReplicationConfig(
+                  dbBucketInfo.getDefaultReplicationConfig());
       }
 
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
@@ -298,12 +302,20 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.QUOTA_ERROR);
       }
     }
+    
+    // avoid iteration of other bucket if quota set is less than previous set
+    if (quotaInBytes < dbBucketInfo.getQuotaInBytes()) {
+      return true;
+    }
+    
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
+      if (omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+        continue;
+      }
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
-          !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }

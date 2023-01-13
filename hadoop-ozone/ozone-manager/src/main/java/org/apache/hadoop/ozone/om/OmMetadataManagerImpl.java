@@ -1453,6 +1453,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
+  public String getOzoneDeletePathKey(long objectId, String pathKey) {
+    return pathKey + OM_KEY_PREFIX + objectId;
+  }
+
+  @Override
   public String getOpenFileName(long volumeId, long bucketId,
                                 long parentID, String fileName,
                                 long id) {

@@ -90,6 +90,18 @@ public class KeyCodec {
   }
 
   /**
+   * Creates a KeyCodec with component name.
+   *
+   * @param config - Security Config.
+   * @param keyDir - path to save the key materials.
+   */
+  public KeyCodec(SecurityConfig config, Path keyDir) {
+    this.securityConfig = config;
+    isPosixFileSystem = KeyCodec::isPosix;
+    this.location = keyDir;
+  }
+
+  /**
    * Checks if File System supports posix style security permissions.
    *
    * @return True if it supports posix.
@@ -323,9 +335,9 @@ public class KeyCodec {
     checkPreconditions(basePath);
 
     File privateKeyFile =
-        Paths.get(location.toString(), privateKeyFileName).toFile();
+        Paths.get(basePath.toString(), privateKeyFileName).toFile();
     File publicKeyFile =
-        Paths.get(location.toString(), publicKeyFileName).toFile();
+        Paths.get(basePath.toString(), publicKeyFileName).toFile();
     checkKeyFile(privateKeyFile, force, publicKeyFile);
 
     try (PemWriter privateKeyWriter = new PemWriter(new

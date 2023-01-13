@@ -405,4 +405,9 @@ public final class OMConfigKeys {
 
   public static final TimeDuration OZONE_OM_CONTAINER_LOCATION_CACHE_TTL_DEFAULT
       = TimeDuration.valueOf(360, TimeUnit.MINUTES);
+
+  public static final String OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR
+      = "ozone.om.enable.ofs.shared.tmp.dir";
+  public static final boolean OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT
+      = false;
 }

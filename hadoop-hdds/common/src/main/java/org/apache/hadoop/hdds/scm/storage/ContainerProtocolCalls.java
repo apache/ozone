@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.BlockNotCommittedException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -233,11 +234,19 @@ public final class ContainerProtocolCalls  {
       BlockData containerBlockData, boolean eof,
       Token<? extends TokenIdentifier> token)
       throws IOException, InterruptedException, ExecutionException {
+    final ContainerCommandRequestProto request = getPutBlockRequest(
+        xceiverClient.getPipeline(), containerBlockData, eof, token);
+    return xceiverClient.sendCommandAsync(request);
+  }
+
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      Pipeline pipeline, BlockData containerBlockData, boolean eof,
+      Token<? extends TokenIdentifier> token) throws IOException {
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()
             .setBlockData(containerBlockData)
             .setEof(eof);
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    final String id = pipeline.getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
             .setContainerID(containerBlockData.getBlockID().getContainerID())
@@ -246,8 +255,7 @@ public final class ContainerProtocolCalls  {
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
-    ContainerCommandRequestProto request = builder.build();
-    return xceiverClient.sendCommandAsync(request);
+    return builder.build();
   }
 
   /**
