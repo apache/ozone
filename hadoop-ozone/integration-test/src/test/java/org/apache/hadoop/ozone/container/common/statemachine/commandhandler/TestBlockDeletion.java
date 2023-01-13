@@ -443,7 +443,7 @@ public class TestBlockDeletion {
             .getContainer(blockID.getContainerID()).getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, conf)) {
           Assertions.assertNotNull(db.getStore().getBlockDataTable()
-              .get(cData.getBlockMetaKey(blockID.getLocalID())));
+              .get(cData.getBlockKey(blockID.getLocalID())));
         }
       }, omKeyLocationInfoGroups);
     }
@@ -461,12 +461,12 @@ public class TestBlockDeletion {
           Table<String, BlockData> blockDataTable =
               db.getStore().getBlockDataTable();
 
-          String blockKey = cData.getBlockMetaKey(blockID.getLocalID());
+          String blockKey = cData.getBlockKey(blockID.getLocalID());
 
           BlockData blockData = blockDataTable.get(blockKey);
           Assertions.assertNull(blockData);
 
-          String deletingKey = cData.getDeletingBlockMetaKey(
+          String deletingKey = cData.getDeletingBlockKey(
               blockID.getLocalID());
           Assertions.assertNull(blockDataTable.get(deletingKey));
         }

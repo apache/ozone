@@ -441,7 +441,7 @@ public class BlockDeletingService extends BackgroundService {
         Table<String, DeletedBlocksTransaction> delTxTable =
             (Table<String, DeletedBlocksTransaction>) table;
         delTxTable.deleteWithBatch(batch,
-            containerData.getDeleteTxnMetaKey(tid));
+            containerData.getDeleteTxnKey(tid));
       };
       Table<String, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<String>) meta.getStore())
@@ -503,7 +503,7 @@ public class BlockDeletingService extends BackgroundService {
             deleter.apply(deleteTxns, batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
               blockDataTable.deleteWithBatch(batch,
-                  containerData.getBlockMetaKey(blk));
+                  containerData.getBlockKey(blk));
             }
           }
 
@@ -551,7 +551,7 @@ public class BlockDeletingService extends BackgroundService {
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
-          String blk = containerData.getBlockMetaKey(blkLong);
+          String blk = containerData.getBlockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blkLong);
           if (blkInfo == null) {

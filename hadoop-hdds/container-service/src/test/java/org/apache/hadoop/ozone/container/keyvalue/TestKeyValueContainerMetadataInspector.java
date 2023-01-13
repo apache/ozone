@@ -293,8 +293,8 @@ public class TestKeyValueContainerMetadataInspector
     try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
       // Don't care about in memory state. Just change the DB values.
-      metadataTable.put(containerData.getBlockCountMetaKey(), blockCount);
-      metadataTable.put(containerData.getBytesUsedMetaKey(), byteCount);
+      metadataTable.put(containerData.getBlockCountKey(), blockCount);
+      metadataTable.put(containerData.getBytesUsedKey(), byteCount);
     }
   }
 
@@ -303,10 +303,10 @@ public class TestKeyValueContainerMetadataInspector
     try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
-      long bytesUsed = metadataTable.get(containerData.getBytesUsedMetaKey());
+      long bytesUsed = metadataTable.get(containerData.getBytesUsedKey());
       Assert.assertEquals(expectedBytesUsed, bytesUsed);
 
-      long blockCount = metadataTable.get(containerData.getBlockCountMetaKey());
+      long blockCount = metadataTable.get(containerData.getBlockCountKey());
       Assert.assertEquals(expectedBlockCount, blockCount);
     }
   }

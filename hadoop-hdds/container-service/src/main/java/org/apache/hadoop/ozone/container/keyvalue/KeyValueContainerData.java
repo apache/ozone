@@ -306,12 +306,12 @@ public class KeyValueContainerData extends ContainerData {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
-    metadataTable.putWithBatch(batchOperation, getBytesUsedMetaKey(),
+    metadataTable.putWithBatch(batchOperation, getBytesUsedKey(),
             getBytesUsed() - releasedBytes);
-    metadataTable.putWithBatch(batchOperation, getBlockCountMetaKey(),
+    metadataTable.putWithBatch(batchOperation, getBlockCountKey(),
             getBlockCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation,
-        getPendingDeleteBlockCountMetaKey(),
+        getPendingDeleteBlockCountKey(),
         getNumPendingDeletionBlocks() - deletedBlockCount);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
@@ -329,35 +329,35 @@ public class KeyValueContainerData extends ContainerData {
   // to container schemas, we should use them instead of using
   // raw const variables defined.
 
-  public String getBlockMetaKey(long localID) {
+  public String getBlockKey(long localID) {
     return formatKey(Long.toString(localID));
   }
 
-  public String getDeletingBlockMetaKey(long localID) {
+  public String getDeletingBlockKey(long localID) {
     return formatKey(DELETING_KEY_PREFIX + localID);
   }
 
-  public String getDeleteTxnMetaKey(long txnID) {
+  public String getDeleteTxnKey(long txnID) {
     return formatKey(Long.toString(txnID));
   }
 
-  public String getLatestDeleteTxnMetaKey() {
+  public String getLatestDeleteTxnKey() {
     return formatKey(DELETE_TRANSACTION_KEY);
   }
 
-  public String getBcsIdMetaKey() {
+  public String getBcsIdKey() {
     return formatKey(BLOCK_COMMIT_SEQUENCE_ID);
   }
 
-  public String getBlockCountMetaKey() {
+  public String getBlockCountKey() {
     return formatKey(BLOCK_COUNT);
   }
 
-  public String getBytesUsedMetaKey() {
+  public String getBytesUsedKey() {
     return formatKey(CONTAINER_BYTES_USED);
   }
 
-  public String getPendingDeleteBlockCountMetaKey() {
+  public String getPendingDeleteBlockCountKey() {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
   }
 

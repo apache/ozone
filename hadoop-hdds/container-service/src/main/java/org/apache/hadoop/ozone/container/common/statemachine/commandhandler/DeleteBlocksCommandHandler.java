@@ -332,7 +332,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
       Table<String, DeletedBlocksTransaction> delTxTable =
           (Table<String, DeletedBlocksTransaction>) table;
-      delTxTable.putWithBatch(batch, containerData.getDeleteTxnMetaKey(tid),
+      delTxTable.putWithBatch(batch, containerData.getDeleteTxnKey(tid),
           txn);
     };
 
@@ -403,10 +403,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
         for (Long blkLong : delTX.getLocalIDList()) {
-          String blk = containerData.getBlockMetaKey(blkLong);
+          String blk = containerData.getBlockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           if (blkInfo != null) {
-            String deletingKey = containerData.getDeletingBlockMetaKey(blkLong);
+            String deletingKey = containerData.getDeletingBlockKey(blkLong);
             if (blockDataTable.get(deletingKey) != null
                 || deletedBlocksTable.get(blk) != null) {
               if (LOG.isDebugEnabled()) {
@@ -459,14 +459,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         // Update in DB pending delete key count and delete transaction ID.
         metadataTable
             .putWithBatch(batchOperation,
-                containerData.getLatestDeleteTxnMetaKey(), delTX.getTxID());
+                containerData.getLatestDeleteTxnKey(), delTX.getTxID());
       }
 
       long pendingDeleteBlocks =
           containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
       metadataTable
           .putWithBatch(batchOperation,
-              containerData.getPendingDeleteBlockCountMetaKey(),
+              containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
       // update pending deletion blocks count and delete transaction ID in
