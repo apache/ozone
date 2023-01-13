@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
  * DB transaction that abstracts the updates to the underlying datastore.
@@ -32,4 +33,7 @@ public interface DBTransactionBuffer extends Closeable {
 
   <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException;
+
+  <KEY, VALUE> TableIterator<KEY, ? extends Table.KeyValue<KEY, VALUE>>
+      getIterator(Table<KEY, VALUE> table) throws IOException;
 }

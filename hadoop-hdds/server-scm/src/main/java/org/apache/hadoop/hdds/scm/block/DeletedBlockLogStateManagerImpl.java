@@ -23,12 +23,10 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -89,12 +87,7 @@ public class DeletedBlockLogStateManagerImpl
       
       private TableIterator<Long, ? extends Table.KeyValue<Long,
           DeletedBlocksTransaction>> getTableIterator() throws IOException {
-        if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
-          RWBatchOperation batchOperation = ((SCMHADBTransactionBuffer)
-              transactionBuffer).getCurrentBatchOperation();
-          return deletedTable.iterator(batchOperation);
-        }
-        return deletedTable.iterator();
+        return transactionBuffer.getIterator(deletedTable);
       }
 
       private void findNext() {

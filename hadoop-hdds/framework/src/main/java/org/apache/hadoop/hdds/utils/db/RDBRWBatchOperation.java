@@ -49,10 +49,6 @@ public class RDBRWBatchOperation implements RWBatchOperation {
     writeBatch = new ManagedReadWriteBatch();
   }
 
-  public RDBRWBatchOperation(ManagedReadWriteBatch writeBatch) {
-    this.writeBatch = writeBatch;
-  }
-
   @Override
   public void commit(RocksDatabase db) throws IOException {
     db.batchWrite(writeBatch);

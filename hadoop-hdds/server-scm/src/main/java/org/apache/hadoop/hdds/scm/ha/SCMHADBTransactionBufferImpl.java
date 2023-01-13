@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
@@ -49,8 +50,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     init();
   }
 
-  @Override
-  public RWBatchOperation getCurrentBatchOperation() {
+  private RWBatchOperation getCurrentBatchOperation() {
     return currentBatchOperation;
   }
 
@@ -64,6 +64,12 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
     table.deleteWithBatch(getCurrentBatchOperation(), key);
+  }
+
+  @Override
+  public <KEY, VALUE> TableIterator<KEY, ? extends Table.KeyValue<KEY, VALUE>>
+      getIterator(Table<KEY, VALUE> table) throws IOException {
+    return table.iterator(getCurrentBatchOperation());
   }
 
   @Override

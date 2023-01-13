@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBRWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RWBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
@@ -40,7 +41,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
     this.dbStore = store;
   }
 
-  public RWBatchOperation getCurrentBatchOperation() {
+  private RWBatchOperation getCurrentBatchOperation() {
     if (currentBatchOperation == null) {
       if (dbStore != null) {
         currentBatchOperation = dbStore.initRWBatchOperation();
@@ -61,6 +62,12 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
     table.deleteWithBatch(getCurrentBatchOperation(), key);
+  }
+
+  @Override
+  public <KEY, VALUE> TableIterator<KEY, ? extends Table.KeyValue<KEY, VALUE>>
+      getIterator(Table<KEY, VALUE> table) throws IOException {
+    return table.iterator(currentBatchOperation);
   }
 
   @Override

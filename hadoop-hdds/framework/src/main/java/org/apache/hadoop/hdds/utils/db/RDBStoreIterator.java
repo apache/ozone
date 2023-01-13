@@ -37,13 +37,18 @@ public class RDBStoreIterator
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreIterator.class);
 
-  private final ManagedRocksIterator rocksDBIterator;
+  private ManagedRocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private byte[] prefix;
-  private RWBatchOperation rwBatch = null;
+
+  /**
+   * This constructor is used by derived class to initiate.
+   */
+  protected RDBStoreIterator() {
+  }
 
   public RDBStoreIterator(ManagedRocksIterator iterator) {
     this(iterator, null);
@@ -51,16 +56,6 @@ public class RDBStoreIterator
 
   public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table) {
     this(iterator, table, null);
-  }
-
-  public RDBStoreIterator(
-      ManagedRocksIterator iterator, RWBatchOperation rwBatch,
-      RDBTable table) throws IOException {
-    this.rocksDBIterator = iterator;
-    this.rocksDBTable = table;
-    this.rwBatch = rwBatch;
-    rwBatch.lockOperation();
-    seekToFirst();
   }
 
   public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table,
@@ -71,6 +66,17 @@ public class RDBStoreIterator
       this.prefix = Arrays.copyOf(prefix, prefix.length);
     }
     seekToFirst();
+  }
+
+  /**
+   * object is initialized with iterator and table and used
+   * by derived constructor.
+   * @param iterator the iterator
+   * @param table the table
+   */
+  protected void initIterator(ManagedRocksIterator iterator, RDBTable table) {
+    this.rocksDBIterator = iterator;
+    this.rocksDBTable = table;
   }
 
   @Override
@@ -148,9 +154,6 @@ public class RDBStoreIterator
   @Override
   public void close() throws IOException {
     rocksDBIterator.close();
-    if (null != rwBatch) {
-      rwBatch.releaseOperation();
-    }
   }
 
   private static boolean startsWith(byte[] prefix, byte[] value) {

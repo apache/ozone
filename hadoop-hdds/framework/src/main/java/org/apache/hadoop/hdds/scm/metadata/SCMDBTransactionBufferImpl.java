@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
  * Default implementation for DBTransactionBuffer for SCM without Ratis.
@@ -40,6 +41,12 @@ public class SCMDBTransactionBufferImpl implements DBTransactionBuffer {
   public <KEY, VALUE>void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
     table.delete(key);
+  }
+
+  @Override
+  public <KEY, VALUE> TableIterator<KEY, ? extends Table.KeyValue<KEY, VALUE>>
+      getIterator(Table<KEY, VALUE> table) throws IOException {
+    return table.iterator();
   }
 
   @Override
