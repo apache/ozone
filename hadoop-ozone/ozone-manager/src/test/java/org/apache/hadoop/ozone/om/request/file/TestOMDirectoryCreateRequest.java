@@ -164,6 +164,38 @@ public class TestOMDirectoryCreateRequest {
   }
 
   @Test
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceed()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    String keyName = "test/" + genRandomKeyName();
+
+    // Add volume and bucket entries to DB with quota
+    // create bucket with quota limit 1
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setQuotaInNamespace(1));
+
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+        keyName);
+    OMDirectoryCreateRequest omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(omRequest, getBucketLayout());
+    OMRequest modifiedOmRequest =
+        omDirectoryCreateRequest.preExecute(ozoneManager);
+
+    omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
+    OMClientResponse omClientResponse =
+        omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    
+    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";

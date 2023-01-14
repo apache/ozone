@@ -106,9 +106,9 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (pipeline.isClosed()) {
-      throw new IOException(String
-          .format("Cannot add container to pipeline=%s in closed state",
-              pipelineID));
+      LOG.warn("Adding container {} to pipeline={} in CLOSED state." +
+          " This happens only for some exceptional cases." +
+          " Check for the previous exceptions.", containerID, pipelineID);
     }
     pipeline2container.get(pipelineID).add(containerID);
   }

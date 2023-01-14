@@ -136,11 +136,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           container.getContainerID(), replicaCount.getReplicas());
       return emptyMap();
     }
-    if (replicaCount.isUnrecoverable()) {
-      LOG.warn("The container {} is unrecoverable. The available replicas" +
-          " are: {}.", container.containerID(), replicaCount.getReplicas());
-      return emptyMap();
-    }
 
     // don't place reconstructed replicas on exclude nodes, since they already
     // have replicas
@@ -400,6 +395,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     // this many maintenance replicas need another copy
     int additionalMaintenanceCopiesNeeded =
         replicaCount.additionalMaintenanceCopiesNeeded(true);
+    if (additionalMaintenanceCopiesNeeded == 0) {
+      return;
+    }
     List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
         additionalMaintenanceCopiesNeeded);
     excludedNodes.addAll(targets);

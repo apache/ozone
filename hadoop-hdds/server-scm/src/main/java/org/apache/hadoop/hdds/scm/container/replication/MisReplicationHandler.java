@@ -45,6 +45,10 @@ import java.util.stream.Collectors;
 /**
  * Handles the Mis replication processing and forming the respective SCM
  * commands.
+ * Mis-replication: State of replicas where containers are neither
+ * under-replicated or over-replicated, but the existing placement
+ * of containers do not conform to the configured placement policy
+ * of the container.
  */
 public abstract class MisReplicationHandler implements
         UnhealthyReplicationHandler {
@@ -91,15 +95,17 @@ public abstract class MisReplicationHandler implements
   }
 
   private Set<ContainerReplica> filterSources(Set<ContainerReplica> replicas) {
-    return replicas.stream().filter(r -> r
-                    .getState() == StorageContainerDatanodeProtocolProtos
-                    .ContainerReplicaProto.State.CLOSED)
-            .filter(r -> ReplicationManager
-                    .getNodeStatus(r.getDatanodeDetails(), nodeManager)
-                    .isHealthy())
-            .filter(r -> r.getDatanodeDetails().getPersistedOpState()
-                    == HddsProtos.NodeOperationalState.IN_SERVICE)
-            .collect(Collectors.toSet());
+    return replicas.stream()
+        .filter(r -> r.getState() == StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED || r.getState() ==
+                StorageContainerDatanodeProtocolProtos
+                    .ContainerReplicaProto.State.QUASI_CLOSED
+        )
+        .filter(r -> ReplicationManager.getNodeStatus(
+            r.getDatanodeDetails(), nodeManager).isHealthy())
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState()
+            == HddsProtos.NodeOperationalState.IN_SERVICE)
+        .collect(Collectors.toSet());
   }
 
   protected abstract ReplicateContainerCommand getReplicateCommand(

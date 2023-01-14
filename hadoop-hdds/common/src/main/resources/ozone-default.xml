@@ -1579,9 +1579,9 @@
   <property>
     <name>hdds.datanode.replication.work.dir</name>
     <tag>DATANODE</tag>
-    <description>Temporary which is used during the container replication
-      betweeen datanodes. Should have enough space to store multiple container
-      (in compressed format), but doesn't require fast io access such as SSD.
+    <description>This configuration is deprecated. Temporary sub directory under
+      each hdds.datanode.dir will be used during the container replication between
+      datanodes to save the downloaded container(in compressed format).
     </description>
   </property>
 
@@ -2116,6 +2116,14 @@
     <value>SHA256withRSA</value>
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>X509 signature certificate.</description>
+  </property>
+  <property>
+    <name>hdds.container.replication.compression</name>
+    <value>NO_COMPRESSION</value>
+    <tag>OZONE, HDDS, DATANODE</tag>
+    <description>Compression algorithm used for closed container replication.
+      Possible chooices include NO_COMPRESSION, GZIP, SNAPPY, LZ4, ZSTD
+    </description>
   </property>
   <property>
     <name>hdds.x509.rootca.certificate.file</name>
@@ -3459,6 +3467,16 @@
   </property>
 
   <property>
+    <name>ozone.om.enable.ofs.shared.tmp.dir</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable shared ofs tmp directory ofs://tmp.  Allows a root tmp
+      directory with sticky-bit behaviour.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.listing.page.size</name>
     <value>1024</value>
     <tag>OZONE, CLIENT</tag>
@@ -3496,6 +3514,23 @@
     <tag>OZONE, DATANODE</tag>
     <description>
       To enable/disable filesystem write via ratis streaming.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.scm.snapshot.task.initial.delay</name>
+    <value>1m</value>
+    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <description>
+      Initial delay in MINUTES by Recon to request SCM DB Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.snapshot.task.interval.delay</name>
+    <value>24h</value>
+    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <description>
+      Interval in MINUTES by Recon to request SCM DB Snapshot.
     </description>
   </property>
 </configuration>

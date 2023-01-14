@@ -74,6 +74,10 @@ public class CertificateException extends SCMSecurityException {
     super(cause);
   }
 
+  public ErrorCode errorCode() {
+    return errorCode;
+  }
+
   /**
    * Error codes to make it easy to decode these exceptions.
    */
@@ -84,6 +88,8 @@ public class CertificateException extends SCMSecurityException {
     BOOTSTRAP_ERROR,
     CSR_ERROR,
     CRYPTO_SIGNATURE_VERIFICATION_ERROR,
-    CERTIFICATE_NOT_FOUND_ERROR
+    CERTIFICATE_NOT_FOUND_ERROR,
+    RENEW_ERROR,
+    ROLLBACK_ERROR
   }
 }
