@@ -227,7 +227,7 @@ public class TestValidateBCSIDOnRestart {
       // modify the bcsid for the container in the ROCKS DB thereby inducing
       // corruption
       db.getStore().getMetadataTable()
-          .put(keyValueContainerData.bcsIdKey(), 0L);
+          .put(keyValueContainerData.getBcsIdKey(), 0L);
     }
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be

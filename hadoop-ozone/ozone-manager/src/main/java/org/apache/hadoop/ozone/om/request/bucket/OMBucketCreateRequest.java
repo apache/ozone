@@ -207,8 +207,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       //Check quotaInBytes to update
-      checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
-          volumeKey);
+      if (!bucketInfo.hasSourceBucket()) {
+        checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
+            volumeKey);
+      }
 
       // Add objectID and updateID
       omBucketInfo.setObjectID(
@@ -387,6 +389,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
       throws IOException {
     long quotaInBytes = omBucketInfo.getQuotaInBytes();
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
+
+    // When volume quota is set, then its mandatory to have bucket quota
+    if (volumeQuotaInBytes > 0) {
+      if (quotaInBytes <= 0) {
+        throw new OMException("Bucket space quota in this volume " +
+            "should be set as volume space quota is already set.",
+            OMException.ResultCodes.QUOTA_ERROR);
+      }
+    }
 
     long totalBucketQuota = 0;
     if (quotaInBytes > 0) {

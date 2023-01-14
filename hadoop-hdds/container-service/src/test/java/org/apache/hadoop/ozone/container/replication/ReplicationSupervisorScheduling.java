@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +29,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 
 import org.junit.jupiter.api.Assertions;
@@ -113,7 +113,7 @@ public class ReplicationSupervisorScheduling {
             }
           }
 
-        }, replicationConfig, new MonotonicClock(ZoneId.systemDefault()));
+        }, replicationConfig, Clock.system(ZoneId.systemDefault()));
 
     final long start = System.currentTimeMillis();
 

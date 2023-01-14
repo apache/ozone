@@ -55,7 +55,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -98,7 +97,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private OzoneConfiguration config;
   private long nextReplicationConfigRefreshTime;
   private long bucketRepConfigRefreshPeriodMS;
-  private java.time.Clock clock = new MonotonicClock(ZoneOffset.UTC);
+  private java.time.Clock clock = Clock.system(ZoneOffset.UTC);
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -244,7 +243,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
               this.clientConfiguredReplicationConfig,
               getReplicationConfigWithRefreshCheck(), config), overWrite,
           recursive);
-      return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
+      return new OzoneFSOutputStream(ozoneOutputStream);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {

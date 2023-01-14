@@ -233,6 +233,6 @@ public class TestDeletingContainerHandler {
 
     Mockito.verify(replicationManager, Mockito.times(times))
         .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
-            Mockito.any(DatanodeDetails.class));
+            Mockito.any(DatanodeDetails.class), Mockito.eq(false));
   }
 }

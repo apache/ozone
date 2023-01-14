@@ -423,7 +423,6 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
     Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
@@ -468,7 +467,6 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
@@ -494,9 +492,8 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertFalse(result.isReplicatedOkAfterPending());
 
     Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, repQueue.misReplicatedQueueSize());
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, report.getStat(

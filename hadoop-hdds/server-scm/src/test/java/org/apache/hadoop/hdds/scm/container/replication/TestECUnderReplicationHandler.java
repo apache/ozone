@@ -69,6 +69,7 @@ import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 
 /**
@@ -84,6 +85,7 @@ public class TestECUnderReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
   private PlacementPolicy ecPlacementPolicy;
+  private int remainingMaintenanceRedundancy = 1;
 
   @BeforeEach
   public void setup() {
@@ -479,6 +481,44 @@ public class TestECUnderReplicationHandler {
   }
 
   /**
+   * HDDS-7683 was a case where the maintenance logic was calling the placement
+   * policy requesting zero nodes. This test asserts that it is never called
+   * with zero nodes to ensure that issue is fixed.
+   */
+  @Test
+  public void testMaintenanceDoesNotRequestZeroNodes() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), Mockito.isNull(),
+            anyInt(), anyLong(), anyLong()))
+        .thenAnswer(invocationOnMock -> {
+          int numNodes = invocationOnMock.getArgument(2);
+          List<DatanodeDetails> targets = new ArrayList<>();
+          for (int i = 0; i < numNodes; i++) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          return targets;
+        });
+
+    ContainerHealthResult.UnderReplicatedHealthResult result =
+        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
+    Mockito.when(result.getContainerInfo()).thenReturn(container);
+    ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
+        ecPlacementPolicy, conf, nodeManager, replicationManager);
+
+    Map<DatanodeDetails, SCMCommand<?>> commands =
+        handler.processAndCreateCommands(availableReplicas,
+            Collections.emptyList(), result, 1);
+    Assertions.assertEquals(1, commands.size());
+    Mockito.verify(ecPlacementPolicy, times(0))
+        .chooseDatanodes(anyList(), Mockito.isNull(), eq(0), anyLong(),
+            anyLong());
+  }
+
+  /**
    * Create 3 replicas with 1 pending ADD. This means that 1 replica needs to
    * be reconstructed. The target DN selected for reconstruction should not be
    * the DN pending add.
@@ -525,6 +565,56 @@ public class TestECUnderReplicationHandler {
     Assertions.assertFalse(commands.containsKey(dn));
   }
 
+  @Test
+  public void testDecommissioningIndexCopiedWhenContainerUnRecoverable()
+      throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1));
+    ContainerReplica decomReplica = ReplicationTestUtil.createContainerReplica(
+        container.containerID(), 2, DECOMMISSIONING, CLOSED);
+    availableReplicas.add(decomReplica);
+    Map<DatanodeDetails, SCMCommand<?>> cmds =
+        testUnderReplicationWithMissingIndexes(Collections.emptyList(),
+            availableReplicas, 1, 0, policy);
+    Assertions.assertEquals(1, cmds.size());
+    ReplicateContainerCommand cmd =
+        (ReplicateContainerCommand) cmds.values().iterator().next();
+
+    List<DatanodeDetails> sources = cmd.getSourceDatanodes();
+    Assertions.assertEquals(1, sources.size());
+    Assertions.assertEquals(decomReplica.getDatanodeDetails(),
+        cmd.getSourceDatanodes().get(0));
+  }
+
+  @Test
+  public void testMaintenanceIndexCopiedWhenContainerUnRecoverable()
+      throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1));
+    ContainerReplica maintReplica = ReplicationTestUtil.createContainerReplica(
+        container.containerID(), 2, ENTERING_MAINTENANCE, CLOSED);
+    availableReplicas.add(maintReplica);
+
+    Map<DatanodeDetails, SCMCommand<?>> cmds =
+        testUnderReplicationWithMissingIndexes(Collections.emptyList(),
+            availableReplicas, 0, 1, policy);
+    Assertions.assertEquals(0, cmds.size());
+
+    // Change the remaining redundancy to ensure something needs copied.
+    remainingMaintenanceRedundancy = 2;
+    cmds = testUnderReplicationWithMissingIndexes(Collections.emptyList(),
+        availableReplicas, 0, 1, policy);
+
+    Assertions.assertEquals(1, cmds.size());
+    ReplicateContainerCommand cmd =
+        (ReplicateContainerCommand) cmds.values().iterator().next();
+
+    List<DatanodeDetails> sources = cmd.getSourceDatanodes();
+    Assertions.assertEquals(1, sources.size());
+    Assertions.assertEquals(maintReplica.getDatanodeDetails(),
+        cmd.getSourceDatanodes().get(0));
+  }
+
   public Map<DatanodeDetails, SCMCommand<?>>
       testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
@@ -538,7 +628,6 @@ public class TestECUnderReplicationHandler {
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
-    int remainingMaintenanceRedundancy = 1;
     Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap = ecURH
         .processAndCreateCommands(availableReplicas, ImmutableList.of(),
             result, remainingMaintenanceRedundancy);

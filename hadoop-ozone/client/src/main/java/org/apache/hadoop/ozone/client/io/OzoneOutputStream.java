@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
@@ -30,14 +31,20 @@ import java.io.OutputStream;
 public class OzoneOutputStream extends OutputStream {
 
   private final OutputStream outputStream;
+  private final Syncable syncable;
 
   /**
    * Constructs OzoneOutputStream with KeyOutputStream.
    *
-   * @param outputStream
+   * @param syncable
    */
-  public OzoneOutputStream(OutputStream outputStream) {
+  public OzoneOutputStream(Syncable syncable) {
+    this((OutputStream)syncable, syncable);
+  }
+
+  public OzoneOutputStream(OutputStream outputStream, Syncable syncable) {
     this.outputStream = outputStream;
+    this.syncable = syncable;
   }
 
   @Override
@@ -59,6 +66,20 @@ public class OzoneOutputStream extends OutputStream {
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
     outputStream.close();
+  }
+
+  public void hsync() throws IOException {
+    if (syncable != null) {
+      if (outputStream != null && outputStream != syncable) {
+        outputStream.flush();
+      }
+      syncable.hsync();
+    } else if (outputStream instanceof Syncable) {
+      ((Syncable)outputStream).hsync();
+    } else {
+      throw new UnsupportedOperationException(outputStream.getClass()
+          + " is not " + Syncable.class.getSimpleName());
+    }
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {

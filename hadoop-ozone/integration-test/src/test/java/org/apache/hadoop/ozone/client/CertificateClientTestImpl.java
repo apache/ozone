@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
@@ -68,7 +70,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   private DefaultApprover approver;
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
-  private boolean isKeyRenewed = false;
 
   public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
     this(conf, true);
@@ -170,6 +171,10 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public void setCertificateId(String certSerialId) {
+  }
+
+  @Override
   public byte[] signDataStream(InputStream stream)
       throws CertificateException {
     return new byte[0];
@@ -193,8 +198,26 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public CertificateSignRequest.Builder getCSRBuilder(KeyPair key)
+      throws CertificateException {
+    return null;
+  }
+
+  @Override
   public CertificateSignRequest.Builder getCSRBuilder() {
     return new CertificateSignRequest.Builder();
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException {
+    return null;
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException {
+    return null;
   }
 
   @Override
@@ -297,10 +320,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     return false;
   }
 
-  public boolean isCertificateRenewed() {
-    return isKeyRenewed;
-  }
-
   public void renewKey() throws Exception {
     KeyPair newKeyPair = keyGen.generateKey();
     CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
@@ -327,7 +346,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     // Save certificate and private key to keyStore
     keyPair = newKeyPair;
     x509Certificate = newX509Certificate;
-    isKeyRenewed = true;
     System.out.println(new Date() + " certificated is renewed");
   }
 

@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,6 +22,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -31,15 +33,16 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test prometheus Sink.
+ * Test prometheus Metrics.
  */
-public class TestPrometheusMetricsSink {
+public class TestPrometheusMetricsIntegration {
 
   private MetricsSystem metrics;
   private PrometheusMetricsSink sink;
@@ -76,7 +79,7 @@ public class TestPrometheusMetricsSink {
     metrics = DefaultMetricsSystem.instance();
 
     metrics.init("test");
-    sink = new PrometheusMetricsSink();
+    sink = new PrometheusMetricsSink("random");
     metrics.register("Prometheus", "Prometheus", sink);
   }
 
@@ -87,15 +90,15 @@ public class TestPrometheusMetricsSink {
   }
 
   @Test
-  public void testPublish() throws IOException {
+  public void testPublish()
+      throws InterruptedException, TimeoutException {
     //GIVEN
     TestMetrics testMetrics = metrics
         .register("TestMetrics", "Testing metrics", new TestMetrics());
 
     testMetrics.numBucketCreateFails.incr();
 
-    //WHEN
-    String writtenMetrics = publishMetricsAndGetOutput();
+    String writtenMetrics = waitForMetricsToPublish("test_metrics_num");
 
     //THEN
     Assertions.assertTrue(
@@ -103,11 +106,14 @@ public class TestPrometheusMetricsSink {
             "test_metrics_num_bucket_create_fails{context=\"dfs\""),
         "The expected metric line is missing from prometheus metrics output"
     );
+
+    metrics.unregisterSource("TestMetrics");
   }
 
   @Test
-  public void testPublishWithSameName() throws IOException {
-    //GIVEN
+  public void testPublishWithSameName()
+      throws InterruptedException, TimeoutException {
+    // GIVEN
     metrics.register("FooBar", "fooBar", (MetricsSource) (collector, all) -> {
       collector.addRecord("RpcMetrics").add(new MetricsTag(PORT_INFO, "1234"))
           .addGauge(COUNTER_INFO, COUNTER_1).endRecord();
@@ -116,8 +122,7 @@ public class TestPrometheusMetricsSink {
           PORT_INFO, "2345")).addGauge(COUNTER_INFO, COUNTER_2).endRecord();
     });
 
-    // WHEN
-    String writtenMetrics = publishMetricsAndGetOutput();
+    String writtenMetrics = waitForMetricsToPublish("rpc_metrics_counter");
 
     // THEN
     Assertions.assertTrue(
@@ -127,11 +132,14 @@ public class TestPrometheusMetricsSink {
     Assertions.assertTrue(
         writtenMetrics.contains("rpc_metrics_counter{port=\"1234\""),
         "The expected metric line is missing from prometheus metrics output");
+
+    metrics.unregisterSource("FooBar");
   }
 
   @Test
-  public void testTypeWithSameNameButDifferentLabels() throws IOException {
-    //GIVEN
+  public void testTypeWithSameNameButDifferentLabels()
+      throws InterruptedException, TimeoutException {
+    // GIVEN
     metrics.register("SameName", "sameName",
         (MetricsSource) (collector, all) -> {
           collector.addRecord("SameName").add(new MetricsTag(PORT_INFO, "1234"))
@@ -141,59 +149,63 @@ public class TestPrometheusMetricsSink {
         });
 
     // WHEN
-    String writtenMetrics = publishMetricsAndGetOutput();
+    String writtenMetrics = waitForMetricsToPublish("same_name_counter");
 
     // THEN
     Assertions.assertEquals(1, StringUtils.countMatches(writtenMetrics,
         "# TYPE same_name_counter"));
+
+    // both metrics should be present
+    Assertions.assertTrue(
+        writtenMetrics.contains("same_name_counter{port=\"1234\""),
+        "The expected metric line is present in prometheus metrics output");
+    Assertions.assertTrue(
+        writtenMetrics.contains("same_name_counter{port=\"2345\""),
+        "The expected metric line is present in prometheus metrics output");
+
+    metrics.unregisterSource("SameName");
   }
 
+  /**
+   * Make sure Prometheus metrics start fresh after each flush.
+   * Publish the metrics and flush them,
+   * then unregister one of them and register another.
+   * Publish and flush the metrics again
+   * and then check that the unregistered metric is not present.
+   */
   @Test
-  public void testNamingCamelCase() {
-    //THEN
-    Assertions.assertEquals("rpc_time_some_metrics",
-        sink.prometheusName("RpcTime", "SomeMetrics"));
-
-    Assertions.assertEquals("om_rpc_time_om_info_keys",
-        sink.prometheusName("OMRpcTime", "OMInfoKeys"));
-
-    Assertions.assertEquals("rpc_time_small",
-        sink.prometheusName("RpcTime", "small"));
-  }
-
-  @Test
-  public void testNamingRocksDB() {
-    //RocksDB metrics are handled differently.
-    // THEN
-    Assertions.assertEquals("rocksdb_om_db_num_open_connections",
-        sink.prometheusName("Rocksdb_om.db", "num_open_connections"));
-  }
-
-  @Test
-  public void testNamingPipeline() {
+  public void testRemovingStaleMetricsOnFlush()
+      throws InterruptedException, TimeoutException {
     // GIVEN
-    String recordName = "SCMPipelineMetrics";
-    String metricName = "NumBlocksAllocated-"
-        + "RATIS-THREE-47659e3d-40c9-43b3-9792-4982fc279aba";
+    metrics.register("StaleMetric", "staleMetric",
+        (MetricsSource) (collector, all) ->
+            collector.addRecord("StaleMetric")
+                .add(new MetricsTag(PORT_INFO, "1234"))
+                .addGauge(COUNTER_INFO, COUNTER_1).endRecord());
+
+    waitForMetricsToPublish("stale_metric_counter");
+
+    // unregister the metric
+    metrics.unregisterSource("StaleMetric");
+
+    metrics.register("SomeMetric", "someMetric",
+        (MetricsSource) (collector, all) ->
+            collector.addRecord("SomeMetric")
+                .add(new MetricsTag(PORT_INFO, "4321"))
+                .addGauge(COUNTER_INFO, COUNTER_2).endRecord());
+
+    String writtenMetrics = waitForMetricsToPublish("some_metric_counter");
 
     // THEN
-    Assertions.assertEquals(
-        "scm_pipeline_metrics_"
-            + "num_blocks_allocated_"
-            + "ratis_three_47659e3d_40c9_43b3_9792_4982fc279aba",
-        sink.prometheusName(recordName, metricName));
-  }
+    // The first metric shouldn't be present
+    Assertions.assertFalse(
+        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
+        "The expected metric line is present in prometheus metrics output");
+    Assertions.assertTrue(
+        writtenMetrics.contains("some_metric_counter{port=\"4321\""),
+        "The expected metric line is present in prometheus metrics output");
 
-  @Test
-  public void testNamingSpaces() {
-    //GIVEN
-    String recordName = "JvmMetrics";
-    String metricName = "GcTimeMillisG1 Young Generation";
-
-    // THEN
-    Assertions.assertEquals(
-        "jvm_metrics_gc_time_millis_g1_young_generation",
-        sink.prometheusName(recordName, metricName));
+    metrics.unregisterSource("SomeMetric");
   }
 
   private String publishMetricsAndGetOutput() throws IOException {
@@ -204,8 +216,34 @@ public class TestPrometheusMetricsSink {
 
     sink.writeMetrics(writer);
     writer.flush();
-
     return stream.toString(UTF_8.name());
+  }
+
+  /**
+   * metrics.publishMetricsNow() might not finish in a reasonable
+   * amount of time leading to a full queue and any further attempt
+   * for publishing to fail. Wrapping the call with
+   * GenericTestUtils.waitFor() to retry until the queue has been
+   * cleared and publish is a success.
+   *
+   * @param registeredMetric to check if it's published
+   * @return all published metrics
+   */
+  private String waitForMetricsToPublish(String registeredMetric)
+      throws InterruptedException, TimeoutException {
+
+    final String[] writtenMetrics = new String[1];
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        writtenMetrics[0] = publishMetricsAndGetOutput();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return writtenMetrics[0].contains(registeredMetric);
+    }, 1000, 120000);
+
+    return writtenMetrics[0];
   }
 
   /**
