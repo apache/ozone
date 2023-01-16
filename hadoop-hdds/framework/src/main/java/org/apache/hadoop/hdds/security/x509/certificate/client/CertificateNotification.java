@@ -19,6 +19,10 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+/**
+ * Class should implement this interface if it wants to be notified when there
+ * is some changes in Certificate.
+ */
 public interface CertificateNotification {
   /**
    * Notify the class implementing this interface that certificate is renewed.
