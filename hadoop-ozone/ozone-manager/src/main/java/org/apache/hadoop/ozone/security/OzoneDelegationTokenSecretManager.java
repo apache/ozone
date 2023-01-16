@@ -214,9 +214,9 @@ public class OzoneDelegationTokenSecretManager
 
     Token<OzoneTokenIdentifier> token = new Token<>(identifier.getBytes(),
         password, identifier.getKind(), getService());
-    //if (LOG.isDebugEnabled()) {
-      LOG.info("Created delegation token: {}", token);
-    //}
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Created delegation token: {}", token);
+    }
     return token;
   }
 

@@ -450,8 +450,8 @@ public final class HddsServerUtil {
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf,
-      UserGroupInformation ugi) throws IOException {
+      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf)
+      throws IOException {
     // Certificate from SCM is required for DN startup to succeed, so retry
     // for ever. In this way DN start up is resilient to SCM service running
     // status.
@@ -464,7 +464,7 @@ public final class HddsServerUtil {
 
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(configuration,
-            ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
+            UserGroupInformation.getCurrentUser()));
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB

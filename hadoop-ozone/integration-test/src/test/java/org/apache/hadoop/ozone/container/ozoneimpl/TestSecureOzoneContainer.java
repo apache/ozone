@@ -55,14 +55,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.PrivilegedAction;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT;
@@ -96,9 +94,6 @@ public class TestSecureOzoneContainer {
   private final boolean tokenExpired;
   private CertificateClientTestImpl caClient;
   private ContainerTokenSecretManager secretManager;
-  private int certMaxTime = 15 * 1000; // 15s
-  private int certGraceTime = 10 * 1000; // 10s
-  private int tokenMaxTime = 9 * 1000; // 9s
 
   public TestSecureOzoneContainer(Boolean requireToken,
       Boolean hasToken, Boolean tokenExpired) {
@@ -125,15 +120,10 @@ public class TestSecureOzoneContainer {
     String ozoneMetaPath =
         GenericTestUtils.getTempPath("ozoneMeta");
     conf.set(OZONE_METADATA_DIRS, ozoneMetaPath);
-    conf.set(HDDS_X509_DEFAULT_DURATION, Duration.ofMillis(certMaxTime).toString());
-    conf.set(HDDS_X509_RENEW_GRACE_DURATION,
-        Duration.ofMillis(certGraceTime).toString());
-    conf.setLong(HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
-        tokenMaxTime);
     secConfig = new SecurityConfig(conf);
-    caClient = new CertificateClientTestImpl(conf, true);
+    caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(
-        new SecurityConfig(conf), tokenMaxTime);
+        new SecurityConfig(conf), TimeUnit.DAYS.toMillis(1));
   }
 
   @Test
@@ -168,80 +158,6 @@ public class TestSecureOzoneContainer {
       if (port == 0) {
         port = secConfig.getConfiguration().getInt(OzoneConfigKeys
                 .DFS_CONTAINER_IPC_PORT, DFS_CONTAINER_IPC_PORT_DEFAULT);
-      }
-      secretManager.start(caClient);
-
-      ugi.doAs((PrivilegedAction<Void>) () -> {
-        try {
-          XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-          client.connect();
-
-          Token<?> token = null;
-          if (hasToken) {
-            Instant expiryDate = tokenExpired
-                ? Instant.now().minusSeconds(3600)
-                : Instant.now().plusSeconds(3600);
-            ContainerTokenIdentifier tokenIdentifier =
-                new ContainerTokenIdentifier(user, containerID,
-                    caClient.getCertificate().getSerialNumber().toString(),
-                    expiryDate);
-            token = secretManager.generateToken(tokenIdentifier);
-          }
-
-          ContainerCommandRequestProto request =
-              getCreateContainerSecureRequest(containerID.getId(),
-                  client.getPipeline(), token);
-          ContainerCommandResponseProto response = client.sendCommand(request);
-          assertNotNull(response);
-          ContainerProtos.Result expectedResult =
-              !requireToken || (hasToken && !tokenExpired)
-                  ? ContainerProtos.Result.SUCCESS
-                  : ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
-          assertEquals(expectedResult, response.getResult(), this::testCase);
-        } catch (SCMSecurityException e) {
-          assertState(requireToken && hasToken && tokenExpired);
-        } catch (IOException e) {
-          assertState(requireToken && !hasToken);
-        } catch (Exception e) {
-          fail(e);
-        }
-        return null;
-      });
-    } finally {
-      if (container != null) {
-        container.stop();
-      }
-    }
-  }
-
-  @Test
-  public void testContainerTokenWithCertRenew() throws Exception {
-    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, true);
-
-    ContainerID containerID = ContainerID.valueOf(getTestContainerID());
-    OzoneContainer container = null;
-    System.out.println(System.getProperties().getProperty("java.library.path"));
-    try {
-      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.getRoot().getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT, pipeline
-          .getFirstNode().getPort(DatanodeDetails.Port.Name.STANDALONE)
-          .getValue());
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
-
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
-      //Set scmId and manually start ozone container.
-      container.start(UUID.randomUUID().toString());
-
-      String user = "user1";
-      UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
-          user,  new String[] {"usergroup"});
-
-      int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
-      if (port == 0) {
-        port = secConfig.getConfiguration().getInt(OzoneConfigKeys
-            .DFS_CONTAINER_IPC_PORT, DFS_CONTAINER_IPC_PORT_DEFAULT);
       }
       secretManager.start(caClient);
 

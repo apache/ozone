@@ -412,7 +412,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Test flags
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
-  private static UserGroupInformation ugi;
 
   private final OzoneLockProvider ozoneLockProvider;
   private OMPerformanceMetrics perfMetrics;
@@ -1235,7 +1234,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static void loginOMUserIfSecurityEnabled(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
-    if (securityEnabled && ugi == null) {
+    if (securityEnabled) {
       loginOMUser(conf);
     }
   }
@@ -3965,16 +3964,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public static void setTestSecureOmFlag(boolean testSecureOmFlag) {
     OzoneManager.testSecureOmFlag = testSecureOmFlag;
-  }
-
-  @VisibleForTesting
-  public static void setUgi(UserGroupInformation user) {
-    OzoneManager.ugi = user;
-  }
-
-  @VisibleForTesting
-  public static UserGroupInformation getUgi() {
-    return OzoneManager.ugi;
   }
 
   public OMNodeDetails getNodeDetails() {
