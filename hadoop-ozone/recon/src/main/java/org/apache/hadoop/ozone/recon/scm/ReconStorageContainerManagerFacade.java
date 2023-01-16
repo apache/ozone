@@ -238,8 +238,8 @@ public class ReconStorageContainerManagerFacade
         containerCountBySizeDao,
         utilizationSchemaDefinition);
     StaleNodeHandler staleNodeHandler =
-        new ReconStaleNodeHandler(nodeManager, pipelineManager,
-            conf, pipelineSyncTask, containerSizeCountTask);
+        new ReconStaleNodeHandler(nodeManager, pipelineManager, conf,
+            pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
         pipelineManager, containerManager,
         scmServiceProvider, containerHealthTask, pipelineSyncTask,
