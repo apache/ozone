@@ -264,15 +264,8 @@ public class OzoneDelegationTokenSecretManager
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
-    identifier.setOmCertSerialId(getOmCertificateSerialId());
+    identifier.setOmCertSerialId(getCertSerialId());
     identifier.setOmServiceId(getOmServiceId());
-  }
-
-  /**
-   * Get OM certificate serial id.
-   * */
-  private String getOmCertificateSerialId() {
-    return getCertClient().getCertificate().getSerialNumber().toString();
   }
 
   private String getOmServiceId() {

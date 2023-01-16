@@ -34,16 +34,23 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
@@ -79,12 +86,15 @@ public class CertificateClientTestImpl implements CertificateClient {
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
   private Map<String, X509Certificate> certificateMap;
+  private ScheduledExecutorService executorService;
+  private Set<CertificateNotification> notificationReceivers;
 
-  public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
-    this(conf, true);
+  public CertificateClientTestImpl(OzoneConfiguration conf)
+      throws Exception {
+    this(conf, false);
   }
 
-  public CertificateClientTestImpl(OzoneConfiguration conf, boolean rootCA)
+  public CertificateClientTestImpl(OzoneConfiguration conf, boolean autoRenew)
       throws Exception {
     certificateMap = new ConcurrentHashMap<>();
     securityConfig = new SecurityConfig(conf);
@@ -144,6 +154,23 @@ public class CertificateClientTestImpl implements CertificateClient {
         securityConfig, this, true);
     clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
         securityConfig, this, true);
+
+    if (autoRenew) {
+      Duration gracePeriod = securityConfig.getRenewalGracePeriod();
+      Date expireDate = x509Certificate.getNotAfter();
+      LocalDateTime gracePeriodStart = expireDate.toInstant()
+          .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
+      LocalDateTime currentTime = LocalDateTime.now();
+      Duration delay = gracePeriodStart.isBefore(currentTime) ? Duration.ZERO :
+          Duration.between(currentTime, gracePeriodStart);
+
+      executorService = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
+              .setDaemon(true).build());
+      this.executorService.schedule(new RenewCertTask(),
+          delay.toMillis(), TimeUnit.MILLISECONDS);
+    }
+    notificationReceivers = new HashSet<>();
   }
 
   @Override
@@ -368,11 +395,28 @@ public class CertificateClientTestImpl implements CertificateClient {
 
     // Save the new private key and certificate to file
     // Save certificate and private key to keyStore
+    X509Certificate oldCert = x509Certificate;
     keyPair = newKeyPair;
     x509Certificate = newX509Certificate;
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
         x509Certificate);
     System.out.println(new Date() + " certificated is renewed");
+
+    // notify notification receivers
+    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+        oldCert.getSerialNumber().toString(),
+        x509Certificate.getSerialNumber().toString()));
+  }
+
+  public class RenewCertTask implements Runnable{
+    @Override
+    public void run() {
+      try {
+        renewKey();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   @Override
@@ -386,6 +430,13 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public void registerNotificationReceiver(CertificateNotification receiver) {
+    synchronized (notificationReceivers) {
+      notificationReceivers.add(receiver);
+    }
+  }
+
+  @Override
   public void close() throws IOException {
     if (serverKeyStoresFactory != null) {
       serverKeyStoresFactory.destroy();
@@ -393,6 +444,10 @@ public class CertificateClientTestImpl implements CertificateClient {
 
     if (clientKeyStoresFactory != null) {
       clientKeyStoresFactory.destroy();
+    }
+
+    if (executorService != null) {
+      executorService.shutdown();
     }
   }
 }

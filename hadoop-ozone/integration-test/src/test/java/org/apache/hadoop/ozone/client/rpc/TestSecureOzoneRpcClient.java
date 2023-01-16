@@ -119,8 +119,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .setCertificateClient(certificateClientTest)
         .build();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 * 60, certificateClientTest.getCertificate().
-        getSerialNumber().toString());
+        60 * 60);
     secretManager.start(certificateClientTest);
     cluster.getOzoneManager().startSecretManager();
     cluster.waitForClusterToBeReady();

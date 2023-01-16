@@ -955,9 +955,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         conf.getTimeDuration(OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    Duration certificateGracePeriod =
-        new SecurityConfig(conf).getRenewalGracePeriod();
-    if (certificateGracePeriod.toMillis() < tokenMaxLifetime) {
+    long certificateGracePeriod =
+        conf.getTimeDuration(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
+            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    if (tokenMaxLifetime > certificateGracePeriod) {
       throw new IllegalArgumentException("Certificate grace period " +
           HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
           " should be greater than maximum delegation token lifetime " +
@@ -984,13 +986,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
+    long certificateGracePeriod =
+        conf.getTimeDuration(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
+            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    if (expiryTime > certificateGracePeriod) {
+      throw new IllegalArgumentException("Certificate grace period " +
+          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+          " should be greater than maximum block token lifetime " +
+          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
+    }
     // TODO: Pass OM cert serial ID.
     if (testSecureOmFlag) {
-      return new OzoneBlockTokenSecretManager(secConfig, expiryTime, "1");
+      return new OzoneBlockTokenSecretManager(secConfig, expiryTime);
     }
     Objects.requireNonNull(certClient);
-    return new OzoneBlockTokenSecretManager(secConfig, expiryTime,
-        certClient.getCertificate().getSerialNumber().toString());
+    return new OzoneBlockTokenSecretManager(secConfig, expiryTime);
   }
 
   private void stopSecretManager() {
@@ -2101,6 +2112,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
+      if (certClient != null) {
+        certClient.close();
+      }
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }

@@ -46,10 +46,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -143,6 +145,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient;
+  private Set<CertificateNotification> notificationReceivers;
   private static UserGroupInformation ugi;
 
   DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
@@ -157,6 +160,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.component = component;
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
+    this.notificationReceivers = new HashSet<>();
 
     loadAllCertificates();
   }
@@ -1100,6 +1104,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return clientKeyStoresFactory;
   }
 
+  /**
+   * Register a receiver that will be called after the certificate renewed.
+   * @param receiver
+   */
+  @Override
+  public void registerNotificationReceiver(CertificateNotification receiver) {
+    synchronized (notificationReceivers) {
+      notificationReceivers.add(receiver);
+    }
+  }
+
   @Override
   public synchronized void close() throws IOException {
     if (executorService != null) {
@@ -1411,7 +1426,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
       renewLock.lock();
       try {
-        Duration timeLeft = timeBeforeExpiryGracePeriod(getCertificate());
+        X509Certificate currentCert = getCertificate();
+        Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
         if (timeLeft.isZero()) {
           String newCertId;
           try {
@@ -1442,6 +1458,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           reloadKeyAndCertificate(newCertId);
           // cleanup backup directory
           cleanBackupDir();
+          // notify notification receivers
+          notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+              currentCert.getSerialNumber().toString(), newCertId));
         }
       } finally {
         renewLock.unlock();

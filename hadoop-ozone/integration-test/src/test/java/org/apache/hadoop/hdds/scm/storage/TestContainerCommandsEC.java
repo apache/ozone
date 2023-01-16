@@ -681,10 +681,10 @@ public class TestContainerCommandsEC {
     SecurityConfig conf = new SecurityConfig(tweakedConfig);
     long tokenLifetime = TimeUnit.DAYS.toMillis(1);
     containerTokenGenerator = new ContainerTokenSecretManager(
-        conf, tokenLifetime, "1");
+        conf, tokenLifetime);
     containerTokenGenerator.start(certClient);
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
-        conf, tokenLifetime, "1");
+        conf, tokenLifetime);
     blockTokenGenerator.start(certClient);
     containerToken = containerTokenGenerator
         .generateToken(ANY_USER, new ContainerID(containerID));

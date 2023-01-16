@@ -146,9 +146,9 @@ public class TestOzoneContainerWithTLS {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME, "1s",
         TimeUnit.MILLISECONDS);
 
-    caClient = new CertificateClientTestImpl(conf, false);
+    caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
-        expiryTime, caClient.getCertificate().getSerialNumber().toString());
+        expiryTime);
   }
 
   @Test(expected = CertificateExpiredException.class)
