@@ -53,7 +53,7 @@ public final class HddsVersionInfo {
     System.out.println(
         "From source with checksum " + HDDS_VERSION_INFO.getSrcChecksum());
     System.out.println(
-        "For platform " + HDDS_VERSION_INFO.getPlatform());
+        "Compiled on platform " + HDDS_VERSION_INFO.getCompilePlatform());
     if (LOG.isDebugEnabled()) {
       LOG.debug("This command was run using " +
           ClassUtil.findContainingJar(HddsVersionInfo.class));

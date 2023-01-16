@@ -80,7 +80,7 @@ public final class OzoneVersionInfo {
     System.out.println(
         "With Apache Ratis: " + RATIS_VERSION_INFO.getBuildVersion());
     System.out.println(
-        "For platform " + OZONE_VERSION_INFO.getPlatform());
+        "Compiled on platform " + OZONE_VERSION_INFO.getCompilePlatform());
     System.out.println();
     LOG.debug("This command was run using " +
         ClassUtil.findContainingJar(OzoneVersionInfo.class));

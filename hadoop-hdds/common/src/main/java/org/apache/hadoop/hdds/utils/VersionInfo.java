@@ -101,8 +101,8 @@ public class VersionInfo {
     return info.getProperty("grpcProtocVersion", "Unknown");
   }
 
-  public String getPlatform() {
-    return info.getProperty("platform", "Unknown");
+  public String getCompilePlatform() {
+    return info.getProperty("compilePlatform", "Unknown");
   }
 
   public String getBuildVersion() {
