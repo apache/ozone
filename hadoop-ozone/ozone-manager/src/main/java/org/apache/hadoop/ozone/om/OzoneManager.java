@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -411,6 +412,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Test flags
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
+  private static UserGroupInformation ugi;
 
   private final OzoneLockProvider ozoneLockProvider;
   private OMPerformanceMetrics perfMetrics;
@@ -953,6 +955,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         conf.getTimeDuration(OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
+    Duration certificateGracePeriod =
+        new SecurityConfig(conf).getRenewalGracePeriod();
+    if (certificateGracePeriod.toMillis() < tokenMaxLifetime) {
+      throw new IllegalArgumentException("Certificate grace period " +
+          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+          " should be greater than maximum delegation token lifetime " +
+          OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY);
+    }
 
     return new OzoneDelegationTokenSecretManager.Builder()
         .setConf(conf)
@@ -1214,7 +1224,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static void loginOMUserIfSecurityEnabled(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
-    if (securityEnabled) {
+    if (securityEnabled && ugi == null) {
       loginOMUser(conf);
     }
   }
@@ -3941,6 +3951,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public static void setTestSecureOmFlag(boolean testSecureOmFlag) {
     OzoneManager.testSecureOmFlag = testSecureOmFlag;
+  }
+
+  @VisibleForTesting
+  public static void setUgi(UserGroupInformation user) {
+    OzoneManager.ugi = user;
+  }
+
+  @VisibleForTesting
+  public static UserGroupInformation getUgi() {
+    return OzoneManager.ugi;
   }
 
   public OMNodeDetails getNodeDetails() {

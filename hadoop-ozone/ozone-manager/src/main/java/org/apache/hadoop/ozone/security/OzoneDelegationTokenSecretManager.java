@@ -214,9 +214,9 @@ public class OzoneDelegationTokenSecretManager
 
     Token<OzoneTokenIdentifier> token = new Token<>(identifier.getBytes(),
         password, identifier.getKind(), getService());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Created delegation token: {}", token);
-    }
+    //if (LOG.isDebugEnabled()) {
+      LOG.info("Created delegation token: {}", token);
+    //}
     return token;
   }
 
@@ -272,11 +272,7 @@ public class OzoneDelegationTokenSecretManager
    * Get OM certificate serial id.
    * */
   private String getOmCertificateSerialId() {
-    if (omCertificateSerialId == null) {
-      omCertificateSerialId =
-          getCertClient().getCertificate().getSerialNumber().toString();
-    }
-    return omCertificateSerialId;
+    return getCertClient().getCertificate().getSerialNumber().toString();
   }
 
   private String getOmServiceId() {
@@ -480,6 +476,7 @@ public class OzoneDelegationTokenSecretManager
     try {
       signerCert.checkValidity();
     } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+      LOG.error("signerCert {} is invalid", signerCert, e);
       return false;
     }
 
@@ -487,6 +484,7 @@ public class OzoneDelegationTokenSecretManager
       return getCertClient().verifySignature(identifier.getBytes(), password,
           signerCert);
     } catch (CertificateException e) {
+      LOG.error("verifySignature with signerCert {} failed", signerCert, e);
       return false;
     }
   }

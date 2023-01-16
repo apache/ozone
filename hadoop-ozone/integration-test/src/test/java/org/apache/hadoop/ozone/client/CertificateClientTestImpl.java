@@ -19,9 +19,14 @@ package org.apache.hadoop.ozone.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -30,6 +35,8 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
@@ -52,6 +59,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CRYPTO_SIGNATURE_VERIFICATION_ERROR;
 
 /**
  * Test implementation for CertificateClient. To be used only for test
@@ -70,6 +78,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   private DefaultApprover approver;
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
+  private Map<String, X509Certificate> certificateMap;
 
   public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
     this(conf, true);
@@ -77,6 +86,7 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   public CertificateClientTestImpl(OzoneConfiguration conf, boolean rootCA)
       throws Exception {
+    certificateMap = new ConcurrentHashMap<>();
     securityConfig = new SecurityConfig(conf);
     keyGen = new HDDSKeyGenerator(securityConfig.getConfiguration());
     keyPair = keyGen.generateKey();
@@ -100,6 +110,7 @@ public class CertificateClientTestImpl implements CertificateClient {
             .makeCA();
     rootCert = new JcaX509CertificateConverter().getCertificate(
         builder.build());
+    certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
 
     // Generate normal certificate, signed by RootCA certificate
     approver = new DefaultApprover(new DefaultProfile(), securityConfig);
@@ -126,6 +137,8 @@ public class CertificateClientTestImpl implements CertificateClient {
             csrBuilder.build(), "scm1", "cluster1");
     x509Certificate =
         new JcaX509CertificateConverter().getCertificate(certificateHolder);
+    certificateMap.put(x509Certificate.getSerialNumber().toString(),
+        x509Certificate);
 
     serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
         securityConfig, this, true);
@@ -152,7 +165,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public X509Certificate getCertificate(String certSerialId)
       throws CertificateException {
-    return x509Certificate;
+    return certificateMap.get(certSerialId);
   }
 
   @Override
@@ -194,7 +207,18 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public boolean verifySignature(byte[] data, byte[] signature,
       X509Certificate cert) throws CertificateException {
-    return true;
+    try {
+      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
+          getSecurityProvider());
+      sign.initVerify(cert);
+      sign.update(data);
+      return sign.verify(signature);
+    } catch (NoSuchAlgorithmException | NoSuchProviderException
+             | InvalidKeyException | SignatureException e) {
+      System.out.println("Error while signing the stream " + e.getMessage());
+      throw new CertificateException("Error while signing the stream", e,
+          CRYPTO_SIGNATURE_VERIFICATION_ERROR);
+    }
   }
 
   @Override
@@ -346,6 +370,8 @@ public class CertificateClientTestImpl implements CertificateClient {
     // Save certificate and private key to keyStore
     keyPair = newKeyPair;
     x509Certificate = newX509Certificate;
+    certificateMap.put(x509Certificate.getSerialNumber().toString(),
+        x509Certificate);
     System.out.println(new Date() + " certificated is renewed");
   }
 

@@ -36,7 +36,9 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * SecretManager for Ozone Master. Responsible for signing identifiers with
@@ -57,7 +59,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
   private final Text service;
   private CertificateClient certClient;
   private volatile boolean running;
-  private OzoneSecretKey currentKey;
+  private AtomicReference<OzoneSecretKey> currentKey;
   private AtomicInteger currentKeyId;
   private AtomicInteger tokenSequenceNumber;
 
@@ -112,12 +114,12 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
   public byte[] createPassword(T identifier) {
     if (logger.isDebugEnabled()) {
       logger.debug("Creating password for identifier: {}, currentKey: {}",
-          formatTokenId(identifier), currentKey.getKeyId());
+          formatTokenId(identifier), currentKey.get().getKeyId());
     }
     byte[] password = null;
     try {
       password = createPassword(identifier.getBytes(),
-          currentKey.getPrivateKey());
+          currentKey.get().getPrivateKey());
     } catch (IOException ioe) {
       logger.error("Could not store token {}!!", formatTokenId(identifier),
           ioe);
@@ -166,16 +168,18 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    * Update the current master key. This is called once by start method before
    * tokenRemoverThread is created,
    */
-  private OzoneSecretKey updateCurrentKey(KeyPair keyPair) throws IOException {
+  private OzoneSecretKey updateCurrentKey(KeyPair keyPair,
+      X509Certificate certificate) throws IOException {
     logger.info("Updating the current master key for generating tokens");
 
     // TODO: fix me based on the certificate expire time to set the key
     // expire time.
     int newCurrentId = incrementCurrentKeyId();
-    OzoneSecretKey newKey = new OzoneSecretKey(newCurrentId, -1,
-        keyPair);
-    currentKey = newKey;
-    return currentKey;
+    OzoneSecretKey newKey = new OzoneSecretKey(newCurrentId,
+        certificate.getNotAfter().getTime(), keyPair,
+        certificate.getSerialNumber().toString());
+    currentKey.set(newKey);
+    return newKey;
   }
 
   public String formatTokenId(T id) {
@@ -193,7 +197,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     Preconditions.checkState(!isRunning());
     setCertClient(client);
     updateCurrentKey(new KeyPair(certClient.getPublicKey(),
-        certClient.getPrivateKey()));
+        certClient.getPrivateKey()), certClient.getCertificate());
     setIsRunning(true);
   }
 
@@ -236,7 +240,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
   }
 
   public OzoneSecretKey getCurrentKey() {
-    return currentKey;
+    return currentKey.get();
   }
 
   public AtomicInteger getCurrentKeyId() {
