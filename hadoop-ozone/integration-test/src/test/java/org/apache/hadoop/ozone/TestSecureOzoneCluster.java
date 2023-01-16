@@ -1083,7 +1083,7 @@ public final class TestSecureOzoneCluster {
   }
 
   /**
-   * Tests delegation token renewal after a certificate renew
+   * Tests delegation token renewal after a certificate renew.
    */
   @Test
   public void testDelegationTokenRenewCrossCertificateRenew() throws Exception {
@@ -1165,7 +1165,7 @@ public final class TestSecureOzoneCluster {
   }
 
   /**
-   * Tests container token renewal after a certificate renew
+   * Tests container token renewal after a certificate renew.
    */
   @Test
   public void testContainerTokenRenewCrossCertificateRenew() throws Exception {
@@ -1236,88 +1236,6 @@ public final class TestSecureOzoneCluster {
     }
   }
 
-  /**
-   * Tests block token renewal after a certificate renew
-   */
-  @Test
-  public void testBlockTokenRenewCrossCertificateRenew() throws Exception {
-    try {
-      // Setup secure OM for start.
-      final int certLifetime = 40 * 1000; // 40s
-      OzoneConfiguration newConf = new OzoneConfiguration(conf);
-      newConf.set(HDDS_X509_DEFAULT_DURATION,
-          Duration.ofMillis(certLifetime).toString());
-      newConf.set(HDDS_X509_RENEW_GRACE_DURATION,
-          Duration.ofMillis(certLifetime - 15 * 1000).toString());
-      newConf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
-          certLifetime - 20 * 1000);
-
-      setupOm(newConf);
-      OzoneManager.setTestSecureOmFlag(true);
-
-      CertificateClientTestImpl certClient =
-          new CertificateClientTestImpl(newConf, true);
-      X509Certificate omCert = certClient.getCertificate();
-      String omCertId1 = omCert.getSerialNumber().toString();
-      // Start OM
-      om.setCertClient(certClient);
-      om.start();
-      GenericTestUtils.waitFor(() -> om.isLeaderReady(), 100, 10000);
-
-      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-
-      // Get first OM client which will authenticate via Kerberos
-      omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          OmTransportFactory.create(newConf, ugi, null),
-          RandomStringUtils.randomAscii(5));
-
-      // Since client is already connected get a delegation token
-      Token<OzoneTokenIdentifier> token1 = omClient.getDelegationToken(
-          new Text("om"));
-
-      // Check if token is of right kind and renewer is running om instance
-      assertNotNull(token1);
-      assertEquals("OzoneToken", token1.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(newConf),
-          token1.getService().toString());
-      OzoneTokenIdentifier temp = new OzoneTokenIdentifier();
-      ByteArrayInputStream buf = new ByteArrayInputStream(
-          token1.getIdentifier());
-      DataInputStream in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(omCertId1, temp.getOmCertSerialId());
-
-      // Renew delegation token
-      long expiryTime = omClient.renewDelegationToken(token1);
-      assertTrue(expiryTime > 0);
-
-      // Wait for OM certificate to renew
-      GenericTestUtils.waitFor(() -> !omCertId1.equals(
-              certClient.getCertificate().getSerialNumber().toString()),
-          100, certLifetime);
-      String omCertId2 =
-          certClient.getCertificate().getSerialNumber().toString();
-      assertNotEquals(omCertId1, omCertId2);
-      // Get a new delegation token
-      Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
-          new Text("om"));
-      buf = new ByteArrayInputStream(token2.getIdentifier());
-      in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(omCertId2, temp.getOmCertSerialId());
-
-      // Because old certificate is still valid, so renew old token will succeed
-      expiryTime = omClient.renewDelegationToken(token1);
-      assertTrue(expiryTime > 0);
-      assertTrue(new Date(expiryTime).before(omCert.getNotAfter()));
-    } finally {
-      if (om != null) {
-        om.stop();
-      }
-      IOUtils.closeQuietly(om);
-    }
-  }
-
   public void validateCertificate(X509Certificate cert) throws Exception {
 
     // Assert that we indeed have a self signed certificate.
@@ -1384,37 +1302,5 @@ public final class TestSecureOzoneCluster {
         .setConfiguration(conf)
         .setScmID("test")
         .build();
-  }
-
-  private static X509CertificateHolder generateX509CertHolder (
-      OzoneConfiguration conf, KeyPair keyPair, KeyPair rootKeyPair,
-      X509Certificate rootCert, Duration certLifetime) throws Exception {
-    // Generate normal certificate, signed by RootCA certificate
-    SecurityConfig secConfig = new SecurityConfig(conf);
-    DefaultApprover approver = new DefaultApprover(new DefaultProfile(),
-        secConfig);
-
-    CertificateSignRequest.Builder csrBuilder =
-        new CertificateSignRequest.Builder();
-    // Get host name.
-    csrBuilder.setKey(keyPair)
-        .setConfiguration(conf)
-        .setScmID("test")
-        .setClusterID("cluster")
-        .setSubject("localhost")
-        .setDigitalSignature(true)
-        .setDigitalEncryption(true);
-
-    LocalDateTime start = LocalDateTime.now();
-    String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
-        HDDS_X509_DEFAULT_DURATION_DEFAULT);
-    X509CertificateHolder certificateHolder =
-        approver.sign(secConfig, rootKeyPair.getPrivate(),
-            new X509CertificateHolder(rootCert.getEncoded()),
-            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(Duration.parse(certDuration))
-                .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build(), "test", "cluster");
-    return certificateHolder;
   }
 }

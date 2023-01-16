@@ -408,7 +408,10 @@ public class CertificateClientTestImpl implements CertificateClient {
         x509Certificate.getSerialNumber().toString()));
   }
 
-  public class RenewCertTask implements Runnable{
+  /**
+   * Task to renew certificate.
+   */
+  public class RenewCertTask implements Runnable {
     @Override
     public void run() {
       try {
