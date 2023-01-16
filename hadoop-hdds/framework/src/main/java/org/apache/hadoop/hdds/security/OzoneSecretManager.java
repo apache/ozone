@@ -187,9 +187,11 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
       logger.info("Old certificate Id doesn't match. Holding {}, oldCertId {}",
           getCertSerialId(), oldCertId);
     }
-    if (!newCertId.equals(certClient.getCertificate())) {
+    if (!newCertId.equals(
+        certClient.getCertificate().getSerialNumber().toString())) {
       logger.info("New certificate Id doesn't match. Holding in caClient {}," +
-          " newCertId {}", newCertId, certClient.getCertificate());
+          " newCertId {}", newCertId,
+          certClient.getCertificate().getSerialNumber().toString());
     }
     updateCurrentKey(new KeyPair(certClient.getPublicKey(),
         certClient.getPrivateKey()), certClient.getCertificate());
