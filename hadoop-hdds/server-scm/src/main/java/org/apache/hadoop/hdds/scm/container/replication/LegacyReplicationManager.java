@@ -434,7 +434,6 @@ public class LegacyReplicationManager {
                   container, replica.getDatanodeDetails(), false);
             }
           }
-          return;
         }
 
         /*
@@ -444,7 +443,6 @@ public class LegacyReplicationManager {
         if (state == LifeCycleState.QUASI_CLOSED) {
           if (canForceCloseContainer(container, replicas)) {
             forceCloseContainer(container, replicas);
-            return;
           } else {
             report.incrementAndSample(HealthState.QUASI_CLOSED_STUCK,
                 container.containerID());
