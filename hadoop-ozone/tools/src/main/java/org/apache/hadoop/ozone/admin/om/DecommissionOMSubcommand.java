@@ -44,9 +44,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NO
  */
 @CommandLine.Command(
     name = "decommission",
-    customSynopsis = "ozone admin om decommission --id=<om-service-id> " +
-        "--nodeid=<decommission-om-node-id> " +
-        "--hostname=<decommission-om-node-address> [options]",
+    customSynopsis = "ozone admin om decommission -id=<om-service-id> " +
+        "-nodeid=<decommission-om-node-id> " +
+        "-hostname=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
         "decommissioned is shutdown first." +
         "\nNote - Add the node to be decommissioned to " +

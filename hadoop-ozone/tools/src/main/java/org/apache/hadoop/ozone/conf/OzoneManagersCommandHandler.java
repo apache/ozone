@@ -30,7 +30,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name = "ozonemanagers",
     aliases = {"-ozonemanagers", "--ozone-managers"},
     description = "Gets list of ozone storage container manager nodes in the " +
-        "cluster. Command line option -ozonemanagers will be removed in " +
+        "cluster." + " Command line option -ozonemanagers will be removed in " +
         "later versions.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

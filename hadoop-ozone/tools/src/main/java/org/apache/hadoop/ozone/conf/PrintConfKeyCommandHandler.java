@@ -26,8 +26,9 @@ import picocli.CommandLine.ParentCommand;
  * Handler for ozone getconf confKey [key].
  */
 @Command(name = "confKey",
-    aliases = {"-confKey", "--confKey"},
-    description = "gets a specific key from the configuration",
+    aliases = {"-confKey", "--conf-key"},
+    description = "gets a specific key from the configuration." +
+        "Command line option -confKey will be removed in later versions.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class PrintConfKeyCommandHandler implements Callable<Void> {

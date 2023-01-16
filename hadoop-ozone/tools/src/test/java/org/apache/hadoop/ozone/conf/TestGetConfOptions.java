@@ -75,7 +75,7 @@ public class TestGetConfOptions {
     Assert.assertEquals("1\n", bout.toString(DEFAULT_ENCODING));
     bout.reset();
     new OzoneGetConf(conf)
-        .run(new String[] {"--confKey", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
+        .run(new String[] {"--conf-key", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
     Assert.assertEquals("1\n", bout.toString(DEFAULT_ENCODING));
   }
 

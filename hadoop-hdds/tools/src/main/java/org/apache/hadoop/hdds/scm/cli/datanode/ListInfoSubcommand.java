@@ -46,8 +46,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String ipaddress;
 
-  @CommandLine.Option(names = {"--uuid"},
-      description = "Show info by datanode UUID.",
+  @CommandLine.Option(names = {"--id", "--uuid"},
+      description = "Show info by datanode UUID. Command line option --id " +
+          "will be removed in later versions.",
       defaultValue = "")
   private String uuid;
 
