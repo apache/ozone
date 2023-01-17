@@ -2708,7 +2708,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    // TODO: HDDS-3402. Files/dirs in FSO buckets currently do inherit parent
+    //  ACLs.
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Add ACL on Bucket
