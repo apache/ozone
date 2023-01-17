@@ -383,6 +383,10 @@ public class TestLegacyReplicationManager {
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.closeContainerCommand));
 
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+      Assertions.assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.MISSING));
+
       // Update the OPEN to CLOSING
       for (ContainerReplica replica: getReplicas(id, State.CLOSING, datanode)) {
         containerStateManager.updateContainerReplica(id, replica);
@@ -393,8 +397,9 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(currentCloseCommandCount + 6,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.closeContainerCommand));
-      ReplicationManagerReport report = replicationManager.getContainerReport();
+      report = replicationManager.getContainerReport();
       Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+      Assertions.assertEquals(1, report.getStat(ReplicationManagerReport.HealthState.MISSING));
     }
 
     @Test

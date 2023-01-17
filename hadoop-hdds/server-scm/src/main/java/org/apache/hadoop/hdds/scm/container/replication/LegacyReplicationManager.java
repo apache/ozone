@@ -428,12 +428,16 @@ public class LegacyReplicationManager {
          * we have to resend close container command to the datanodes.
          */
         if (state == LifeCycleState.CLOSING) {
+          if (isClosingContainerMissing(replicas)) {
+            report.incrementAndSample(HealthState.MISSING, container.containerID());
+          }
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
               sendCloseCommand(
                   container, replica.getDatanodeDetails(), false);
             }
           }
+          return;
         }
 
         /*
@@ -443,6 +447,7 @@ public class LegacyReplicationManager {
         if (state == LifeCycleState.QUASI_CLOSED) {
           if (canForceCloseContainer(container, replicas)) {
             forceCloseContainer(container, replicas);
+            return;
           } else {
             report.incrementAndSample(HealthState.QUASI_CLOSED_STUCK,
                 container.containerID());
@@ -1608,6 +1613,16 @@ public class LegacyReplicationManager {
     LifeCycleState state = container.getState();
     return replicas.stream()
         .allMatch(r -> compareState(state, r.getState()));
+  }
+
+  /**
+   * A closing container is missing if there is no open replicas
+   * @param replicas The replicas belonging to the container
+   * @return True if the container is healthy, false otherwise
+   */
+  private boolean isClosingContainerMissing(Set<ContainerReplica> replicas) {
+    return !replicas.stream()
+            .anyMatch(r -> compareState(LifeCycleState.OPEN, r.getState()));
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
