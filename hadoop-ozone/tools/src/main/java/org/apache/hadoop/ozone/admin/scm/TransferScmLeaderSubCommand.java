@@ -25,7 +25,7 @@ import picocli.CommandLine.Mixin;
 import java.util.concurrent.Callable;
 
 /**
- * Handler of ozone admin om transfer command.
+ * Handler of ozone admin scm transfer command.
  */
 @CommandLine.Command(
     name = "transfer",
