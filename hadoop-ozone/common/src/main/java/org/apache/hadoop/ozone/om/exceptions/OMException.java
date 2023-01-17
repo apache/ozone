@@ -259,6 +259,8 @@ public class OMException extends IOException {
 
     FEATURE_NOT_ENABLED,
 
-    INVALID_SNAPSHOT_ERROR
+    INVALID_SNAPSHOT_ERROR,
+
+    CONTAINS_SNAPSHOT,
   }
 }
