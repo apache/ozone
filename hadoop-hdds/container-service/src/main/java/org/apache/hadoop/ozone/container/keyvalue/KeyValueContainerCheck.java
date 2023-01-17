@@ -277,7 +277,7 @@ public class KeyValueContainerCheck {
   private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
       throws IOException {
     String blockKey =
-        onDiskContainerData.blockKey(block.getBlockID().getLocalID());
+        onDiskContainerData.getBlockKey(block.getBlockID().getLocalID());
     return db.getStore().getBlockDataTable().get(blockKey);
   }
 

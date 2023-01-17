@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -36,6 +38,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
@@ -245,21 +249,30 @@ public class TestReplicationSupervisor {
   }
 
   @Test
-  public void testDownloadAndImportReplicatorFailure() {
+  public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
         new ReplicationSupervisor(set, context, mutableReplicator,
             newDirectExecutorService(), clock);
 
+    OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
     Path res = Paths.get("file:/tmp/no-such-file");
     Mockito.when(
-        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
+        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList(),
+            Mockito.any(Path.class)))
         .thenReturn(res);
 
+    final String testDir = GenericTestUtils.getTempPath(
+        TestReplicationSupervisor.class.getSimpleName() +
+            "-" + UUID.randomUUID().toString());
+    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+    Mockito.when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(
+            new HddsVolume.Builder(testDir).conf(conf).build()));
     ContainerReplicator replicatorFactory =
-        new DownloadAndImportReplicator(set, null, moc, null);
+        new DownloadAndImportReplicator(conf, set, null, moc, null, volumeSet);
 
     replicatorRef.set(replicatorFactory);
 

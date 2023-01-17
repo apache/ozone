@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -276,4 +277,23 @@ public class FSOBucketHandler extends BucketHandler {
         parentObjectId, fileName);
     return getOmMetadataManager().getFileTable().getSkipCache(ozoneKey);
   }
+
+  @Override
+  public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
+    String path = OM_KEY_PREFIX;
+    path += String.join(OM_KEY_PREFIX, names);
+    Preconditions.checkArgument(
+        names.length >= 3,
+        "Path should be a directory: %s", path);
+    long parentObjectId = getDirObjectId(names, names.length - 1);
+    String dirKey = getOmMetadataManager().getOzonePathKey(
+        getVolumeObjectId(names),
+        getBucketObjectId(names),
+        parentObjectId,
+        names[names.length - 1]);
+    OmDirectoryInfo dirInfo = getOmMetadataManager()
+        .getDirectoryTable().getSkipCache(dirKey);
+    return dirInfo;
+  }
+
 }

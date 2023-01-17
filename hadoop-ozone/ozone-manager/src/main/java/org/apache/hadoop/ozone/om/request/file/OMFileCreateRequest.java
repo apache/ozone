@@ -277,7 +277,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
       numMissingParents = missingParentInfos.size();
       checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
       omBucketInfo.incrUsedNamespace(numMissingParents);

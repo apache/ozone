@@ -456,6 +456,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
 
     omStorage = new OMStorage(conf);
+    omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
@@ -1231,7 +1232,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public static boolean omInit(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
-    OMHANodeDetails.loadOMHAConfig(conf);
+    OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
+    String nodeId = omhaNodeDetails.getLocalNodeDetails().getNodeId();
     loginOMUserIfSecurityEnabled(conf);
     OMStorage omStorage = new OMStorage(conf);
     StorageState state = omStorage.getState();
@@ -1248,6 +1250,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
 
       if (state != StorageState.INITIALIZED) {
+        omStorage.setOmNodeId(nodeId);
         omStorage.setClusterId(clusterId);
         omStorage.initialize();
         System.out.println(

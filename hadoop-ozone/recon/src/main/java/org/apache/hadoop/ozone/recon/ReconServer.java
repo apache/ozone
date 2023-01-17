@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
@@ -72,6 +73,7 @@ public class ReconServer extends GenericCli {
   private ReconDBProvider reconDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
+  private ReconSafeModeManager reconSafeModeMgr;
   private OzoneConfiguration configuration;
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
@@ -130,11 +132,14 @@ public class ReconServer extends GenericCli {
       LOG.info("Creating Recon Schema.");
       reconSchemaManager.createReconSchema();
 
+      this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
+      this.reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
       this.ozoneManagerServiceProvider =
           injector.getInstance(OzoneManagerServiceProvider.class);
       this.reconStorageContainerManager =
           injector.getInstance(OzoneStorageContainerManager.class);
+
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
       LOG.info("Recon server initialized successfully!");
