@@ -17,7 +17,7 @@
  *
  */
 
-package org.apache.hadoop.hdds.security.x509.certificates.utils;
+package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -32,7 +32,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
