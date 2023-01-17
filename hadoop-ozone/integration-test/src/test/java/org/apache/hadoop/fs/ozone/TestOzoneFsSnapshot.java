@@ -33,7 +33,6 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.fs.FileSystem.create;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.Assert.assertEquals;
@@ -80,7 +79,8 @@ public class TestOzoneFsSnapshot {
     }
   }
 
-  private void createVolBuckKey(String testVolBucket, String testKey) throws Exception {
+  private void createVolBuckKey(String testVolBucket, String testKey)
+          throws Exception {
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     try {
       // Create volume and bucket
