@@ -367,7 +367,7 @@ public class OzoneAddress {
         throw new OzoneClientException(
             "Delimiters (/) not allowed following " +
                 "a bucket name. Only a snapshot name with " +
-                "a snapshot indicator are accepted");
+                "a snapshot indicator is accepted");
       }
     } else if (volumeName.length() == 0) {
       throw new OzoneClientException(
