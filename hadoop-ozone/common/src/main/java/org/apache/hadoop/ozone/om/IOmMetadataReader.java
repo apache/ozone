@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -38,6 +39,10 @@ public interface IOmMetadataReader {
    * @return OmKeyInfo instance that client uses to talk to container.
    */
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
+
+  KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
+                                      boolean assumeS3Context)
+      throws IOException;
 
   /**
    * List the status for a file or a directory and its contents.

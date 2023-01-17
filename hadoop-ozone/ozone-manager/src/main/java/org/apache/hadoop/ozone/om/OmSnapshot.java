@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -88,6 +89,14 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
     return denormalizeOmKeyInfo(omMetadataReader.lookupKey(
         normalizeOmKeyArgs(args)));
+  }
+
+  @Override
+  public KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
+                                             boolean assumeS3Context)
+    throws IOException {
+    return denormalizeKeyInfoWithVolumeContext(
+        omMetadataReader.getKeyInfo(normalizeOmKeyArgs(args), assumeS3Context));
   }
 
   @Override
@@ -215,6 +224,11 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         omKeyInfo, fileStatus.getBlockSize(), fileStatus.isDirectory());
   }
 
+  private KeyInfoWithVolumeContext denormalizeKeyInfoWithVolumeContext(KeyInfoWithVolumeContext k) {
+    return new KeyInfoWithVolumeContext(k.getVolumeArgs().orElse(null),
+        k.getUserPrincipal().orElse(null),
+        denormalizeOmKeyInfo(k.getKeyInfo()));
+  }
   private OmKeyInfo createDenormalizedBucketKeyInfo() {
     return new OmKeyInfo.Builder()
       .setVolumeName(volumeName)
