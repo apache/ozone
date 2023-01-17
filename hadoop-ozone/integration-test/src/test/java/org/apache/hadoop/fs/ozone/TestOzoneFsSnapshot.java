@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.fs.FileSystem.create;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.Assert.assertEquals;
@@ -79,6 +80,24 @@ public class TestOzoneFsSnapshot {
     }
   }
 
+  private void createVolBuckKey(String testVolBucket, String testKey) throws Exception {
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+    try {
+      // Create volume and bucket
+      int res = ToolRunner.run(shell,
+              new String[]{"-mkdir", "-p", testVolBucket});
+      assertEquals(0, res);
+      // Create key
+      res = ToolRunner.run(shell, new String[]{"-touch", testKey});
+      assertEquals(0, res);
+      // List the bucket to make sure that bucket exists.
+      res = ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
+      assertEquals(0, res);
+    } finally {
+      shell.close();
+    }
+  }
+
   @Test
   public void testCreateSnapshot() throws Exception {
     String volume = "vol1";
@@ -87,20 +106,11 @@ public class TestOzoneFsSnapshot {
     String snapshotName = "snap1";
     String testKey = testVolBucket + "/key1";
 
+    createVolBuckKey(testVolBucket, testKey);
+
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     try {
-      // Create volume and bucket
       int res = ToolRunner.run(shell,
-          new String[]{"-mkdir", "-p", testVolBucket});
-      assertEquals(0, res);
-      // Create key
-      ToolRunner.run(shell, new String[]{"-touch", testKey});
-      assertEquals(0, res);
-      // List the bucket to make sure that bucket exists.
-      ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
-      assertEquals(0, res);
-
-      res = ToolRunner.run(shell,
           new String[]{"-createSnapshot", testVolBucket, snapshotName});
       // Asserts that create request succeeded
       assertEquals(0, res);
@@ -129,20 +139,11 @@ public class TestOzoneFsSnapshot {
     String testVolBucket = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
     String testKey = testVolBucket + OM_KEY_PREFIX + key;
 
+    createVolBuckKey(testVolBucket, testKey);
+
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     try {
-      // Create volume and bucket
       int res = ToolRunner.run(shell,
-              new String[]{"-mkdir", "-p", testVolBucket});
-      assertEquals(0, res);
-      // Create key
-      ToolRunner.run(shell, new String[]{"-touch", testKey});
-      assertEquals(0, res);
-      // List the bucket to make sure that bucket exists.
-      ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
-      assertEquals(0, res);
-
-      res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, snapshotName});
       // Asserts that create request succeeded
       assertEquals(0, res);
@@ -166,20 +167,11 @@ public class TestOzoneFsSnapshot {
     String testVolBucket = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
     String testKey = testVolBucket + OM_KEY_PREFIX + key;
 
+    createVolBuckKey(testVolBucket, testKey);
+
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     try {
-      // Create volume and bucket
       int res = ToolRunner.run(shell,
-              new String[]{"-mkdir", "-p", testVolBucket});
-      assertEquals(0, res);
-      // Create key
-      ToolRunner.run(shell, new String[]{"-touch", testKey});
-      assertEquals(0, res);
-      // List the bucket to make sure that bucket exists.
-      ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
-      assertEquals(0, res);
-
-      res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, snapshotName});
       // Asserts that create request failed since invalid name passed
       assertEquals(1, res);
@@ -199,20 +191,11 @@ public class TestOzoneFsSnapshot {
     String testVolBucket = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
     String testKey = testVolBucket + OM_KEY_PREFIX + key;
 
+    createVolBuckKey(testVolBucket, testKey);
+
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     try {
-      // Create volume and bucket
       int res = ToolRunner.run(shell,
-              new String[]{"-mkdir", "-p", testVolBucket});
-      assertEquals(0, res);
-      // Create key
-      ToolRunner.run(shell, new String[]{"-touch", testKey});
-      assertEquals(0, res);
-      // List the bucket to make sure that bucket exists.
-      ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
-      assertEquals(0, res);
-
-      res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, snapshotName});
       // Asserts that create request failed since only numeric name passed
       assertEquals(1, res);
@@ -252,20 +235,11 @@ public class TestOzoneFsSnapshot {
     String testVolBucket = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
     String testKey = testVolBucket + OM_KEY_PREFIX + key;
 
+    createVolBuckKey(testVolBucket, testKey);
+
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     try {
-      // Create volume and bucket
       int res = ToolRunner.run(shell,
-              new String[]{"-mkdir", "-p", testVolBucket});
-      assertEquals(0, res);
-      // Create key
-      ToolRunner.run(shell, new String[]{"-touch", testKey});
-      assertEquals(0, res);
-      // List the bucket to make sure that bucket exists.
-      ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
-      assertEquals(0, res);
-
-      res = ToolRunner.run(shell,
               new String[]{"-createSnapshot", testVolBucket, name63});
       // Asserts that create request succeeded since namelength
       // less than 64 char
