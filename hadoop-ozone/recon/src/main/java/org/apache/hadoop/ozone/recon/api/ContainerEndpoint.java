@@ -173,8 +173,19 @@ public class ContainerEndpoint {
         // Directly calling get() on the Key table instead of iterating since
         // only full keys are supported now. When we change to using a prefix
         // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
-            .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        // The first expression will try to get the OmKeyInfo object by calling
+        // getSkipCache on the BucketLayout.LEGACY table, passing in the
+        // keyPrefix as the key. If this expression returns null, meaning
+        // the key was not found in the LEGACY table, the second expression
+        // will be evaluated and the OmKeyInfo will be obtained from the
+        // BucketLayout.FILE_SYSTEM_OPTIMIZED table.
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
+            .getSkipCache(containerKeyPrefix.getKeyPrefix()) == null ?
+            omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+                .getSkipCache(containerKeyPrefix.getKeyPrefix()) :
+            omMetadataManager.getKeyTable(BucketLayout.LEGACY)
+                .getSkipCache(containerKeyPrefix.getKeyPrefix());
+
         if (null != omKeyInfo) {
           // Filter keys by version.
           List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo

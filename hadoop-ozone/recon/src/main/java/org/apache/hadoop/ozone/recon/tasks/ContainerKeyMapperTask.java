@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 import java.io.IOException;
@@ -127,7 +128,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   public Collection<String> getTaskTables() {
-    return Collections.singletonList(KEY_TABLE);
+    List<String> taskTables = new ArrayList<>();
+    taskTables.add(KEY_TABLE);
+    taskTables.add(FILE_TABLE);
+    return taskTables;
   }
 
   @Override
