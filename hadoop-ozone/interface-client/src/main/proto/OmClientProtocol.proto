@@ -457,6 +457,8 @@ enum Status {
     FEATURE_NOT_ENABLED = 86;
 
     INVALID_SNAPSHOT_ERROR = 87;
+
+    CONTAINS_SNAPSHOT = 88;
 }
 
 /**
