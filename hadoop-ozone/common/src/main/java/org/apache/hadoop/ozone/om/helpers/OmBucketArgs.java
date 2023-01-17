@@ -344,9 +344,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     // OmBucketArgs ctor already has more arguments, so setting the default
     // replication config separately.
     if (bucketArgs.hasDefaultReplicationConfig()) {
-      omBucketArgs.setDefaultReplicationConfig(new DefaultReplicationConfig(
+      omBucketArgs.setDefaultReplicationConfig(
+          DefaultReplicationConfig.fromProto(
               bucketArgs.getDefaultReplicationConfig()));
     }
+
     if (bucketArgs.hasQuotaInBytes()) {
       omBucketArgs.setQuotaInBytes(bucketArgs.getQuotaInBytes());
     }
