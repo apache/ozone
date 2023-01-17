@@ -96,7 +96,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
                                              boolean assumeS3Context)
     throws IOException {
     return denormalizeKeyInfoWithVolumeContext(
-        omMetadataReader.getKeyInfo(normalizeOmKeyArgs(args), assumeS3Context));
+        omMetadataReader.getKeyInfo(normalizeOmKeyArgs(args),
+        assumeS3Context));
   }
 
   @Override
@@ -224,7 +225,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         omKeyInfo, fileStatus.getBlockSize(), fileStatus.isDirectory());
   }
 
-  private KeyInfoWithVolumeContext denormalizeKeyInfoWithVolumeContext(KeyInfoWithVolumeContext k) {
+  private KeyInfoWithVolumeContext denormalizeKeyInfoWithVolumeContext(
+      KeyInfoWithVolumeContext k) {
     return new KeyInfoWithVolumeContext(k.getVolumeArgs().orElse(null),
         k.getUserPrincipal().orElse(null),
         denormalizeOmKeyInfo(k.getKeyInfo()));

@@ -392,9 +392,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmMultipartKeyInfo> getMultipartInfoTable() {
     return multipartInfoTable;
-  } 
+  }
 
-  private void checkTableStatus(Table table, String name, boolean addCacheMetrics) throws IOException {
+  private void checkTableStatus(Table table, String name,
+      boolean addCacheMetrics) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
         "continue.";
     String errMsg = "Inconsistent DB state, Table - %s. Please check the logs" +
@@ -525,7 +526,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * @throws IOException
    */
-  protected void initializeOmTables(boolean addCacheMetrics) throws IOException {
+  protected void initializeOmTables(boolean addCacheMetrics)
+      throws IOException {
     userTable =
         this.store.getTable(USER_TABLE, String.class,
             PersistedUserVolumeInfo.class);
@@ -590,7 +592,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
-    checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE, addCacheMetrics);
+    checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE,
+        addCacheMetrics);
 
     metaTable = this.store.getTable(META_TABLE, String.class, String.class);
     checkTableStatus(metaTable, META_TABLE, addCacheMetrics);
@@ -598,13 +601,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
     tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
         String.class, OmDBAccessIdInfo.class);
-    checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE, addCacheMetrics);
+    checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE,
+        addCacheMetrics);
 
     // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
     principalToAccessIdsTable = this.store.getTable(
         PRINCIPAL_TO_ACCESS_IDS_TABLE,
         String.class, OmDBUserPrincipalInfo.class);
-    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE, addCacheMetrics);
+    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE,
+        addCacheMetrics);
 
     // tenant name -> tenant (tenant states)
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
