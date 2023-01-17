@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -59,14 +58,12 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
-import org.apache.ratis.retry.ExponentialBackoffRetry;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
-import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -492,21 +489,21 @@ public final class RatisHelper {
 
   /**
    * Use raft client to send admin request, transfer the leadership.
-   * If not isRandom, then use host to match the target leader.
    * 1. Set priority and send setConfiguration request
    * 2. Trigger transferLeadership API.
    *
    * @param server        the Raft server
    * @param groupId       the Raft group Id
    * @param targetPeerId  the target expected leader
-
    * @throws IOException
    */
-  public static void transferRatisLeadership(RaftServer server,
-      RaftGroupId groupId, RaftPeerId targetPeerId)
+  public static void transferRatisLeadership(ConfigurationSource conf,
+      RaftServer server, RaftGroupId groupId, RaftPeerId targetPeerId)
       throws IOException {
     RaftGroup raftGroup = server.getDivision(groupId).getGroup();
-    RaftClient raftClient = createBackoffRaftClient(raftGroup);
+    // TODO: use common raft client related conf
+    RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
+        null, raftGroup, createRetryPolicy(conf), null, conf);
     if (!raftGroup.getPeers().stream().map(RaftPeer::getId)
         .collect(Collectors.toSet()).contains(targetPeerId)) {
       throw new IOException("Cannot choose the target leader. The expected " +
@@ -547,22 +544,5 @@ public final class RatisHelper {
           targetPeerId, reply);
       throw new IOException(reply.getException());
     }
-  }
-
-  public static RaftClient createBackoffRaftClient(RaftGroup raftGroup) {
-    RaftProperties properties = new RaftProperties();
-    RaftClientConfigKeys.Rpc.setRequestTimeout(properties,
-        TimeDuration.valueOf(15, TimeUnit.SECONDS));
-    ExponentialBackoffRetry retryPolicy = ExponentialBackoffRetry.newBuilder()
-        .setBaseSleepTime(TimeDuration.valueOf(2000, TimeUnit.MILLISECONDS))
-        .setMaxAttempts(10)
-        .setMaxSleepTime(
-            TimeDuration.valueOf(10000, TimeUnit.MILLISECONDS))
-        .build();
-    return RaftClient.newBuilder()
-        .setRaftGroup(raftGroup)
-        .setProperties(properties)
-        .setRetryPolicy(retryPolicy)
-        .build();
   }
 }

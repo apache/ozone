@@ -47,8 +47,8 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
   static class TransferOption {
     @CommandLine.Option(
         names = {"-n", "--nodeId"},
-        description = "The target Node Id of OM to transfer leadership." +
-            " Will convert to host with default ratis port. E.g SCM1."
+        description = "The target Node Id of SCM to transfer leadership." +
+            " E.g SCM1."
     )
     private String scmNodeId;
 
@@ -62,7 +62,12 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     ScmClient client = scmOption.createScmClient(
         parent.getParent().getOzoneConf());
     client.transferLeadership(configGroup.scmNodeId, configGroup.isRandom);
-    System.out.println("Transfer leadership success.");
+    if (configGroup.isRandom) {
+      System.out.println("Transfer leadership successfully.");
+    } else {
+      System.out.println("Transfer leadership successfully to " +
+          configGroup.scmNodeId + ".");
+    }
     return null;
   }
 }

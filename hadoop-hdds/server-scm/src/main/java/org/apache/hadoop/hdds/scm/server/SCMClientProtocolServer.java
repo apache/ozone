@@ -823,16 +823,17 @@ public class SCMClientProtocolServer implements
                 .equals(ratisAddr.replace("127.0.0.1", "localhost")))
             .findFirst().map(RaftPeer::getId).orElse(null);
       }
-      RatisHelper.transferRatisLeadership(server, groupID, targetPeerId);
+      RatisHelper.transferRatisLeadership(scm.getConfiguration(), server,
+          groupID, targetPeerId);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.TRANSFER_LEADER, auditMap, ex));
+          SCMAction.TRANSFER_LEADERSHIP, auditMap, ex));
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            SCMAction.TRANSFER_LEADER, auditMap));
+            SCMAction.TRANSFER_LEADERSHIP, auditMap));
       }
     }
   }

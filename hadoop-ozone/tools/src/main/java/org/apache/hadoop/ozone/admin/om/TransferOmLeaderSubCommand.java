@@ -49,8 +49,8 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
   static class TransferOption {
     @CommandLine.Option(
         names = {"-n", "--nodeId"},
-        description = "The target Node Id of OM to transfer leadership." +
-            " Will be converted to host with ratis port. E.g OM1."
+        description = "The target Node Id of OM to transfer leadership. " +
+            "E.g OM1."
     )
     private String omNodeId;
 
@@ -64,7 +64,12 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
     OzoneManagerProtocol client =
         parent.createOmClient(omServiceId, null, true);
     client.transferLeadership(configGroup.omNodeId, configGroup.isRandom);
-    System.out.println("Transfer leadership success.");
+    if (configGroup.isRandom) {
+      System.out.println("Transfer leadership successfully.");
+    } else {
+      System.out.println("Transfer leadership successfully to " +
+          configGroup.omNodeId + ".");
+    }
     return null;
   }
 }

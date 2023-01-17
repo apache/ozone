@@ -3107,7 +3107,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } else {
         targetPeerId = RaftPeerId.valueOf(nodeId);
       }
-      RatisHelper.transferRatisLeadership(server, groupID, targetPeerId);
+      RatisHelper.transferRatisLeadership(configuration, server, groupID,
+          targetPeerId);
     } catch (IOException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
