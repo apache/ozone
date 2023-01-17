@@ -63,7 +63,7 @@ public final class S3GatewayConfigKeys {
       "ozone.s3g.kerberos.keytab.file";
   public static final String OZONE_S3G_KERBEROS_PRINCIPAL_KEY =
       "ozone.s3g.kerberos.principal";
-
+  public static final boolean OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED = true;
 
   /**
    * Never constructed.

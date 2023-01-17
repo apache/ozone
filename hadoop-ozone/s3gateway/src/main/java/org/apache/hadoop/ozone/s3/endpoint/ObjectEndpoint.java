@@ -69,10 +69,12 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
+import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -176,6 +178,10 @@ public class ObjectEndpoint extends EndpointBase {
       InputStream body) throws IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.CREATE_KEY;
+    if (length == 0 &&
+        S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED) {
+      s3GAction = S3GAction.CREATE_DIRECTORY;
+    }
     boolean auditSuccess = true;
 
     OzoneOutputStream output = null;
@@ -196,6 +202,12 @@ public class ObjectEndpoint extends EndpointBase {
 
       // Normal put object
       OzoneBucket bucket = volume.getBucket(bucketName);
+      if (s3GAction == S3GAction.CREATE_DIRECTORY &&
+          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        getClientProtocol()
+            .createDirectory(volume.getName(), bucketName, keyPath);
+        return Response.ok().status(HttpStatus.SC_OK).build();
+      }
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType);
 
@@ -245,6 +257,8 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ResultCodes.FILE_ALREADY_EXISTS == ex.getResult()) {
+        throw newError(S3ErrorTable.INVALID_REQUEST, keyPath, ex);
       }
       throw ex;
     } catch (Exception ex) {
