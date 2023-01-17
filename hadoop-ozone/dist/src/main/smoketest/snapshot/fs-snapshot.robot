@@ -71,6 +71,7 @@ List snapshots with fs -ls
 List snapshot keys with fs -ls
     ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}
                     Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}
+                    Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_TWO}
     ${result} =     Execute             ozone fs -ls /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}
                     Should contain      ${result}       /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}
 
