@@ -628,11 +628,11 @@ public class TestContainerCommandsEC {
     conf.setFromObject(writableECContainerProviderConfig);
 
     OzoneManager.setTestSecureOmFlag(true);
-    certClient = new CertificateClientTestImpl(config);
+    certClient = new CertificateClientTestImpl(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(NUM_DN)
         .setScmId(SCM_ID).setClusterId(CLUSTER_ID)
-        .setCertificateClient(new CertificateClientTestImpl(conf))
+        .setCertificateClient(certClient)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
