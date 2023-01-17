@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
 import javax.crypto.SecretKey;
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -26,7 +27,7 @@ import java.util.UUID;
  * Enclosed a symmetric {@link SecretKey} with additional data for life-cycle
  * management.
  */
-public class ManagedSecretKey {
+public final class ManagedSecretKey implements Serializable {
   private final UUID id;
   private final Instant creationTime;
   private final Instant expiryTime;
@@ -74,5 +75,11 @@ public class ManagedSecretKey {
     }
     ManagedSecretKey that = (ManagedSecretKey) obj;
     return this.id.equals(that.id);
+  }
+
+  @Override
+  public String toString() {
+    return "SecretKey(id = " + id + ", creation at: "
+        + creationTime + ", expire at: " + expiryTime + ")";
   }
 }

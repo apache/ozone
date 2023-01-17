@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
+import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
@@ -715,6 +716,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 .removeExpiredEntries(containerReplicaOpExpiryMs)).build();
 
     serviceManager.register(expiredContainerReplicaOpScrubber);
+
+    SecretKeyManagerService secretKeyManagerService =
+        new SecretKeyManagerService(scmContext, conf,
+            scmHAManager.getRatisServer());
+    serviceManager.register(secretKeyManagerService);
 
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();

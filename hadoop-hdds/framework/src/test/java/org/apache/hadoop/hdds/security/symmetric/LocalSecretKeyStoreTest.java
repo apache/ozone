@@ -51,14 +51,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class LocalSecretKeyStoreTest {
   private SecretKeyStore secretKeyStore;
-  private Path keyDir;
-  private String secretKeysFileName = "test.json";
+  private Path testSecretFile;
 
   @BeforeEach
   private void setup() throws Exception {
-    keyDir = Files.createTempDirectory("key-store-test");
-    secretKeyStore = new LocalSecretKeyStore(keyDir.toFile().getAbsolutePath(),
-        secretKeysFileName);
+    testSecretFile = Files.createTempFile("key-strore-test", ".json");
+    secretKeyStore = new LocalSecretKeyStore(testSecretFile);
   }
 
   public static Stream<Arguments> saveAndLoadTestCases() throws Exception {
@@ -84,7 +82,7 @@ public class LocalSecretKeyStoreTest {
 
     // Ensure the intended file exists and is readable and writeable to
     // file owner only.
-    File file = new File(keyDir.toFile(), secretKeysFileName);
+    File file = testSecretFile.toFile();
     assertTrue(file.exists());
     Set<PosixFilePermission> permissions =
         Files.getPosixFilePermissions(file.toPath());

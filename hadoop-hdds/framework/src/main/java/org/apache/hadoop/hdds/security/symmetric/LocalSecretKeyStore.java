@@ -32,6 +32,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
@@ -41,10 +43,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
-import java.security.KeyStore;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
@@ -62,11 +61,13 @@ import static java.util.stream.Collectors.toList;
  * JSON file on local file system.
  */
 public class LocalSecretKeyStore implements SecretKeyStore {
+  private static final Logger LOG = LoggerFactory.getLogger(LocalSecretKeyStore.class);
+
   private final Path secretKeysFile;
   private final ObjectMapper mapper;
 
-  public LocalSecretKeyStore(String keyDirectory, String secretKeyFileName) {
-    this.secretKeysFile = Paths.get(keyDirectory, secretKeyFileName);
+  public LocalSecretKeyStore(Path secretKeysFile) {
+    this.secretKeysFile = secretKeysFile;
     this.mapper = new ObjectMapper()
         .registerModule(new JavaTimeModule())
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
@@ -82,9 +83,11 @@ public class LocalSecretKeyStore implements SecretKeyStore {
     try (MappingIterator<ManagedSecretKeyDto> iterator =
              reader.readValues(secretKeysFile.toFile())) {
       List<ManagedSecretKeyDto> dtos = iterator.readAll();
-      return dtos.stream()
+      List<ManagedSecretKey> result = dtos.stream()
           .map(ManagedSecretKeyDto::toObject)
           .collect(toList());
+      LOG.info("Loaded {} from {}", result, secretKeysFile);
+      return result;
     } catch (IOException e) {
       throw new IllegalStateException("Error reading SecretKeys from "
           + secretKeysFile, e);
@@ -99,7 +102,8 @@ public class LocalSecretKeyStore implements SecretKeyStore {
         .map(ManagedSecretKeyDto::new)
         .collect(toList());
 
-    try (SequenceWriter writer = mapper.writer().writeValues(secretKeysFile.toFile())) {
+    try (SequenceWriter writer =
+             mapper.writer().writeValues(secretKeysFile.toFile())) {
       writer.init(true);
       for (ManagedSecretKeyDto dto : dtos) {
         writer.write(dto);
@@ -108,12 +112,16 @@ public class LocalSecretKeyStore implements SecretKeyStore {
       throw new IllegalStateException("Error saving SecretKeys to file "
           + secretKeysFile, e);
     }
+    LOG.info("Saved {} to file {}", secretKeys, secretKeysFile);
   }
 
   private void setFileOwnerPermissions(Path path) {
     Set<PosixFilePermission> permissions = newHashSet(OWNER_READ, OWNER_WRITE);
     try {
       if (!Files.exists(path)) {
+        if (!Files.exists(path.getParent())) {
+          Files.createDirectories(path.getParent());
+        }
         Files.createFile(path);
       }
       Files.setPosixFilePermissions(path, permissions);
