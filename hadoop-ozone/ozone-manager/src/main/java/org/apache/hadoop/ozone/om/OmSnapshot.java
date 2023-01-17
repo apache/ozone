@@ -94,7 +94,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   @Override
   public KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
                                              boolean assumeS3Context)
-    throws IOException {
+      throws IOException {
     return denormalizeKeyInfoWithVolumeContext(
         omMetadataReader.getKeyInfo(normalizeOmKeyArgs(args),
         assumeS3Context));

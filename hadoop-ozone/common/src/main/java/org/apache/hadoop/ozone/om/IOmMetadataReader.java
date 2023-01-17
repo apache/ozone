@@ -40,7 +40,7 @@ public interface IOmMetadataReader {
    */
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
 
-  KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
+  KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args,
                                       boolean assumeS3Context)
       throws IOException;
 
@@ -82,7 +82,7 @@ public interface IOmMetadataReader {
    * OzoneFS api to lookup for a file.
    *
    * @param args Key args
-   * @throws OMException if given key is not found or it is not a file
+   * @throws OMException if given key is not found, or it is not a file
    *                     if bucket does not exist
    * @throws IOException if there is error in the db
    *                     invalid arguments
