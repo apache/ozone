@@ -271,6 +271,44 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
         </configuration>
       </plugin>
+      <plugin>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>depcheck</id>
+            <phase></phase>
+          </execution>
+          <execution>
+            <id>banned-rocksdb-imports</id>
+            <phase>process-sources</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <RestrictImports>
+                  <includeTestCode>false</includeTestCode>
+                  <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>
+                  <!-- By default, ban all the classes in org.rocksdb -->
+                  <bannedImport>org.rocksdb.**</bannedImport>
+                  <allowedImports>
+                    <!-- Allow these imports for snapshot diff. We can't use managed DB for Snapshot diff because
+                     we need to create tables on fly and managed DB doesn't allow that. -->
+                    <allowedImport>org.rocksdb.Options</allowedImport>
+                    <allowedImport>org.rocksdb.RocksDB</allowedImport>
+                    <allowedImport>org.rocksdb.RocksIterator</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyOptions</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
+                    <allowedImport>org.rocksdb.RocksDBException</allowedImport>
+                  </allowedImports>
+                  <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
+                </RestrictImports>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
     <testResources>
       <testResource>

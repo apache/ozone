@@ -22,6 +22,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
+import java.io.File;
+import java.nio.file.Paths;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -35,6 +37,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,27 +51,29 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
-
 /**
  * This class is used to manage/create OM snapshots.
  */
-public final class OmSnapshotManager {
+public final class OmSnapshotManager implements AutoCloseable {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmSnapshotManager.class);
+
   private final OzoneManager ozoneManager;
   private final SnapshotDiffManager snapshotDiffManager;
   private final LoadingCache<String, OmSnapshot> snapshotCache;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmSnapshotManager.class);
+  private final RocksDB rocksDB;
 
   OmSnapshotManager(OzoneManager ozoneManager) {
     this.ozoneManager = ozoneManager;
 
     // Pass in the differ
     final RocksDBCheckpointDiffer differ = ozoneManager
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer();
-    this.snapshotDiffManager = new SnapshotDiffManager(differ);
+            .getMetadataManager()
+            .getStore()
+            .getRocksDBCheckpointDiffer();
+
+    this.rocksDB = createRocksDbForSnapshotDiff();
+    this.snapshotDiffManager = new SnapshotDiffManager(rocksDB, differ);
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
@@ -145,26 +151,28 @@ public final class OmSnapshotManager {
       throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
 
-    final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
-
-    final RocksDBCheckpointDiffer dbCpDiffer =
-        omMetadataManager.getStore().getRocksDBCheckpointDiffer();
-
     final DBCheckpoint dbCheckpoint = store.getSnapshot(
         snapshotInfo.getCheckpointDirName());
 
-    // Write snapshot generation (latest sequence number) to compaction log.
-    // This will be used for DAG reconstruction as snapshotGeneration.
-    dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-        snapshotInfo.getSnapshotID(),
-        snapshotInfo.getCreationTime());
+    final RocksDBCheckpointDiffer dbCpDiffer =
+        store.getRocksDBCheckpointDiffer();
 
-    // Set compaction log filename to the latest DB sequence number
-    // right after taking the RocksDB checkpoint for Ozone snapshot.
-    //
-    // Note it doesn't matter if sequence number hasn't increased (even though
-    // it shouldn't happen), since the writer always appends the file.
-    dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
+    if (dbCpDiffer != null) {
+      final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
+
+      // Write snapshot generation (latest sequence number) to compaction log.
+      // This will be used for DAG reconstruction as snapshotGeneration.
+      dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
+          snapshotInfo.getSnapshotID(),
+          snapshotInfo.getCreationTime());
+
+      // Set compaction log filename to the latest DB sequence number
+      // right after taking the RocksDB checkpoint for Ozone snapshot.
+      //
+      // Note it doesn't matter if sequence number hasn't increased (even though
+      // it shouldn't happen), since the writer always appends the file.
+      dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
+    }
 
     return dbCheckpoint;
   }
@@ -266,6 +274,36 @@ public final class OmSnapshotManager {
     if (fromSnapshot.getCreationTime() > toSnapshot.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
           " should be older than to toSnapshot:" + toSnapshot.getName());
+    }
+  }
+
+  private RocksDB createRocksDbForSnapshotDiff() {
+
+    final Options options = new Options().setCreateIfMissing(true);
+
+    // TODO: Temp DB dir for draft PR. Change it later.
+    final File dbDirPath = new File("/tmp");
+    if (!dbDirPath.mkdirs() && !dbDirPath.exists()) {
+      throw new IllegalArgumentException("Unable to create directory " +
+          dbDirPath);
+    }
+
+    String dbPath = Paths.get(dbDirPath.toString(), "snapshot.diff.db")
+        .toFile()
+        .getAbsolutePath();
+
+    try {
+      return RocksDB.open(options, dbPath);
+    } catch (RocksDBException exception) {
+      // TODO: Fail gracefully.
+      throw new RuntimeException(exception);
+    }
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (rocksDB != null) {
+      rocksDB.close();
     }
   }
 }

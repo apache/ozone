@@ -18,10 +18,14 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import java.util.Iterator;
+import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -36,6 +40,10 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.jetbrains.annotations.NotNull;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,11 +66,19 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 public class SnapshotDiffManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotDiffManager.class);
-  private RocksDBCheckpointDiffer differ;
+          LoggerFactory.getLogger(SnapshotDiffManager.class);
+  private final RocksDBCheckpointDiffer differ;
+  private final RocksDB rocksDB;
+  private final CodecRegistry codecRegistry;
+  private final byte[] emptyByteArray = new byte[0];
 
-  public SnapshotDiffManager(RocksDBCheckpointDiffer differ) {
+  public SnapshotDiffManager(RocksDB rocksDB, RocksDBCheckpointDiffer differ) {
+    this.rocksDB = rocksDB;
     this.differ = differ;
+    this.codecRegistry = new CodecRegistry();
+
+    this.codecRegistry.addCodec(DiffReportEntry.class,
+        new OmDBDiffReportEntryCodec());
   }
 
   private Map<String, String> getTablePrefixes(
@@ -113,54 +129,126 @@ public class SnapshotDiffManager {
     final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
         fromSnapshot.getMetadataManager());
 
-    /*
-     * The reason for having ObjectID to KeyName mapping instead of OmKeyInfo
-     * is to reduce the memory footprint.
-     */
-    final Map<Long, String> oldObjIdToKeyMap = new HashMap<>();
-    // Long --> const. length
-    // String --> var. length "/dir1/dir2/dir3/dir4/dir5/key1"
-    final Map<Long, String> newObjIdToKeyMap = new HashMap<>();
+    // TODO: This should comes from request itself.
+    String requestId = UUID.randomUUID().toString();
 
-    final Set<Long> objectIDsToCheck = new HashSet<>();
+    ColumnFamilyHandle fromSnapshotColumnFamily = null;
+    ColumnFamilyHandle toSnapshotColumnFamily = null;
+    ColumnFamilyHandle objectIDsColumnFamily = null;
 
-    // add to object ID map for key/file.
+    // RequestId is prepended to column family name to make it unique
+    // for request.
+    try {
+      fromSnapshotColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-fromSnapshot"),
+              new ColumnFamilyOptions()));
+      toSnapshotColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-toSnapshot"),
+              new ColumnFamilyOptions()));
+      objectIDsColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-objectIDs"),
+              new ColumnFamilyOptions()));
+      /*
+       * The reason for having ObjectID to KeyName mapping instead of OmKeyInfo
+       * is to reduce the memory footprint.
+       */
+      final PersistentMap<Long, String> oldObjIdToKeyPersistentMap =
+          new RocksDBPersistentMap<>(rocksDB,
+              fromSnapshotColumnFamily,
+              codecRegistry,
+              Long.class,
+              String.class);
 
-    final Table<String, OmKeyInfo> fsKeyTable = fromSnapshot
-        .getMetadataManager().getKeyTable(bucketLayout);
-    final Table<String, OmKeyInfo> tsKeyTable = toSnapshot
-        .getMetadataManager().getKeyTable(bucketLayout);
-    final Set<String> deltaFilesForKeyOrFileTable =
-        getDeltaFiles(fromSnapshot, toSnapshot,
-            Collections.singletonList(fsKeyTable.getName()),
-            fsInfo, tsInfo, volume, bucket);
+      // Long --> const. length
+      // String --> var. length "/dir1/dir2/dir3/dir4/dir5/key1"
+      final PersistentMap<Long, String> newObjIdToKeyPersistentMap =
+          new RocksDBPersistentMap<>(rocksDB,
+              toSnapshotColumnFamily,
+              codecRegistry,
+              Long.class,
+              String.class);
 
-    addToObjectIdMap(fsKeyTable, tsKeyTable, deltaFilesForKeyOrFileTable,
-        oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, false);
+      // add to object ID map for key/file.
+      final PersistentMap<Long, byte[]> objectIDsToCheckMap =
+          new RocksDBPersistentMap<>(rocksDB,
+              objectIDsColumnFamily,
+              codecRegistry,
+              Long.class,
+              byte[].class);
 
-    if (bucketLayout.isFileSystemOptimized()) {
-      // add to object ID map for directory.
-      final Table<String, OmDirectoryInfo> fsDirTable =
-          fromSnapshot.getMetadataManager().getDirectoryTable();
-      final Table<String, OmDirectoryInfo> tsDirTable =
-          toSnapshot.getMetadataManager().getDirectoryTable();
-      final Set<String> deltaFilesForDirTable =
+      final Table<String, OmKeyInfo> fsKeyTable = fromSnapshot
+          .getMetadataManager().getKeyTable(bucketLayout);
+      final Table<String, OmKeyInfo> tsKeyTable = toSnapshot
+          .getMetadataManager().getKeyTable(bucketLayout);
+      final Set<String> deltaFilesForKeyOrFileTable =
           getDeltaFiles(fromSnapshot, toSnapshot,
-              Collections.singletonList(fsDirTable.getName()),
+              Collections.singletonList(fsKeyTable.getName()),
               fsInfo, tsInfo, volume, bucket);
-      addToObjectIdMap(fsDirTable, tsDirTable, deltaFilesForDirTable,
-          oldObjIdToKeyMap, newObjIdToKeyMap, objectIDsToCheck, true);
-    }
 
-    return new SnapshotDiffReport(volume, bucket, fromSnapshot.getName(),
-        toSnapshot.getName(), generateDiffReport(objectIDsToCheck,
-        oldObjIdToKeyMap, newObjIdToKeyMap));
+      addToObjectIdMap(fsKeyTable,
+          tsKeyTable,
+          deltaFilesForKeyOrFileTable,
+          oldObjIdToKeyPersistentMap,
+          newObjIdToKeyPersistentMap,
+          objectIDsToCheckMap,
+          false);
+
+      if (bucketLayout.isFileSystemOptimized()) {
+        // add to object ID map for directory.
+        final Table<String, OmDirectoryInfo> fsDirTable =
+            fromSnapshot.getMetadataManager().getDirectoryTable();
+        final Table<String, OmDirectoryInfo> tsDirTable =
+            toSnapshot.getMetadataManager().getDirectoryTable();
+        final Set<String> deltaFilesForDirTable =
+            getDeltaFiles(fromSnapshot, toSnapshot,
+                Collections.singletonList(fsDirTable.getName()),
+                fsInfo, tsInfo, volume, bucket);
+        addToObjectIdMap(fsDirTable,
+            tsDirTable,
+            deltaFilesForDirTable,
+            oldObjIdToKeyPersistentMap,
+            newObjIdToKeyPersistentMap,
+            objectIDsToCheckMap,
+            true);
+      }
+
+      List<DiffReportEntry> diffReportEntries = generateDiffReport(requestId,
+          objectIDsToCheckMap,
+          oldObjIdToKeyPersistentMap,
+          newObjIdToKeyPersistentMap);
+
+      return new SnapshotDiffReport(volume,
+          bucket,
+          fromSnapshot.getName(),
+          toSnapshot.getName(),
+          diffReportEntries);
+    } finally {
+      // Clean up: drop the intermediate column family and close them.
+      if (fromSnapshotColumnFamily != null) {
+        rocksDB.dropColumnFamily(fromSnapshotColumnFamily);
+        fromSnapshotColumnFamily.close();
+      }
+      if (toSnapshotColumnFamily != null) {
+        rocksDB.dropColumnFamily(toSnapshotColumnFamily);
+        toSnapshotColumnFamily.close();
+      }
+      if (objectIDsColumnFamily != null) {
+        rocksDB.dropColumnFamily(objectIDsColumnFamily);
+        objectIDsColumnFamily.close();
+      }
+    }
   }
 
   private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
-      Table<String, ? extends WithObjectID> tsTable, Set<String> deltaFiles,
-      Map<Long, String> oldObjIdToKeyMap, Map<Long, String> newObjIdToKeyMap,
-      Set<Long> objectIDsToCheck, boolean isDirectoryTable) {
+                                Table<String, ? extends WithObjectID> tsTable,
+                                Set<String> deltaFiles,
+                                PersistentMap<Long, String> oldObjIdToKeyMap,
+                                PersistentMap<Long, String> newObjIdToKeyMap,
+                                PersistentMap<Long, byte[]> objectIDsToCheck,
+                                boolean isDirectoryTable) {
 
     if (deltaFiles.isEmpty()) {
       return;
@@ -178,14 +266,14 @@ public class SnapshotDiffManager {
           if (oldKey != null) {
             final long oldObjId = oldKey.getObjectID();
             oldObjIdToKeyMap.put(oldObjId,
-                getKeyOrDirectoryName(isDirectoryTable, oldKey));
-            objectIDsToCheck.add(oldObjId);
+                    getKeyOrDirectoryName(isDirectoryTable, oldKey));
+            objectIDsToCheck.put(oldObjId, emptyByteArray);
           }
           if (newKey != null) {
             final long newObjId = newKey.getObjectID();
             newObjIdToKeyMap.put(newObjId,
-                getKeyOrDirectoryName(isDirectoryTable, newKey));
-            objectIDsToCheck.add(newObjId);
+                    getKeyOrDirectoryName(isDirectoryTable, newKey));
+            objectIDsToCheck.put(newObjId, emptyByteArray);
           }
         } catch (IOException e) {
           throw new RuntimeException(e);
@@ -271,61 +359,130 @@ public class SnapshotDiffManager {
   }
 
   private List<DiffReportEntry> generateDiffReport(
-      final Set<Long> objectIDsToCheck,
-      final Map<Long, String> oldObjIdToKeyMap,
-      final Map<Long, String> newObjIdToKeyMap) {
+      final String requestId,
+      final PersistentMap<Long, byte[]> objectIDsToCheck,
+      final PersistentMap<Long, String> oldObjIdToKeyMap,
+      final PersistentMap<Long, String> newObjIdToKeyMap
+  ) throws RocksDBException, IOException {
 
-    final List<DiffReportEntry> deleteDiffs = new ArrayList<>();
-    final List<DiffReportEntry> renameDiffs = new ArrayList<>();
-    final List<DiffReportEntry> createDiffs = new ArrayList<>();
-    final List<DiffReportEntry> modifyDiffs = new ArrayList<>();
+    // RequestId is prepended to column family name to make it unique
+    // for request.
+    ColumnFamilyHandle deleteDiffColumnFamily = null;
+    ColumnFamilyHandle renameDiffColumnFamily = null;
+    ColumnFamilyHandle createDiffColumnFamily = null;
+    ColumnFamilyHandle modifyDiffColumnFamily = null;
+
+    try {
+      deleteDiffColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-deleteDiff"),
+              new ColumnFamilyOptions()));
+      renameDiffColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-renameDiff"),
+              new ColumnFamilyOptions()));
+      createDiffColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-createDiff"),
+              new ColumnFamilyOptions()));
+      modifyDiffColumnFamily = rocksDB.createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData(requestId + "-modifyDiff"),
+              new ColumnFamilyOptions()));
+
+      final PersistentMap<Long, DiffReportEntry> deleteDiffs =
+          createDiffReportPersistentMap(deleteDiffColumnFamily);
+      final PersistentMap<Long, DiffReportEntry> renameDiffs =
+          createDiffReportPersistentMap(renameDiffColumnFamily);
+      final PersistentMap<Long, DiffReportEntry> createDiffs =
+          createDiffReportPersistentMap(createDiffColumnFamily);
+      final PersistentMap<Long, DiffReportEntry> modifyDiffs =
+          createDiffReportPersistentMap(modifyDiffColumnFamily);
 
 
-    for (Long id : objectIDsToCheck) {
-      /*
-       * This key can be
-       * -> Created after the old snapshot was taken, which means it will be
-       *    missing in oldKeyTable and present in newKeyTable.
-       * -> Deleted after the old snapshot was taken, which means it will be
-       *    present in oldKeyTable and missing in newKeyTable.
-       * -> Modified after the old snapshot was taken, which means it will be
-       *    present in oldKeyTable and present in newKeyTable with same
-       *    Object ID but with different metadata.
-       * -> Renamed after the old snapshot was taken, which means it will be
-       *    present in oldKeyTable and present in newKeyTable but with different
-       *    name and same Object ID.
-       */
+      long deleteCounter = 0L;
+      long renameCounter = 0L;
+      long createCounter = 0L;
+      long modifyCounter = 0L;
 
-      final String oldKeyName = oldObjIdToKeyMap.get(id);
-      final String newKeyName = newObjIdToKeyMap.get(id);
+      Iterator<Long> objectIdsIterator = objectIDsToCheck.getKeyIterator();
+      while (objectIdsIterator.hasNext()) {
+        Long id = objectIdsIterator.next();
+        /*
+         * This key can be
+         * -> Created after the old snapshot was taken, which means it will be
+         *    missing in oldKeyTable and present in newKeyTable.
+         * -> Deleted after the old snapshot was taken, which means it will be
+         *    present in oldKeyTable and missing in newKeyTable.
+         * -> Modified after the old snapshot was taken, which means it will be
+         *    present in oldKeyTable and present in newKeyTable with same
+         *    Object ID but with different metadata.
+         * -> Renamed after the old snapshot was taken, which means it will be
+         *    present in oldKeyTable and present in newKeyTable but with
+         *    different name and same Object ID.
+         */
 
-      if (oldKeyName == null && newKeyName == null) {
-        // This cannot happen.
-        continue;
+        final String oldKeyName = oldObjIdToKeyMap.get(id);
+        final String newKeyName = newObjIdToKeyMap.get(id);
+
+        if (oldKeyName == null && newKeyName == null) {
+          // This cannot happen.
+          throw new IllegalStateException("Old and new key name both are null");
+        } else if (oldKeyName == null) { // Key Created.
+          createDiffs.put(createCounter++,
+              DiffReportEntry.of(DiffType.CREATE, newKeyName));
+        } else if (newKeyName == null) { // Key Deleted.
+          deleteDiffs.put(deleteCounter++,
+              DiffReportEntry.of(DiffType.DELETE, oldKeyName));
+        } else if (oldKeyName.equals(newKeyName)) { // Key modified.
+          modifyDiffs.put(modifyCounter++,
+              DiffReportEntry.of(DiffType.MODIFY, newKeyName));
+        } else { // Key Renamed.
+          renameDiffs.put(renameCounter++,
+              DiffReportEntry.of(DiffType.RENAME, oldKeyName, newKeyName));
+        }
       }
 
-      // Key Created.
-      if (oldKeyName == null) {
-        createDiffs.add(DiffReportEntry.of(DiffType.CREATE, newKeyName));
-        continue;
+      return aggregateDiffReports(deleteDiffs,
+          renameDiffs,
+          createDiffs,
+          modifyDiffs);
+    } finally {
+      if (deleteDiffColumnFamily != null) {
+        rocksDB.dropColumnFamily(deleteDiffColumnFamily);
+        deleteDiffColumnFamily.close();
       }
-
-      // Key Deleted.
-      if (newKeyName == null) {
-        deleteDiffs.add(DiffReportEntry.of(DiffType.DELETE, oldKeyName));
-        continue;
+      if (renameDiffColumnFamily != null) {
+        rocksDB.dropColumnFamily(renameDiffColumnFamily);
+        renameDiffColumnFamily.close();
       }
-
-      // Key modified.
-      if (oldKeyName.equals(newKeyName)) {
-        modifyDiffs.add(DiffReportEntry.of(DiffType.MODIFY, newKeyName));
-        continue;
+      if (createDiffColumnFamily != null) {
+        rocksDB.dropColumnFamily(createDiffColumnFamily);
+        createDiffColumnFamily.close();
       }
-
-      // Key Renamed.
-      renameDiffs.add(DiffReportEntry.of(DiffType.RENAME,
-          oldKeyName, newKeyName));
+      if (modifyDiffColumnFamily != null) {
+        rocksDB.dropColumnFamily(modifyDiffColumnFamily);
+        modifyDiffColumnFamily.close();
+      }
     }
+  }
+
+  private PersistentMap<Long, DiffReportEntry> createDiffReportPersistentMap(
+      ColumnFamilyHandle columnFamilyHandle
+  ) {
+    return new RocksDBPersistentMap<>(rocksDB,
+        columnFamilyHandle,
+        codecRegistry,
+        Long.class,
+        DiffReportEntry.class);
+  }
+
+  private List<DiffReportEntry> aggregateDiffReports(
+      PersistentMap<Long, DiffReportEntry> deleteDiffs,
+      PersistentMap<Long, DiffReportEntry> renameDiffs,
+      PersistentMap<Long, DiffReportEntry> createDiffs,
+      PersistentMap<Long, DiffReportEntry> modifyDiffs
+  ) {
     /*
      * The order in which snap-diff should be applied
      *
@@ -362,11 +519,19 @@ public class SnapshotDiffManager {
      *
      */
 
+    // TODO: This needs to be changed to persist in RocksDB, probably
+    //  in active object store RocksDB and handle with pagination.
     final List<DiffReportEntry> snapshotDiffs = new ArrayList<>();
-    snapshotDiffs.addAll(deleteDiffs);
-    snapshotDiffs.addAll(renameDiffs);
-    snapshotDiffs.addAll(createDiffs);
-    snapshotDiffs.addAll(modifyDiffs);
+
+    deleteDiffs.getEntryIterator()
+        .forEachRemaining(entry -> snapshotDiffs.add(entry.getValue()));
+    renameDiffs.getEntryIterator()
+        .forEachRemaining(entry -> snapshotDiffs.add(entry.getValue()));
+    createDiffs.getEntryIterator()
+        .forEachRemaining(entry -> snapshotDiffs.add(entry.getValue()));
+    modifyDiffs.getEntryIterator()
+        .forEachRemaining(entry -> snapshotDiffs.add(entry.getValue()));
+
     return snapshotDiffs;
   }
 
