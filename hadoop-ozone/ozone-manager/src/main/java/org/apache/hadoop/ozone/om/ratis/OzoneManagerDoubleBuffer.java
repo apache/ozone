@@ -275,8 +275,9 @@ public final class OzoneManagerDoubleBuffer {
 
             AtomicReference<String> lastTraceId = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
+              OMResponse omResponse = null;
               try {
-                OMResponse omResponse = entry.getResponse().getOMResponse();
+                omResponse = entry.getResponse().getOMResponse();
                 lastTraceId.set(omResponse.getTraceID());
                 addToBatchWithTrace(omResponse,
                     (SupplierWithIOException<Void>) () -> {
@@ -290,7 +291,9 @@ public final class OzoneManagerDoubleBuffer {
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
-                terminate(ex);
+                terminate(ex, 1, omResponse);
+              } catch (Throwable t) {
+                terminate(t, 2, omResponse);
               }
             });
 
@@ -386,11 +389,9 @@ public final class OzoneManagerDoubleBuffer {
               + "exit.", Thread.currentThread().getName());
         }
       } catch (IOException ex) {
-        terminate(ex);
+        terminate(ex, 1);
       } catch (Throwable t) {
-        final String s = "OMDoubleBuffer flush thread " +
-            Thread.currentThread().getName() + " encountered Throwable error";
-        ExitUtils.terminate(2, s, t, LOG);
+        terminate(t, 2);
       }
     }
   }
@@ -480,10 +481,18 @@ public final class OzoneManagerDoubleBuffer {
 
   }
 
-  private void terminate(IOException ex) {
-    String message = "During flush to DB encountered error in " +
-        "OMDoubleBuffer flush thread " + Thread.currentThread().getName();
-    ExitUtils.terminate(1, message, ex, LOG);
+  private void terminate(Throwable t, int status) {
+    terminate(t, status, null);
+  }
+
+  private void terminate(Throwable t, int status, OMResponse omResponse) {
+    StringBuilder message = new StringBuilder(
+        "During flush to DB encountered error in " +
+        "OMDoubleBuffer flush thread " + Thread.currentThread().getName());
+    if (omResponse != null) {
+      message.append(" when handling OMRequest: ").append(omResponse);
+    }
+    ExitUtils.terminate(status, message.toString(), t, LOG);
   }
 
   /**

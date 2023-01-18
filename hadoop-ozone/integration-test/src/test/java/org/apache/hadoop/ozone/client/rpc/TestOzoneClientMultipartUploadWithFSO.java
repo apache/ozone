@@ -330,7 +330,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
       throws IOException {
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 1024)));
 

@@ -121,7 +121,7 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
     LOG.debug("Trying to delete UNHEALTHY replica [{}]", replica);
     try {
       replicationManager.sendDeleteCommand(containerInfo,
-          replica.getReplicaIndex(), replica.getDatanodeDetails());
+          replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
     } catch (NotLeaderException e) {
       LOG.warn("Failed to delete UNHEALTHY replica [{}]", replica, e);
     }

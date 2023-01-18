@@ -66,4 +66,21 @@ public class ReconTaskConfig {
     this.missingContainerTaskInterval = interval.toMillis();
   }
 
+  @Config(key = "safemode.wait.threshold",
+      type = ConfigType.TIME,
+      defaultValue = "300s",
+      tags = { ConfigTag.RECON, ConfigTag.OZONE },
+      description = "The time interval to wait for starting container " +
+          "health task and pipeline sync task before recon " +
+          "exits out of safe or warmup mode. "
+  )
+  private long safeModeWaitThreshold = Duration.ofMinutes(5).toMillis();
+
+  public Duration getSafeModeWaitThreshold() {
+    return Duration.ofMillis(safeModeWaitThreshold);
+  }
+
+  public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
+    this.safeModeWaitThreshold = safeModeWaitThreshold.toMillis();
+  }
 }

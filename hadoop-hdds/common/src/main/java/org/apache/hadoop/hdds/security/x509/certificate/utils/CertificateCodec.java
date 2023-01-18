@@ -79,6 +79,11 @@ public class CertificateCodec {
     this.location = securityConfig.getCertificateLocation(component);
   }
 
+  public CertificateCodec(SecurityConfig config, Path certPath) {
+    this.securityConfig = config;
+    this.location = certPath;
+  }
+
   /**
    * Returns a X509 Certificate from the Certificate Holder.
    *

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -65,6 +66,17 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
             Pair.of(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 3));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3, 4, 5, 6, 7})
+  public void testMisReplicationWithAllNodesAvailableQuasiClosed(
+      int misreplicationCount) throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(State.QUASI_CLOSED, Pair.of(IN_SERVICE, 0),
+            Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+    testMisReplication(availableReplicas, Collections.emptyList(),
+        0, misreplicationCount, Math.min(misreplicationCount, 3));
   }
 
   @Test

@@ -108,6 +108,7 @@ public class ContainerHealthResult {
     private final boolean dueToDecommission;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
+    private boolean hasUnReplicatedOfflineIndexes = false;
     private int requeueCount = 0;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
@@ -205,6 +206,27 @@ public class ContainerHealthResult {
      */
     public boolean isUnrecoverable() {
       return unrecoverable;
+    }
+
+    /**
+     * Pass true if a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @param val pass true if the container has indexes on nodes going offline
+     *            or false otherwise.
+     */
+    public void setHasUnReplicatedOfflineIndexes(boolean val) {
+      hasUnReplicatedOfflineIndexes = val;
+    }
+    /**
+     * Indicates whether a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @return True if the container has some decommission or maintenance only
+     *         indexes.
+     */
+    public boolean hasUnreplicatedOfflineIndexes() {
+      return hasUnReplicatedOfflineIndexes;
     }
   }
 

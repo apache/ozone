@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -345,7 +346,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
-        if (replicaSet.isSufficientlyReplicated()) {
+        if (replicaSet.isSufficientlyReplicatedForOffline(dn)) {
           sufficientlyReplicated++;
         } else {
           if (LOG.isDebugEnabled()) {
@@ -398,7 +399,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return underReplicated == 0 && unhealthy == 0;
   }
 
-  private String replicaDetails(Set<ContainerReplica> replicas) {
+  private String replicaDetails(Collection<ContainerReplica> replicas) {
     StringBuilder sb = new StringBuilder();
     sb.append("Replicas{");
     sb.append(replicas.stream()
