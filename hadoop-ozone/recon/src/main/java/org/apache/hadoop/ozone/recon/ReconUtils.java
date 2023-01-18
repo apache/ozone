@@ -102,7 +102,7 @@ public class ReconUtils {
   }
 
   /**
-   * Given a source directory, create a tar.gz file from it.
+   * Given a source directory, create a tar file from it.
    *
    * @param sourcePath the path to the directory to be archived.
    * @return tar file

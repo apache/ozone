@@ -179,7 +179,7 @@ public class TestOMDbCheckpointServlet {
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
-    doNothing().when(responseMock).setContentType("application/x-tgz");
+    doNothing().when(responseMock).setContentType("application/x-tar");
     doNothing().when(responseMock).setHeader(Matchers.anyString(),
         Matchers.anyString());
 

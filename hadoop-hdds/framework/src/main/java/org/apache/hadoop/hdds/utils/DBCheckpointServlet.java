@@ -21,8 +21,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -37,12 +35,11 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -50,7 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar.gz)
+ * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
  */
 public class DBCheckpointServlet extends HttpServlet {
 
@@ -165,7 +162,7 @@ public class DBCheckpointServlet extends HttpServlet {
       if (file == null) {
         return;
       }
-      response.setContentType("application/x-tgz");
+      response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition",
           "attachment; filename=\"" +
                file + ".tar\"");
@@ -198,7 +195,7 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
+   * Write DB Checkpoint to an output stream as a compressed file (tar).
    *
    * @param checkpoint  checkpoint file
    * @param destination desination output stream.
@@ -226,15 +223,4 @@ public class DBCheckpointServlet extends HttpServlet {
     }
   }
 
-  private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
-    }
-    archiveOutputStream.closeArchiveEntry();
-  }
 }

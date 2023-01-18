@@ -523,7 +523,7 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
+   * Write DB Checkpoint to an output stream as a compressed file (tar).
    *
    * @param checkpoint  checkpoint file
    * @param destination destination output stream.
@@ -548,8 +548,8 @@ public final class HddsServerUtil {
     }
   }
 
-  private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
+  public static void includeFile(File file, String entryName,
+                                 ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);

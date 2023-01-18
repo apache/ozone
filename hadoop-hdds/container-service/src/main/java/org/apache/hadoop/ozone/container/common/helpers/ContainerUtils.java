@@ -280,14 +280,14 @@ public final class ContainerUtils {
     return Long.parseLong(containerBaseDir.getName());
   }
 
-  public static String getContainerTarGzName(long containerId) {
-    return "container-" + containerId + ".tar.gz";
+  public static String getContainerTarName(long containerId) {
+    return "container-" + containerId + ".tar";
   }
 
   public static long retrieveContainerIdFromTarGzName(String tarGzName)
       throws IOException {
     assert tarGzName != null;
-    Pattern pattern = Pattern.compile("container-(\\d+).tar.gz");
+    Pattern pattern = Pattern.compile("container-(\\d+).tar");
     // Now create matcher object.
     Matcher m = pattern.matcher(tarGzName);
 

@@ -61,8 +61,8 @@ public class TestContainerUtils {
   @Test
   public void testTarGzName() throws IOException {
     long containerId = 100;
-    String tarGzName = "container-100.tar.gz";
-    assertEquals(tarGzName, ContainerUtils.getContainerTarGzName(containerId));
+    String tarGzName = "container-100.tar";
+    assertEquals(tarGzName, ContainerUtils.getContainerTarName(containerId));
 
     assertEquals(containerId,
         ContainerUtils.retrieveContainerIdFromTarGzName(tarGzName));
