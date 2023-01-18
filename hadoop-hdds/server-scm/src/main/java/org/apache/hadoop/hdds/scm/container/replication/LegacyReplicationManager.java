@@ -429,7 +429,8 @@ public class LegacyReplicationManager {
          */
         if (state == LifeCycleState.CLOSING) {
           if (isClosingContainerMissing(replicas)) {
-            report.incrementAndSample(HealthState.MISSING, container.containerID());
+            report.incrementAndSample(HealthState.MISSING,
+                    container.containerID());
           }
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
@@ -447,6 +448,10 @@ public class LegacyReplicationManager {
         if (state == LifeCycleState.QUASI_CLOSED) {
           if (canForceCloseContainer(container, replicas)) {
             forceCloseContainer(container, replicas);
+            if (isQuasyCloseContainerMissing(replicas)) {
+              report.incrementAndSample(HealthState.MISSING,
+                      container.containerID());
+            }
             return;
           } else {
             report.incrementAndSample(HealthState.QUASI_CLOSED_STUCK,
@@ -1616,13 +1621,24 @@ public class LegacyReplicationManager {
   }
 
   /**
-   * A closing container is missing if there is no open replicas
+   * A closing container is missing if there is no replicas.
    * @param replicas The replicas belonging to the container
-   * @return True if the container is healthy, false otherwise
+   * @return True if the container is missing, false otherwise
    */
   private boolean isClosingContainerMissing(Set<ContainerReplica> replicas) {
-    return !replicas.stream()
-            .anyMatch(r -> compareState(LifeCycleState.OPEN, r.getState()));
+    return replicas.size() == 0;
+  }
+
+  /**
+   * A quasy close container is missing if there is no replicas or
+   * all replicas are in quasy close state.
+   * @param replicas The replicas belonging to the container
+   * @return True if the container is missing, false otherwise
+   */
+  private boolean isQuasyCloseContainerMissing(Set<ContainerReplica> replicas) {
+    return replicas.size() == 0 || replicas.stream()
+            .allMatch(r ->
+                    compareState(LifeCycleState.QUASI_CLOSED, r.getState()));
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
