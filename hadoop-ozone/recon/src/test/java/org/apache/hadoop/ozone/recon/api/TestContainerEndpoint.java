@@ -96,7 +96,7 @@ import org.junit.rules.TemporaryFolder;
 /**
  * Test for container endpoint.
  */
-public class TestContainerEndpoint extends AbstractReconContainerManagerTest {
+public class TestContainerEndpoint {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -330,14 +330,9 @@ public class TestContainerEndpoint extends AbstractReconContainerManagerTest {
   }
 
   @Test
-  public void testGetContainers() {
-    try {
+  public void testGetContainers() throws IOException, TimeoutException {
       putContainerInfos(5);
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (TimeoutException e) {
-      e.printStackTrace();
-    }
+
     Response response = containerEndpoint.getContainers(10, 0L);
 
     ContainersResponse responseObject =
