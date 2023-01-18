@@ -96,8 +96,7 @@ public class TestRatisOverReplicationHandler {
   }
 
   /**
-   * Handler should create one delete command when a closed ratis container
-   * has 5 replicas and 1 pending delete.
+   * Container has 4 replicas and 1 stale so none should be deleted.
    */
   @Test
   public void testOverReplicatedClosedContainerWithStale() throws IOException,
