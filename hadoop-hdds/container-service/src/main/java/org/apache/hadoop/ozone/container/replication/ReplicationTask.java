@@ -31,15 +31,9 @@ public class ReplicationTask {
 
   private volatile Status status = Status.QUEUED;
 
-  private final long containerId;
-
-  private final List<DatanodeDetails> sources;
-
   private final Instant queued = Instant.now();
 
-  private final long deadlineMsSinceEpoch;
-
-  private final long term;
+  private final ReplicateContainerCommand cmd;
 
   /**
    * Counter for the transferred bytes.
@@ -47,10 +41,7 @@ public class ReplicationTask {
   private long transferredBytes;
 
   public ReplicationTask(ReplicateContainerCommand cmd) {
-    this.containerId = cmd.getContainerID();
-    this.sources = cmd.getSourceDatanodes();
-    this.deadlineMsSinceEpoch = cmd.getDeadline();
-    this.term = cmd.getTerm();
+    this.cmd = cmd;
   }
 
   /**
@@ -68,7 +59,7 @@ public class ReplicationTask {
    * A returned value of zero indicates no deadline.
    */
   public long getDeadline() {
-    return deadlineMsSinceEpoch;
+    return cmd.getDeadline();
   }
 
   @Override
@@ -80,20 +71,21 @@ public class ReplicationTask {
       return false;
     }
     ReplicationTask that = (ReplicationTask) o;
-    return containerId == that.containerId;
+    return getContainerId() == that.getContainerId() &&
+        Objects.equals(getTarget(), that.getTarget());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(containerId);
+    return Objects.hash(getContainerId(), getTarget());
   }
 
   public long getContainerId() {
-    return containerId;
+    return cmd.getContainerID();
   }
 
   public List<DatanodeDetails> getSources() {
-    return sources;
+    return cmd.getSourceDatanodes();
   }
 
   public Status getStatus() {
@@ -108,8 +100,7 @@ public class ReplicationTask {
   public String toString() {
     return "ReplicationTask{" +
         "status=" + status +
-        ", containerId=" + containerId +
-        ", sources=" + sources +
+        ", cmd={" + cmd + "}" +
         ", queued=" + queued +
         '}';
   }
@@ -127,7 +118,15 @@ public class ReplicationTask {
   }
 
   long getTerm() {
-    return term;
+    return cmd.getTerm();
+  }
+
+  DatanodeDetails getTarget() {
+    return cmd.getTargetDatanode();
+  }
+
+  ReplicateContainerCommand getCommand() {
+    return cmd;
   }
 
   /**
@@ -135,7 +134,7 @@ public class ReplicationTask {
    */
   public enum Status {
     QUEUED,
-    DOWNLOADING,
+    IN_PROGRESS,
     FAILED,
     DONE
   }

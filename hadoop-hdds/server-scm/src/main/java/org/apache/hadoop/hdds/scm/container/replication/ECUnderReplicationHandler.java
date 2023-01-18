@@ -356,16 +356,18 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                   replicas, selectedDatanodes, excludedNodes, decomIndexes);
               break;
             }
-            DatanodeDetails decommissioningSrcNode
-                = replica.getDatanodeDetails();
-            final ReplicateContainerCommand replicateCommand =
-                new ReplicateContainerCommand(container.getContainerID(),
-                    ImmutableList.of(decommissioningSrcNode));
+            final boolean push = replicationManager.getConfig().isPush();
+            DatanodeDetails source = replica.getDatanodeDetails();
+            DatanodeDetails target = iterator.next();
+            final long containerID = container.getContainerID();
+            final ReplicateContainerCommand replicateCommand = push
+                ? ReplicateContainerCommand.toTarget(containerID, target)
+                : ReplicateContainerCommand.fromSources(containerID,
+                    ImmutableList.of(source));
             // For EC containers, we need to track the replica index which is
             // to be replicated, so add it to the command.
             replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-            DatanodeDetails target = iterator.next();
-            commands.put(target, replicateCommand);
+            commands.put(push ? source : target, replicateCommand);
           }
         }
       }

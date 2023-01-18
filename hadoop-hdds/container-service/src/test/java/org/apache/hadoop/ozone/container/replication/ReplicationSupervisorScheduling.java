@@ -113,7 +113,7 @@ public class ReplicationSupervisorScheduling {
             }
           }
 
-        }, replicationConfig, Clock.system(ZoneId.systemDefault()));
+        }, null, replicationConfig, Clock.system(ZoneId.systemDefault()));
 
     final long start = System.currentTimeMillis();
 

@@ -79,6 +79,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
@@ -861,6 +862,16 @@ public class ReplicationManager implements SCMService {
     )
     private int maintenanceRemainingRedundancy = 1;
 
+    @Config(key = "push",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "false",
+        tags = { SCM, DATANODE },
+        description = "If false, replication happens by asking the target to " +
+            "pull from source nodes.  If true, the source node is asked to " +
+            "push to the target node."
+    )
+    private boolean push;
+
     @PostConstruct
     public void validate() {
       if (!(commandDeadlineFactor > 0) || (commandDeadlineFactor > 1)) {
@@ -904,6 +915,10 @@ public class ReplicationManager implements SCMService {
 
     public int getMaintenanceReplicaMinimum() {
       return maintenanceReplicaMinimum;
+    }
+
+    public boolean isPush() {
+      return push;
     }
   }
 
@@ -950,6 +965,10 @@ public class ReplicationManager implements SCMService {
 
   public synchronized ReplicationManagerMetrics getMetrics() {
     return metrics;
+  }
+
+  public ReplicationManagerConfiguration getConfig() {
+    return rmConf;
   }
 
 
