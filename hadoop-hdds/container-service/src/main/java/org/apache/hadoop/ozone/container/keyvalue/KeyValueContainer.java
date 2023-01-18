@@ -335,7 +335,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
-    LOG.warn("Moving container {} to state {} from state:{} Trace:{}",
+    LOG.warn("Moving container {} to state {} from state:{}",
             containerData.getContainerPath(), containerData.getState(),
             prevState);
   }
