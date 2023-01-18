@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
@@ -56,6 +58,7 @@ public class TestRatisOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
+  private NodeManager nodeManager;
 
   @Before
   public void setup() throws NodeNotFoundException {
@@ -66,6 +69,10 @@ public class TestRatisOverReplicationHandler {
     Mockito.when(policy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+
+    nodeManager = Mockito.mock(NodeManager.class);
+    Mockito.when(nodeManager.getNodeStatus(Mockito.any()))
+        .thenReturn(NodeStatus.inServiceHealthy());
 
     GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
   }
@@ -86,6 +93,23 @@ public class TestRatisOverReplicationHandler {
     // created
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(),
         1);
+  }
+
+  /**
+   * Container has 4 replicas and 1 stale so none should be deleted.
+   */
+  @Test
+  public void testOverReplicatedClosedContainerWithStale() throws IOException,
+      NodeNotFoundException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+
+    ContainerReplica stale = replicas.stream().findFirst().get();
+    Mockito.when(nodeManager.getNodeStatus(stale.getDatanodeDetails()))
+        .thenReturn(NodeStatus.inServiceStale());
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
   }
 
   /**
@@ -261,7 +285,7 @@ public class TestRatisOverReplicationHandler {
       ContainerHealthResult healthResult,
       int expectNumCommands) throws IOException {
     RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(policy);
+        new RatisOverReplicationHandler(policy, nodeManager);
 
     Map<DatanodeDetails, SCMCommand<?>> commands =
         handler.processAndCreateCommands(replicas, pendingOps,
