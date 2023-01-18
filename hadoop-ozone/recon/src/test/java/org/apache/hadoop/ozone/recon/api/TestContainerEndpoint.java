@@ -75,7 +75,6 @@ import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.AbstractReconContainerManagerTest;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -331,7 +330,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetContainers() throws IOException, TimeoutException {
-      putContainerInfos(5);
+    putContainerInfos(5);
 
     Response response = containerEndpoint.getContainers(10, 0L);
 
