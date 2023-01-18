@@ -396,6 +396,7 @@ public class KeyValueContainerCheck {
   }
 
   private void handleCorruption(IOException e) {
-    LOG.error("Marking Container [{}] UNHEALTHY as it failed metadata check. Exception: {}", containerID, e);
+    LOG.error("Marking Container [{}] UNHEALTHY as it failed metadata check." +
+                    " Exception: {}", containerID, e);
   }
 }
