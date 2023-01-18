@@ -122,7 +122,7 @@ public class ContainerEndpoint {
       return Response.ok().build();
     }
     long containersCount;
-    Collection<ContainerMetadata> containerMetadatas =
+    Collection<ContainerMetadata> containerMetaDataList =
         containerManager.getContainers(ContainerID.valueOf(prevKey), limit)
             .stream()
             .map(container -> {
@@ -133,9 +133,9 @@ public class ContainerEndpoint {
             })
             .collect(Collectors.toList());
 
-    containersCount = containerMetadatas.size();
+    containersCount = containerMetaDataList.size();
     ContainersResponse containersResponse =
-        new ContainersResponse(containersCount, containerMetadatas);
+        new ContainersResponse(containersCount, containerMetaDataList);
     return Response.ok(containersResponse).build();
   }
 
