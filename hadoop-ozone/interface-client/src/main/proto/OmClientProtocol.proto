@@ -953,6 +953,7 @@ message KeyInfo {
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
+    optional bool isFile = 19;
 }
 
 message DirectoryInfo {

@@ -440,7 +440,8 @@ public class BlockDeletingService extends BackgroundService {
       Deleter schema3Deleter = (table, batch, tid) -> {
         Table<String, DeletedBlocksTransaction> delTxTable =
             (Table<String, DeletedBlocksTransaction>) table;
-        delTxTable.deleteWithBatch(batch, containerData.deleteTxnKey(tid));
+        delTxTable.deleteWithBatch(batch,
+            containerData.getDeleteTxnKey(tid));
       };
       Table<String, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<String>) meta.getStore())
@@ -502,7 +503,7 @@ public class BlockDeletingService extends BackgroundService {
             deleter.apply(deleteTxns, batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
               blockDataTable.deleteWithBatch(batch,
-                  containerData.blockKey(blk));
+                  containerData.getBlockKey(blk));
             }
           }
 
@@ -550,14 +551,19 @@ public class BlockDeletingService extends BackgroundService {
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
-          String blk = containerData.blockKey(blkLong);
+          String blk = containerData.getBlockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blkLong);
           if (blkInfo == null) {
-            LOG.warn("Missing delete block(Container = " +
-                container.getContainerData().getContainerID() + ", Block = " +
-                blkLong);
-            blocksProcessed++;
+            try {
+              handler.deleteUnreferenced(container, blkLong);
+            } catch (IOException e) {
+              LOG.error("Failed to delete files for unreferenced block {} of" +
+                      " container {}", blkLong,
+                  container.getContainerData().getContainerID(), e);
+            } finally {
+              blocksProcessed++;
+            }
             continue;
           }
 
@@ -565,7 +571,6 @@ public class BlockDeletingService extends BackgroundService {
           try {
             handler.deleteBlock(container, blkInfo);
             blocksDeleted++;
-            blocksProcessed++;
             deleted = true;
           } catch (IOException e) {
             // TODO: if deletion of certain block retries exceed the certain
@@ -573,6 +578,8 @@ public class BlockDeletingService extends BackgroundService {
             //  otherwise invalid numPendingDeletionBlocks could accumulate
             //  beyond the limit and the following deletion will stop.
             LOG.error("Failed to delete files for block {}", blkLong, e);
+          } finally {
+            blocksProcessed++;
           }
 
           if (deleted) {

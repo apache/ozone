@@ -65,6 +65,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
@@ -316,8 +317,20 @@ public class TestOmMetrics {
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
 
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        new ECReplicationConfig("rs-6-4-1024K"));
+    try {
+      keySession = writeClient.openKey(keyArgs);
+      writeClient.commitKey(keyArgs, keySession.getId());
+    } catch (Exception e) {
+      //Expected Failure in preExecute due to not enough datanode
+      Assertions.assertTrue(e.getMessage()
+          .contains("No enough datanodes to choose"));
+    }
+
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
+    assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());

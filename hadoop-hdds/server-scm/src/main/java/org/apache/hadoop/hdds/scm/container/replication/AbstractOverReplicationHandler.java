@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,7 +56,8 @@ public abstract class AbstractOverReplicationHandler
    */
   public abstract Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
-      ContainerHealthResult result, int remainingMaintenanceRedundancy);
+      ContainerHealthResult result, int remainingMaintenanceRedundancy) throws
+      IOException;
 
   /**
    * Identify whether the placement status is actually equal for a
@@ -76,6 +78,20 @@ public abstract class AbstractOverReplicationHandler
         getPlacementStatus(replicas, replicationFactor);
     replicas.add(replica);
     return isPlacementStatusActuallyEqual(currentCPS, newCPS);
+  }
+
+  /**
+   * Allow the placement policy to indicate which replicas can be removed for
+   * an over replicated container, so that the placement policy is not violated
+   * by removing them.
+   * @param replicas
+   * @param expectedCountPerUniqueReplica
+   * @return
+   */
+  protected Set<ContainerReplica> selectReplicasToRemove(
+      Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+    return placementPolicy.replicasToRemoveToFixOverreplication(
+        replicas, expectedCountPerUniqueReplica);
   }
 
   /**

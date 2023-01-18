@@ -692,7 +692,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(0));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(0));
     Assertions.assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE pipeline
@@ -701,7 +702,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(ratisOneDn, RATIS, ONE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(1));
     Assertions.assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/THREE pipeline
@@ -712,7 +714,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(2));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(2));
     Assertions.assertEquals(pipelineCount, 1);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline
@@ -721,7 +724,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(1));
     Assertions.assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline and
@@ -734,7 +738,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(1));
     Assertions.assertEquals(pipelineCount, 2);
   }
 

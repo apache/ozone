@@ -205,16 +205,10 @@ public final class ScmUtils {
   @NotNull
   public static List<BlockingQueue<ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
-    int threadPoolSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
-            StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
-                + "_OR_"
-                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
+    int threadPoolSize = configuration.getInt(getContainerReportConfPrefix()
             + ".thread.pool.size",
         OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
-    int queueSize = configuration.getInt(OZONE_SCM_EVENT_PREFIX +
-            StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
-                + "_OR_"
-                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName())
+    int queueSize = configuration.getInt(getContainerReportConfPrefix()
             + ".queue.size",
         OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
     List<BlockingQueue<ContainerReport>> queues = new ArrayList<>();
@@ -222,6 +216,13 @@ public final class ScmUtils {
       queues.add(new ContainerReportQueue(queueSize));
     }
     return queues;
+  }
+  
+  public static String getContainerReportConfPrefix() {
+    return OZONE_SCM_EVENT_PREFIX +
+        StringUtils.camelize(SCMEvents.CONTAINER_REPORT.getName()
+            + "_OR_"
+            + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName());
   }
 
 }

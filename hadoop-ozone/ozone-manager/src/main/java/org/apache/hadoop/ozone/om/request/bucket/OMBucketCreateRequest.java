@@ -207,8 +207,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       //Check quotaInBytes to update
-      checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
-          volumeKey);
+      if (!bucketInfo.hasSourceBucket()) {
+        checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
+            volumeKey);
+      }
 
       // Add objectID and updateID
       omBucketInfo.setObjectID(
@@ -388,6 +390,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
     long quotaInBytes = omBucketInfo.getQuotaInBytes();
     long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
 
+    // When volume quota is set, then its mandatory to have bucket quota
+    if (volumeQuotaInBytes > 0) {
+      if (quotaInBytes <= 0) {
+        throw new OMException("Bucket space quota in this volume " +
+            "should be set as volume space quota is already set.",
+            OMException.ResultCodes.QUOTA_ERROR);
+      }
+    }
+
     long totalBucketQuota = 0;
     if (quotaInBytes > 0) {
       totalBucketQuota = quotaInBytes;
@@ -405,10 +416,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
     if (volumeQuotaInBytes < totalBucketQuota
         && volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           " set to:" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
 
