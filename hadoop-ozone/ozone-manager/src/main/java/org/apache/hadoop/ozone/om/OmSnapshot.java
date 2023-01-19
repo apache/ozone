@@ -227,9 +227,11 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   private KeyInfoWithVolumeContext denormalizeKeyInfoWithVolumeContext(
       KeyInfoWithVolumeContext k) {
-    return new KeyInfoWithVolumeContext(k.getVolumeArgs().orElse(null),
-        k.getUserPrincipal().orElse(null),
-        denormalizeOmKeyInfo(k.getKeyInfo()));
+    return new KeyInfoWithVolumeContext.Builder()
+        .setKeyInfo(denormalizeOmKeyInfo(k.getKeyInfo()))
+        .setVolumeArgs(k.getVolumeArgs().orElse(null))
+        .setUserPrincipal(k.getUserPrincipal().orElse(null))
+        .build();
   }
 
   private OmKeyInfo createDenormalizedBucketKeyInfo() {
