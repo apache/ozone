@@ -231,6 +231,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         k.getUserPrincipal().orElse(null),
         denormalizeOmKeyInfo(k.getKeyInfo()));
   }
+
   private OmKeyInfo createDenormalizedBucketKeyInfo() {
     return new OmKeyInfo.Builder()
       .setVolumeName(volumeName)
