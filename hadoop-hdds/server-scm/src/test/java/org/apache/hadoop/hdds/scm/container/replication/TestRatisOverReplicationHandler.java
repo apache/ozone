@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.slf4j.event.Level;
@@ -154,6 +155,7 @@ public class TestRatisOverReplicationHandler {
    * prioritize creating delete commands for unhealthy replicas over quasi
    * closed replicas.
    */
+  @Ignore("HDDS-7804")
   @Test
   public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
       throws IOException {

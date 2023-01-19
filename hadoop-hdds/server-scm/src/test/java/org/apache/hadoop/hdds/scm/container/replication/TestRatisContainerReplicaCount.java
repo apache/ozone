@@ -27,7 +27,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -430,7 +433,8 @@ class TestRatisContainerReplicaCount {
         IN_SERVICE, CLOSING));
 
     RatisContainerReplicaCount rcnt =
-        new RatisContainerReplicaCount(container, replicas, 0, 0, 3, 2);
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2);
     assertTrue(rcnt.isSufficientlyReplicated());
   }
 
@@ -442,12 +446,16 @@ class TestRatisContainerReplicaCount {
             HddsProtos.LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas =
         createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0, 0);
-    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
-        IN_SERVICE, UNHEALTHY));
+    ContainerReplica unhealthyReplica = createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, UNHEALTHY);
+    replicas.add(unhealthyReplica);
 
-    RatisContainerReplicaCount rcnt =
-        new RatisContainerReplicaCount(container, replicas, 0, 0, 3, 2);
-    assertTrue(rcnt.isSufficientlyReplicated());
+    List<ContainerReplicaOp> ops = new ArrayList<>();
+    ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplica.getDatanodeDetails(), 0));
+    RatisContainerReplicaCount replicaCount =
+        new RatisContainerReplicaCount(container, replicas, ops, 2);
+    assertTrue(replicaCount.isSufficientlyReplicated());
   }
 
   @Test
