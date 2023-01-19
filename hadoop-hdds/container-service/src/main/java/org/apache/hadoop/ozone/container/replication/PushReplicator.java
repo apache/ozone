@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,13 +53,18 @@ public class PushReplicator implements ContainerReplicator {
 
     source.prepare(containerID);
 
-    try (OutputStream output = uploader.startUpload(containerID, target, fut)) {
+    OutputStream output = null;
+    try {
+      output = uploader.startUpload(containerID, target, fut);
       source.copyData(containerID, output, NO_COMPRESSION.name());
       fut.get();
       task.setStatus(Status.DONE);
     } catch (Exception e) {
       LOG.warn("Container {} replication was unsuccessful.", containerID, e);
       task.setStatus(Status.FAILED);
+    } finally {
+      // output may have already been closed, ignore such errors
+      IOUtils.cleanupWithLogger(LOG, output);
     }
   }
 }
