@@ -70,8 +70,10 @@ class SendContainerRequestHandler
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
-        path = ContainerImporter.getUntarDirectory(volume)
-            .resolve(ContainerUtils.getContainerTarGzName(containerId));
+        Path dir = ContainerImporter.getUntarDirectory(volume);
+        Files.createDirectories(dir);
+        // FIXME cleanup on completion
+        path = dir.resolve(ContainerUtils.getContainerTarGzName(containerId));
         output = Files.newOutputStream(path);
       }
 
@@ -81,6 +83,7 @@ class SendContainerRequestHandler
 
       nextOffset += req.getLen();
     } catch (Throwable t) {
+      LOG.error("Error", t);
       IOUtils.cleanupWithLogger(LOG, output);
       output = null;
       responseObserver.onError(t);
