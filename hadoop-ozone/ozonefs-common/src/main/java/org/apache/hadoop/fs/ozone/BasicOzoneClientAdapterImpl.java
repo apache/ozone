@@ -636,4 +636,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         length, combineMode, ozoneClient.getObjectStore().getClientProxy());
 
   }
+
+  public OzoneBucket getBucket() {
+    return bucket;
+  }
+
+  public OzoneVolume getVolume() {
+    return volume;
+  }
 }

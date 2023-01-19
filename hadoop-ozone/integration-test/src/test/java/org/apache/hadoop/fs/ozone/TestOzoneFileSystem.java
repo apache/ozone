@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,7 +36,9 @@ import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -1740,5 +1743,50 @@ public class TestOzoneFileSystem {
       paths.remove(pathname);
     }
     Assert.assertTrue("ListStatus failed:" + paths, paths.isEmpty());
+  }
+
+  @Test
+  public void testQuotaSummary() throws Exception {
+    // No keys yet.
+    checkStatus(Long.MAX_VALUE, 0);
+
+    // Create single replica 1024 byte key.
+    int keySize = 1024;
+    TestDataUtil.createKey(ozoneBucket, "key1", ReplicationFactor.ONE,
+        ReplicationType.RATIS, new String(new byte[keySize]));
+    checkStatus(Long.MAX_VALUE, keySize);
+
+// Not possible to test after HDDS-7751.
+// It's not possible to set volume quota if child bucket has no quota.
+// Set volume quota to 2GB.
+//    cluster.getClient()
+//        .getObjectStore()
+//        .getVolume(volumeName)
+//        .setQuota(OzoneQuota.getOzoneQuota(2 * OzoneConsts.GB, -1));
+//    checkStatus(2 * OzoneConsts.GB, keySize);
+
+    // Set bucket quota to 1GB.
+    cluster.getClient()
+        .getObjectStore()
+        .getVolume(volumeName)
+        .getBucket(bucketName)
+        .setQuota(OzoneQuota.getOzoneQuota(OzoneConsts.GB, -1));
+    checkStatus(OzoneConsts.GB, keySize);
+  }
+
+  private void checkStatus(long capacity, long used)
+      throws Exception {
+    try (FileSystem ozoneFileSystem =
+                 FileSystem.get(getFs().getUri(), getFs().getConf())) {
+      FsStatus status = ozoneFileSystem.getStatus();
+      long remaining = capacity - used;
+      assertEquals(String.format("Expected %d capacity bytes found %d",
+          capacity, status.getCapacity()), capacity, status.getCapacity());
+      assertEquals(String.format("Expected %d used bytes found %d", used,
+          status.getUsed()), used, status.getUsed());
+      assertEquals(
+          String.format("Expected %d remaining bytes found %d", remaining,
+              status.getRemaining()), remaining, status.getRemaining());
+    }
   }
 }
