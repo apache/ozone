@@ -32,7 +32,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 
@@ -58,11 +58,11 @@ public class SCMSnapshotProvider {
 
   private Map<String, SCMNodeDetails> peerNodesMap;
 
-  private final SCMCertificateClient scmCertificateClient;
+  private final CertificateClient scmCertificateClient;
 
   public SCMSnapshotProvider(ConfigurationSource conf,
       List<SCMNodeDetails> peerNodes,
-      SCMCertificateClient scmCertificateClient) {
+      CertificateClient scmCertificateClient) {
     LOG.info("Initializing SCM Snapshot Provider");
     this.conf = conf;
     this.scmCertificateClient = scmCertificateClient;

@@ -362,4 +362,10 @@ public interface CertificateClient extends Closeable {
    * Return the store factory for key manager and trust manager for client.
    */
   KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+
+  /**
+   * Register a receiver that will be called after the certificate renewed.
+   * @param receiver
+   */
+  void registerNotificationReceiver(CertificateNotification receiver);
 }

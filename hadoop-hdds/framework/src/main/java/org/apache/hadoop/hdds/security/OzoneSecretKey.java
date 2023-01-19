@@ -49,13 +49,16 @@ public class OzoneSecretKey implements Writable {
   private PrivateKey privateKey;
   private PublicKey publicKey;
   private SecurityConfig securityConfig;
+  private String certSerialId;
 
-  public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair) {
+  public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair,
+      String certificateSerialId) {
     Preconditions.checkNotNull(keyId);
     this.keyId = keyId;
     this.expiryDate = expiryDate;
     this.privateKey = keyPair.getPrivate();
     this.publicKey = keyPair.getPublic();
+    this.certSerialId = certificateSerialId;
   }
 
   /*
@@ -87,6 +90,10 @@ public class OzoneSecretKey implements Writable {
 
   public PublicKey getPublicKey() {
     return publicKey;
+  }
+
+  public String getCertSerialId() {
+    return certSerialId;
   }
 
   public byte[] getEncodedPrivateKey() {

@@ -41,9 +41,8 @@ public class ContainerTokenSecretManager
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerTokenSecretManager.class);
 
-  public ContainerTokenSecretManager(SecurityConfig conf,
-      long tokenLifetime, String certSerialId) {
-    super(conf, tokenLifetime, certSerialId, LOG);
+  public ContainerTokenSecretManager(SecurityConfig conf, long tokenLifetime) {
+    super(conf, tokenLifetime, LOG);
   }
 
   public ContainerTokenIdentifier createIdentifier(String user,

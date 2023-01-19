@@ -44,9 +44,8 @@ public class OzoneBlockTokenSecretManager extends
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneBlockTokenSecretManager.class);
 
-  public OzoneBlockTokenSecretManager(SecurityConfig conf,
-      long tokenLifetime, String omCertSerialId) {
-    super(conf, tokenLifetime, omCertSerialId, LOG);
+  public OzoneBlockTokenSecretManager(SecurityConfig conf, long tokenLifetime) {
+    super(conf, tokenLifetime, LOG);
   }
 
   @Override
