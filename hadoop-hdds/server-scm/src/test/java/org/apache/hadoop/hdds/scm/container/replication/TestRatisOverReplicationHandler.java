@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.slf4j.event.Level;
@@ -148,32 +147,6 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
-  }
-
-  /**
-   * When a quasi closed container is over replicated, the handler should
-   * prioritize creating delete commands for unhealthy replicas over quasi
-   * closed replicas.
-   */
-  @Ignore("HDDS-7804")
-  @Test
-  public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
-      throws IOException {
-    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
-        RATIS_REPLICATION_CONFIG);
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    ContainerReplica unhealthyReplica =
-        createContainerReplica(container.containerID(), 0,
-            HddsProtos.NodeOperationalState.IN_SERVICE,
-            ContainerReplicaProto.State.UNHEALTHY);
-    replicas.add(unhealthyReplica);
-
-    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
-        Collections.emptyList(), getOverReplicatedHealthResult(), 1);
-    Assert.assertTrue(
-        commands.containsKey(unhealthyReplica.getDatanodeDetails()));
   }
 
   /**
