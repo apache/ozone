@@ -39,7 +39,7 @@ import static java.util.Collections.emptyList;
 /**
  * SCM command to request replication of a container.
  */
-public class ReplicateContainerCommand
+public final class ReplicateContainerCommand
     extends SCMCommand<ReplicateContainerCommandProto> {
 
   private final long containerID;
@@ -57,17 +57,15 @@ public class ReplicateContainerCommand
     return new ReplicateContainerCommand(containerID, emptyList(), target);
   }
 
+  public static ReplicateContainerCommand forTest(long containerID) {
+    return new ReplicateContainerCommand(containerID, emptyList(), null);
+  }
+
   private ReplicateContainerCommand(long containerID,
       List<DatanodeDetails> sourceDatanodes, DatanodeDetails target) {
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
     this.targetDatanode = target;
-  }
-
-
-  public ReplicateContainerCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes) {
-    this(containerID, sourceDatanodes, null);
   }
 
   // Should be called only for protobuf conversion

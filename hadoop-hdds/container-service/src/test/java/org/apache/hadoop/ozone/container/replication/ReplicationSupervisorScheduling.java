@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
+
 /**
  * Helper to check scheduling efficiency.
  * <p>
@@ -121,7 +123,7 @@ public class ReplicationSupervisorScheduling {
     for (int i = 0; i < 100; i++) {
       List<DatanodeDetails> sources = new ArrayList<>();
       sources.add(datanodes.get(random.nextInt(datanodes.size())));
-      rs.addTask(new ReplicationTask(i, sources));
+      rs.addTask(new ReplicationTask(fromSources(i, sources)));
     }
     rs.shutdownAfterFinish();
     final long executionTime = System.currentTimeMillis() - start;

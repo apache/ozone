@@ -45,16 +45,6 @@ public class ReplicationTask {
   }
 
   /**
-   * Intended to only be used in tests.
-   */
-  protected ReplicationTask(
-      long containerId,
-      List<DatanodeDetails> sources
-  ) {
-    this(new ReplicateContainerCommand(containerId, sources));
-  }
-
-  /**
    * Returns any deadline set on this task, in milliseconds since the epoch.
    * A returned value of zero indicates no deadline.
    */

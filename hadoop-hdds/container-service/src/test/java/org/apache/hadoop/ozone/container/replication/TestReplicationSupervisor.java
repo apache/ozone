@@ -359,7 +359,7 @@ public class TestReplicationSupervisor {
 
   private static ReplicateContainerCommand createCommand(long containerId) {
     ReplicateContainerCommand cmd =
-        new ReplicateContainerCommand(containerId, emptyList());
+        ReplicateContainerCommand.forTest(containerId);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
   }
