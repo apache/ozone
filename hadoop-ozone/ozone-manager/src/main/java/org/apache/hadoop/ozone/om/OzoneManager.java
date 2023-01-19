@@ -727,6 +727,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         this, LOG, AUDIT, metrics);
     omSnapshotManager = new OmSnapshotManager(this);
 
+    // Snapshot metrics
+    updateActiveSnapshotMetrics();
+
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
       if (layoutVersionInDB != null &&
@@ -1515,9 +1518,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
-    // Snapshot metrics
-    updateActiveSnapshotMetrics();
-
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
         OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -1587,9 +1587,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
-    // Snapshot metrics
-    updateActiveSnapshotMetrics();
-
     // Schedule save metrics
     long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
         OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -1642,16 +1639,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try (TableIterator<String, ? extends
         KeyValue<String, SnapshotInfo>> keyIter =
              metadataManager.getSnapshotInfoTable().iterator()) {
-      Table.KeyValue<String, SnapshotInfo> keyValue;
-
-      List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
 
       while (keyIter.hasNext()) {
-        keyValue = keyIter.next();
-        snapshotInfoList.add(keyValue.getValue());
-      }
+        SnapshotInfo info = keyIter.next().getValue();
 
-      for (SnapshotInfo info : snapshotInfoList) {
         SnapshotInfo.SnapshotStatus snapshotStatus =
             info.getSnapshotStatus();
 
@@ -1670,7 +1661,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.setNumSnapshotActive(activeGauge);
     metrics.setNumSnapshotDeleted(deletedGauge);
-    metrics.setNumSnapshotDeleted(reclaimedGauge);
+    metrics.setNumSnapshotReclaimed(reclaimedGauge);
   }
 
   private void checkConfigBeforeBootstrap() throws IOException {
@@ -3661,9 +3652,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
     metrics.setNumFiles(metadataManager
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
-
-    // Snapshot metrics
-    updateActiveSnapshotMetrics();
 
     // Delete the omMetrics file if it exists and save the a new metrics file
     // with new data
