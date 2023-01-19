@@ -430,14 +430,14 @@ public class LegacyReplicationManager {
          * list, if the operation is completed or if it has timed out.
          */
         updateInflightAction(container, inflightReplication,
-                action -> replicas.stream().anyMatch(
-                        r -> r.getDatanodeDetails().equals(action.getDatanode())),
+                action -> replicas.stream().anyMatch(r ->
+                        r.getDatanodeDetails().equals(action.getDatanode())),
                 () -> metrics.incrNumReplicationCmdsTimeout(),
                 action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
-                action -> replicas.stream().noneMatch(
-                        r -> r.getDatanodeDetails().equals(action.getDatanode())),
+                action -> replicas.stream().noneMatch(r ->
+                        r.getDatanodeDetails().equals(action.getDatanode())),
                 () -> metrics.incrNumDeletionCmdsTimeout(),
                 action -> updateCompletedDeletionMetrics(container, action));
 
