@@ -84,7 +84,7 @@ public class TestReconWithOzoneManagerHA {
     objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
         .getObjectStore();
     objectStore.createVolume(VOL_NAME);
-    // TODO: HDDS-7763
+    // TODO: HDDS-5463
     //  Recon's container ID to key mapping does not yet support FSO buckets.
     objectStore.getVolume(VOL_NAME).createBucket(VOL_NAME,
         BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)

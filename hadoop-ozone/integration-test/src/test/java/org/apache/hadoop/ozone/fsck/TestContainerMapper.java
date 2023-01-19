@@ -104,7 +104,7 @@ public class TestContainerMapper {
     ozoneManager = cluster.getOzoneManager();
     store.createVolume(volName);
     OzoneVolume volume = store.getVolume(volName);
-    // TODO: HDDS-7763
+    // TODO: HDDS-5463
     //  Recon's contaienr ID to key mapping does not yet support FSO buckets.
     volume.createBucket(bucketName, BucketArgs.newBuilder()
             .setBucketLayout(BucketLayout.OBJECT_STORE)

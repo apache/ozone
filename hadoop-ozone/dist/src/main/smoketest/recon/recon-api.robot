@@ -60,7 +60,7 @@ Check http return code
 *** Test Cases ***
 Check if Recon picks up OM data
     Execute    ozone sh volume create recon
-    # TODO: HDDS-7763
+    # TODO: HDDS-5463
     #   Recon's container ID to key mapping does not yet support FSO buckets.
     # TODO: HDDS-7810
     #   Recon's du doesnot yet support OBS buckets.
