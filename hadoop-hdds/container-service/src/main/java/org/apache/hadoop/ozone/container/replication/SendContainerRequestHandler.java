@@ -26,6 +26,7 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,7 +73,6 @@ class SendContainerRequestHandler
         volume = importer.chooseNextVolume();
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
-        // FIXME cleanup on completion
         path = dir.resolve(ContainerUtils.getContainerTarGzName(containerId));
         output = Files.newOutputStream(path);
       }
@@ -83,17 +83,15 @@ class SendContainerRequestHandler
 
       nextOffset += req.getLen();
     } catch (Throwable t) {
-      LOG.error("Error", t);
-      IOUtils.cleanupWithLogger(LOG, output);
-      output = null;
-      responseObserver.onError(t);
+      onError(t);
     }
   }
 
   @Override
   public void onError(Throwable t) {
     LOG.error("Error", t);
-    IOUtils.cleanupWithLogger(LOG, output);
+    closeOutput();
+    deleteTarball();
     responseObserver.onError(t);
   }
 
@@ -105,16 +103,29 @@ class SendContainerRequestHandler
     }
 
     LOG.info("Received all parts for container {}", containerId);
-    IOUtils.cleanupWithLogger(LOG, output);
+    closeOutput();
 
     try {
       importer.importContainer(containerId, path, volume);
+      LOG.info("Imported container {}", containerId);
+      responseObserver.onCompleted();
     } catch (Throwable t) {
       LOG.info("Failed to import container {}", containerId, t);
+      deleteTarball();
       responseObserver.onError(t);
     }
+  }
 
-    LOG.info("Imported container {}", containerId);
-    responseObserver.onCompleted();
+  private void closeOutput() {
+    IOUtils.cleanupWithLogger(LOG, output);
+    output = null;
+  }
+
+  private void deleteTarball() {
+    try {
+      Files.deleteIfExists(path);
+    } catch (IOException e) {
+      LOG.warn("Error removing {}", path);
+    }
   }
 }
