@@ -32,9 +32,11 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -82,7 +84,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private final OmMetadataReaderMetrics metrics;
   private final Logger log;
   private final AuditLogger audit;
-  private OMPerformanceMetrics perfMetrics;
+  private final OMPerformanceMetrics perfMetrics;
 
   public OmMetadataReader(KeyManager keyManager,
                           PrefixManager prefixManager,
@@ -165,6 +167,69 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
 
       perfMetrics.addLookupLatency(Time.monotonicNowNanos() - start);
+    }
+  }
+
+  @Override
+  public KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
+                                             boolean assumeS3Context)
+      throws IOException {
+    long start = Time.monotonicNowNanos();
+
+    java.util.Optional<S3VolumeContext> s3VolumeContext =
+        java.util.Optional.empty();
+
+    final OmKeyArgs resolvedVolumeArgs;
+    if (assumeS3Context) {
+      S3VolumeContext context = ozoneManager.getS3VolumeContext();
+      s3VolumeContext = java.util.Optional.of(context);
+      resolvedVolumeArgs = args.toBuilder()
+          .setVolumeName(context.getOmVolumeArgs().getVolume())
+          .build();
+    } else {
+      resolvedVolumeArgs = args;
+    }
+
+    final ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getGetKeyInfoResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(resolvedVolumeArgs));
+
+    boolean auditSuccess = true;
+    OmKeyArgs resolvedArgs = bucket.update(args);
+
+    try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
+            checkAcls(ResourceType.KEY,
+                StoreType.OZONE, ACLType.READ,
+                bucket.realVolume(), bucket.realBucket(), args.getKeyName())
+        );
+      }
+
+      metrics.incNumGetKeyInfo();
+      OmKeyInfo keyInfo =
+          keyManager.getKeyInfo(resolvedArgs,
+              OmMetadataReader.getClientAddress());
+      KeyInfoWithVolumeContext.Builder builder = KeyInfoWithVolumeContext
+          .newBuilder()
+          .setKeyInfo(keyInfo);
+      s3VolumeContext.ifPresent(context -> {
+        builder.setVolumeArgs(context.getOmVolumeArgs());
+        builder.setUserPrincipal(context.getUserPrincipal());
+      });
+      return builder.build();
+    } catch (Exception ex) {
+      metrics.incNumGetKeyInfoFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(OMAction.READ_KEY,
+          bucket.audit(resolvedVolumeArgs.toAuditMap()), ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_KEY,
+            bucket.audit(resolvedVolumeArgs.toAuditMap())));
+      }
+      perfMetrics.addGetKeyInfoLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 
