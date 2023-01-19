@@ -35,6 +35,7 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
   protected void sendPart(boolean eof, int length, ByteString data) {
     SendContainerRequest request = SendContainerRequest.newBuilder()
         .setContainerID(getContainerId())
+        .setData(data)
         .setOffset(getWrittenBytes())
         .setLen(length)
         .setEof(eof)
