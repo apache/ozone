@@ -404,7 +404,7 @@ public class TestLegacyReplicationManager {
      * Expectation: Missing containers 1.
      */
     @Test
-    public void testClosingLastContainer()
+    public void testClosingMissingContainer()
             throws IOException, TimeoutException {
       final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
       final ContainerID id = container.containerID();
@@ -430,8 +430,8 @@ public class TestLegacyReplicationManager {
 
       ReplicationManagerReport report = replicationManager.getContainerReport();
       Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
-      Assertions.assertEquals(0,
-              report.getStat(ReplicationManagerReport.HealthState.MISSING));
+      Assertions.assertEquals(0, report.getStat(
+              ReplicationManagerReport.HealthState.MISSING));
 
       for (ContainerReplica replica : replicas) {
         containerStateManager.removeContainerReplica(id, replica);
@@ -445,8 +445,12 @@ public class TestLegacyReplicationManager {
 
       report = replicationManager.getContainerReport();
       Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
-      Assertions.assertEquals(1,
-              report.getStat(ReplicationManagerReport.HealthState.MISSING));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.MISSING));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.UNHEALTHY));
     }
 
     @Test
