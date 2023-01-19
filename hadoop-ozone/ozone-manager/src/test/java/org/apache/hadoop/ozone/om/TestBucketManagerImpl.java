@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.Assert;
 import org.junit.After;
@@ -358,6 +359,8 @@ public class TestBucketManagerImpl {
             .setVolumeName("sample-vol")
             .setBucketName("bucket-one")
             .setKeyName("key-one")
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(
@@ -371,6 +374,8 @@ public class TestBucketManagerImpl {
             .setVolumeName("sample-vol")
             .setBucketName("bucket-one")
             .setKeyName("key-two")
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .setAcls(Collections.emptyList())
             .setLocationInfoList(new ArrayList<>())
             .setReplicationConfig(

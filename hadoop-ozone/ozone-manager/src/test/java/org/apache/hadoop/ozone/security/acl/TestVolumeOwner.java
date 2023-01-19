@@ -137,6 +137,8 @@ public class TestVolumeOwner {
               .setReplicationConfig(
                   StandaloneReplicationConfig.getInstance(
                       HddsProtos.ReplicationFactor.ONE))
+              .setOwnerName(
+                  UserGroupInformation.getCurrentUser().getShortUserName())
               .setDataSize(0);
           if (k == 0) {
             keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(

@@ -395,6 +395,7 @@ public class TestParentAcl {
         // here we give test ugi full access
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
 
 

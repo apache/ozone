@@ -1230,6 +1230,7 @@ public class RpcClient implements ClientProtocol {
     }
     HddsClientUtils.checkNotNull(keyName, replicationConfig);
     String requestId = UUID.randomUUID().toString();
+    String ownerName = ugi.getShortUserName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1238,6 +1239,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadata(metadata)
+        .setOwnerName(ownerName)
         .setAcls(getAclList());
 
     if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
@@ -1690,6 +1692,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     String requestId = UUID.randomUUID().toString();
+    String ownerName = ugi.getShortUserName();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1700,6 +1703,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
         .setAcls(getAclList())
+        .setOwnerName(ownerName)
         .build();
 
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
@@ -1956,6 +1960,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, boolean overWrite, boolean recursive)
       throws IOException {
+    String ownerName = ugi.getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1964,6 +1969,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setOwnerName(ownerName)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);

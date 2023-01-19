@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.After;
@@ -125,6 +126,7 @@ public class TestTrashService {
         .setLocationInfoList(new ArrayList<>())
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
 
     /* Create and delete key in the Key Manager. */

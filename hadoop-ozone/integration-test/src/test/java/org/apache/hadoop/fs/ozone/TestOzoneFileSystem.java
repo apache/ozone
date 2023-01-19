@@ -746,6 +746,8 @@ public class TestOzoneFileSystem {
             .setAcls(Collections.emptyList())
             .setReplicationConfig(new ECReplicationConfig(3, 2))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
     OpenKeySession session = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, session.getId());
