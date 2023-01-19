@@ -760,11 +760,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numRemoveAcl.incr();
   }
 
+  @Override
   public void incNumGetKeyInfo() {
     numGetKeyInfo.incr();
     numKeyOps.incr();
   }
 
+  @Override
   public void incNumGetKeyInfoFails() {
     getNumGetKeyInfoFails.incr();
   }

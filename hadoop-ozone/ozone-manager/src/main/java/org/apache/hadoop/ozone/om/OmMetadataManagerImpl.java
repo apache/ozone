@@ -310,7 +310,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     setStore(loadDB(conf, new File(snapshotDir),
         OM_DB_NAME + snapshotDirName, true));
-    initializeOmTables();
+    initializeOmTables(false);
   }
 
   /**
@@ -394,7 +394,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return multipartInfoTable;
   }
 
-  private void checkTableStatus(Table table, String name) throws IOException {
+  private void checkTableStatus(Table table, String name,
+      boolean addCacheMetrics) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
         "continue.";
     String errMsg = "Inconsistent DB state, Table - %s. Please check the logs" +
@@ -404,7 +405,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       throw new IOException(String.format(errMsg, name));
     }
     this.tableMap.put(name, table);
-    tableCacheMetrics.add(table.createCacheMetrics());
+    if (addCacheMetrics) {
+      tableCacheMetrics.add(table.createCacheMetrics());
+    }
   }
 
   /**
@@ -450,7 +453,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
       this.store = loadDB(configuration, metaDir);
 
-      initializeOmTables();
+      initializeOmTables(true);
     }
   }
 
@@ -523,96 +526,100 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *
    * @throws IOException
    */
-  protected void initializeOmTables() throws IOException {
+  protected void initializeOmTables(boolean addCacheMetrics)
+      throws IOException {
     userTable =
         this.store.getTable(USER_TABLE, String.class,
             PersistedUserVolumeInfo.class);
-    checkTableStatus(userTable, USER_TABLE);
+    checkTableStatus(userTable, USER_TABLE, addCacheMetrics);
 
     CacheType cacheType = CacheType.FULL_CACHE;
 
     volumeTable =
         this.store.getTable(VOLUME_TABLE, String.class, OmVolumeArgs.class,
             cacheType);
-    checkTableStatus(volumeTable, VOLUME_TABLE);
+    checkTableStatus(volumeTable, VOLUME_TABLE, addCacheMetrics);
 
     bucketTable =
         this.store.getTable(BUCKET_TABLE, String.class, OmBucketInfo.class,
             cacheType);
 
-    checkTableStatus(bucketTable, BUCKET_TABLE);
+    checkTableStatus(bucketTable, BUCKET_TABLE, addCacheMetrics);
 
     keyTable = this.store.getTable(KEY_TABLE, String.class, OmKeyInfo.class);
-    checkTableStatus(keyTable, KEY_TABLE);
+    checkTableStatus(keyTable, KEY_TABLE, addCacheMetrics);
 
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
-    checkTableStatus(deletedTable, DELETED_TABLE);
+    checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
             OmKeyInfo.class);
-    checkTableStatus(openKeyTable, OPEN_KEY_TABLE);
+    checkTableStatus(openKeyTable, OPEN_KEY_TABLE, addCacheMetrics);
 
     multipartInfoTable = this.store.getTable(MULTIPARTINFO_TABLE,
         String.class, OmMultipartKeyInfo.class);
-    checkTableStatus(multipartInfoTable, MULTIPARTINFO_TABLE);
+    checkTableStatus(multipartInfoTable, MULTIPARTINFO_TABLE, addCacheMetrics);
 
     dTokenTable = this.store.getTable(DELEGATION_TOKEN_TABLE,
         OzoneTokenIdentifier.class, Long.class);
-    checkTableStatus(dTokenTable, DELEGATION_TOKEN_TABLE);
+    checkTableStatus(dTokenTable, DELEGATION_TOKEN_TABLE, addCacheMetrics);
 
     s3SecretTable = this.store.getTable(S3_SECRET_TABLE, String.class,
         S3SecretValue.class);
-    checkTableStatus(s3SecretTable, S3_SECRET_TABLE);
+    checkTableStatus(s3SecretTable, S3_SECRET_TABLE, addCacheMetrics);
 
     prefixTable = this.store.getTable(PREFIX_TABLE, String.class,
         OmPrefixInfo.class);
-    checkTableStatus(prefixTable, PREFIX_TABLE);
+    checkTableStatus(prefixTable, PREFIX_TABLE, addCacheMetrics);
 
     dirTable = this.store.getTable(DIRECTORY_TABLE, String.class,
             OmDirectoryInfo.class);
-    checkTableStatus(dirTable, DIRECTORY_TABLE);
+    checkTableStatus(dirTable, DIRECTORY_TABLE, addCacheMetrics);
 
     fileTable = this.store.getTable(FILE_TABLE, String.class,
             OmKeyInfo.class);
-    checkTableStatus(fileTable, FILE_TABLE);
+    checkTableStatus(fileTable, FILE_TABLE, addCacheMetrics);
 
     openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
             OmKeyInfo.class);
-    checkTableStatus(openFileTable, OPEN_FILE_TABLE);
+    checkTableStatus(openFileTable, OPEN_FILE_TABLE, addCacheMetrics);
 
     deletedDirTable = this.store.getTable(DELETED_DIR_TABLE, String.class,
         OmKeyInfo.class);
-    checkTableStatus(deletedDirTable, DELETED_DIR_TABLE);
+    checkTableStatus(deletedDirTable, DELETED_DIR_TABLE, addCacheMetrics);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, TransactionInfo.class);
-    checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE);
+    checkTableStatus(transactionInfoTable, TRANSACTION_INFO_TABLE,
+        addCacheMetrics);
 
     metaTable = this.store.getTable(META_TABLE, String.class, String.class);
-    checkTableStatus(metaTable, META_TABLE);
+    checkTableStatus(metaTable, META_TABLE, addCacheMetrics);
 
     // accessId -> OmDBAccessIdInfo (tenantId, secret, Kerberos principal)
     tenantAccessIdTable = this.store.getTable(TENANT_ACCESS_ID_TABLE,
         String.class, OmDBAccessIdInfo.class);
-    checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE);
+    checkTableStatus(tenantAccessIdTable, TENANT_ACCESS_ID_TABLE,
+        addCacheMetrics);
 
     // User principal -> OmDBUserPrincipalInfo (a list of accessIds)
     principalToAccessIdsTable = this.store.getTable(
         PRINCIPAL_TO_ACCESS_IDS_TABLE,
         String.class, OmDBUserPrincipalInfo.class);
-    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE);
+    checkTableStatus(principalToAccessIdsTable, PRINCIPAL_TO_ACCESS_IDS_TABLE,
+        addCacheMetrics);
 
     // tenant name -> tenant (tenant states)
     tenantStateTable = this.store.getTable(TENANT_STATE_TABLE,
         String.class, OmDBTenantState.class);
-    checkTableStatus(tenantStateTable, TENANT_STATE_TABLE);
+    checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
         String.class, SnapshotInfo.class);
-    checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE);
+    checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
   }
 
