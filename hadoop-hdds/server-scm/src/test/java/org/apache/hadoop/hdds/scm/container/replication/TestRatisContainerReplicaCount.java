@@ -446,8 +446,8 @@ class TestRatisContainerReplicaCount {
             HddsProtos.LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas =
         createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0, 0);
-    ContainerReplica unhealthyReplica = createContainerReplica(ContainerID.valueOf(1L), 0,
-        IN_SERVICE, UNHEALTHY);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        ContainerID.valueOf(1L), 0, IN_SERVICE, UNHEALTHY);
     replicas.add(unhealthyReplica);
 
     List<ContainerReplicaOp> ops = new ArrayList<>();
