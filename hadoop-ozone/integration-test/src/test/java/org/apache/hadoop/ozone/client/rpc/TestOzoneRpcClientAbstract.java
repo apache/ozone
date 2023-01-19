@@ -3684,7 +3684,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Assertions.assertEquals(sb.toString(), new String(fileContent, UTF_8));
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-    .setVolumeName(bucket.getVolumeName())
+        .setVolumeName(bucket.getVolumeName())
         .setBucketName(bucket.getName())
         .setKeyName(keyName)
         .build();
