@@ -47,6 +47,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.SpyInputStream;
+import org.apache.ozone.test.SpyOutputStream;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -55,6 +57,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.newInputStream;
+import static java.nio.file.Files.newOutputStream;
 
 /**
  * Test the tar/untar for a given container.
@@ -185,9 +189,9 @@ public class TestTarContainerPacker {
     Path targetFile = TEMP_DIR.resolve("container.tar.gz");
 
     //WHEN: pack it
-    try (FileOutputStream output = new FileOutputStream(targetFile.toFile())) {
-      packer.pack(sourceContainer, output);
-    }
+    SpyOutputStream outputForPack =
+        new SpyOutputStream(newOutputStream(targetFile));
+    packer.pack(sourceContainer, outputForPack);
 
     //THEN: check the result
     TarArchiveInputStream tarStream = null;
@@ -209,13 +213,16 @@ public class TestTarContainerPacker {
         tarStream.close();
       }
     }
+    outputForPack.assertClosedExactlyOnce();
 
     //read the container descriptor only
-    try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      String containerYaml = new String(packer.unpackContainerDescriptor(input),
-          UTF_8);
-      Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
-    }
+    SpyInputStream inputForUnpackDescriptor =
+        new SpyInputStream(newInputStream(targetFile));
+    String containerYaml = new String(
+        packer.unpackContainerDescriptor(inputForUnpackDescriptor),
+        UTF_8);
+    Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
+    inputForUnpackDescriptor.assertClosedExactlyOnce();
 
     KeyValueContainerData destinationContainerData =
         createContainer(DEST_CONTAINER_ROOT, false);
@@ -223,17 +230,14 @@ public class TestTarContainerPacker {
     KeyValueContainer destinationContainer =
         new KeyValueContainer(destinationContainerData, conf);
 
-    String descriptor;
-
     //unpackContainerData
-    try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      descriptor =
-          new String(packer.unpackContainerData(destinationContainer, input,
-              TEMP_DIR,
-              DEST_CONTAINER_ROOT.resolve(String.valueOf(
-                  destinationContainer.getContainerData().getContainerID()))),
-              UTF_8);
-    }
+    SpyInputStream inputForUnpackData =
+        new SpyInputStream(newInputStream(targetFile));
+    String descriptor = new String(
+        packer.unpackContainerData(destinationContainer, inputForUnpackData,
+            TEMP_DIR, DEST_CONTAINER_ROOT.resolve(String.valueOf(
+                destinationContainer.getContainerData().getContainerID()))),
+        UTF_8);
 
     assertExampleMetadataDbIsGood(
         TarContainerPacker.getDbPath(destinationContainerData),
@@ -246,6 +250,7 @@ public class TestTarContainerPacker {
             + "unpackContainerData Call",
         destinationContainer.getContainerFile().exists());
     Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
+    inputForUnpackData.assertClosedExactlyOnce();
   }
 
   @Test
@@ -408,4 +413,5 @@ public class TestTarContainerPacker {
       Assert.assertEquals(content, strings.get(0));
     }
   }
+
 }
