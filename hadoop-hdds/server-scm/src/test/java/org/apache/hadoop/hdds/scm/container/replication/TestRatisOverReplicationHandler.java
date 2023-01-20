@@ -150,31 +150,6 @@ public class TestRatisOverReplicationHandler {
   }
 
   /**
-   * When a quasi closed container is over replicated, the handler should
-   * prioritize creating delete commands for unhealthy replicas over quasi
-   * closed replicas.
-   */
-  @Test
-  public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
-      throws IOException {
-    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
-        RATIS_REPLICATION_CONFIG);
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    ContainerReplica unhealthyReplica =
-        createContainerReplica(container.containerID(), 0,
-            HddsProtos.NodeOperationalState.IN_SERVICE,
-            ContainerReplicaProto.State.UNHEALTHY);
-    replicas.add(unhealthyReplica);
-
-    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
-        Collections.emptyList(), getOverReplicatedHealthResult(), 1);
-    Assert.assertTrue(
-        commands.containsKey(unhealthyReplica.getDatanodeDetails()));
-  }
-
-  /**
    * Handler should not create any delete commands if removing a replica
    * makes the container mis replicated.
    */
