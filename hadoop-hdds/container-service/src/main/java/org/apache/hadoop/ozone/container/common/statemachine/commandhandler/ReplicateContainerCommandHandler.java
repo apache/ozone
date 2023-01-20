@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -50,11 +51,15 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   private ReplicationSupervisor supervisor;
 
+  private ContainerReplicator replicator;
+
   public ReplicateContainerCommandHandler(
       ConfigurationSource conf,
-      ReplicationSupervisor supervisor) {
+      ReplicationSupervisor supervisor,
+      ContainerReplicator replicator) {
     this.conf = conf;
     this.supervisor = supervisor;
+    this.replicator = replicator;
   }
 
   @Override
@@ -72,7 +77,7 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
         "Replication command is received for container %s "
             + "without source or target datanodes.", containerID);
 
-    ReplicationTask task = new ReplicationTask(replicateCommand);
+    ReplicationTask task = new ReplicationTask(replicateCommand, replicator);
     supervisor.addTask(task);
   }
 

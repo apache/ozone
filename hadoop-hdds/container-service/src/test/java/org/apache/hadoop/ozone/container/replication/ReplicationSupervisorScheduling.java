@@ -77,45 +77,45 @@ public class ReplicationSupervisorScheduling {
 
     ContainerSet cs = new ContainerSet(1000);
 
+    //simplified executor emulating the current sequential download +
+    //import.
+    ContainerReplicator replicator = task -> {
+      //download, limited by the number of source datanodes
+      final DatanodeDetails sourceDatanode =
+          task.getSources().get(random.nextInt(task.getSources().size()));
+
+      final Map<Integer, Object> volumes =
+          volumeLocks.get(sourceDatanode.getUuid());
+      Object volumeLock = volumes.get(random.nextInt(volumes.size()));
+      synchronized (volumeLock) {
+        System.out.println("Downloading " + task.getContainerId() + " from "
+            + sourceDatanode.getUuid());
+        try {
+          volumeLock.wait(1000);
+        } catch (InterruptedException ex) {
+          ex.printStackTrace();
+        }
+      }
+
+      //import, limited by the destination datanode
+      final int volumeIndex = random.nextInt(destinationLocks.size());
+      Object destinationLock = destinationLocks.get(volumeIndex);
+      synchronized (destinationLock) {
+        System.out.println(
+            "Importing " + task.getContainerId() + " to disk "
+                + volumeIndex);
+
+        try {
+          destinationLock.wait(1000);
+        } catch (InterruptedException ex) {
+          ex.printStackTrace();
+        }
+      }
+    };
+
     ReplicationSupervisor rs = new ReplicationSupervisor(cs, null,
-
-        //simplified executor emulating the current sequential download +
-        //import.
-        task -> {
-
-          //download, limited by the number of source datanodes
-          final DatanodeDetails sourceDatanode =
-              task.getSources().get(random.nextInt(task.getSources().size()));
-
-          final Map<Integer, Object> volumes =
-              volumeLocks.get(sourceDatanode.getUuid());
-          Object volumeLock = volumes.get(random.nextInt(volumes.size()));
-          synchronized (volumeLock) {
-            System.out.println("Downloading " + task.getContainerId() + " from "
-                + sourceDatanode.getUuid());
-            try {
-              volumeLock.wait(1000);
-            } catch (InterruptedException ex) {
-              ex.printStackTrace();
-            }
-          }
-
-          //import, limited by the destination datanode
-          final int volumeIndex = random.nextInt(destinationLocks.size());
-          Object destinationLock = destinationLocks.get(volumeIndex);
-          synchronized (destinationLock) {
-            System.out.println(
-                "Importing " + task.getContainerId() + " to disk "
-                    + volumeIndex);
-
-            try {
-              destinationLock.wait(1000);
-            } catch (InterruptedException ex) {
-              ex.printStackTrace();
-            }
-          }
-
-        }, null, replicationConfig, Clock.system(ZoneId.systemDefault()));
+        replicator, null, replicationConfig,
+        Clock.system(ZoneId.systemDefault()));
 
     final long start = System.currentTimeMillis();
 
@@ -123,7 +123,8 @@ public class ReplicationSupervisorScheduling {
     for (int i = 0; i < 100; i++) {
       List<DatanodeDetails> sources = new ArrayList<>();
       sources.add(datanodes.get(random.nextInt(datanodes.size())));
-      rs.addTask(new ReplicationTask(fromSources(i, sources)));
+
+      rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
     }
     rs.shutdownAfterFinish();
     final long executionTime = System.currentTimeMillis() - start;

@@ -137,9 +137,9 @@ public class ReplicationSupervisor {
    * An executable form of a replication task with status handling.
    */
   public final class TaskRunner implements Runnable {
-    private final ReplicationTask task;
+    private final AbstractReplicationTask task;
 
-    public TaskRunner(ReplicationTask task) {
+    public TaskRunner(AbstractReplicationTask task) {
       this.task = task;
     }
 
@@ -175,16 +175,21 @@ public class ReplicationSupervisor {
           }
         }
 
-        final boolean pull = task.getTarget() == null;
-        if (containerSet.getContainer(task.getContainerId()) != null && pull) {
+        // TODO - remove this along with the below block. Note we need to check
+        //        if the target is "this node" and if so skip it.
+       // final boolean pull = task.getTarget() == null;
+        if (containerSet.getContainer(task.getContainerId()) != null) {
           LOG.debug("Container {} has already been downloaded.", containerId);
           return;
         }
 
+        // TODO - remove this commented blocks and put replicator choice into
+        //  the cmd
+       // task.setStatus(Status.IN_PROGRESS);
+       // ContainerReplicator replicator = pull ? pullReplicator : pushReplicator;
+       // replicator.replicate(task);
         task.setStatus(Status.IN_PROGRESS);
-        ContainerReplicator replicator = pull ? pullReplicator : pushReplicator;
-        replicator.replicate(task);
-
+        task.runTask();
         if (task.getStatus() == Status.FAILED) {
           LOG.error("Failed {}", this);
           failureCounter.incrementAndGet();
@@ -203,7 +208,7 @@ public class ReplicationSupervisor {
 
     @Override
     public String toString() {
-      return task.getCommand().toString();
+      return task.toString();
     }
   }
 

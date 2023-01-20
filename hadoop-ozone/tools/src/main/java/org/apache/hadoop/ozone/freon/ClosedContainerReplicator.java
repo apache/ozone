@@ -82,6 +82,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   private ReplicationSupervisor supervisor;
 
+  private ContainerReplicator replicator;
+
   private Timer timer;
 
   private List<ReplicationTask> replicationTasks;
@@ -130,7 +132,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(
               ReplicateContainerCommand.fromSources(container.getContainerID(),
-                  datanodesWithContainer)));
+                  datanodesWithContainer), replicator));
         }
       }
 
@@ -205,7 +207,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
         controller, new TarContainerPacker(), null);
-    ContainerReplicator replicator = new DownloadAndImportReplicator(importer,
+    replicator = new DownloadAndImportReplicator(importer,
         new SimpleContainerDownloader(conf, null));
 
     ReplicationServer.ReplicationConfig replicationConfig

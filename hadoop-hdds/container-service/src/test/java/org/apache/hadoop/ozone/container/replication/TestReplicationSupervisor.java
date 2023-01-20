@@ -299,13 +299,13 @@ public class TestReplicationSupervisor {
 
     ReplicateContainerCommand cmd = createCommand(1);
     cmd.setDeadline(clock.millis() + 10000);
-    ReplicationTask task1 = new ReplicationTask(cmd);
+    ReplicationTask task1 = new ReplicationTask(cmd, replicatorRef.get());
     cmd = createCommand(2);
     cmd.setDeadline(clock.millis() + 20000);
-    ReplicationTask task2 = new ReplicationTask(cmd);
+    ReplicationTask task2 = new ReplicationTask(cmd, replicatorRef.get());
     cmd = createCommand(3);
     // No deadline set
-    ReplicationTask task3 = new ReplicationTask(cmd);
+    ReplicationTask task3 = new ReplicationTask(cmd, replicatorRef.get());
     // no deadline set
 
     clock.fastForward(15000);
@@ -352,9 +352,9 @@ public class TestReplicationSupervisor {
     return supervisor;
   }
 
-  private static ReplicationTask createTask(long containerId) {
+  private ReplicationTask createTask(long containerId) {
     ReplicateContainerCommand cmd = createCommand(containerId);
-    return new ReplicationTask(cmd);
+    return new ReplicationTask(cmd, replicatorRef.get());
   }
 
   private static ReplicateContainerCommand createCommand(long containerId) {

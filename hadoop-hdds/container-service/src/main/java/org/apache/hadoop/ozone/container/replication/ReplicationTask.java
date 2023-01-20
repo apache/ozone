@@ -28,18 +28,31 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
  */
 public class ReplicationTask extends AbstractReplicationTask {
 
-  private volatile Status status = Status.QUEUED;
-
   private final ReplicateContainerCommand cmd;
+  private final ContainerReplicator replicator;
 
   /**
    * Counter for the transferred bytes.
    */
   private long transferredBytes;
 
-  public ReplicationTask(ReplicateContainerCommand cmd) {
+  public ReplicationTask(ReplicateContainerCommand cmd,
+                         ContainerReplicator replicator) {
     super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
     this.cmd = cmd;
+    this.replicator = replicator;
+  }
+
+  /**
+   * Intended to only be used in tests.
+   */
+  protected ReplicationTask(
+      long containerId,
+      List<DatanodeDetails> sources,
+      ContainerReplicator replicator
+  ) {
+    this(ReplicateContainerCommand.fromSources(containerId, sources),
+        replicator);
   }
 
   @Override
@@ -95,6 +108,6 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   @Override
   public void runTask() {
-    // Placeholder for now
+    replicator.replicate(this);
   }
 }
