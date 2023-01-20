@@ -109,6 +109,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
+    omMetrics.incNumSnapshotActive();
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;

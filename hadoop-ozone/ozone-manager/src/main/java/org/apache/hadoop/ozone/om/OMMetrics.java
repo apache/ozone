@@ -120,6 +120,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
   private @Metric MutableCounterLong numSnapshotCreateFails;
   private @Metric MutableCounterLong numSnapshotListFails;
+  private @Metric MutableCounterLong numSnapshotActive;
+  private @Metric MutableCounterLong numSnapshotDeleted;
+  private @Metric MutableCounterLong numSnapshotReclaimed;
 
   // Number of tenant operations attempted
   private @Metric MutableCounterLong numTenantOps;
@@ -446,6 +449,45 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumSnapshotListFails() {
     numSnapshotListFails.incr();
+  }
+
+  public void setNumSnapshotActive(long num) {
+    long currVal = numSnapshotActive.value();
+    numSnapshotActive.incr(num - currVal);
+  }
+
+  public void incNumSnapshotActive() {
+    numSnapshotActive.incr();
+  }
+
+  public void decNumSnapshotActive() {
+    numSnapshotActive.incr(-1);
+  }
+
+  public void setNumSnapshotDeleted(long num) {
+    long currVal = numSnapshotDeleted.value();
+    numSnapshotDeleted.incr(num - currVal);
+  }
+
+  public void incNumSnapshotDeleted() {
+    numSnapshotDeleted.incr();
+  }
+
+  public void decNumSnapshotDeleted() {
+    numSnapshotDeleted.incr(-1);
+  }
+
+  public void setNumSnapshotReclaimed(long num) {
+    long currVal = numSnapshotReclaimed.value();
+    numSnapshotReclaimed.incr(num - currVal);
+  }
+
+  public void incNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr();
+  }
+
+  public void decNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr(-1);
   }
 
   public void incNumCompleteMultipartUploadFails() {
@@ -1141,6 +1183,18 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumSnapshotListFails() {
     return numSnapshotListFails.value();
+  }
+
+  public long getNumSnapshotActive() {
+    return numSnapshotActive.value();
+  }
+
+  public long getNumSnapshotDeleted() {
+    return numSnapshotDeleted.value();
+  }
+
+  public long getNumSnapshotReclaimed() {
+    return numSnapshotReclaimed.value();
   }
 
 

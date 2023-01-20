@@ -727,6 +727,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         this, LOG, AUDIT, metrics);
     omSnapshotManager = new OmSnapshotManager(this);
 
+    // Snapshot metrics
+    updateActiveSnapshotMetrics();
+
     if (withNewSnapshot) {
       Integer layoutVersionInDB = getLayoutVersionInDB();
       if (layoutVersionInDB != null &&
@@ -1620,6 +1623,45 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+  }
+
+  /**
+   * Iterate the Snapshot table, check the status
+   * for every snapshot and update OMMetrics.
+   */
+  private void updateActiveSnapshotMetrics()
+      throws IOException {
+
+    long activeGauge = 0;
+    long deletedGauge = 0;
+    long reclaimedGauge = 0;
+
+    try (TableIterator<String, ? extends
+        KeyValue<String, SnapshotInfo>> keyIter =
+             metadataManager.getSnapshotInfoTable().iterator()) {
+
+      while (keyIter.hasNext()) {
+        SnapshotInfo info = keyIter.next().getValue();
+
+        SnapshotInfo.SnapshotStatus snapshotStatus =
+            info.getSnapshotStatus();
+
+        if (snapshotStatus.equals(SnapshotInfo
+            .SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          activeGauge++;
+        } else if (snapshotStatus.equals(SnapshotInfo
+            .SnapshotStatus.SNAPSHOT_DELETED)) {
+          deletedGauge++;
+        } else if (snapshotStatus.equals(SnapshotInfo
+            .SnapshotStatus.SNAPSHOT_RECLAIMED)) {
+          reclaimedGauge++;
+        }
+      }
+    }
+
+    metrics.setNumSnapshotActive(activeGauge);
+    metrics.setNumSnapshotDeleted(deletedGauge);
+    metrics.setNumSnapshotReclaimed(reclaimedGauge);
   }
 
   private void checkConfigBeforeBootstrap() throws IOException {
