@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * This is the actual EC reconstruction coordination task.
  */
-public class ECReconstructionCoordinatorTask implements Runnable {
+public class ECReconstructionCoordinatorTask
+    extends AbstractReplicationTask implements Runnable {
   private static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
@@ -43,6 +45,9 @@ public class ECReconstructionCoordinatorTask implements Runnable {
       ConcurrentHashMap.KeySetView<Object, Boolean>
           inprogressReconstructionCoordinatorCounter,
       Clock clock) {
+    super(reconstructionCommandInfo.getContainerID(),
+        reconstructionCommandInfo.getDeadline(),
+        reconstructionCommandInfo.getTerm());
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
     this.inprogressCounter = inprogressReconstructionCoordinatorCounter;
@@ -50,7 +55,7 @@ public class ECReconstructionCoordinatorTask implements Runnable {
   }
 
   @Override
-  public void run() {
+  public void runTask() {
     // Implement the coordinator logic to handle a container group
     // reconstruction.
 
@@ -106,5 +111,10 @@ public class ECReconstructionCoordinatorTask implements Runnable {
   @Override
   public String toString() {
     return "ECReconstructionTask{info=" + reconstructionCommandInfo + '}';
+  }
+
+  @Override
+  public void run() {
+    runTask();
   }
 }

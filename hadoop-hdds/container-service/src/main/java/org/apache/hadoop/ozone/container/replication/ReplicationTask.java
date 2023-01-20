@@ -94,7 +94,7 @@ public class ReplicationTask extends AbstractReplicationTask {
   }
 
   @Override
-  public void run() {
+  public void runTask() {
     // Placeholder for now
   }
 }

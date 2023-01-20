@@ -85,6 +85,6 @@ public abstract class AbstractReplicationTask {
    * Abstract method which needs to be overridden by the sub classes to execute
    * the task.
    */
-  public abstract void run();
+  public abstract void runTask();
 
 }
