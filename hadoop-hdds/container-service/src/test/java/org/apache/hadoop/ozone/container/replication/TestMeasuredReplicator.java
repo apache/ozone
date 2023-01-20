@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
