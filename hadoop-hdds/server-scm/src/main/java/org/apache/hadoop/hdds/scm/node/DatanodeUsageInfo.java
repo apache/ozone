@@ -180,11 +180,13 @@ public class DatanodeUsageInfo {
    *
    * @return Protobuf HddsProtos.DatanodeUsageInfo
    */
-  public DatanodeUsageInfoProto toProto(int clientVersion) {
-    return toProtoBuilder(clientVersion).build();
+  public DatanodeUsageInfoProto toProto(int clientVersion,
+                                        long containerCount) {
+    return toProtoBuilder(clientVersion, containerCount).build();
   }
 
-  private DatanodeUsageInfoProto.Builder toProtoBuilder(int clientVersion) {
+  private DatanodeUsageInfoProto.Builder toProtoBuilder(int clientVersion,
+                                                        long containerCount) {
     DatanodeUsageInfoProto.Builder builder =
         DatanodeUsageInfoProto.newBuilder();
 
@@ -196,6 +198,8 @@ public class DatanodeUsageInfo {
       builder.setUsed(scmNodeStat.getScmUsed().get());
       builder.setRemaining(scmNodeStat.getRemaining().get());
     }
+
+    builder.setContainerCount(containerCount);
     return builder;
   }
 }
