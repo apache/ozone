@@ -49,12 +49,12 @@ public class TestOzoneFsSnapshot {
   private static MiniOzoneCluster cluster;
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static OzoneManager ozoneManager;
-  private static OzoneFsShell shell;
-  private static String volume;
-  private static String bucket;
-  private static String key;
-  private static String bucketPath;
-  private static String bucketWithSnapshotIndicatorPath;
+  private OzoneFsShell shell;
+  private String volume;
+  private String bucket;
+  private String key;
+  private String bucketPath;
+  private String bucketWithSnapshotIndicatorPath;
 
   @BeforeAll
   public static void initClass() throws Exception {
@@ -80,12 +80,12 @@ public class TestOzoneFsSnapshot {
 
     shell = new OzoneFsShell(clientConf);
 
-    volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    bucket = "buck-" + RandomStringUtils.randomNumeric(5);
-    key = "key-" + RandomStringUtils.randomNumeric(5);
+    this.volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    this.bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    this.key = "key-" + RandomStringUtils.randomNumeric(5);
 
-    bucketPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
-    bucketWithSnapshotIndicatorPath = bucketPath +
+    this.bucketPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
+    this.bucketWithSnapshotIndicatorPath = bucketPath +
         OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR;
 
     String keyPath = bucketPath + OM_KEY_PREFIX + key;
