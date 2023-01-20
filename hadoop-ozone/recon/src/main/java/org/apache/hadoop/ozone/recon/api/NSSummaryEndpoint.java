@@ -104,14 +104,14 @@ public class NSSummaryEndpoint {
           childMetricsListMap.put(EntityType.VOLUME.name(),
               duResponse.getDuData()
               .stream().sorted(Comparator.comparingLong(
-                  DUResponse.DiskUsage::getVolumeCount).reversed())
+                  DUResponse.DiskUsage::getBucketCount).reversed())
               .limit(count).collect(Collectors.toList()));
           break;
         case VOLUME:
           childMetricsListMap.put(EntityType.BUCKET.name(),
               duResponse.getDuData()
               .stream().sorted(Comparator.comparingLong(
-                  DUResponse.DiskUsage::getBucketCount).reversed())
+                  DUResponse.DiskUsage::getKeyCount).reversed())
               .limit(count).collect(Collectors.toList()));
           break;
         case BUCKET:
@@ -124,7 +124,7 @@ public class NSSummaryEndpoint {
                   .limit(count).collect(Collectors.toList()));
           childMetricsListMap.put(EntityType.DIRECTORY.name(),
               dirs.stream().sorted(Comparator.comparingLong(
-                      DUResponse.DiskUsage::getKeyCount).reversed())
+                      DUResponse.DiskUsage::getDirCount).reversed())
                   .limit(count).collect(Collectors.toList()));
           break;
         default:

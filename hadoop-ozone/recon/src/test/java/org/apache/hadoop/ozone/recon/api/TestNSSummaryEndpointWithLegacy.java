@@ -46,6 +46,8 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityInfoResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
@@ -440,6 +442,153 @@ public class TestNSSummaryEndpointWithLegacy {
   public void testGetBasicInfoKey() throws Exception {
     // Test key
     commonUtils.testNSSummaryBasicInfoKey(nsSummaryEndpoint);
+  }
+
+  @Test
+  public void testEntityRootInfoOrderByCount() throws Exception {
+    Response entityMetricsResp = nsSummaryEndpoint.getEntityMetrics(ROOT_PATH,
+        "count", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    Assert.assertEquals(1, entityInfoResponse.getChildMetricsListMap().size());
+    Assert.assertEquals(EntityType.ROOT, entityInfoResponse.getEntityType());
+    Assert.assertEquals(4, entityInfoResponse.getNumBucket());
+    Assert.assertEquals(5, entityInfoResponse.getNumTotalDir());
+    Assert.assertEquals(2, entityInfoResponse.getNumVolume());
+    Assert.assertEquals(10, entityInfoResponse.getNumTotalKey());
+    Assert.assertEquals(ResponseStatus.OK, entityInfoResponse.getStatus());
+    List<DUResponse.DiskUsage> duRootData =
+        entityInfoResponse.getChildMetricsListMap().get("VOLUME");
+    DUResponse.DiskUsage duVol1 = duRootData.get(0);
+    DUResponse.DiskUsage duVol2 = duRootData.get(1);
+    Assert.assertEquals(2, duVol1.getBucketCount());
+    Assert.assertEquals(2, duVol2.getBucketCount());
+  }
+
+  @Test
+  public void testEntityVolumeInfoOrderByCount() throws Exception {
+    Response entityMetricsResp = nsSummaryEndpoint.getEntityMetrics(VOL_PATH,
+        "count", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    Assert.assertEquals(1, entityInfoResponse.getChildMetricsListMap().size());
+    Assert.assertEquals(EntityType.VOLUME, entityInfoResponse.getEntityType());
+    Assert.assertEquals(2, entityInfoResponse.getNumBucket());
+    Assert.assertEquals(4, entityInfoResponse.getNumTotalDir());
+    Assert.assertEquals(-1, entityInfoResponse.getNumVolume());
+    Assert.assertEquals(6, entityInfoResponse.getNumTotalKey());
+    Assert.assertEquals(ResponseStatus.OK, entityInfoResponse.getStatus());
+    List<DUResponse.DiskUsage> duVolData =
+        entityInfoResponse.getChildMetricsListMap().get("BUCKET");
+    DUResponse.DiskUsage duBucket1 = duVolData.get(0);
+    DUResponse.DiskUsage duBucket2 = duVolData.get(1);
+    Assert.assertEquals(4, duBucket1.getKeyCount());
+    Assert.assertEquals(2, duBucket2.getKeyCount());
+  }
+
+  @Test
+  public void testEntityBucketInfoOrderByCount() throws Exception {
+    Response entityMetricsResp =
+        nsSummaryEndpoint.getEntityMetrics(BUCKET_ONE_PATH,
+        "count", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    Assert.assertEquals(2,
+        entityInfoResponse.getChildMetricsListMap().size());
+    Assert.assertEquals(EntityType.BUCKET, entityInfoResponse.getEntityType());
+    Assert.assertEquals(-1, entityInfoResponse.getNumBucket());
+    Assert.assertEquals(4, entityInfoResponse.getNumTotalDir());
+    Assert.assertEquals(-1, entityInfoResponse.getNumVolume());
+    Assert.assertEquals(4, entityInfoResponse.getNumTotalKey());
+    Assert.assertEquals(ResponseStatus.OK, entityInfoResponse.getStatus());
+    List<DUResponse.DiskUsage> duBucketData =
+        entityInfoResponse.getChildMetricsListMap().get("DIRECTORY");
+    DUResponse.DiskUsage duDir1 = duBucketData.get(0);
+    Assert.assertEquals(3, duDir1.getDirCount());
+    duBucketData =
+        entityInfoResponse.getChildMetricsListMap().get("KEY");
+    DUResponse.DiskUsage duKey = duBucketData.get(0);
+    Assert.assertEquals(0, duKey.getKeyCount());
+  }
+
+  @Test
+  public void testEntityRootInfoOrderBySize() throws Exception {
+    Response entityMetricsResp = nsSummaryEndpoint.getEntityMetrics(ROOT_PATH,
+        "count", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    List<DUResponse.DiskUsage> duRootData =
+        entityInfoResponse.getChildMetricsListMap().get("VOLUME");
+    DUResponse.DiskUsage duVol1 = duRootData.get(0);
+    DUResponse.DiskUsage duVol2 = duRootData.get(1);
+    Assert.assertEquals(VOL_DATA_SIZE, duVol1.getSize());
+    Assert.assertEquals(VOL_TWO_DATA_SIZE, duVol2.getSize());
+  }
+
+  @Test
+  public void testEntityVolumeInfoOrderBySize() throws Exception {
+    Response entityMetricsResp = nsSummaryEndpoint.getEntityMetrics(VOL_PATH,
+        "count", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    List<DUResponse.DiskUsage> duVolData =
+        entityInfoResponse.getChildMetricsListMap().get("BUCKET");
+    DUResponse.DiskUsage duBucket1 = duVolData.get(0);
+    DUResponse.DiskUsage duBucket2 = duVolData.get(1);
+    Assert.assertEquals(BUCKET_ONE_DATA_SIZE, duBucket1.getSize());
+    Assert.assertEquals(BUCKET_TWO_DATA_SIZE, duBucket2.getSize());
+  }
+
+  @Test
+  public void testEntityBucketInfoOrderBySize() throws Exception {
+    Response entityMetricsResp =
+        nsSummaryEndpoint.getEntityMetrics(BUCKET_ONE_PATH,
+        "count", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    List<DUResponse.DiskUsage> duVolData =
+        entityInfoResponse.getChildMetricsListMap().get("DIRECTORY");
+    DUResponse.DiskUsage duDir1 = duVolData.get(0);
+    Assert.assertEquals(DIR_ONE_DATA_SIZE, duDir1.getSize());
+  }
+
+  @Test
+  public void testEntityRootInfoOrderByAge() throws Exception {
+    Response entityMetricsResp = nsSummaryEndpoint.getEntityMetrics(ROOT_PATH,
+        "age", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    List<DUResponse.DiskUsage> duRootData =
+        entityInfoResponse.getChildMetricsListMap().get("VOLUME");
+    DUResponse.DiskUsage duVol1 = duRootData.get(0);
+    DUResponse.DiskUsage duVol2 = duRootData.get(1);
+    Assert.assertTrue(duVol1.getCreateTime() >= duVol2.getCreateTime());
+  }
+
+  @Test
+  public void testEntityVolumeInfoOrderByAge() throws Exception {
+    Response entityMetricsResp = nsSummaryEndpoint.getEntityMetrics(VOL_PATH,
+        "age", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    List<DUResponse.DiskUsage> duVolData =
+        entityInfoResponse.getChildMetricsListMap().get("BUCKET");
+    DUResponse.DiskUsage duBucket1 = duVolData.get(0);
+    DUResponse.DiskUsage duBucket2 = duVolData.get(1);
+    Assert.assertTrue(duBucket1.getCreateTime() >= duBucket2.getCreateTime());
+  }
+
+  @Test
+  public void testEntityBucketInfoOrderByAge() throws Exception {
+    Response entityMetricsResp =
+        nsSummaryEndpoint.getEntityMetrics(BUCKET_ONE_PATH,
+        "age", 2);
+    EntityInfoResponse entityInfoResponse =
+        (EntityInfoResponse) entityMetricsResp.getEntity();
+    List<DUResponse.DiskUsage> duBucketData =
+        entityInfoResponse.getChildMetricsListMap().get("DIRECTORY");
+    DUResponse.DiskUsage duDir1 = duBucketData.get(0);
+    Assert.assertEquals(0, duDir1.getCreateTime());
   }
 
   @Test
