@@ -2800,7 +2800,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         () -> resolveBucketLink(resolvedVolumeArgs));
 
     boolean auditSuccess = true;
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = bucket.update(resolvedVolumeArgs);
 
     try {
       if (isAclEnabled) {
