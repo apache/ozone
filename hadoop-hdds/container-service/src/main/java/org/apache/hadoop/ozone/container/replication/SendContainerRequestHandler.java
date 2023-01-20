@@ -108,6 +108,7 @@ class SendContainerRequestHandler
     try {
       importer.importContainer(containerId, path, volume);
       LOG.info("Imported container {}", containerId);
+      responseObserver.onNext(SendContainerResponse.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Throwable t) {
       LOG.info("Failed to import container {}", containerId, t);
