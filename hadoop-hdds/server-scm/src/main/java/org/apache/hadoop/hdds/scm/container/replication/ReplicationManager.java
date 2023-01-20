@@ -230,7 +230,7 @@ public class ReplicationManager implements SCMService {
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, nodeManager, this);
     ratisOverReplicationHandler =
-        new RatisOverReplicationHandler(ratisContainerPlacement);
+        new RatisOverReplicationHandler(ratisContainerPlacement, nodeManager);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());

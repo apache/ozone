@@ -166,9 +166,7 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream compressed = compress(output);
-         ArchiveOutputStream archiveOutput = tar(compressed)) {
-
+    try (ArchiveOutputStream archiveOutput = tar(compress(output))) {
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
 
@@ -187,8 +185,7 @@ public class TarContainerPacker
   @Override
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
-    try (InputStream decompressed = decompress(input);
-        ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = untar(decompress(input))) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -313,8 +310,7 @@ public class TarContainerPacker
   private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)
       throws IOException {
     byte[] descriptorFileContent = null;
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = untar(decompress(input))) {
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();

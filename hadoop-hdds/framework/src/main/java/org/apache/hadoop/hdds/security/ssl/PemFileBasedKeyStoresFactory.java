@@ -141,7 +141,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
   public synchronized void init(Mode mode, boolean requireClientAuth)
       throws IOException, GeneralSecurityException {
 
-    monitoringTimer = new Timer(caClient.getComponentName() + "-"
+    monitoringTimer = new Timer(caClient.getComponentName() + "-" + mode + "-"
         + SSL_MONITORING_THREAD_NAME, true);
 
     // key manager
