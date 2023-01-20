@@ -23,9 +23,6 @@ OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
 
-OZONE-SITE.XML_ozone.om.http-address=0.0.0.0:9874
-OZONE-SITE.XML_ozone.scm.http-address=0.0.0.0:9876
-
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
 OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1

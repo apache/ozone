@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
@@ -106,8 +107,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
   @Test
-  public void testOMHAMetrics() throws InterruptedException {
-    Thread.sleep(2000);
+  public void testOMHAMetrics()
+      throws InterruptedException, TimeoutException {
+    waitForLeaderToBeReady();
 
     OzoneManager leaderOM = getCluster().getOMLeader();
     OzoneManager randomOM = getCluster().getOzoneManager(1);
@@ -127,6 +129,22 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       Assertions.assertEquals(0L,
           omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
     }
+  }
+
+  /**
+   * Some tests are stopping or restarting OMs.
+   * There are test cases where we might need to
+   * wait for a leader to be elected and ready.
+   */
+  private void waitForLeaderToBeReady()
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return getCluster().getOMLeader().isLeaderReady();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 20000);
   }
 
   @Test
