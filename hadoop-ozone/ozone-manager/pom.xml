@@ -292,8 +292,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <!-- By default, ban all the classes in org.rocksdb -->
                   <bannedImport>org.rocksdb.**</bannedImport>
                   <allowedImports>
-                    <!-- Allow these imports for snapshot diff. We can't use managed DB for Snapshot diff because
-                     we need to create tables on fly and managed DB doesn't allow that. -->
+                    <!-- Allow rocksdb import for snapshot diff. We can't use managed DB for snapshot diff
+                     because it doesn't allow table creation on fly, and we need to create and drop tables on fly. -->
                     <allowedImport>org.rocksdb.Options</allowedImport>
                     <allowedImport>org.rocksdb.RocksDB</allowedImport>
                     <allowedImport>org.rocksdb.RocksIterator</allowedImport>

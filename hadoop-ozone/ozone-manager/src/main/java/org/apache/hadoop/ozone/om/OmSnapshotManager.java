@@ -301,7 +301,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     if (rocksDB != null) {
       rocksDB.close();
     }

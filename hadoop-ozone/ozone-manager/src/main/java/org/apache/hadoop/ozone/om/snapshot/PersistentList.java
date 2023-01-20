@@ -18,12 +18,18 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import java.util.Iterator;
+
 /**
- * Define an interface for persistent map.
+ * Define an interface for persistent list.
  */
-public interface PersistentMap<K, V> {
+public interface PersistentList<E> {
 
-  V get(K key);
+  boolean add(E entry);
 
-  void put(K key, V value);
+  boolean addAll(PersistentList<E> from);
+
+  E get(int index);
+
+  Iterator<E> iterator();
 }

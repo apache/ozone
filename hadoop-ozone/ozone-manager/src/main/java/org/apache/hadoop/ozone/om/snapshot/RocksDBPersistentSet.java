@@ -19,54 +19,68 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
+import java.util.Iterator;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
 
 /**
- * Persistent map backed by RocksDB.
+ * Persistent set backed by RocksDB.
  */
-public class RocksDBPersistentMap <K, V> implements PersistentMap<K, V> {
+public class RocksDBPersistentSet<E> implements PersistentSet<E> {
   private final RocksDB db;
   private final ColumnFamilyHandle columnFamilyHandle;
   private final CodecRegistry codecRegistry;
-  private final Class<K> keyType;
-  private final Class<V> valueType;
+  private final Class<E> entryType;
+  private final byte[] emptyByteArray = new byte[0];
 
-  RocksDBPersistentMap(RocksDB db,
+  RocksDBPersistentSet(RocksDB db,
                        ColumnFamilyHandle columnFamilyHandle,
                        CodecRegistry codecRegistry,
-                       Class<K> keyType,
-                       Class<V> valueType) {
+                       Class<E> entryType) {
     this.db = db;
     this.columnFamilyHandle = columnFamilyHandle;
     this.codecRegistry = codecRegistry;
-    this.keyType = keyType;
-    this.valueType = valueType;
+    this.entryType = entryType;
   }
 
-  @Override
-  public V get(K key) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = db.get(columnFamilyHandle, rawKey);
-      return codecRegistry.asObject(rawValue, valueType);
-    } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
-      throw new RuntimeException(exception);
-    }
-  }
 
   @Override
-  public void put(K key, V value) {
+  public void add(E entry) {
     try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = codecRegistry.asRawData(value);
+      byte[] rawKey = codecRegistry.asRawData(entry);
+      byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
       db.put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
       // TODO:: Fail gracefully.
       throw new RuntimeException(exception);
     }
+  }
+
+  @Override
+  public Iterator<E> iterator() {
+    RocksIterator rocksIterator = db.newIterator(columnFamilyHandle);
+    rocksIterator.seekToFirst();
+
+    return new Iterator<E>() {
+      @Override
+      public boolean hasNext() {
+        return rocksIterator.isValid();
+      }
+
+      @Override
+      public E next() {
+        byte[] rawKey = rocksIterator.key();
+        rocksIterator.next();
+        try {
+          return codecRegistry.asObject(rawKey, entryType);
+        } catch (IOException exception) {
+          // TODO:: Fail gracefully.
+          throw new RuntimeException(exception);
+        }
+      }
+    };
   }
 }
