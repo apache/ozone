@@ -22,24 +22,18 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -189,35 +183,6 @@ public class DBCheckpointServlet extends HttpServlet {
         } catch (IOException e) {
           LOG.error("Error trying to clean checkpoint at {} .",
               checkpoint.getCheckpointLocation().toString());
-        }
-      }
-    }
-  }
-
-  /**
-   * Write DB Checkpoint to an output stream as a compressed file (tar).
-   *
-   * @param checkpoint  checkpoint file
-   * @param destination desination output stream.
-   * @throws IOException
-   */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
-      throws IOException {
-
-    try (ArchiveOutputStream archiveOutputStream =
-        new TarArchiveOutputStream(destination)) {
-
-      Path checkpointPath = checkpoint.getCheckpointLocation();
-      try (Stream<Path> files = Files.list(checkpointPath)) {
-        for (Path path : files.collect(Collectors.toList())) {
-          if (path != null) {
-            Path fileName = path.getFileName();
-            if (fileName != null) {
-              includeFile(path.toFile(), fileName.toString(),
-                  archiveOutputStream);
-            }
-          }
         }
       }
     }

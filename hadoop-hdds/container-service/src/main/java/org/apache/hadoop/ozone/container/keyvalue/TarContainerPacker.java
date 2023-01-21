@@ -58,7 +58,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
- * Compress/uncompress KeyValueContainer data to a tar.gz archive.
+ * Compress/uncompress KeyValueContainer data to a tar archive.
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
