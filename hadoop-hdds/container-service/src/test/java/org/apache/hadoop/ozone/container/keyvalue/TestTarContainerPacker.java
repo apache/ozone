@@ -186,7 +186,7 @@ public class TestTarContainerPacker {
     //sample container descriptor file
     writeDescriptor(sourceContainer);
 
-    Path targetFile = TEMP_DIR.resolve("container.tar.gz");
+    Path targetFile = TEMP_DIR.resolve("container.tar");
 
     //WHEN: pack it
     SpyOutputStream outputForPack =
@@ -377,7 +377,7 @@ public class TestTarContainerPacker {
 
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
-    File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
+    File targetFile = TEMP_DIR.resolve("container.tar").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
          OutputStream compressed = packer.compress(output);
          ArchiveOutputStream archive = new TarArchiveOutputStream(compressed)) {

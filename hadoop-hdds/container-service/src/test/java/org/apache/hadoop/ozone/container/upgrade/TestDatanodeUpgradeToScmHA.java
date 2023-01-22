@@ -674,7 +674,7 @@ public class TestDatanodeUpgradeToScmHA {
             new TarContainerPacker(), dsm.getContainer().getVolumeSet());
 
     File tempFile = tempFolder.newFile(
-        ContainerUtils.getContainerTarGzName(containerID));
+        ContainerUtils.getContainerTarName(containerID));
     Files.copy(source.toPath(), tempFile.toPath(),
         StandardCopyOption.REPLACE_EXISTING);
     replicator.importContainer(containerID, tempFile.toPath(), null);

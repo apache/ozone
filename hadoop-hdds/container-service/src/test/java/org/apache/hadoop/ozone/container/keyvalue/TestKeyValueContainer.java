@@ -193,7 +193,7 @@ public class TestKeyValueContainer {
     checkContainerFilesPresent(data, 0);
 
     //destination path
-    File exportTar = folder.newFile("exported.tar.gz");
+    File exportTar = folder.newFile("exported.tar");
     TarContainerPacker packer = new TarContainerPacker();
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -220,7 +220,7 @@ public class TestKeyValueContainer {
     populate(numberOfKeysToWrite);
 
     //destination path
-    File folderToExport = folder.newFile("exported.tar.gz");
+    File folderToExport = folder.newFile("exported.tar");
     for (Map.Entry<CopyContainerCompression, String> entry :
         CopyContainerCompression.getCompressionMapping().entrySet()) {
       TarContainerPacker packer = new TarContainerPacker(entry.getValue());
@@ -368,7 +368,7 @@ public class TestKeyValueContainer {
     List<Thread> threads = IntStream.range(0, 20)
         .mapToObj(i -> new Thread(() -> {
           try {
-            File file = folder.newFile("concurrent" + i + ".tar.gz");
+            File file = folder.newFile("concurrent" + i + ".tar");
             try (OutputStream out = new FileOutputStream(file)) {
               keyValueContainer.exportContainerData(out, packer);
             }
