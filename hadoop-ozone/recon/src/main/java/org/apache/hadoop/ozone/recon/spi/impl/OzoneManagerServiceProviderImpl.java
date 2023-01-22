@@ -341,7 +341,7 @@ public class OzoneManagerServiceProviderImpl
     String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();
     File targetFile = new File(omSnapshotDBParentDir, snapshotFileName +
-        ".tar.gz");
+        ".tar");
     try {
       SecurityUtil.doAsLoginUser(() -> {
         try (InputStream inputStream = reconUtils.makeHttpCall(
