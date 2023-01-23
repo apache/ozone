@@ -207,8 +207,25 @@ Transfer Leadership for OM
     # Transfer leadership to the Follower OM
     ${result} =             Execute                 ozone admin om transfer --service-id=omservice -n ${followerOM}
                             LOG                     ${result}
-                            Should Contain          ${result}               Transfer leadership success.
+                            Should Contain          ${result}               Transfer leadership successfully
 
     ${newLeaderOM} =        Get OM Leader Node
                             Should be Equal         ${followerOM}           ${newLeaderOM}
+    Write Test File
+
+Transfer Leadership for OM randomly
+    # Check OM write operation before failover
+    Create volume and bucket
+    Write Test File
+
+    # Find Leader OM and one Follower OM
+    ${leaderOM} =           Get OM Leader Node
+                            LOG                     Leader OM: ${leaderOM}
+    # Transfer leadership to the Follower OM
+    ${result} =             Execute                 ozone admin om transfer -r
+                            LOG                     ${result}
+                            Should Contain          ${result}               Transfer leadership successfully
+
+    ${newLeaderOM} =        Get OM Leader Node
+                            Should Not be Equal     ${leaderOM}             ${newLeaderOM}
     Write Test File
