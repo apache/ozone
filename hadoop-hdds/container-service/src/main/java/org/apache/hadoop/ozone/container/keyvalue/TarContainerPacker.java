@@ -263,6 +263,7 @@ public class TarContainerPacker
     // empty.
     ArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
+    archiveOutput.closeArchiveEntry();
 
     // Add files in the directory.
     try (Stream<Path> dirEntries = Files.list(dir)) {
