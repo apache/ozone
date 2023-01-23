@@ -119,7 +119,7 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
     if (limit < 0 || prevKey < 0) {
       // Send back an empty response
-      return Response.ok().build();
+      return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
     long containersCount;
     Collection<ContainerMetadata> containerMetaDataList =
