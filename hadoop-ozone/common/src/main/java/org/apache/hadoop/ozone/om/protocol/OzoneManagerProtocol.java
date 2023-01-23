@@ -29,10 +29,12 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -263,6 +266,29 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
+
+  /**
+   * Look up for the container of an existing key.
+   *
+   * @param args the args of the key.
+   * @return OmKeyInfo instance that client uses to talk to container.
+   * @throws IOException
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
+   */
+  @Deprecated
+  OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
+
+  /**
+   * Lookup for the container of an existing key.
+   *
+   * @param args the args of the key.
+   * @param assumeS3Context if true OM will automatically lookup the S3
+   *                        volume context and includes in the response.
+   * @return KeyInfoWithVolumeContext includes info that client uses to talk
+   *         to containers and S3 volume context info if assumeS3Context is set.
+   */
+  KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args, boolean assumeS3Context)
+      throws IOException;
 
   /**
    * Rename an existing key within a bucket.
@@ -736,6 +762,51 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+
+  /**
+   * OzoneFS api to lookup for a file.
+   *
+   * @param keyArgs Key args
+   * @throws OMException if given key is not found or it is not a file
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
+   */
+  @Deprecated
+  OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
+
+  /**
+   * List the status for a file or a directory and its contents.
+   *
+   * @param keyArgs    Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @return list of file status
+   */
+  List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
+      String startKey, long numEntries) throws IOException;
+
+  /**
+   * List the status for a file or a directory and its contents.
+   *
+   * @param keyArgs    Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @return list of file status
+   */
+  List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
+                                   String startKey, long numEntries,
+                                   boolean allowPartialPrefixes)
+      throws IOException;
 
   /**
    * Add acl for Ozone object. Return true if acl is added successfully else

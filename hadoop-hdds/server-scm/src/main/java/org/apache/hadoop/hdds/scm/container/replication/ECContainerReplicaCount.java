@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
@@ -35,6 +37,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * This class provides a set of methods to test for over / under replication of
@@ -51,6 +54,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *     will eventually go away.
  *   * Any pending deletes are treated as if they have deleted
  *   * Pending adds are ignored as they may fail to create.
+ *   * Unhealthy replicas contribute to under replication - an index with
+ *   only unhealthy and no closed replicas is considered under replicated
  *
  * Similar for over replication:
  *
@@ -58,6 +63,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  *   * Pending delete replicas will complete
  *   * Pending adds are ignored as they may not complete.
  *   * Maintenance copies are not considered until they are back to IN_SERVICE
+ *   * Having unhealthy replicas is not considered over replication
  */
 
 public class ECContainerReplicaCount implements ContainerReplicaCount {
@@ -84,15 +90,47 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
 
+    Set<DatanodeDetails> unhealthyReplicaDNs = new HashSet<>();
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        unhealthyReplicaDNs.add(r.getDatanodeDetails());
+      }
+    }
+
     for (ContainerReplicaOp op : replicaPendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
         pendingAdd.add(op.getReplicaIndex());
       } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete.add(op.getReplicaIndex());
+        if (!unhealthyReplicaDNs.contains(op.getTarget())) {
+          // We ignore unhealthy replicas later in this method, so we also
+          // need to ignore pending deletes on those unhealthy replicas,
+          // otherwise the pending delete will decrement the healthy count and
+          // make the container appear under-replicated when it is not.
+          pendingDelete.add(op.getReplicaIndex());
+        }
       }
     }
 
     for (ContainerReplica replica : replicas) {
+      /*
+      Remove UNHEALTHY replicas because they are unavailable. They could be a
+      reason for under replication but should not be a reason for over
+      replication.
+
+      For example, consider the following set of replicas for an EC 3-2
+      container:
+      Replica Index 1: Closed
+      Replica Index 2: Closed
+      Replica Index 3: Closed, Unhealthy (2 replicas for this index)
+      Replica Index 4: Unhealthy
+      Replica Index 5: Closed
+
+      This is a case of under replication because index 4 is unavailable. Index
+      3 is not considered over replicated because its second copy is unhealthy.
+      */
+      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        continue;
+      }
       HddsProtos.NodeOperationalState state =
           replica.getDatanodeDetails().getPersistedOpState();
       int index = replica.getReplicaIndex();
@@ -396,6 +434,49 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     maintenanceIndexes.forEach((k, v) -> healthy.merge(k, v, Integer::sum));
     return hasFullSetOfIndexes(healthy) && onlineIndexes.size()
         >= repConfig.getData() + remainingMaintenanceRedundancy;
+  }
+
+  /**
+   * If we are checking a container for sufficient replication for "offline",
+   * ie decommission or maintenance, then it is not really a requirement that
+   * all replicas for the container are present. Instead, we can ensure the
+   * replica on the node going offline has a copy elsewhere on another
+   * IN_SERVICE node, and if so that replica is sufficiently replicated.
+   * @param datanode The datanode being checked to go offline.
+   * @return True if the container is sufficiently replicated or if this replica
+   *         on the passed node is present elsewhere on an IN_SERVICE node.
+   */
+  @Override
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode) {
+    boolean sufficientlyReplicated = isSufficientlyReplicated(false);
+    if (sufficientlyReplicated) {
+      return true;
+    }
+    // If it is not sufficiently replicated (ie the container has all replicas)
+    // then we need to check if the replica that is on this node is available
+    // on another ONLINE node, ie in the healthy set. This means we avoid
+    // blocking decommission or maintenance caused by un-recoverable EC
+    // containers.
+    if (datanode.getPersistedOpState() == IN_SERVICE) {
+      // The node passed into this method must be a node going offline, so it
+      // cannot be IN_SERVICE. If an IN_SERVICE mode is passed, just return
+      // false.
+      return false;
+    }
+    ContainerReplica thisReplica = null;
+    for (ContainerReplica r : replicas) {
+      if (r.getDatanodeDetails().equals(datanode)) {
+        thisReplica = r;
+        break;
+      }
+    }
+    if (thisReplica == null) {
+      // From the set of replicas, none are on the passed datanode.
+      // This should not happen in practice but if it does we cannot indicate
+      // the container is sufficiently replicated.
+      return false;
+    }
+    return healthyIndexes.containsKey(thisReplica.getReplicaIndex());
   }
 
   @Override

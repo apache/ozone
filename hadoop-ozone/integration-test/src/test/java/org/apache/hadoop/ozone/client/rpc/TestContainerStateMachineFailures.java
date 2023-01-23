@@ -781,7 +781,6 @@ public class TestContainerStateMachineFailures {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(key)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = null;
     try {

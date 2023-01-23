@@ -206,31 +206,24 @@ This product bundles various third-party components under other open source
 licenses. This section summarizes those components and their licenses.
 See licenses/ for text of these licenses.
 
-EPL
+
+EDL 1.0
 =====================
 
-   org.eclipse.jetty:jetty-client
-   org.eclipse.jetty:jetty-http
-   org.eclipse.jetty:jetty-io
-   org.eclipse.jetty:jetty-security
-   org.eclipse.jetty:jetty-server
-   org.eclipse.jetty:jetty-servlet
-   org.eclipse.jetty:jetty-util
-   org.eclipse.jetty:jetty-util-ajax
-   org.eclipse.jetty:jetty-webapp
-   org.eclipse.jetty:jetty-xml
+   jakarta.activation:jakarta.activation-api
+   jakarta.xml.bind:jakarta.xml.bind-api
+
+
+EPL 2.0
+=====================
+
+   jakarta.annotation:jakarta.annotation-api
+   jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
    org.aspectj:aspectjweaver
 
 
-BSD
-=====================
-
-   org.codehaus.woodstox:stax2-api
-   com.github.vlsi.mxgraph:jgraphx
-
-
-CDDL
+CDDL 1.1 + GPLv2 with classpath exception
 =====================
 
    com.sun.istack:istack-commons-runtime
@@ -240,6 +233,10 @@ CDDL
    com.sun.jersey:jersey-server
    com.sun.jersey:jersey-servlet
    javax.activation:activation
+   javax.annotation:javax.annotation-api
+   javax.el:javax.el-api
+   javax.interceptor:javax.interceptor-api
+   javax.servlet:javax.servlet-api
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
    javax.xml.bind:jaxb-api
@@ -253,6 +250,7 @@ CDDL
    org.glassfish.hk2:osgi-resource-locator
    org.glassfish.jaxb:jaxb-runtime
    org.glassfish.jaxb:jaxb-core
+   org.glassfish.jaxb:jaxb-runtime
    org.glassfish.jaxb:txw2
    org.glassfish.jersey.containers:jersey-container-servlet
    org.glassfish.jersey.containers:jersey-container-servlet-core
@@ -266,34 +264,59 @@ CDDL
    org.glassfish.jersey.media:jersey-media-json-jackson
    org.jvnet.staxex:stax-ex
 
-Apache License
+
+Apache License 2.0
 =====================
 
    ch.qos.reload4j:reload4j
+   com.amazonaws:aws-java-sdk-core
+   com.amazonaws:aws-java-sdk-kms
+   com.amazonaws:aws-java-sdk-s3
+   com.amazonaws:jmespath-java
    com.carrotsearch:hppc
    com.fasterxml.jackson.core:jackson-annotations
    com.fasterxml.jackson.core:jackson-core
    com.fasterxml.jackson.core:jackson-databind
+   com.fasterxml.jackson.dataformat:jackson-dataformat-cbor
    com.fasterxml.jackson.dataformat:jackson-dataformat-xml
+   com.fasterxml.jackson.datatype:jackson-datatype-jsr310
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
    com.github.stephenc.jcip:jcip-annotations
+   com.google.android:annotations
    com.google.api.grpc:proto-google-common-protos
+   com.google.code.findbugs:jsr305
    com.google.code.gson:gson
    com.google.errorprone:error_prone_annotations
+   com.google.guava:failureaccess
    com.google.guava:guava
+   com.google.guava:listenablefuture
    com.google.inject.extensions:guice-assistedinject
    com.google.inject.extensions:guice-multibindings
    com.google.inject.extensions:guice-servlet
    com.google.inject:guice
+   com.google.j2objc:j2objc-annotations
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
    com.squareup.okhttp3:okhttp
    com.squareup.okio:okio
    com.sun.xml.fastinfoset:FastInfoset
+   commons-beanutils:commons-beanutils
+   commons-cli:commons-cli
+   commons-codec:commons-codec
+   commons-collections:commons-collections
+   commons-daemon:commons-daemon
+   commons-digester:commons-digester
+   commons-httpclient:commons-httpclient
+   commons-io:commons-io
+   commons-lang:commons-lang
+   commons-logging:commons-logging
+   commons-net:commons-net
+   commons-validator:commons-validator
    info.picocli:picocli
    io.dropwizard.metrics:metrics-core
+   io.grpc:grpc-api
    io.grpc:grpc-context
    io.grpc:grpc-core
    io.grpc:grpc-netty
@@ -304,8 +327,6 @@ Apache License
    io.jaegertracing:jaeger-core
    io.jaegertracing:jaeger-thrift
    io.jaegertracing:jaeger-tracerresolver
-   io.netty:netty
-   io.netty:netty-all
    io.netty:netty-buffer
    io.netty:netty-codec
    io.netty:netty-codec-http
@@ -328,21 +349,87 @@ Apache License
    io.opentracing:opentracing-api
    io.opentracing:opentracing-noop
    io.opentracing:opentracing-util
+   io.perfmark:perfmark-api
+   io.prometheus:simpleclient
+   io.prometheus:simpleclient_common
+   io.prometheus:simpleclient_dropwizard
+   joda-time:joda-time
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
+   javax.inject:javax.inject
    net.minidev:accessors-smart
    net.minidev:json-smart
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
-   org.bouncycastle:bcpkix-jdk15on
-   org.bouncycastle:bcprov-jdk15on
+   org.apache.commons:commons-compress
+   org.apache.commons:commons-configuration2
+   org.apache.commons:commons-lang3
+   org.apache.commons:commons-pool2
+   org.apache.commons:commons-text
+   org.apache.derby:derby
+   org.apache.hadoop:hadoop-annotations
+   org.apache.hadoop:hadoop-auth
+   org.apache.hadoop:hadoop-common
+   org.apache.hadoop:hadoop-hdfs
+   org.apache.hadoop:hadoop-hdfs-client
+   org.apache.hadoop:hadoop-shaded-guava
+   org.apache.hadoop:hadoop-shaded-protobuf
+   org.apache.httpcomponents:httpasyncclient
+   org.apache.httpcomponents:httpcore
+   org.apache.httpcomponents:httpcore-nio
+   org.apache.httpcomponents:httpmime
+   org.apache.kerby:kerb-admin
+   org.apache.kerby:kerb-client
+   org.apache.kerby:kerb-common
+   org.apache.kerby:kerb-core
+   org.apache.kerby:kerb-crypto
+   org.apache.kerby:kerb-identity
+   org.apache.kerby:kerb-server
+   org.apache.kerby:kerb-simplekdc
+   org.apache.kerby:kerb-util
+   org.apache.kerby:kerby-asn1
+   org.apache.kerby:kerby-config
+   org.apache.kerby:kerby-pkix
+   org.apache.kerby:kerby-util
+   org.apache.kerby:kerby-xdr
+   org.apache.kerby:token-provider
+   org.apache.logging.log4j:log4j-api
+   org.apache.logging.log4j:log4j-core
+   org.apache.orc:orc-core
+   org.apache.ranger:ranger-intg
+   org.apache.ranger:ranger-plugin-classloader
+   org.apache.ranger:ranger-plugin-audit
+   org.apache.ranger:ranger-plugin-common
+   org.apache.ranger:ranger-plugin-cred
+   org.apache.ratis:ratis-client
+   org.apache.ratis:ratis-common
+   org.apache.ratis:ratis-grpc
+   org.apache.ratis:ratis-metrics
+   org.apache.ratis:ratis-proto
+   org.apache.ratis:ratis-server
+   org.apache.ratis:ratis-server-api
+   org.apache.ratis:ratis-thirdparty-misc
+   org.apache.ratis:ratis-tools
+   org.apache.thrift:libthrift
    org.codehaus.jackson:jackson-core-asl
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl
    org.codehaus.jackson:jackson-xc
-   org.codehaus.jettison:jettison
+   org.eclipse.jetty:jetty-client
+   org.eclipse.jetty:jetty-http
+   org.eclipse.jetty:jetty-io
+   org.eclipse.jetty:jetty-security
+   org.eclipse.jetty:jetty-server
+   org.eclipse.jetty:jetty-servlet
+   org.eclipse.jetty:jetty-util
+   org.eclipse.jetty:jetty-util-ajax
+   org.eclipse.jetty:jetty-webapp
+   org.eclipse.jetty:jetty-xml
    org.hamcrest:hamcrest-all
    org.javassist:javassist
+   org.jetbrains:annotations
+   org.jetbrains.kotlin:kotlin-stdlib
+   org.jetbrains.kotlin:kotlin-stdlib-common
    org.jboss.weld.servlet:weld-servlet
    org.jheaps:jheaps
    org.jooq:jooq
@@ -357,14 +444,18 @@ Apache License
    org.xerial.snappy:snappy-java
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
+   software.amazon.ion:ion-java
 
 
 MIT
 =====================
 
    com.kstruct:gethostname4j
-   net.sf.jopt-simple:jopt-simple
+   org.bouncycastle:bcpkix-jdk15on
+   org.bouncycastle:bcprov-jdk15on
+   org.checkerframework:checker-qual
    org.codehaus.mojo:animal-sniffer-annotations
+   org.kohsuke.metainf-services:metainf-services
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
 
@@ -397,7 +488,7 @@ Public Domain
 BSD 3-Clause
 =====================
 
-   com.google.code.findbugs:jsr305
+   com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
    com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j
@@ -409,7 +500,9 @@ BSD 3-Clause
 BSD 2-Clause
 =====================
 
+   com.github.luben:zstd-jni
    dnsjava:dnsjava
+   org.codehaus.woodstox:stax2-api
 
 
 WTFPL
@@ -436,14 +529,13 @@ BSD 3-Clause
 =====================
 
 d3-3.5.17.min.js
-d3-3.5.17.min.js
-glyphicons-*
 
 MIT License
 =====================
 
 bootstrap-3.4.1
 css/bootstrap-*
+fonts/glyphicons-*
 bootstrap.min.js
 angular-route-1.8.0.min.js
 angular-nvd3-1.0.9.min.js

@@ -68,8 +68,11 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
 
   @Override
   public void onMessage(ContainerID containerID, EventPublisher publisher) {
-    LOG.info("Close container Event triggered for container : {}", containerID);
+
     try {
+      LOG.info("Close container Event triggered for container : {}, " +
+              "current state: {}", containerID,
+              containerManager.getContainer(containerID).getState());
       // If the container is in OPEN state, FINALIZE it.
       if (containerManager.getContainer(containerID).getState()
           == LifeCycleState.OPEN) {

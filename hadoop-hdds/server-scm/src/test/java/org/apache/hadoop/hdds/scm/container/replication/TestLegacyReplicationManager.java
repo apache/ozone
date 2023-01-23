@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager
-    .ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.LegacyReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
@@ -117,7 +117,8 @@ public class TestLegacyReplicationManager {
 
   private ReplicationManager replicationManager;
   private ContainerStateManager containerStateManager;
-  private PlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy ratisContainerPlacementPolicy;
+  private PlacementPolicy ecContainerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
@@ -193,9 +194,10 @@ public class TestLegacyReplicationManager {
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    ratisContainerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    ecContainerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
-    Mockito.when(containerPlacementPolicy.chooseDatanodes(
+    Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
         Mockito.any(), Mockito.any(), Mockito.anyInt(),
             Mockito.anyLong(), Mockito.anyLong()))
         .thenAnswer(invocation -> {
@@ -205,7 +207,7 @@ public class TestLegacyReplicationManager {
               .collect(Collectors.toList());
         });
 
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.any(),
         Mockito.anyInt()
         )).thenAnswer(invocation ->
@@ -219,15 +221,15 @@ public class TestLegacyReplicationManager {
       throws Exception {
     replicationManager.stop();
     dbStore.close();
-    final LegacyReplicationManager.ReplicationManagerConfiguration conf
-        = new LegacyReplicationManager.ReplicationManagerConfiguration();
+    final LegacyReplicationManagerConfiguration conf
+        = new LegacyReplicationManagerConfiguration();
     conf.setContainerInflightReplicationLimit(replicationLimit);
     conf.setContainerInflightDeletionLimit(deletionLimit);
     createReplicationManager(conf);
   }
 
   void createReplicationManager(
-      LegacyReplicationManager.ReplicationManagerConfiguration conf)
+      LegacyReplicationManagerConfiguration conf)
       throws Exception {
     createReplicationManager(null, conf);
   }
@@ -238,7 +240,7 @@ public class TestLegacyReplicationManager {
   }
 
   void createReplicationManager(ReplicationManagerConfiguration rmConf,
-      LegacyReplicationManager.ReplicationManagerConfiguration lrmConf)
+      LegacyReplicationManagerConfiguration lrmConf)
       throws InterruptedException, IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     testDir = GenericTestUtils
@@ -257,14 +259,15 @@ public class TestLegacyReplicationManager {
       config, new SCMDBDefinition());
 
     LegacyReplicationManager legacyRM = new LegacyReplicationManager(
-        config, containerManager, containerPlacementPolicy, eventQueue,
+        config, containerManager, ratisContainerPlacementPolicy, eventQueue,
         SCMContext.emptyContext(), nodeManager, scmHAManager, clock,
         SCMDBDefinition.MOVE.getTable(dbStore));
 
     replicationManager = new ReplicationManager(
         config,
         containerManager,
-        containerPlacementPolicy,
+        ratisContainerPlacementPolicy,
+        ecContainerPlacementPolicy,
         eventQueue,
         SCMContext.emptyContext(),
         nodeManager,
@@ -1102,7 +1105,7 @@ public class TestLegacyReplicationManager {
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are 3 replicas. When there are 2 or 4 replicas
     // the status returned will be healthy.
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list.size() == 3),
         Mockito.anyInt()
     )).thenAnswer(invocation ->  {
@@ -1138,7 +1141,7 @@ public class TestLegacyReplicationManager {
     // Now make it so that all containers seem mis-replicated no matter how
     // many replicas. This will test replicas are not scheduled if the new
     // replica does not fix the mis-replication.
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.anyList(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->  {
@@ -1190,7 +1193,7 @@ public class TestLegacyReplicationManager {
 
     // Ensure a mis-replicated status is returned for any containers in this
     // test where there are exactly 3 replicas checked.
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list.size() == 3),
         Mockito.anyInt()
     )).thenAnswer(
@@ -1241,7 +1244,7 @@ public class TestLegacyReplicationManager {
         id, replicaThree);
     containerStateManager.updateContainerReplica(id, replicaFour);
 
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list.size() == 3),
         Mockito.anyInt()
     )).thenAnswer(
@@ -1289,7 +1292,7 @@ public class TestLegacyReplicationManager {
     containerStateManager.updateContainerReplica(id, replicaFour);
     containerStateManager.updateContainerReplica(id, replicaFive);
 
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
         Mockito.argThat(list -> list != null && list.size() <= 4),
         Mockito.anyInt()
     )).thenAnswer(

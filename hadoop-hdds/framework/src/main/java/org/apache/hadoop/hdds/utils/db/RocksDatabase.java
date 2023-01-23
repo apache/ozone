@@ -22,6 +22,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -72,7 +74,7 @@ import static org.rocksdb.RocksDB.listColumnFamilies;
 public final class RocksDatabase {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
-  static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+  public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
   private static List<ColumnFamilyHandle> columnFamilyHandles =
       new ArrayList<>();
@@ -147,12 +149,13 @@ public final class RocksDatabase {
       }
       columnFamilyHandles = handles;
       // init a column family map.
+      AtomicLong counter = new AtomicLong(0);
       for (ColumnFamilyHandle h : handles) {
-        final ColumnFamily f = new ColumnFamily(h);
+        final ColumnFamily f = new ColumnFamily(h, counter);
         columnFamilies.put(f.getName(), f);
       }
       return new RocksDatabase(dbFile, db, dbOptions, writeOptions,
-          descriptors, Collections.unmodifiableMap(columnFamilies));
+          descriptors, Collections.unmodifiableMap(columnFamilies), counter);
     } catch (RocksDBException e) {
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
       throw toIOException(RocksDatabase.class, "open " + dbFile, e);
@@ -160,7 +163,12 @@ public final class RocksDatabase {
   }
 
   private static void close(ColumnFamilyDescriptor d) {
-    runWithTryCatch(() -> closeDeeply(d.getOptions()), new Object() {
+    ManagedColumnFamilyOptions options =
+        (ManagedColumnFamilyOptions) d.getOptions();
+    if (options.isReused()) {
+      return;
+    }
+    runWithTryCatch(() -> closeDeeply(options), new Object() {
       @Override
       public String toString() {
         return d.getClass() + ":" + bytes2String(d.getName());
@@ -218,11 +226,15 @@ public final class RocksDatabase {
     }
 
     public void createCheckpoint(Path path) throws IOException {
+      assertClose();
       try {
+        counter.incrementAndGet();
         checkpoint.get().createCheckpoint(path.toString());
       } catch (RocksDBException e) {
-        closeOnError(e);
+        closeOnError(e, true);
         throw toIOException(this, "createCheckpoint " + path, e);
+      } finally {
+        counter.decrementAndGet();
       }
     }
 
@@ -243,11 +255,15 @@ public final class RocksDatabase {
    */
   public static final class ColumnFamily {
     private final byte[] nameBytes;
+    private AtomicLong counter;
     private final String name;
     private final ColumnFamilyHandle handle;
+    private AtomicBoolean isClosed = new AtomicBoolean(false);
 
-    public ColumnFamily(ColumnFamilyHandle handle) throws RocksDBException {
+    public ColumnFamily(ColumnFamilyHandle handle, AtomicLong counter)
+        throws RocksDBException {
       this.nameBytes = handle.getName();
+      this.counter = counter;
       this.name = bytes2String(nameBytes);
       this.handle = handle;
       LOG.debug("new ColumnFamily for {}", name);
@@ -271,19 +287,37 @@ public final class RocksDatabase {
 
     public void batchDelete(ManagedWriteBatch writeBatch, byte[] key)
         throws IOException {
+      assertClosed();
       try {
+        counter.incrementAndGet();
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toIOException(this, "batchDelete key " + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
       }
     }
 
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
+      assertClosed();
       try {
+        counter.incrementAndGet();
         writeBatch.put(getHandle(), key, value);
       } catch (RocksDBException e) {
         throw toIOException(this, "batchPut key " + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+    
+    public void markClosed() {
+      isClosed.set(true);
+    }
+
+    private void assertClosed() throws IOException {
+      if (isClosed.get()) {
+        throw new IOException("Rocks Database is closed");
       }
     }
 
@@ -301,28 +335,58 @@ public final class RocksDatabase {
   private final Map<String, ColumnFamily> columnFamilies;
 
   private final AtomicBoolean isClosed = new AtomicBoolean();
+  
+  private final AtomicLong counter;
 
   private RocksDatabase(File dbFile, ManagedRocksDB db,
       ManagedDBOptions dbOptions, ManagedWriteOptions writeOptions,
       List<ColumnFamilyDescriptor> descriptors,
-      Map<String, ColumnFamily> columnFamilies) {
+      Map<String, ColumnFamily> columnFamilies, AtomicLong counter) {
     this.name = getClass().getSimpleName() + "[" + dbFile + "]";
     this.db = db;
     this.dbOptions = dbOptions;
     this.writeOptions = writeOptions;
     this.descriptors = descriptors;
     this.columnFamilies = columnFamilies;
+    this.counter = counter;
   }
 
   public void close() {
     if (isClosed.compareAndSet(false, true)) {
+      if (columnFamilies != null) {
+        columnFamilies.values().stream().forEach(f -> f.markClosed());
+      }
+      // wait till all access to rocks db is process to avoid crash while close
+      while (true) {
+        if (counter.get() == 0) {
+          break;
+        }
+        try {
+          Thread.currentThread().sleep(1);
+        } catch (InterruptedException e) {
+          close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
+      
+      // close when counter is 0, no more operation
       close(columnFamilies, db, descriptors, writeOptions, dbOptions);
     }
   }
 
-  private void closeOnError(RocksDBException e) {
+  private void closeOnError(RocksDBException e, boolean isCounted) {
     if (shouldClose(e)) {
-      close();
+      try {
+        if (isCounted) {
+          counter.decrementAndGet();
+        }
+        close();
+      } finally {
+        if (isCounted) {
+          counter.incrementAndGet();
+        }
+      }
     }
   }
 
@@ -335,37 +399,55 @@ public final class RocksDatabase {
       return false;
     }
   }
+  
+  private void assertClose() throws IOException {
+    if (isClosed()) {
+      throw new IOException("Rocks Database is closed");
+    }
+  }
 
   public void ingestExternalFile(ColumnFamily family, List<String> files,
       ManagedIngestExternalFileOptions ingestOptions) throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       db.get().ingestExternalFile(family.getHandle(), files, ingestOptions);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       String msg = "Failed to ingest external files " +
           files.stream().collect(Collectors.joining(", ")) + " of " +
           family.getName();
       throw toIOException(this, msg, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public void put(ColumnFamily family, byte[] key, byte[] value)
       throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       db.get().put(family.getHandle(), writeOptions, key, value);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "put " + bytes2String(key), e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public void flush() throws IOException {
+    assertClose();
     try (ManagedFlushOptions options = new ManagedFlushOptions()) {
+      counter.incrementAndGet();
       options.setWaitForFlush(true);
       db.get().flush(options);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "flush", e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
@@ -385,26 +467,34 @@ public final class RocksDatabase {
         flush();
       }
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "flush", e);
     }
   }
 
   public void flushWal(boolean sync) throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       db.get().flushWal(sync);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "flushWal with sync=" + sync, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public void compactRange() throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       db.get().compactRange();
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
@@ -423,7 +513,7 @@ public final class RocksDatabase {
         db.get().compactRange();
       }
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "compactRange", e);
     }
   }
@@ -436,7 +526,7 @@ public final class RocksDatabase {
           return cf;
         }
       } catch (RocksDBException e) {
-        closeOnError(e);
+        closeOnError(e, true);
         throw toIOException(this, "columnFamilyHandle.getName", e);
       }
     }
@@ -452,8 +542,15 @@ public final class RocksDatabase {
    *         otherwise, return true.
    * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
-  public boolean keyMayExist(ColumnFamily family, byte[] key) {
-    return db.get().keyMayExist(family.getHandle(), key, null);
+  public boolean keyMayExist(ColumnFamily family, byte[] key)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      return db.get().keyMayExist(family.getHandle(), key, null);
+    } finally {
+      counter.decrementAndGet();
+    }
   }
 
   /**
@@ -462,10 +559,16 @@ public final class RocksDatabase {
    * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
   public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
-      byte[] key) {
-    final Holder<byte[]> out = new Holder<>();
-    return db.get().keyMayExist(family.getHandle(), key, out) ?
-        out::getValue : null;
+      byte[] key) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      final Holder<byte[]> out = new Holder<>();
+      return db.get().keyMayExist(family.getHandle(), key, out) ?
+          out::getValue : null;
+    } finally {
+      counter.decrementAndGet();
+    }
   }
 
   public ColumnFamily getColumnFamily(String key) {
@@ -477,12 +580,16 @@ public final class RocksDatabase {
   }
 
   public byte[] get(ColumnFamily family, byte[] key) throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       return db.get().get(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       final String message = "get " + bytes2String(key) + " from " + family;
       throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
@@ -495,78 +602,118 @@ public final class RocksDatabase {
   }
 
   private long getLongProperty(String key) throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       return db.get().getLongProperty(key);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "getLongProperty " + key, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   private long getLongProperty(ColumnFamily family, String key)
       throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       return db.get().getLongProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       final String message = "getLongProperty " + key + " from " + family;
       throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public String getProperty(String key) throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       return db.get().getProperty(key);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "getProperty " + key, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public String getProperty(ColumnFamily family, String key)
       throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       return db.get().getProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "getProperty " + key + " from " + family, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public ManagedTransactionLogIterator getUpdatesSince(long sequenceNumber)
       throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       return managed(db.get().getUpdatesSince(sequenceNumber));
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "getUpdatesSince " + sequenceNumber, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public long getLatestSequenceNumber() {
-    return db.get().getLatestSequenceNumber();
+    try {
+      counter.incrementAndGet();
+      return db.get().getLatestSequenceNumber();
+    } finally {
+      counter.decrementAndGet();
+    }
   }
 
-  public ManagedRocksIterator newIterator(ColumnFamily family) {
-    return managed(db.get().newIterator(family.getHandle()));
+  public ManagedRocksIterator newIterator(ColumnFamily family)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      return managed(db.get().newIterator(family.getHandle()));
+    } finally {
+      counter.decrementAndGet();
+    }
   }
 
   public ManagedRocksIterator newIterator(ColumnFamily family,
-                                          boolean fillCache) {
+      boolean fillCache) throws IOException {
+    assertClose();
     try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
+      counter.incrementAndGet();
       readOptions.setFillCache(fillCache);
       return managed(db.get().newIterator(family.getHandle(), readOptions));
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
   public void batchWrite(ManagedWriteBatch writeBatch,
                          ManagedWriteOptions options)
       throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       db.get().write(options, writeBatch);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       throw toIOException(this, "batchWrite", e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 
@@ -575,12 +722,16 @@ public final class RocksDatabase {
   }
 
   public void delete(ColumnFamily family, byte[] key) throws IOException {
+    assertClose();
     try {
+      counter.incrementAndGet();
       db.get().delete(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e);
+      closeOnError(e, true);
       final String message = "delete " + bytes2String(key) + " from " + family;
       throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
     }
   }
 

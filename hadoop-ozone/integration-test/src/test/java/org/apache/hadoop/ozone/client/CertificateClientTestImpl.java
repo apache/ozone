@@ -18,18 +18,24 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
@@ -37,8 +43,15 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 
+import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION_DEFAULT;
 
 /**
  * Test implementation for CertificateClient. To be used only for test
@@ -47,31 +60,77 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 
 public class CertificateClientTestImpl implements CertificateClient {
 
-  private final SecurityConfig securityConfig;
-  private final KeyPair keyPair;
   private final OzoneConfiguration config;
-  private final X509Certificate x509Certificate;
+  private final SecurityConfig securityConfig;
+  private KeyPair keyPair;
+  private X509Certificate x509Certificate;
+  private final KeyPair rootKeyPair;
+  private final X509Certificate rootCert;
+  private HDDSKeyGenerator keyGen;
+  private DefaultApprover approver;
+  private KeyStoresFactory serverKeyStoresFactory;
+  private KeyStoresFactory clientKeyStoresFactory;
 
   public CertificateClientTestImpl(OzoneConfiguration conf) throws Exception {
+    this(conf, true);
+  }
+
+  public CertificateClientTestImpl(OzoneConfiguration conf, boolean rootCA)
+      throws Exception {
     securityConfig = new SecurityConfig(conf);
-    HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+    keyGen = new HDDSKeyGenerator(securityConfig.getConfiguration());
     keyPair = keyGen.generateKey();
+    rootKeyPair = keyGen.generateKey();
     config = conf;
+    LocalDateTime start = LocalDateTime.now();
+    String rootCACertDuration = conf.get(HDDS_X509_MAX_DURATION,
+        HDDS_X509_MAX_DURATION_DEFAULT);
+    LocalDateTime end = start.plus(Duration.parse(rootCACertDuration));
+
+    // Generate RootCA certificate
     SelfSignedCertificate.Builder builder =
         SelfSignedCertificate.newBuilder()
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(365, ChronoUnit.DAYS))
+            .setBeginDate(start)
+            .setEndDate(end)
             .setClusterID("cluster1")
-            .setKey(keyPair)
-            .setSubject("localhost")
+            .setKey(rootKeyPair)
+            .setSubject("rootCA@localhost")
             .setConfiguration(config)
-            .setScmID("TestScmId1")
+            .setScmID("scm1")
             .makeCA();
-    X509CertificateHolder certificateHolder = null;
-    certificateHolder = builder.build();
-    x509Certificate = new JcaX509CertificateConverter().getCertificate(
-        certificateHolder);
+    rootCert = new JcaX509CertificateConverter().getCertificate(
+        builder.build());
+
+    // Generate normal certificate, signed by RootCA certificate
+    approver = new DefaultApprover(new DefaultProfile(), securityConfig);
+
+    CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+    // Get host name.
+    csrBuilder.setKey(keyPair)
+        .setConfiguration(config)
+        .setScmID("scm1")
+        .setClusterID("cluster1")
+        .setSubject("localhost")
+        .setDigitalSignature(true)
+        .setDigitalEncryption(true);
+
+    start = LocalDateTime.now();
+    String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
+        HDDS_X509_DEFAULT_DURATION_DEFAULT);
+    X509CertificateHolder certificateHolder =
+        approver.sign(securityConfig, rootKeyPair.getPrivate(),
+            new X509CertificateHolder(rootCert.getEncoded()),
+            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
+            Date.from(start.plus(Duration.parse(certDuration))
+                .atZone(ZoneId.systemDefault()).toInstant()),
+            csrBuilder.build(), "scm1", "cluster1");
+    x509Certificate =
+        new JcaX509CertificateConverter().getCertificate(certificateHolder);
+
+    serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
+        securityConfig, this, true);
+    clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
+        securityConfig, this, true);
   }
 
   @Override
@@ -103,12 +162,16 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public X509Certificate getCACertificate() {
-    return x509Certificate;
+    return rootCert;
   }
 
   @Override
   public boolean verifyCertificate(X509Certificate certificate) {
     return true;
+  }
+
+  @Override
+  public void setCertificateId(String certSerialId) {
   }
 
   @Override
@@ -135,8 +198,26 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public CertificateSignRequest.Builder getCSRBuilder(KeyPair key)
+      throws CertificateException {
+    return null;
+  }
+
+  @Override
   public CertificateSignRequest.Builder getCSRBuilder() {
     return new CertificateSignRequest.Builder();
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException {
+    return null;
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException {
+    return null;
   }
 
   @Override
@@ -239,4 +320,53 @@ public class CertificateClientTestImpl implements CertificateClient {
     return false;
   }
 
+  public void renewKey() throws Exception {
+    KeyPair newKeyPair = keyGen.generateKey();
+    CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+    // Get host name.
+    csrBuilder.setKey(newKeyPair)
+        .setConfiguration(config)
+        .setScmID("scm1")
+        .setClusterID("cluster1")
+        .setSubject("localhost")
+        .setDigitalSignature(true);
+
+    String certDuration = config.get(HDDS_X509_DEFAULT_DURATION,
+        HDDS_X509_DEFAULT_DURATION_DEFAULT);
+    Date start = new Date();
+    X509CertificateHolder certificateHolder =
+        approver.sign(securityConfig, rootKeyPair.getPrivate(),
+            new X509CertificateHolder(rootCert.getEncoded()), start,
+            new Date(start.getTime() + Duration.parse(certDuration).toMillis()),
+            csrBuilder.build(), "scm1", "cluster1");
+    X509Certificate newX509Certificate =
+        new JcaX509CertificateConverter().getCertificate(certificateHolder);
+
+    // Save the new private key and certificate to file
+    // Save certificate and private key to keyStore
+    keyPair = newKeyPair;
+    x509Certificate = newX509Certificate;
+    System.out.println(new Date() + " certificated is renewed");
+  }
+
+  @Override
+  public KeyStoresFactory getServerKeyStoresFactory() {
+    return serverKeyStoresFactory;
+  }
+
+  @Override
+  public KeyStoresFactory getClientKeyStoresFactory() {
+    return clientKeyStoresFactory;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (serverKeyStoresFactory != null) {
+      serverKeyStoresFactory.destroy();
+    }
+
+    if (clientKeyStoresFactory != null) {
+      clientKeyStoresFactory.destroy();
+    }
+  }
 }

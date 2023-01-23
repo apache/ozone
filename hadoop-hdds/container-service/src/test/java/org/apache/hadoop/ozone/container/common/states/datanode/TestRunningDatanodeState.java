@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.common.states.datanode;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
@@ -69,7 +69,7 @@ public class TestRunningDatanodeState {
     long startTime = Time.monotonicNow();
     state.await(500, TimeUnit.MILLISECONDS);
     long endTime = Time.monotonicNow();
-    Assert.assertTrue((endTime - startTime) >= 500);
+    Assertions.assertTrue((endTime - startTime) >= 500);
 
     futureOne.complete(SHUTDOWN);
 
@@ -83,7 +83,7 @@ public class TestRunningDatanodeState {
     startTime = Time.monotonicNow();
     state.await(500, TimeUnit.MILLISECONDS);
     endTime = Time.monotonicNow();
-    Assert.assertTrue((endTime - startTime) < 500);
+    Assertions.assertTrue((endTime - startTime) < 500);
 
     executorService.shutdown();
   }

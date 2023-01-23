@@ -37,9 +37,11 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.jetbrains.annotations.NotNull;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -48,6 +50,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -123,8 +127,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         //if datanode is specified, replicate only container if it has a
         //replica.
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
-          replicationTasks.add(new ReplicationTask(container.getContainerID(),
-              datanodesWithContainer));
+          replicationTasks.add(new ReplicationTask(
+              new ReplicateContainerCommand(container.getContainerID(),
+                  datanodesWithContainer)));
         }
       }
 
@@ -203,7 +208,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
             new SimpleContainerDownloader(conf, null),
             new TarContainerPacker());
 
-    supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
+    ReplicationServer.ReplicationConfig replicationConfig
+        = conf.getObject(ReplicationServer.ReplicationConfig.class);
+    supervisor = new ReplicationSupervisor(containerSet, null,
+        replicator, replicationConfig, Clock.system(ZoneId.systemDefault()));
   }
 
   private void replicateContainer(long counter) throws Exception {

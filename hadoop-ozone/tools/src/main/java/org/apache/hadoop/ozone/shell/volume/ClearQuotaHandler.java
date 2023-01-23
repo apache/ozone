@@ -31,7 +31,8 @@ import java.io.IOException;
  * clear quota of the volume.
  */
 @Command(name = "clrquota",
-    description = "clear quota of the volume")
+    description = "clear quota of the volume. At least one of the " +
+        "quota clear flag is mandatory.")
 public class ClearQuotaHandler extends VolumeHandler {
 
   @CommandLine.Mixin
@@ -42,12 +43,19 @@ public class ClearQuotaHandler extends VolumeHandler {
       throws IOException {
     String volumeName = address.getVolumeName();
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-
+    boolean isOptionPresent = false;
     if (clrSpaceQuota.getClrSpaceQuota()) {
       volume.clearSpaceQuota();
+      isOptionPresent = true;
     }
     if (clrSpaceQuota.getClrNamespaceQuota()) {
       volume.clearNamespaceQuota();
+      isOptionPresent = true;
+    }
+
+    if (!isOptionPresent) {
+      throw new IOException(
+          "At least one of the quota clear flag is required.");
     }
   }
 }

@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -89,7 +91,23 @@ public class DirectoryEntityHandler extends EntityHandler {
     for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
-      String subdirName = subdirNSSummary.getDirName();
+      // for the subdirName we need the subdir filename, not the key name
+      // Eg. /vol/bucket1/dir1/dir2,
+      // key name is /dir1/dir2
+      // we need to get dir2
+      Path subdirPath = Paths.get(subdirNSSummary.getDirName());
+      Path subdirFileName = subdirPath.getFileName();
+      String subdirName;
+      // Checking for null to get rid of a findbugs error and
+      // then throwing the NPException to avoid swallowing it.
+      // Error: Possible null pointer dereference in
+      // ...DirectoryEntityHandler.getDuResponse(boolean, boolean) due to
+      // return value of called method Dereferenced at DirectoryEntityHandler
+      if (subdirFileName != null) {
+        subdirName = subdirFileName.toString();
+      } else {
+        throw new NullPointerException("Subdirectory file name is null.");
+      }
       // build the path for subdirectory
       String subpath = BucketHandler
               .buildSubpath(getNormalizedPath(), subdirName);

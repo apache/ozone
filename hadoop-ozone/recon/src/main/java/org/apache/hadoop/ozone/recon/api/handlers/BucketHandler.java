@@ -17,14 +17,9 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -38,6 +33,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
@@ -113,27 +110,6 @@ public abstract class BucketHandler {
     return subpath;
   }
 
-  public long getKeySizeWithReplication(OmKeyInfo keyInfo) {
-    OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocations =
-        locationGroup.getBlocksLatestVersionOnly();
-    long du = 0L;
-    // a key could be too large to fit in one single container
-    for (OmKeyLocationInfo location: keyLocations) {
-      BlockID block = location.getBlockID();
-      ContainerID containerId = new ContainerID(block.getContainerID());
-      try {
-        int replicationFactor =
-            containerManager.getContainerReplicas(containerId).size();
-        long blockSize = location.getLength() * replicationFactor;
-        du += blockSize;
-      } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find container {}", block.getContainerID(), cnfe);
-      }
-    }
-    return du;
-  }
-
   /**
    * Example: /vol1/buck1/a/b/c/d/e/file1.txt -> a/b/c/d/e/file1.txt.
    * @param names parsed request
@@ -183,8 +159,24 @@ public abstract class BucketHandler {
                 OzoneStorageContainerManager reconSCM,
                 OmBucketInfo bucketInfo) throws IOException {
 
-    return new FSOBucketHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketInfo);
+    // If bucketInfo is null then entity type is UNKNOWN
+    if (Objects.isNull(bucketInfo)) {
+      return null;
+    } else {
+      if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+        return new FSOBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
+      } else if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.LEGACY)) {
+        return new LegacyBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
+      } else {
+        LOG.error("Unsupported bucket layout: " +
+            bucketInfo.getBucketLayout());
+        return null;
+      }
+    }
   }
 
   public static BucketHandler getBucketHandler(
@@ -197,11 +189,7 @@ public abstract class BucketHandler {
     OmBucketInfo bucketInfo = omMetadataManager
         .getBucketTable().getSkipCache(bucketKey);
 
-    if (bucketInfo == null) {
-      return null;
-    } else {
-      return getBucketHandler(reconNamespaceSummaryManager,
-          omMetadataManager, reconSCM, bucketInfo);
-    }
+    return getBucketHandler(reconNamespaceSummaryManager,
+        omMetadataManager, reconSCM, bucketInfo);
   }
 }

@@ -68,4 +68,7 @@ public final class ReconConfigKeys {
 
   public static final String OZONE_RECON_ADMINISTRATORS_GROUPS =
       "ozone.recon.administrators.groups";
+
+  public static final String OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD
+      = "ozone.recon.task.safemode.wait.threshold";
 }

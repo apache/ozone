@@ -18,19 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.TreeSet;
-
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -68,8 +56,32 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.apache.commons.io.IOUtils;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -87,20 +99,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
-import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ozone.test.TestClock;
-import org.apache.ozone.test.tag.Flaky;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -125,7 +123,7 @@ public class TestOzoneFileSystem {
     // TestOzoneFileSystem#init() function will be invoked only at the
     // beginning of every new set of Parameterized.Parameters.
     if (enabledFileSystemPaths != setDefaultFs ||
-            omRatisEnabled != enableOMRatis) {
+            omRatisEnabled != enableOMRatis || cluster == null) {
       enabledFileSystemPaths = setDefaultFs;
       omRatisEnabled = enableOMRatis;
       try {
@@ -155,6 +153,7 @@ public class TestOzoneFileSystem {
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
+  private static OzoneBucket ozoneBucket;
   private static String volumeName;
   private static String bucketName;
   private static Trash trash;
@@ -181,10 +180,9 @@ public class TestOzoneFileSystem {
     writeClient = cluster.getRpcClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    volumeName = ozoneBucket.getVolumeName();
+    bucketName = ozoneBucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
             OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
@@ -334,6 +332,30 @@ public class TestOzoneFileSystem {
     Path subdir = new Path("/d1/d2/");
     boolean status = fs.mkdirs(subdir);
     assertTrue("Shouldn't send error if dir exists", status);
+  }
+
+  @Test
+  public void testMakeDirsWithAnFakeDirectory() throws Exception {
+    /*
+     * Op 1. commit a key -> "dir1/dir2/key1"
+     * Op 2. create dir -> "dir1/testDir", the dir1 is a fake dir,
+     *  "dir1/testDir" can be created normal
+     */
+
+    String fakeGrandpaKey = "dir1";
+    String fakeParentKey = fakeGrandpaKey + "/dir2";
+    String fullKeyName = fakeParentKey + "/key1";
+    TestDataUtil.createKey(ozoneBucket, fullKeyName, "");
+
+    // /dir1/dir2 should not exist
+    assertFalse(fs.exists(new Path(fakeParentKey)));
+
+    // /dir1/dir2/key2 should be created because has a fake parent directory
+    Path subdir = new Path(fakeParentKey, "key2");
+    assertTrue(fs.mkdirs(subdir));
+    // the intermediate directories /dir1 and /dir1/dir2 will be created too
+    assertTrue(fs.exists(new Path(fakeGrandpaKey)));
+    assertTrue(fs.exists(new Path(fakeParentKey)));
   }
 
   @Test
@@ -617,6 +639,45 @@ public class TestOzoneFileSystem {
     writeClient.deleteKey(keyArgs);
   }
 
+  @Test
+  public void testListStatusWithIntermediateDirWithECEnabled()
+          throws Exception {
+    String keyName = "object-dir/object-name1";
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(new ECReplicationConfig(3, 2))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
+    Path parent = new Path("/");
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return fs.listStatus(parent).length != 0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+    FileStatus[] fileStatuses = fs.listStatus(parent);
+    // the number of immediate children of root is 1
+    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertEquals(fileStatuses[0].isErasureCoded(),
+            !bucketLayout.isFileSystemOptimized());
+    fileStatuses = fs.listStatus(new Path(
+            fileStatuses[0].getPath().toString() + "/object-name1"));
+    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertTrue(fileStatuses[0].isErasureCoded());
+    writeClient.deleteKey(keyArgs);
+  }
+
   /**
    * Tests listStatus operation on root directory.
    */
@@ -688,6 +749,37 @@ public class TestOzoneFileSystem {
     for (int i = 0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
     }
+  }
+
+  @Test
+  public void testListStatusOnKeyNameContainDelimiter() throws Exception {
+    /*
+    * op1: create a key -> "dir1/dir2/key1"
+    * op2: `ls /` child dir "/dir1/" will be return
+    * op2: `ls /dir1` child dir "/dir1/dir2/" will be return
+    * op3: `ls /dir1/dir2` file "/dir1/dir2/key" will be return
+    *
+    * the "/dir1", "/dir1/dir2/" are fake directory
+    * */
+    String keyName = "dir1/dir2/key1";
+    TestDataUtil.createKey(ozoneBucket, keyName, "");
+    FileStatus[] fileStatuses;
+
+    fileStatuses = fs.listStatus(new Path("/"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1", fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+
+    fileStatuses = fs.listStatus(new Path("/dir1"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1/dir2", fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+
+    fileStatuses = fs.listStatus(new Path("/dir1/dir2"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1/dir2/key1",
+        fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isFile());
   }
 
   /**
@@ -968,10 +1060,10 @@ public class TestOzoneFileSystem {
     Path fileNotExists = new Path("/file_notexist");
     try {
       fs.open(fileNotExists);
-      Assert.fail("Should throw FILE_NOT_FOUND error as file doesn't exist!");
+      Assert.fail("Should throw FileNotFoundException as file doesn't exist!");
     } catch (FileNotFoundException fnfe) {
-      Assert.assertTrue("Expected FILE_NOT_FOUND error",
-              fnfe.getMessage().contains("FILE_NOT_FOUND"));
+      Assert.assertTrue("Expected KEY_NOT_FOUND error",
+              fnfe.getMessage().contains("KEY_NOT_FOUND"));
     }
   }
 
@@ -1234,6 +1326,24 @@ public class TestOzoneFileSystem {
     assertTrue("Renamed failed", fs.rename(file1Destin, abcRootPath));
     assertTrue("Renamed filed: /a/b/c/file1", fs.exists(new Path(abcRootPath,
             "file1")));
+  }
+
+  @Test
+  public void testRenameContainDelimiterFile() throws Exception {
+    String fakeGrandpaKey = "dir1";
+    String fakeParentKey = fakeGrandpaKey + "/dir2";
+    String sourceKeyName = fakeParentKey + "/key1";
+    String targetKeyName = fakeParentKey +  "/key2";
+    TestDataUtil.createKey(ozoneBucket, sourceKeyName, "");
+
+    Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
+    Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
+    assertTrue(fs.rename(sourcePath, targetPath));
+    assertFalse(fs.exists(sourcePath));
+    assertTrue(fs.exists(targetPath));
+    // intermediate directories will not be created
+    assertFalse(fs.exists(new Path(fakeGrandpaKey)));
+    assertFalse(fs.exists(new Path(fakeParentKey)));
   }
 
 

@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -64,6 +65,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
@@ -196,7 +198,7 @@ public class TestOmMetrics {
             ozoneManager, "bucketManager");
     BucketManager mockBm = Mockito.spy(bucketManager);
 
-    OmBucketInfo bucketInfo = createBucketInfo();
+    OmBucketInfo bucketInfo = createBucketInfo(false);
     doBucketOps(bucketInfo);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -208,11 +210,18 @@ public class TestOmMetrics {
     assertCounter("NumBucketLists", 1L, omMetrics);
     assertCounter("NumBuckets", 0L, omMetrics);
 
-    bucketInfo = createBucketInfo();
+    OmBucketInfo ecBucketInfo = createBucketInfo(true);
+    writeClient.createBucket(ecBucketInfo);
+    writeClient.deleteBucket(ecBucketInfo.getVolumeName(),
+        ecBucketInfo.getBucketName());
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("EcBucketCreateTotal", 1L, omMetrics);
+
+    bucketInfo = createBucketInfo(false);
     writeClient.createBucket(bucketInfo);
-    bucketInfo = createBucketInfo();
+    bucketInfo = createBucketInfo(false);
     writeClient.createBucket(bucketInfo);
-    bucketInfo = createBucketInfo();
+    bucketInfo = createBucketInfo(false);
     writeClient.createBucket(bucketInfo);
     writeClient.deleteBucket(bucketInfo.getVolumeName(),
         bucketInfo.getBucketName());
@@ -232,15 +241,24 @@ public class TestOmMetrics {
     mockWritePathExceptions(OmBucketInfo.class);
     doBucketOps(bucketInfo);
 
+    ecBucketInfo = createBucketInfo(true);
+    try {
+      writeClient.createBucket(ecBucketInfo);
+    } catch (Exception e) {
+      //Expected failure
+    }
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBucketOps", 14L, omMetrics);
-    assertCounter("NumBucketCreates", 5L, omMetrics);
+    assertCounter("EcBucketCreateFailsTotal", 1L, omMetrics);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumBucketOps", 17L, omMetrics);
+    assertCounter("NumBucketCreates", 7L, omMetrics);
     assertCounter("NumBucketUpdates", 2L, omMetrics);
     assertCounter("NumBucketInfos", 2L, omMetrics);
-    assertCounter("NumBucketDeletes", 3L, omMetrics);
+    assertCounter("NumBucketDeletes", 4L, omMetrics);
     assertCounter("NumBucketLists", 2L, omMetrics);
 
-    assertCounter("NumBucketCreateFails", 1L, omMetrics);
+    assertCounter("NumBucketCreateFails", 2L, omMetrics);
     assertCounter("NumBucketUpdateFails", 1L, omMetrics);
     assertCounter("NumBucketInfoFails", 1L, omMetrics);
     assertCounter("NumBucketDeleteFails", 1L, omMetrics);
@@ -283,6 +301,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeyOps", 14L, omMetrics);
+    assertCounter("EcKeyCreateTotal", 1L, omMetrics);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
@@ -298,8 +317,20 @@ public class TestOmMetrics {
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
 
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        new ECReplicationConfig("rs-6-4-1024K"));
+    try {
+      keySession = writeClient.openKey(keyArgs);
+      writeClient.commitKey(keyArgs, keySession.getId());
+    } catch (Exception e) {
+      //Expected Failure in preExecute due to not enough datanode
+      Assertions.assertTrue(e.getMessage()
+          .contains("No enough datanodes to choose"));
+    }
+
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
+    assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
@@ -335,13 +366,83 @@ public class TestOmMetrics {
     assertCounter("NumKeyListFails", 1L, omMetrics);
     assertCounter("NumTrashKeyListFails", 1L, omMetrics);
     assertCounter("NumInitiateMultipartUploadFails", 1L, omMetrics);
-
-
     assertCounter("NumKeys", 2L, omMetrics);
+
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        new ECReplicationConfig("rs-3-2-1024K"));
+    try {
+      keySession = writeClient.openKey(keyArgs);
+      writeClient.commitKey(keyArgs, keySession.getId());
+    } catch (Exception e) {
+      //Expected Failure
+    }
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("EcKeyCreateFailsTotal", 1L, omMetrics);
 
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);
 
+  }
+
+  @Test
+  public void testSnapshotOps() throws Exception {
+    // This tests needs enough datanodes to allocate the
+    // blocks for the keys.
+    clusterBuilder.setNumDatanodes(3);
+    startCluster();
+
+    OmBucketInfo omBucketInfo = createBucketInfo(false);
+
+    String volumeName = omBucketInfo.getVolumeName();
+    String bucketName = omBucketInfo.getBucketName();
+    String snapshot1 = "snap1";
+    String snapshot2 = "snap2";
+
+    writeClient.createBucket(omBucketInfo);
+
+    // Create first key
+    OmKeyArgs keyArgs1 = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    OpenKeySession keySession = writeClient.openKey(keyArgs1);
+    writeClient.commitKey(keyArgs1, keySession.getId());
+
+    // Create first snapshot
+    writeClient.createSnapshot(volumeName, bucketName, snapshot1);
+
+    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+
+    assertCounter("NumSnapshotCreateFails", 0L, omMetrics);
+    assertCounter("NumSnapshotCreates", 1L, omMetrics);
+    assertCounter("NumSnapshotListFails", 0L, omMetrics);
+    assertCounter("NumSnapshotLists", 0L, omMetrics);
+
+    assertCounter("NumSnapshotActive", 1L, omMetrics);
+    assertCounter("NumSnapshotDeleted", 0L, omMetrics);
+    assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
+
+    // Create second key
+    OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    OpenKeySession keySession2 = writeClient.openKey(keyArgs2);
+    writeClient.commitKey(keyArgs2, keySession2.getId());
+
+    // Create second snapshot
+    writeClient.createSnapshot(volumeName, bucketName, snapshot2);
+
+    // List snapshots
+    writeClient.listSnapshot(volumeName, bucketName);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotActive", 2L, omMetrics);
+    assertCounter("NumSnapshotCreates", 2L, omMetrics);
+    assertCounter("NumSnapshotLists", 1L, omMetrics);
+
+    // restart OM
+    cluster.restartOzoneManager();
+
+    // Check number of active snapshots in the snapshot table
+    // is the same after OM restart
+    assertCounter("NumSnapshotActive", 2L, omMetrics);
   }
 
   private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {
@@ -605,13 +706,19 @@ public class TestOmMetrics {
         .setBucketName(info.getBucketName())
         .build();
   }
-  private OmBucketInfo createBucketInfo() throws IOException {
+  private OmBucketInfo createBucketInfo(boolean isEcBucket) throws IOException {
     OmVolumeArgs volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);
+    DefaultReplicationConfig repConf = new DefaultReplicationConfig(
+        new ECReplicationConfig("rs-3-2-1024k"));
     String bucketName = UUID.randomUUID().toString();
-    return new OmBucketInfo.Builder()
+
+    OmBucketInfo.Builder builder = new OmBucketInfo.Builder()
         .setVolumeName(volumeArgs.getVolume())
-        .setBucketName(bucketName)
-        .build();
+        .setBucketName(bucketName);
+    if (isEcBucket) {
+      builder.setDefaultReplicationConfig(repConf);
+    }
+    return builder.build();
   }
 }

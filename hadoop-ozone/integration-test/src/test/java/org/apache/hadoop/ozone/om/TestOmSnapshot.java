@@ -46,6 +46,7 @@ import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -65,6 +66,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
@@ -397,6 +399,31 @@ public class TestOmSnapshot {
     LambdaTestUtils.intercept(OMException.class,
             "Bucket not found",
             () -> createSnapshot(volume, bucket));
+  }
+
+  @Test
+  public void testBucketDeleteIfSnapshotExists() throws Exception {
+    String volume1 = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket1 = "buc-" + RandomStringUtils.randomNumeric(5);
+    String bucket2 = "buc-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume1);
+    OzoneVolume volume = store.getVolume(volume1);
+    volume.createBucket(bucket1);
+    volume.createBucket(bucket2);
+    OzoneBucket bucketWithSnapshot = volume.getBucket(bucket1);
+    OzoneBucket bucketWithoutSnapshot = volume.getBucket(bucket2);
+    String key = "key-";
+    createFileKey(bucketWithSnapshot, key);
+    createFileKey(bucketWithoutSnapshot, key);
+    createSnapshot(volume1, bucket1);
+    deleteKeys(bucketWithSnapshot);
+    deleteKeys(bucketWithoutSnapshot);
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> volume.deleteBucket(bucket1));
+    Assertions.assertEquals(CONTAINS_SNAPSHOT, omException.getResult());
+    // TODO: Delete snapshot then delete bucket1 when deletion is implemented
+    // no exception for bucket without snapshot
+    volume.deleteBucket(bucket2);
   }
 
   @Test

@@ -87,7 +87,8 @@ public class TestContainerServer {
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
-    caClient = new DNCertificateClient(new SecurityConfig(CONF));
+    caClient = new DNCertificateClient(new SecurityConfig(CONF),
+        null, null, null, null);
   }
 
   @Test

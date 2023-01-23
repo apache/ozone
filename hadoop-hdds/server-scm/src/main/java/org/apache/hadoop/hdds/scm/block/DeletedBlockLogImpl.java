@@ -195,6 +195,9 @@ public class DeletedBlockLogImpl
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
       }
+      for (Long txID: txIDs) {
+        transactionToRetryCountMap.computeIfPresent(txID, (key, value) -> 0);
+      }
       return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
           new ArrayList<>(new HashSet<>(txIDs)));
     } finally {
@@ -390,17 +393,22 @@ public class DeletedBlockLogImpl
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions) {
     try {
+      DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
+          .newBuilder(tx)
+          .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
+          .build();
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueOf(tx.getContainerID()));
+          .getContainerReplicas(
+              ContainerID.valueOf(updatedTxn.getContainerID()));
       for (ContainerReplica replica : replicas) {
         UUID dnID = replica.getDatanodeDetails().getUuid();
         Set<UUID> dnsWithTransactionCommitted =
-            transactionToDNsCommitMap.get(tx.getTxID());
+            transactionToDNsCommitMap.get(updatedTxn.getTxID());
         if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
             .contains(dnID)) {
           // Transaction need not be sent to dns which have
           // already committed it
-          transactions.addTransactionToDN(dnID, tx);
+          transactions.addTransactionToDN(dnID, updatedTxn);
         }
       }
     } catch (IOException e) {
