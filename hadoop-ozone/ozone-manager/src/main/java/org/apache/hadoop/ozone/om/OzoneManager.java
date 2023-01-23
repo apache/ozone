@@ -3083,7 +3083,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void transferLeadership(String nodeId, boolean isRandom)
+  public void transferLeadership(String nodeId)
       throws IOException {
     final UserGroupInformation ugi = getRemoteUser();
     if (!isAdmin(ugi)) {
@@ -3097,12 +3097,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put("nodeId", nodeId);
-    auditMap.put("isRandom", String.valueOf(isRandom));
     try {
       RaftServer server = omRatisServer.getServer();
       RaftGroupId groupID = omRatisServer.getRaftGroup().getGroupId();
       RaftPeerId targetPeerId;
-      if (isRandom) {
+      if (nodeId.isEmpty()) {
         RaftPeer curLeader = omRatisServer.getLeader();
         targetPeerId = server.getDivision(groupID).getGroup()
             .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()

@@ -63,13 +63,12 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
   public Void call() throws Exception {
     OzoneManagerProtocol client =
         parent.createOmClient(omServiceId, null, true);
-    client.transferLeadership(configGroup.omNodeId, configGroup.isRandom);
     if (configGroup.isRandom) {
-      System.out.println("Transfer leadership successfully.");
-    } else {
-      System.out.println("Transfer leadership successfully to " +
-          configGroup.omNodeId + ".");
+      configGroup.omNodeId = "";
     }
+    client.transferLeadership(configGroup.omNodeId);
+    System.out.println("Transfer leadership successfully to " +
+        (configGroup.isRandom ? "random node" : configGroup.omNodeId) + ".");
     return null;
   }
 }

@@ -797,19 +797,18 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void transferLeadership(String nodeId, boolean isRandom)
+  public void transferLeadership(String nodeId)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
     boolean auditSuccess = true;
     final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("host", nodeId);
-    auditMap.put("isRandom", String.valueOf(isRandom));
+    auditMap.put("nodeId", nodeId);
     try {
       SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
       RaftServer server = scmRatisServer.getDivision().getRaftServer();
       RaftGroupId groupID = scmRatisServer.getSCMStateMachine().getGroupId();
       RaftPeerId targetPeerId;
-      if (isRandom) {
+      if (nodeId.isEmpty()) {
         RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager().
             getRatisServer()).getLeader();
         targetPeerId = server.getDivision(groupID).getGroup()

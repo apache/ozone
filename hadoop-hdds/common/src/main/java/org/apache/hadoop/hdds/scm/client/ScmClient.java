@@ -364,10 +364,9 @@ public interface ScmClient extends Closeable {
    * Transfer the raft leadership.
    *
    * @param nodeId        the nodeId of the target expected leader
-   * @param isRandom      whether to choose random follower as target leader
    * @throws IOException
    */
-  void transferLeadership(String nodeId, boolean isRandom) throws IOException;
+  void transferLeadership(String nodeId) throws IOException;
 
   /**
    * Reset the expired deleted block retry count.

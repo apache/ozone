@@ -1187,9 +1187,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public TransferLeadershipResponseProto transferScmLeadership(
       TransferLeadershipRequestProto request) throws IOException {
-    String nodeId = request.hasNodeId() ? request.getNodeId() : "";
-    boolean isRandom = request.getIsRandom();
-    impl.transferLeadership(nodeId, isRandom);
+    String nodeId = request.getNodeId();
+    impl.transferLeadership(nodeId);
     return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

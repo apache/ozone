@@ -61,13 +61,12 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
   public Void call() throws Exception {
     ScmClient client = scmOption.createScmClient(
         parent.getParent().getOzoneConf());
-    client.transferLeadership(configGroup.scmNodeId, configGroup.isRandom);
     if (configGroup.isRandom) {
-      System.out.println("Transfer leadership successfully.");
-    } else {
-      System.out.println("Transfer leadership successfully to " +
-          configGroup.scmNodeId + ".");
+      configGroup.scmNodeId = "";
     }
+    client.transferLeadership(configGroup.scmNodeId);
+    System.out.println("Transfer leadership successfully to " +
+        (configGroup.isRandom ? "random node" : configGroup.scmNodeId) + ".");
     return null;
   }
 }

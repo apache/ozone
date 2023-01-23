@@ -453,8 +453,7 @@ message ContainerBalancerConfigurationProto {
 }
 
 message TransferLeadershipRequestProto {
-    required bool isRandom = 1;
-    optional string nodeId = 2;
+    required string nodeId = 1;
 }
 
 message TransferLeadershipResponseProto {

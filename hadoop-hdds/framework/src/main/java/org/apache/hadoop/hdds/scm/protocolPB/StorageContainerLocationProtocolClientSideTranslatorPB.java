@@ -704,16 +704,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void transferLeadership(String nodeId, boolean isRandom)
+  public void transferLeadership(String nodeId)
       throws IOException {
     TransferLeadershipRequestProto.Builder reqBuilder =
         TransferLeadershipRequestProto.newBuilder();
-    if (isRandom) {
-      reqBuilder.setIsRandom(true);
-    } else {
-      reqBuilder.setNodeId(nodeId);
-      reqBuilder.setIsRandom(false);
-    }
+    reqBuilder.setNodeId(nodeId);
     submitRequest(Type.TransferLeadership,
         builder -> builder.setTransferScmLeadershipRequest(reqBuilder.build()));
   }

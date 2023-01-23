@@ -1463,16 +1463,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void transferLeadership(String nodeId, boolean isRandom)
+  public void transferLeadership(String nodeId)
       throws IOException {
     TransferLeadershipRequestProto.Builder builder =
         TransferLeadershipRequestProto.newBuilder();
-    if (isRandom) {
-      builder.setIsRandom(true);
-    } else {
-      builder.setNodeId(nodeId);
-      builder.setIsRandom(false);
-    }
+    builder.setNodeId(nodeId);
     OMRequest omRequest = createOMRequest(Type.TransferLeadership)
         .setTransferOmLeadershipRequest(builder.build())
         .build();
