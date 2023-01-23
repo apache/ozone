@@ -144,7 +144,6 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
-share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
@@ -271,4 +270,5 @@ share/ozone/lib/token-provider.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/weld-servlet.Final.jar
 share/ozone/lib/woodstox-core.jar
+share/ozone/lib/zookeeper.jar
 share/ozone/lib/zstd-jni.jar
