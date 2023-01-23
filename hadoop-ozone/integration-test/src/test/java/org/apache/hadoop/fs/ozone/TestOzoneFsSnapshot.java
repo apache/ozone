@@ -16,12 +16,14 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
@@ -35,7 +37,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 
@@ -222,26 +226,17 @@ public class TestOzoneFsSnapshot {
   }
 
   /**
-   * Test list snapshots and keys with "ozone fs -ls".
+   * Test list snapshots with "ozone fs -ls".
    */
   @Test
   public void testFsLsSnapshot() throws Exception {
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-    String snapshotPath = bucketWithSnapshotIndicatorPath +
-        OM_KEY_PREFIX + snapshotName;
-    String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + key;
-
-    // Create snapshot
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
-    // Asserts that create request succeeded
-    Assertions.assertEquals(0, res);
+    String snapshotName = createSnapshot();
 
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
 
       // Check for snapshot with "ozone fs -ls"
-      res = ToolRunner.run(shell,
+      int res = ToolRunner.run(shell,
           new String[]{"-ls", bucketWithSnapshotIndicatorPath});
       // Asserts that -ls request succeeded
       Assertions.assertEquals(0, res);
@@ -250,9 +245,24 @@ public class TestOzoneFsSnapshot {
       Assertions.assertTrue(capture.getOutput()
           .contains(bucketWithSnapshotIndicatorPath
               + OM_KEY_PREFIX + snapshotName));
+    }
+  }
+
+  /**
+   * Test list snapshot keys with "ozone fs -ls".
+   */
+  @Test
+  public void testFsLsSnapshotKeys() throws Exception {
+    String snapshotName = createSnapshot();
+    String snapshotPath = bucketWithSnapshotIndicatorPath +
+        OM_KEY_PREFIX + snapshotName;
+    String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + key;
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
 
       // Check for snapshot keys with "ozone fs -ls"
-      res = ToolRunner.run(shell,
+      int res = ToolRunner.run(shell,
           new String[]{"-ls", snapshotPath});
       // Asserts that -ls request succeeded
       Assertions.assertEquals(0, res);
@@ -303,5 +313,30 @@ public class TestOzoneFsSnapshot {
     } finally {
       shell.close();
     }
+  }
+
+  private String createSnapshot() throws Exception {
+    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+
+    // Create snapshot
+    int res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", bucketPath, snapshotName});
+    // Asserts that create request succeeded
+    Assertions.assertEquals(0, res);
+
+    File metaDir = OMStorage
+        .getOmDbDir(ozoneManager.getConfiguration());
+
+    // wait till the snapshot directory exists
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volume, bucket, snapshotName));
+    String snapshotDirName = metaDir + OM_KEY_PREFIX +
+        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
+        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
+        1000, 100000);
+
+    return snapshotName;
   }
 }

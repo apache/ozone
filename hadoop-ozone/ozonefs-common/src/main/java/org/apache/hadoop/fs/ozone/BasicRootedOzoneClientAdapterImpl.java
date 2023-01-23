@@ -1187,7 +1187,7 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneSnapshot.getCreationTime(), 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, path, new BlockLocation[0],
+        owner, group, null, new BlockLocation[0],
         !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
         ozoneBucket.getReplicationConfig() != null &&
             ozoneBucket.getReplicationConfig().getReplicationType() ==
@@ -1223,7 +1223,7 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        owner, group, path, new BlockLocation[0],
+        owner, group, null, new BlockLocation[0],
         !StringUtils.isEmpty(ozoneBucket.getEncryptionKeyName()),
         ozoneBucket.getReplicationConfig() != null &&
             ozoneBucket.getReplicationConfig().getReplicationType() ==
