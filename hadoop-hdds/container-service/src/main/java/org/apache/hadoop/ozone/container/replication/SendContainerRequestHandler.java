@@ -73,7 +73,7 @@ class SendContainerRequestHandler
         volume = importer.chooseNextVolume();
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
-        path = dir.resolve(ContainerUtils.getContainerTarGzName(containerId));
+        path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
         output = Files.newOutputStream(path);
       }
 

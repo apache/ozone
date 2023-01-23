@@ -108,7 +108,7 @@ public class GrpcReplicationClient implements AutoCloseable {
     CompletableFuture<Path> response = new CompletableFuture<>();
 
     Path destinationPath = dir
-        .resolve(ContainerUtils.getContainerTarGzName(containerId));
+        .resolve(ContainerUtils.getContainerTarName(containerId));
 
     client.download(request,
         new StreamDownloader(containerId, response, destinationPath));
