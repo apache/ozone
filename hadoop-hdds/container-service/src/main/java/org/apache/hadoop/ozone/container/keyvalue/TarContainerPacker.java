@@ -167,13 +167,13 @@ public class TarContainerPacker
     KeyValueContainerData containerData = container.getContainerData();
 
     try (ArchiveOutputStream archiveOutput = tar(compress(output))) {
+      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
+          archiveOutput);
+
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
-          archiveOutput);
-
-      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
     } catch (CompressorException e) {
       throw new IOException(
