@@ -505,10 +505,8 @@ message CopyContainerResponseProto {
 message SendContainerRequest {
   required int64 containerID = 1;
   required uint64 offset = 2;
-  required uint64 len = 3;
-  required bool eof = 4;
-  required bytes data = 5;
-  optional int64 checksum = 6;
+  required bytes data = 3;
+  optional int64 checksum = 4;
 }
 
 message SendContainerResponse {

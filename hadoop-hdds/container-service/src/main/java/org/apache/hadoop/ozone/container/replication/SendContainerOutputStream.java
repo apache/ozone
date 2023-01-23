@@ -37,8 +37,6 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
         .setContainerID(getContainerId())
         .setData(data)
         .setOffset(getWrittenBytes())
-        .setLen(length)
-        .setEof(eof)
         .build();
     getStreamObserver().onNext(request);
   }

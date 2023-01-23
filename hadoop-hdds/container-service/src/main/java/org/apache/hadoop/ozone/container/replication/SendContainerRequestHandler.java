@@ -61,12 +61,11 @@ class SendContainerRequestHandler
   @Override
   public void onNext(SendContainerRequest req) {
     try {
-      LOG.info("Received part for container id:{} offset:{} len:{} eof:{}",
-          req.getContainerID(), req.getOffset(), req.getLen(), req.getEof());
+      final long length = req.getData().size();
+      LOG.info("Received part for container id:{} offset:{} len:{}",
+          req.getContainerID(), req.getOffset(), length);
 
       assertSame(nextOffset, req.getOffset(), "offset");
-      // TODO get rid of 'eof'?
-      // TODO get rid of 'len'?
 
       if (containerId == -1) {
         containerId = req.getContainerID();
@@ -81,7 +80,7 @@ class SendContainerRequestHandler
 
       req.getData().writeTo(output);
 
-      nextOffset += req.getLen();
+      nextOffset += length;
     } catch (Throwable t) {
       onError(t);
     }
