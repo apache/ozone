@@ -67,7 +67,7 @@ public class TarContainerPacker
 
   static final String DB_DIR_NAME = "db";
 
-  private static final String CONTAINER_FILE_NAME = "container.yaml";
+  static final String CONTAINER_FILE_NAME = "container.yaml";
 
   private final String compression;
 
