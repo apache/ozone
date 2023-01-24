@@ -212,8 +212,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     ReplicationServer.ReplicationConfig replicationConfig
         = conf.getObject(ReplicationServer.ReplicationConfig.class);
-    supervisor = new ReplicationSupervisor(containerSet, null,
-        replicator, null, replicationConfig,
+    supervisor = new ReplicationSupervisor(null, replicationConfig,
         Clock.system(ZoneId.systemDefault()));
   }
 

@@ -256,8 +256,7 @@ public class TestReplicationSupervisor {
   @Test
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, pullReplicator,
-            pushReplicator, newDirectExecutorService(), clock);
+        new ReplicationSupervisor(context, newDirectExecutorService(), clock);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
@@ -347,8 +346,7 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, pullReplicator, pushReplicator,
-            executor, clock);
+        new ReplicationSupervisor(context, executor, clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }

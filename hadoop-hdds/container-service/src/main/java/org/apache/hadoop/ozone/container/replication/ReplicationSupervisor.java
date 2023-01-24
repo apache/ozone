@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -47,9 +46,6 @@ public class ReplicationSupervisor {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
 
-  private final ContainerSet containerSet;
-  private final ContainerReplicator pullReplicator;
-  private final ContainerReplicator pushReplicator;
   private final ExecutorService executor;
   private final StateContext context;
   private final Clock clock;
@@ -69,13 +65,7 @@ public class ReplicationSupervisor {
 
   @VisibleForTesting
   ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator pullReplicator, ContainerReplicator pushReplicator,
-      ExecutorService executor,
-      Clock clock) {
-    this.containerSet = containerSet;
-    this.pullReplicator = pullReplicator;
-    this.pushReplicator = pushReplicator;
+      StateContext context, ExecutorService executor, Clock clock) {
     this.inFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
@@ -83,10 +73,8 @@ public class ReplicationSupervisor {
   }
 
   public ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator pullReplicator, ContainerReplicator pushReplicator,
-      ReplicationConfig replicationConfig, Clock clock) {
-    this(containerSet, context, pullReplicator, pushReplicator,
+      StateContext context, ReplicationConfig replicationConfig, Clock clock) {
+    this(context,
         new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,

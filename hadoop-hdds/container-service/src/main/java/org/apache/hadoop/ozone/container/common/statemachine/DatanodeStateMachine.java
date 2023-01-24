@@ -193,9 +193,7 @@ public class DatanodeStateMachine implements Closeable {
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
-    supervisor =
-        new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, pushReplicator, replicationConfig, clock);
+    supervisor = new ReplicationSupervisor(context, replicationConfig, clock);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
