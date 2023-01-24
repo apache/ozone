@@ -168,6 +168,7 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(4, supervisor.getReplicationRequestCount());
       Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assert.assertEquals(3, supervisor.getReplicationSkippedCount());
       Assert.assertEquals(0, supervisor.getInFlightReplications());
       Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(1, set.containerCount());
@@ -278,7 +279,7 @@ public class TestReplicationSupervisor {
     ContainerImporter importer =
         new ContainerImporter(conf, set, null, null, volumeSet);
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(importer, moc);
+        new DownloadAndImportReplicator(set, importer, moc);
 
     replicatorRef.set(replicator);
 
@@ -378,7 +379,10 @@ public class TestReplicationSupervisor {
 
     @Override
     public void replicate(ReplicationTask task) {
-      Assert.assertNull(set.getContainer(task.getContainerId()));
+      if (set.getContainer(task.getContainerId()) != null) {
+        task.setStatus(AbstractReplicationTask.Status.SKIPPED);
+        return;
+      }
 
       // assumes same-thread execution
       Assert.assertEquals(1, supervisor.getInFlightReplications());

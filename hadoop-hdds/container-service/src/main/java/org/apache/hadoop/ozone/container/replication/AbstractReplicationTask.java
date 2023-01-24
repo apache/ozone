@@ -32,9 +32,9 @@ public abstract class AbstractReplicationTask {
   public enum Status {
     QUEUED,
     IN_PROGRESS,
-    DOWNLOADING, // TODO - remove
     FAILED,
-    DONE
+    DONE,
+    SKIPPED
   }
 
   private volatile Status status = Status.QUEUED;

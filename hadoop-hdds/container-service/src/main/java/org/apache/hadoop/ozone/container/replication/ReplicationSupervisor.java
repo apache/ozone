@@ -58,6 +58,7 @@ public class ReplicationSupervisor {
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
   private final AtomicLong timeoutCounter = new AtomicLong();
+  private final AtomicLong skippedCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -145,7 +146,6 @@ public class ReplicationSupervisor {
 
     @Override
     public void run() {
-      final Long containerId = task.getContainerId();
       try {
         requestCounter.incrementAndGet();
 
@@ -175,19 +175,12 @@ public class ReplicationSupervisor {
           }
         }
 
-        // TODO - remove this along with the below block. Note we need to check
-        //        if the target is "this node" and if so skip it.
-       // final boolean pull = task.getTarget() == null;
-        if (containerSet.getContainer(task.getContainerId()) != null) {
-          LOG.debug("Container {} has already been downloaded.", containerId);
-          return;
-        }
-
         // TODO - remove this commented blocks and put replicator choice into
         //  the cmd
-       // task.setStatus(Status.IN_PROGRESS);
-       // ContainerReplicator replicator = pull ? pullReplicator : pushReplicator;
-       // replicator.replicate(task);
+        // task.setStatus(Status.IN_PROGRESS);
+        // ContainerReplicator replicator = pull ?
+        //     pullReplicator : pushReplicator;
+        // replicator.replicate(task);
         task.setStatus(Status.IN_PROGRESS);
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
@@ -196,6 +189,9 @@ public class ReplicationSupervisor {
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
           successCounter.incrementAndGet();
+        } else if (task.getStatus() == Status.SKIPPED) {
+          LOG.info("Skipped {}", this);
+          skippedCounter.incrementAndGet();
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
@@ -234,6 +230,10 @@ public class ReplicationSupervisor {
 
   public long getReplicationTimeoutCount() {
     return timeoutCounter.get();
+  }
+
+  public long getReplicationSkippedCount() {
+    return skippedCounter.get();
   }
 
 }

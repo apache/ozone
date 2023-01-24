@@ -207,7 +207,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
         controller, new TarContainerPacker(), null);
-    replicator = new DownloadAndImportReplicator(importer,
+    replicator = new DownloadAndImportReplicator(containerSet, importer,
         new SimpleContainerDownloader(conf, null));
 
     ReplicationServer.ReplicationConfig replicationConfig

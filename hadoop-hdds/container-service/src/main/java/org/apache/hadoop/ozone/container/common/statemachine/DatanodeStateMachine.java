@@ -180,6 +180,7 @@ public class DatanodeStateMachine implements Closeable {
         container.getController(),
         new TarContainerPacker(), container.getVolumeSet());
     ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
+        container.getContainerSet(),
         importer,
         new SimpleContainerDownloader(conf, dnCertClient));
     ContainerReplicator pushReplicator = new PushReplicator(
