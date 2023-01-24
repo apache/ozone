@@ -467,16 +467,16 @@ public class LegacyReplicationManager {
          * list, if the operation is completed or if it has timed out.
          */
         updateInflightAction(container, inflightReplication,
-                action -> replicas.stream().anyMatch(r ->
-                        r.getDatanodeDetails().equals(action.getDatanode())),
-                () -> metrics.incrNumReplicationCmdsTimeout(),
-                action -> updateCompletedReplicationMetrics(container, action));
+            action -> replicas.stream().anyMatch(
+                r -> r.getDatanodeDetails().equals(action.getDatanode())),
+            () -> metrics.incrNumReplicationCmdsTimeout(),
+            action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
-                action -> replicas.stream().noneMatch(r ->
-                        r.getDatanodeDetails().equals(action.getDatanode())),
-                () -> metrics.incrNumDeletionCmdsTimeout(),
-                action -> updateCompletedDeletionMetrics(container, action));
+            action -> replicas.stream().noneMatch(
+                r -> r.getDatanodeDetails().equals(action.getDatanode())),
+            () -> metrics.incrNumDeletionCmdsTimeout(),
+            action -> updateCompletedDeletionMetrics(container, action));
 
         /*
          * If container is under deleting and all it's replicas are deleted,
@@ -497,9 +497,9 @@ public class LegacyReplicationManager {
         }
 
         RatisContainerReplicaCount replicaSet =
-                getContainerReplicaCount(container, replicas);
+            getContainerReplicaCount(container, replicas);
         ContainerPlacementStatus placementStatus = getPlacementStatus(
-                replicas, container.getReplicationConfig().getRequiredNodes());
+            replicas, container.getReplicationConfig().getRequiredNodes());
 
         /*
          * We don't have to take any action if the container is healthy.
