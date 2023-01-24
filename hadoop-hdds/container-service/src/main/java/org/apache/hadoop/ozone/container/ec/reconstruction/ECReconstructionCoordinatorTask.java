@@ -23,9 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Clock;
-import java.util.OptionalLong;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This is the actual EC reconstruction coordination task.
@@ -34,24 +31,17 @@ public class ECReconstructionCoordinatorTask
     extends AbstractReplicationTask implements Runnable {
   private static final Logger LOG =
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
-  private final ConcurrentHashMap.KeySetView<Object, Boolean> inprogressCounter;
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
-  private final Clock clock;
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
-      ECReconstructionCommandInfo reconstructionCommandInfo,
-      ConcurrentHashMap.KeySetView<Object, Boolean>
-          inprogressReconstructionCoordinatorCounter,
-      Clock clock) {
+      ECReconstructionCommandInfo reconstructionCommandInfo) {
     super(reconstructionCommandInfo.getContainerID(),
         reconstructionCommandInfo.getDeadline(),
         reconstructionCommandInfo.getTerm());
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
-    this.inprogressCounter = inprogressReconstructionCoordinatorCounter;
-    this.clock = clock;
   }
 
   @Override
@@ -75,24 +65,6 @@ public class ECReconstructionCoordinatorTask
           containerID);
     }
     try {
-      if (reconstructionCommandInfo.getDeadline() > 0
-          && clock.millis() > reconstructionCommandInfo.getDeadline()) {
-        LOG.info("Ignoring this reconstruct container command for container" +
-                " {} since the current time {}ms is past the deadline {}ms",
-            containerID, clock.millis(),
-            reconstructionCommandInfo.getDeadline());
-        return;
-      }
-
-      final OptionalLong currentTerm =
-          reconstructionCoordinator.getTermOfLeaderSCM();
-      final long taskTerm = reconstructionCommandInfo.getTerm();
-      if (currentTerm.isPresent() && taskTerm < currentTerm.getAsLong()) {
-        LOG.info("Ignoring {} since SCM leader has new term ({} < {})",
-            reconstructionCommandInfo, taskTerm, currentTerm.getAsLong());
-        return;
-      }
-
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
           reconstructionCommandInfo.getEcReplicationConfig(),
@@ -100,11 +72,11 @@ public class ECReconstructionCoordinatorTask
           reconstructionCommandInfo.getTargetNodeMap());
       long elapsed = Time.monotonicNow() - start;
       LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
+      setStatus(Status.DONE);
     } catch (IOException e) {
       long elapsed = Time.monotonicNow() - start;
       LOG.warn("Failed {} after {} ms", reconstructionCommandInfo, elapsed, e);
-    } finally {
-      this.inprogressCounter.remove(containerID);
+      setStatus(Status.FAILED);
     }
   }
 

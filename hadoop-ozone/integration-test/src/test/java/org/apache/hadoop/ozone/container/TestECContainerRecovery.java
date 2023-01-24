@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
@@ -295,12 +294,9 @@ public class TestECContainerRecovery {
       dn.getDatanodeStateMachine().getContainer()
               .getContainerSet().setRecoveringTimeout(100);
 
-      ECReconstructionSupervisor ecReconstructionSupervisor =
-              GenericTestUtils.getFieldReflection(dn.getDatanodeStateMachine(),
-                      "ecReconstructionSupervisor");
       ECReconstructionCoordinator coordinator = GenericTestUtils
-              .mockFieldReflection(ecReconstructionSupervisor,
-                      "reconstructionCoordinator");
+              .mockFieldReflection(dn.getDatanodeStateMachine(),
+                      "ecReconstructionCoordinator");
 
       Mockito.doAnswer(invocation -> {
         GenericTestUtils.waitFor(() ->
