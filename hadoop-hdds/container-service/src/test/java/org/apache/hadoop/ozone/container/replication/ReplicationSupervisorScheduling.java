@@ -75,8 +75,6 @@ public class ReplicationSupervisorScheduling {
       destinationLocks.put(i, new Object());
     }
 
-    ContainerSet cs = new ContainerSet(1000);
-
     //simplified executor emulating the current sequential download +
     //import.
     ContainerReplicator replicator = task -> {
