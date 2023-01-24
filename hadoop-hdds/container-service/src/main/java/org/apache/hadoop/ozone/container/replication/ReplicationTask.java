@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,29 +26,33 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 /**
  * The task to download a container from the sources.
  */
-public class ReplicationTask {
-
-  private volatile Status status = Status.QUEUED;
-
-  private final Instant queued = Instant.now();
+public class ReplicationTask extends AbstractReplicationTask {
 
   private final ReplicateContainerCommand cmd;
+  private final ContainerReplicator replicator;
 
   /**
    * Counter for the transferred bytes.
    */
   private long transferredBytes;
 
-  public ReplicationTask(ReplicateContainerCommand cmd) {
+  public ReplicationTask(ReplicateContainerCommand cmd,
+                         ContainerReplicator replicator) {
+    super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
     this.cmd = cmd;
+    this.replicator = replicator;
   }
 
   /**
-   * Returns any deadline set on this task, in milliseconds since the epoch.
-   * A returned value of zero indicates no deadline.
+   * Intended to only be used in tests.
    */
-  public long getDeadline() {
-    return cmd.getDeadline();
+  protected ReplicationTask(
+      long containerId,
+      List<DatanodeDetails> sources,
+      ContainerReplicator replicator
+  ) {
+    this(ReplicateContainerCommand.fromSources(containerId, sources),
+        replicator);
   }
 
   @Override
@@ -78,25 +81,13 @@ public class ReplicationTask {
     return cmd.getSourceDatanodes();
   }
 
-  public Status getStatus() {
-    return status;
-  }
-
-  public void setStatus(Status status) {
-    this.status = status;
-  }
-
   @Override
   public String toString() {
     return "ReplicationTask{" +
-        "status=" + status +
+        "status=" + getStatus() +
         ", cmd={" + cmd + "}" +
-        ", queued=" + queued +
+        ", queued=" + getQueued() +
         '}';
-  }
-
-  public Instant getQueued() {
-    return queued;
   }
 
   public long getTransferredBytes() {
@@ -107,10 +98,6 @@ public class ReplicationTask {
     this.transferredBytes = transferredBytes;
   }
 
-  long getTerm() {
-    return cmd.getTerm();
-  }
-
   DatanodeDetails getTarget() {
     return cmd.getTargetDatanode();
   }
@@ -119,13 +106,8 @@ public class ReplicationTask {
     return cmd;
   }
 
-  /**
-   * Status of the replication.
-   */
-  public enum Status {
-    QUEUED,
-    IN_PROGRESS,
-    FAILED,
-    DONE
+  @Override
+  public void runTask() {
+    replicator.replicate(this);
   }
 }

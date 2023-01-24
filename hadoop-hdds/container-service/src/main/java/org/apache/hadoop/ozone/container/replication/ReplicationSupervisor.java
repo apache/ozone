@@ -29,10 +29,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -47,9 +46,6 @@ public class ReplicationSupervisor {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
 
-  private final ContainerSet containerSet;
-  private final ContainerReplicator pullReplicator;
-  private final ContainerReplicator pushReplicator;
   private final ExecutorService executor;
   private final StateContext context;
   private final Clock clock;
@@ -58,23 +54,18 @@ public class ReplicationSupervisor {
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
   private final AtomicLong timeoutCounter = new AtomicLong();
+  private final AtomicLong skippedCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
    * or queued for download. Tracked so we don't schedule > 1
    * concurrent download for the same container.
    */
-  private final Set<ReplicationTask> inFlight;
+  private final Set<AbstractReplicationTask> inFlight;
 
   @VisibleForTesting
   ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator pullReplicator, ContainerReplicator pushReplicator,
-      ExecutorService executor,
-      Clock clock) {
-    this.containerSet = containerSet;
-    this.pullReplicator = pullReplicator;
-    this.pushReplicator = pushReplicator;
+      StateContext context, ExecutorService executor, Clock clock) {
     this.inFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
@@ -82,10 +73,8 @@ public class ReplicationSupervisor {
   }
 
   public ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator pullReplicator, ContainerReplicator pushReplicator,
-      ReplicationConfig replicationConfig, Clock clock) {
-    this(containerSet, context, pullReplicator, pushReplicator,
+      StateContext context, ReplicationConfig replicationConfig, Clock clock) {
+    this(context,
         new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
@@ -99,7 +88,7 @@ public class ReplicationSupervisor {
   /**
    * Queue an asynchronous download of the given container.
    */
-  public void addTask(ReplicationTask task) {
+  public void addTask(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
       executor.execute(new TaskRunner(task));
     }
@@ -137,15 +126,14 @@ public class ReplicationSupervisor {
    * An executable form of a replication task with status handling.
    */
   public final class TaskRunner implements Runnable {
-    private final ReplicationTask task;
+    private final AbstractReplicationTask task;
 
-    public TaskRunner(ReplicationTask task) {
+    public TaskRunner(AbstractReplicationTask task) {
       this.task = task;
     }
 
     @Override
     public void run() {
-      final Long containerId = task.getContainerId();
       try {
         requestCounter.incrementAndGet();
 
@@ -175,22 +163,17 @@ public class ReplicationSupervisor {
           }
         }
 
-        final boolean pull = task.getTarget() == null;
-        if (containerSet.getContainer(task.getContainerId()) != null && pull) {
-          LOG.debug("Container {} has already been downloaded.", containerId);
-          return;
-        }
-
         task.setStatus(Status.IN_PROGRESS);
-        ContainerReplicator replicator = pull ? pullReplicator : pushReplicator;
-        replicator.replicate(task);
-
+        task.runTask();
         if (task.getStatus() == Status.FAILED) {
           LOG.error("Failed {}", this);
           failureCounter.incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
           successCounter.incrementAndGet();
+        } else if (task.getStatus() == Status.SKIPPED) {
+          LOG.info("Skipped {}", this);
+          skippedCounter.incrementAndGet();
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
@@ -203,7 +186,7 @@ public class ReplicationSupervisor {
 
     @Override
     public String toString() {
-      return task.getCommand().toString();
+      return task.toString();
     }
   }
 
@@ -229,6 +212,10 @@ public class ReplicationSupervisor {
 
   public long getReplicationTimeoutCount() {
     return timeoutCounter.get();
+  }
+
+  public long getReplicationSkippedCount() {
+    return skippedCounter.get();
   }
 
 }

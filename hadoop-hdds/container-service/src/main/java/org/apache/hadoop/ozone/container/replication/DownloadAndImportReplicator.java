@@ -23,8 +23,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,10 +43,13 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
+  private final ContainerSet containerSet;
 
   public DownloadAndImportReplicator(
+      ContainerSet containerSet,
       ContainerImporter containerImporter,
       ContainerDownloader downloader) {
+    this.containerSet = containerSet;
     this.downloader = downloader;
     this.containerImporter = containerImporter;
   }
@@ -53,6 +57,11 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   @Override
   public void replicate(ReplicationTask task) {
     long containerID = task.getContainerId();
+    if (containerSet.getContainer(containerID) != null) {
+      LOG.debug("Container {} has already been downloaded.", containerID);
+      task.setStatus(Status.SKIPPED);
+      return;
+    }
 
     List<DatanodeDetails> sourceDatanodes = task.getSources();
 

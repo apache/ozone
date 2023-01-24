@@ -168,6 +168,7 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(4, supervisor.getReplicationRequestCount());
       Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assert.assertEquals(3, supervisor.getReplicationSkippedCount());
       Assert.assertEquals(0, supervisor.getInFlightReplications());
       Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(1, set.containerCount());
@@ -255,8 +256,7 @@ public class TestReplicationSupervisor {
   @Test
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, pullReplicator,
-            pushReplicator, newDirectExecutorService(), clock);
+        new ReplicationSupervisor(context, newDirectExecutorService(), clock);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
@@ -278,7 +278,7 @@ public class TestReplicationSupervisor {
     ContainerImporter importer =
         new ContainerImporter(conf, set, null, null, volumeSet);
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(importer, moc);
+        new DownloadAndImportReplicator(set, importer, moc);
 
     replicatorRef.set(replicator);
 
@@ -299,13 +299,13 @@ public class TestReplicationSupervisor {
 
     ReplicateContainerCommand cmd = createCommand(1);
     cmd.setDeadline(clock.millis() + 10000);
-    ReplicationTask task1 = new ReplicationTask(cmd);
+    ReplicationTask task1 = new ReplicationTask(cmd, replicatorRef.get());
     cmd = createCommand(2);
     cmd.setDeadline(clock.millis() + 20000);
-    ReplicationTask task2 = new ReplicationTask(cmd);
+    ReplicationTask task2 = new ReplicationTask(cmd, replicatorRef.get());
     cmd = createCommand(3);
     // No deadline set
-    ReplicationTask task3 = new ReplicationTask(cmd);
+    ReplicationTask task3 = new ReplicationTask(cmd, replicatorRef.get());
     // no deadline set
 
     clock.fastForward(15000);
@@ -346,15 +346,14 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, pullReplicator, pushReplicator,
-            executor, clock);
+        new ReplicationSupervisor(context, executor, clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }
 
-  private static ReplicationTask createTask(long containerId) {
+  private ReplicationTask createTask(long containerId) {
     ReplicateContainerCommand cmd = createCommand(containerId);
-    return new ReplicationTask(cmd);
+    return new ReplicationTask(cmd, replicatorRef.get());
   }
 
   private static ReplicateContainerCommand createCommand(long containerId) {
@@ -378,7 +377,10 @@ public class TestReplicationSupervisor {
 
     @Override
     public void replicate(ReplicationTask task) {
-      Assert.assertNull(set.getContainer(task.getContainerId()));
+      if (set.getContainer(task.getContainerId()) != null) {
+        task.setStatus(AbstractReplicationTask.Status.SKIPPED);
+        return;
+      }
 
       // assumes same-thread execution
       Assert.assertEquals(1, supervisor.getInFlightReplications());
