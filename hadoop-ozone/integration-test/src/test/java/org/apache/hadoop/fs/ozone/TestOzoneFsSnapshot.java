@@ -305,6 +305,17 @@ public class TestOzoneFsSnapshot {
       res = ToolRunner.run(shell,
               new String[]{"-rm", "-r", "-skipTrash", testVolBucket});
       assertEquals(1, res);
+
+      res = ToolRunner.run(shell,
+              new String[]{"-ls", testVolBucket});
+      assertEquals(0, res);
+
+      String snapshotPath = testVolBucket + OM_KEY_PREFIX + ".snapshot"
+              + OM_KEY_PREFIX + snapshotName + OM_KEY_PREFIX;
+      res = ToolRunner.run(shell,
+              new String[]{"-ls", snapshotPath});
+      assertEquals(0, res);
+
     } finally {
       shell.close();
     }
