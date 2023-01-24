@@ -160,6 +160,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   public static boolean isSecretKeyEnable(SecurityConfig conf) {
     return conf.isSecurityEnabled() &&
-        conf.isBlockTokenEnabled() && conf.isContainerTokenEnabled();
+        (conf.isBlockTokenEnabled() || conf.isContainerTokenEnabled());
   }
 }

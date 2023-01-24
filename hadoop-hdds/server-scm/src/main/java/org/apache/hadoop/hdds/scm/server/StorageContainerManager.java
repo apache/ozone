@@ -719,7 +719,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager.register(expiredContainerReplicaOpScrubber);
 
     if (isSecretKeyEnable(securityConfig)) {
-      LOG.info("Enabling SecretKeys management.");
       SecretKeyManagerService secretKeyManagerService =
           new SecretKeyManagerService(scmContext, conf,
               scmHAManager.getRatisServer());
