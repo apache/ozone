@@ -270,7 +270,7 @@ public class OFSPath {
    * e.g. /vol/bucket/.snapshot is a snapshot indicator.
    */
   public boolean isSnapshotIndicator() {
-    if (keyName.contains(OM_SNAPSHOT_INDICATOR)) {
+    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
       String[] keyNames = keyName.split(OZONE_URI_DELIMITER);
 
       if (keyNames.length == 1) {

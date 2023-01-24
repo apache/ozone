@@ -638,30 +638,29 @@ public class BasicRootedOzoneClientAdapterImpl
     String key = ofsPath.getKeyName();
     if (ofsPath.isRoot()) {
       return getFileStatusAdapterForRoot(uri);
-    }
-    if (ofsPath.isVolume()) {
+    } else if (ofsPath.isVolume()) {
       OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
       return getFileStatusAdapterForVolume(volume, uri);
-    }
-    try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
-
-      if (ofsPath.isSnapshotIndicator()) {
-        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-        return getFileStatusAdapterWithSnapshotIndicator(
-            volume, bucket, uri);
+    } else {
+      try {
+        OzoneBucket bucket = getBucket(ofsPath, false);
+        if (ofsPath.isSnapshotIndicator()) {
+          OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+          return getFileStatusAdapterWithSnapshotIndicator(
+              volume, bucket, uri);
+        } else {
+          OzoneFileStatus status = bucket.getFileStatus(key);
+          return toFileStatusAdapter(status, userName, uri, qualifiedPath,
+              ofsPath.getNonKeyPath());
+        }
+      } catch (OMException e) {
+        if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+          throw new FileNotFoundException(key + ": No such file or directory!");
+        } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
+          throw new FileNotFoundException(key + ": Bucket doesn't exist!");
+        }
+        throw e;
       }
-
-      OzoneFileStatus status = bucket.getFileStatus(key);
-      return toFileStatusAdapter(status, userName, uri, qualifiedPath,
-          ofsPath.getNonKeyPath());
-    } catch (OMException e) {
-      if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
-        throw new FileNotFoundException(key + ": No such file or directory!");
-      } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
-        throw new FileNotFoundException(key + ": Bucket doesn't exist!");
-      }
-      throw e;
     }
   }
 
@@ -792,8 +791,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
-   * Helper for OFS listStatus
-   * on a bucket to get all snapshots.
+   * Helper for OFS listStatus on a bucket to get all snapshots.
    */
   private List<FileStatusAdapter> listStatusBucketSnapshot(
       String volumeName, String bucketName, URI uri) throws IOException {
@@ -807,14 +805,11 @@ public class BasicRootedOzoneClientAdapterImpl
     String group = getGroupName(ugi);
 
     OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
-    List<FileStatusAdapter> fileStatusAdapterList = new ArrayList<>();
-    for (OzoneSnapshot ozoneSnapshot : snapshotList) {
-      fileStatusAdapterList.add(
-          getFileStatusAdapterForBucketSnapshot(
-              ozoneBucket, ozoneSnapshot, uri, owner, group));
-    }
 
-    return fileStatusAdapterList;
+    return snapshotList.stream()
+        .map(ozoneSnapshot -> getFileStatusAdapterForBucketSnapshot(
+            ozoneBucket, ozoneSnapshot, uri, owner, group))
+        .collect(Collectors.toList());
   }
 
   /**

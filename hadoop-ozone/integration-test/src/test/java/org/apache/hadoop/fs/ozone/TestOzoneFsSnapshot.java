@@ -35,6 +35,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -125,9 +127,30 @@ public class TestOzoneFsSnapshot {
   }
 
   @Test
-  public void testCreateSnapshot() throws Exception {
+  public void testCreateSnapshotDuplicateName() throws Exception {
     String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
 
+    int res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", bucketPath, snapshotName});
+    // Asserts that create request succeeded
+    Assertions.assertEquals(0, res);
+
+    res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", bucketPath, snapshotName});
+    // Asserts that create request fails since snapshot name provided twice
+    Assertions.assertEquals(1, res);
+  }
+
+  /**
+   * Create snapshot should succeed.
+   * 1st case: valid snapshot name
+   * 2nd case: snapshot name length is less than 64 chars
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"snap-1",
+      "snap75795657617173401188448010125899089001363595171500499231286"})
+  public void testCreateSnapshotSuccess(String snapshotName)
+      throws Exception {
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", bucketPath, snapshotName});
     // Asserts that create request succeeded
@@ -144,76 +167,25 @@ public class TestOzoneFsSnapshot {
     Assertions.assertNotNull(snapshotInfo);
   }
 
-  @Test
-  public void testCreateSnapshotDuplicateName() throws Exception {
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
-
+  /**
+   * Create snapshot should fail.
+   * 1st case: snapshot name contains invalid char
+   * 2nd case: snapshot name consists only of numbers
+   * 3rd case: bucket path is invalid
+   * 4th case: snapshot name length is more than 64 chars
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"snapa?b", "1234", "invalidURI",
+      "snap156808943643007724443266605711479126926050896107709081166294"})
+  public void testCreateSnapshotFailure(String snapshotName)
+      throws Exception {
+    if (snapshotName.equals("invalidURI")) {
+      bucketPath += "/bucket/";
+    }
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", bucketPath, snapshotName});
-    // Asserts that create request succeeded
-    Assertions.assertEquals(0, res);
-
-    res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
-    // Asserts that create request fails since snapshot name provided twice
+    // Asserts that create request failed
     Assertions.assertEquals(1, res);
-  }
-
-  @Test
-  public void testCreateSnapshotInvalidName() throws Exception {
-    String snapshotName = "snapa?b";
-
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
-    // Asserts that create request failed since invalid name passed
-    Assertions.assertEquals(1, res);
-  }
-
-  @Test
-  public void testCreateSnapshotOnlyNumericName() throws Exception {
-    String snapshotName = "1234";
-
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
-    // Asserts that create request failed since only numeric name passed
-    Assertions.assertEquals(1, res);
-  }
-
-  @Test
-  public void testCreateSnapshotInvalidURI() throws Exception {
-
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", "invalidURI"});
-    // Asserts that create request failed since
-    // invalid volume-bucket URI passed
-    Assertions.assertEquals(1, res);
-  }
-
-  @Test
-  public void testCreateSnapshotNameLength() throws Exception {
-    String name63 =
-        "snap75795657617173401188448010125899089001363595171500499231286";
-    String name64 =
-        "snap156808943643007724443266605711479126926050896107709081166294";
-
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, name63});
-    // Asserts that create request succeeded since name length
-    // less than 64 char
-    Assertions.assertEquals(0, res);
-
-    res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, name64});
-    // Asserts that create request fails since name length
-    // more than 64 char
-    Assertions.assertEquals(1, res);
-
-    SnapshotInfo snapshotInfo = ozoneManager
-        .getMetadataManager()
-        .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volume, bucket, name63));
-
-    Assertions.assertNotNull(snapshotInfo);
   }
 
   @Test
