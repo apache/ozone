@@ -38,17 +38,18 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.times;
 
 /**
- * Tests for the ClosedWithMismatchedReplicasHandler.
+ * Tests for the MismatchedReplicasHandler.
  */
-public class TestClosedWithMismatchedReplicasHandler {
+public class TestMismatchedReplicasHandler {
 
   private ReplicationManager replicationManager;
-  private ClosedWithMismatchedReplicasHandler handler;
+  private MismatchedReplicasHandler handler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
 
@@ -58,7 +59,7 @@ public class TestClosedWithMismatchedReplicasHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    handler = new ClosedWithMismatchedReplicasHandler(replicationManager);
+    handler = new MismatchedReplicasHandler(replicationManager);
   }
 
   @Test
@@ -221,5 +222,52 @@ public class TestClosedWithMismatchedReplicasHandler {
     Mockito.verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(
             containerInfo, mismatch3.getDatanodeDetails(), true);
+  }
+
+  /**
+   * Mismatched replicas (OPEN or CLOSING) of a QUASI-CLOSED ratis container
+   * should be sent close (and not force close) commands.
+   */
+  @Test
+  public void testCloseCommandSentForMismatchedReplicaOfQuasiClosedContainer() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, QUASI_CLOSED);
+    ContainerReplica mismatch1 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.OPEN);
+    ContainerReplica mismatch2 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.CLOSING);
+    ContainerReplica mismatch3 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.UNHEALTHY);
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(mismatch1);
+    containerReplicas.add(mismatch2);
+    containerReplicas.add(mismatch3);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    // this handler always returns false so other handlers can fix issues
+    // such as under replication
+    Assertions.assertFalse(handler.handle(request));
+
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(
+            containerInfo, mismatch1.getDatanodeDetails(), false);
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(
+            containerInfo, mismatch2.getDatanodeDetails(), false);
+    // close command should not be sent for unhealthy replica
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(
+            containerInfo, mismatch3.getDatanodeDetails(), false);
   }
 }

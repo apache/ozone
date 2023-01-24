@@ -73,7 +73,7 @@ public class ExportSubcommand implements Callable<Void> {
     for (int i = 0; i < containerCount; i++) {
       replicationSource.prepare(containerId);
       final File destinationFile =
-          new File(destination, "container-" + containerId + ".tar.gz");
+          new File(destination, "container-" + containerId + ".tar");
       try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
         try {
           replicationSource.copyData(containerId, fos, GZIP);
