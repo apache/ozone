@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -54,7 +55,7 @@ public class OzoneAddress {
 
   private String bucketName = "";
 
-  private String snapshotName = "";
+  private String snapshotNameWithIndicator = "";
 
   private String keyName = "";
 
@@ -295,8 +296,8 @@ public class OzoneAddress {
     return bucketName;
   }
 
-  public String getSnapshotName() {
-    return snapshotName;
+  public String getSnapshotNameWithIndicator() {
+    return snapshotNameWithIndicator;
   }
 
   public String getKeyName() {
@@ -350,7 +351,7 @@ public class OzoneAddress {
   }
 
   /**
-   * Similar to #ensureBucketAddress()
+   * Checking for a volume and a bucket
    * but also accepting a snapshot
    * indicator and a snapshot name.
    * If the keyName can't be considered
@@ -362,7 +363,7 @@ public class OzoneAddress {
       throws OzoneClientException {
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
-        snapshotName += keyName;
+        snapshotNameWithIndicator += keyName;
       } else {
         throw new OzoneClientException(
             "Delimiters (/) not allowed following " +

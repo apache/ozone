@@ -51,13 +51,11 @@ public class ListKeyHandler extends SnapshotHandler {
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
-    String snapshotName = "";
+    String snapshotNameWithIndicator = address.getSnapshotNameWithIndicator();
     String keyPrefix = "";
 
-    if (!Strings.isNullOrEmpty(
-        address.getSnapshotName())) {
-      snapshotName += address.getSnapshotName();
-      keyPrefix += snapshotName;
+    if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
+      keyPrefix += snapshotNameWithIndicator;
 
       if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
         keyPrefix += "/";
@@ -81,10 +79,10 @@ public class ListKeyHandler extends SnapshotHandler {
       out().println("Listing first " + maxKeyLimit + " entries of the " +
           "result. Use --length (-l) to override max returned keys.");
     } else if (isVerbose()) {
-      if (!Strings.isNullOrEmpty(snapshotName)) {
+      if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
         // snapshot[0] = .snapshot
         // snapshot[1] = snapshot name
-        String[] snapshotValues = snapshotName.split("/");
+        String[] snapshotValues = snapshotNameWithIndicator.split("/");
 
         out().printf("Found : %d keys for snapshot %s " +
                 "under bucket %s in volume : %s ",
