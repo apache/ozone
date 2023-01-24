@@ -450,7 +450,7 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1, report.getStat(
               ReplicationManagerReport.HealthState.UNDER_REPLICATED));
       Assertions.assertEquals(1, report.getStat(
-              ReplicationManagerReport.HealthState.UNHEALTHY));
+              ReplicationManagerReport.HealthState.MIS_REPLICATED));
     }
 
     @Test

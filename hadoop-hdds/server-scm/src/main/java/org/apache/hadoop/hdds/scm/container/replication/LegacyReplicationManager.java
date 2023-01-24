@@ -423,37 +423,12 @@ public class LegacyReplicationManager {
         }
 
         /*
-         * Before processing the container we have to reconcile the
-         * inflightReplication and inflightDeletion actions.
-         *
-         * We remove the entry from inflightReplication and inflightDeletion
-         * list, if the operation is completed or if it has timed out.
-         */
-        updateInflightAction(container, inflightReplication,
-                action -> replicas.stream().anyMatch(r ->
-                        r.getDatanodeDetails().equals(action.getDatanode())),
-                () -> metrics.incrNumReplicationCmdsTimeout(),
-                action -> updateCompletedReplicationMetrics(container, action));
-
-        updateInflightAction(container, inflightDeletion,
-                action -> replicas.stream().noneMatch(r ->
-                        r.getDatanodeDetails().equals(action.getDatanode())),
-                () -> metrics.incrNumDeletionCmdsTimeout(),
-                action -> updateCompletedDeletionMetrics(container, action));
-
-        RatisContainerReplicaCount replicaSet =
-                getContainerReplicaCount(container, replicas);
-        ContainerPlacementStatus placementStatus = getPlacementStatus(
-                replicas, container.getReplicationConfig().getRequiredNodes());
-
-        /*
          * If the container is in CLOSING state, the replicas can either
          * be in OPEN or in CLOSING state. In both of this cases
          * we have to resend close container command to the datanodes.
          */
         if (state == LifeCycleState.CLOSING) {
-          setHealthStateForClosing(replicaSet, placementStatus, container,
-                  report);
+          setHealthStateForClosing(replicas, container, report);
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
               sendCloseCommand(
@@ -485,6 +460,25 @@ public class LegacyReplicationManager {
         }
 
         /*
+         * Before processing the container we have to reconcile the
+         * inflightReplication and inflightDeletion actions.
+         *
+         * We remove the entry from inflightReplication and inflightDeletion
+         * list, if the operation is completed or if it has timed out.
+         */
+        updateInflightAction(container, inflightReplication,
+                action -> replicas.stream().anyMatch(r ->
+                        r.getDatanodeDetails().equals(action.getDatanode())),
+                () -> metrics.incrNumReplicationCmdsTimeout(),
+                action -> updateCompletedReplicationMetrics(container, action));
+
+        updateInflightAction(container, inflightDeletion,
+                action -> replicas.stream().noneMatch(r ->
+                        r.getDatanodeDetails().equals(action.getDatanode())),
+                () -> metrics.incrNumDeletionCmdsTimeout(),
+                action -> updateCompletedDeletionMetrics(container, action));
+
+        /*
          * If container is under deleting and all it's replicas are deleted,
          * then make the container as CLEANED,
          * or resend the delete replica command if needed.
@@ -501,6 +495,11 @@ public class LegacyReplicationManager {
         if (state == LifeCycleState.DELETED) {
           return;
         }
+
+        RatisContainerReplicaCount replicaSet =
+                getContainerReplicaCount(container, replicas);
+        ContainerPlacementStatus placementStatus = getPlacementStatus(
+                replicas, container.getReplicationConfig().getRequiredNodes());
 
         /*
          * We don't have to take any action if the container is healthy.
@@ -1614,27 +1613,17 @@ public class LegacyReplicationManager {
         .allMatch(r -> compareState(state, r.getState()));
   }
 
-  private void setHealthStateForClosing(RatisContainerReplicaCount replicaSet,
-          ContainerPlacementStatus placementStatus,
-          ContainerInfo container,
-          ReplicationManagerReport report) {
-    boolean sufficientlyReplicated = replicaSet.isSufficientlyReplicated();
-    boolean placementSatisfied = placementStatus.isPolicySatisfied();
-    ContainerID containerID = container.containerID();
-    if (!placementStatus.isPolicySatisfied()) {
-      report.incrementAndSample(HealthState.MIS_REPLICATED, containerID);
-    }
-    if (!replicaSet.isHealthy()) {
-      report.incrementAndSample(HealthState.UNHEALTHY, containerID);
-    }
-    if (!sufficientlyReplicated || !placementSatisfied) {
-      if (!inflightReplication.isFull() || !inflightDeletion.isFull()) {
-        if (replicaSet.isUnrecoverable()) {
-          report.incrementAndSample(HealthState.MISSING, containerID);
-          report.incrementAndSample(HealthState.UNDER_REPLICATED,
-                  containerID);
-        }
-      }
+  private void setHealthStateForClosing(Set<ContainerReplica> replicas,
+                                        ContainerInfo container,
+                                        ReplicationManagerReport report) {
+    if (!replicas.stream().
+            anyMatch(r -> compareState(LifeCycleState.OPEN, r.getState()) ||
+                    compareState(LifeCycleState.CLOSED, r.getState()))) {
+      report.incrementAndSample(HealthState.MISSING, container.containerID());
+      report.incrementAndSample(HealthState.UNDER_REPLICATED,
+              container.containerID());
+      report.incrementAndSample(HealthState.MIS_REPLICATED,
+              container.containerID());
     }
   }
 
