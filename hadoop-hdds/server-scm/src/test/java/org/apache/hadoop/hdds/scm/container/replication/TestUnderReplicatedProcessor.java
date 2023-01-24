@@ -111,7 +111,7 @@ public class TestUnderReplicatedProcessor {
     List<DatanodeDetails> sourceDns = new ArrayList<>();
     sourceDns.add(MockDatanodeDetails.randomDatanodeDetails());
     DatanodeDetails targetDn = MockDatanodeDetails.randomDatanodeDetails();
-    ReplicateContainerCommand rcc = new ReplicateContainerCommand(
+    ReplicateContainerCommand rcc = ReplicateContainerCommand.fromSources(
         container.getContainerID(), sourceDns);
     rcc.setReplicaIndex(3);
 

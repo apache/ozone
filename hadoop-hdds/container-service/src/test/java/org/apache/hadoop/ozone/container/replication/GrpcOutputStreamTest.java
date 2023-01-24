@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,22 +43,29 @@ import static org.mockito.Mockito.verify;
  * Tests for {@code GrpcOutputStream}.
  */
 @ExtendWith(MockitoExtension.class)
-public class TestGrpcOutputStream {
+abstract class GrpcOutputStreamTest<T> {
 
   private static final Random RND = new Random();
 
   private final long containerId = RND.nextLong();
   private final int bufferSize = RND.nextInt(1024) + 128 + 1;
+  private final Class<? extends T> clazz;
 
   @Mock
-  private StreamObserver<CopyContainerResponseProto> observer;
+  private StreamObserver<T> observer;
 
   private OutputStream subject;
 
-  @BeforeEach
-  public void setUp() throws Exception {
-    subject = new GrpcOutputStream(observer, containerId, bufferSize);
+  protected GrpcOutputStreamTest(Class<? extends T> clazz) {
+    this.clazz = clazz;
   }
+
+  @BeforeEach
+  public void setUp() {
+    subject = createSubject();
+  }
+
+  protected abstract OutputStream createSubject();
 
   @Test
   public void seriesOfBytesInSingleResponse() throws IOException {
@@ -158,25 +164,19 @@ public class TestGrpcOutputStream {
       expectedResponseCount++;
     }
 
-    ArgumentCaptor<CopyContainerResponseProto> captor =
-        ArgumentCaptor.forClass(CopyContainerResponseProto.class);
+    ArgumentCaptor<T> captor =
+        ArgumentCaptor.forClass(clazz);
     verify(observer, times(expectedResponseCount)).onNext(captor.capture());
 
-    List<CopyContainerResponseProto> responses =
+    List<T> responses =
         new ArrayList<>(captor.getAllValues());
     for (int i = 0; i < expectedResponseCount; i++) {
-      CopyContainerResponseProto response = responses.get(i);
-      assertEquals(containerId, response.getContainerID());
-
+      T response = responses.get(i);
       int expectedOffset = i * bufferSize;
-      assertEquals(expectedOffset, response.getReadOffset());
-
       int size = Math.min(bufferSize, bytes.length - expectedOffset);
-      assertEquals(size, response.getLen());
-
       byte[] part = new byte[size];
       System.arraycopy(bytes, expectedOffset, part, 0, size);
-      ByteString data = response.getData();
+      ByteString data = verifyPart(response, expectedOffset, size);
       assertArrayEquals(part, data.toByteArray());
 
       // we don't want concatenated ByteStrings
@@ -185,6 +185,9 @@ public class TestGrpcOutputStream {
 
     verify(observer, times(1)).onCompleted();
   }
+
+  protected abstract ByteString verifyPart(
+      T response, int expectedOffset, int size);
 
   private static byte[] concat(byte[]... parts) {
     int length = Arrays.stream(parts).mapToInt(each -> each.length).sum();
@@ -210,4 +213,15 @@ public class TestGrpcOutputStream {
     return bytes;
   }
 
+  long getContainerId() {
+    return containerId;
+  }
+
+  StreamObserver<T> getObserver() {
+    return observer;
+  }
+
+  int getBufferSize() {
+    return bufferSize;
+  }
 }

@@ -97,6 +97,10 @@ public class TestECUnderReplicationHandler {
       }
     };
     replicationManager = Mockito.mock(ReplicationManager.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        new ReplicationManager.ReplicationManagerConfiguration();
+    Mockito.when(replicationManager.getConfig())
+        .thenReturn(rmConf);
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(DATA, PARITY);
     container = ReplicationTestUtil

@@ -60,9 +60,13 @@ import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetri
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.GrpcContainerUploader;
 import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.PushReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
@@ -171,19 +175,26 @@ public class DatanodeStateMachine implements Closeable {
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
-    ContainerReplicator replicator =
-        new DownloadAndImportReplicator(conf, container.getContainerSet(),
-            container.getController(),
-            new SimpleContainerDownloader(conf, dnCertClient),
-            new TarContainerPacker(), container.getVolumeSet());
+    ContainerImporter importer = new ContainerImporter(conf,
+        container.getContainerSet(),
+        container.getController(),
+        new TarContainerPacker(), container.getVolumeSet());
+    ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
+        importer,
+        new SimpleContainerDownloader(conf, dnCertClient));
+    ContainerReplicator pushReplicator = new PushReplicator(
+        // TODO compression, metrics
+        new OnDemandContainerReplicationSource(container.getController()),
+        new GrpcContainerUploader(conf, dnCertClient)
+    );
 
-    replicatorMetrics = new MeasuredReplicator(replicator);
+    replicatorMetrics = new MeasuredReplicator(pullReplicator);
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, replicationConfig, clock);
+            replicatorMetrics, pushReplicator, replicationConfig, clock);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);

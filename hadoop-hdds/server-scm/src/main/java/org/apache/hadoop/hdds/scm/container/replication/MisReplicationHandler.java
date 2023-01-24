@@ -58,15 +58,18 @@ public abstract class MisReplicationHandler implements
   private final PlacementPolicy<ContainerReplica> containerPlacement;
   private final long currentContainerSize;
   private final NodeManager nodeManager;
+  private boolean push;
 
   public MisReplicationHandler(
           final PlacementPolicy<ContainerReplica> containerPlacement,
-          final ConfigurationSource conf, NodeManager nodeManager) {
+          final ConfigurationSource conf, NodeManager nodeManager,
+      final boolean push) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf.getStorageSize(
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.nodeManager = nodeManager;
+    this.push = push;
   }
 
   protected abstract ContainerReplicaCount getContainerReplicaCount(
@@ -108,8 +111,8 @@ public abstract class MisReplicationHandler implements
         .collect(Collectors.toSet());
   }
 
-  protected abstract ReplicateContainerCommand getReplicateCommand(
-          ContainerInfo containerInfo, ContainerReplica replica);
+  protected abstract ReplicateContainerCommand updateReplicateCommand(
+          ReplicateContainerCommand command, ContainerReplica replica);
 
   private Map<DatanodeDetails, SCMCommand<?>> getReplicateCommands(
           ContainerInfo containerInfo,
@@ -121,8 +124,15 @@ public abstract class MisReplicationHandler implements
       if (datanodeIdx == targetDns.size()) {
         break;
       }
-      commandMap.put(targetDns.get(datanodeIdx),
-              getReplicateCommand(containerInfo, replica));
+      long containerID = containerInfo.getContainerID();
+      DatanodeDetails source = replica.getDatanodeDetails();
+      DatanodeDetails target = targetDns.get(datanodeIdx);
+      ReplicateContainerCommand replicateCommand = push
+          ? ReplicateContainerCommand.toTarget(containerID, target)
+          : ReplicateContainerCommand.fromSources(containerID,
+              Collections.singletonList(source));
+      replicateCommand = updateReplicateCommand(replicateCommand, replica);
+      commandMap.put(push ? source : target, replicateCommand);
       datanodeIdx += 1;
     }
     return commandMap;

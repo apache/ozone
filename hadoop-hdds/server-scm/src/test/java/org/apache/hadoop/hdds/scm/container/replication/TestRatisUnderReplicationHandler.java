@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -61,6 +62,7 @@ public class TestRatisUnderReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
+  private ReplicationManager replicationManager;
 
   @Before
   public void setup() throws NodeNotFoundException {
@@ -71,6 +73,9 @@ public class TestRatisUnderReplicationHandler {
     conf = SCMTestUtils.getConf();
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig())
+        .thenReturn(new ReplicationManagerConfiguration());
 
     /*
      Return NodeStatus with NodeOperationalState as specified in
@@ -183,7 +188,8 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
         conf);
     RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, nodeManager);
+        new RatisUnderReplicationHandler(policy, conf, nodeManager,
+            replicationManager);
 
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
@@ -211,7 +217,8 @@ public class TestRatisUnderReplicationHandler {
       ContainerHealthResult healthResult,
       int minHealthyForMaintenance, int expectNumCommands) throws IOException {
     RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, nodeManager);
+        new RatisUnderReplicationHandler(policy, conf, nodeManager,
+            replicationManager);
 
     Map<DatanodeDetails, SCMCommand<?>> commands =
         handler.processAndCreateCommands(replicas, pendingOps,
