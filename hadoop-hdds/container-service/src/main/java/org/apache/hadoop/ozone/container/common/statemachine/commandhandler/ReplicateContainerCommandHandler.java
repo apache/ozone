@@ -51,15 +51,19 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   private ReplicationSupervisor supervisor;
 
-  private ContainerReplicator replicator;
+  private ContainerReplicator downloadReplicator;
+
+  private ContainerReplicator pushReplicator;
 
   public ReplicateContainerCommandHandler(
       ConfigurationSource conf,
       ReplicationSupervisor supervisor,
-      ContainerReplicator replicator) {
+      ContainerReplicator downloadReplicator,
+      ContainerReplicator pushReplicator) {
     this.conf = conf;
     this.supervisor = supervisor;
-    this.replicator = replicator;
+    this.downloadReplicator = downloadReplicator;
+    this.pushReplicator = pushReplicator;
   }
 
   @Override
@@ -76,6 +80,10 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
     Preconditions.checkArgument(!sourceDatanodes.isEmpty() || target != null,
         "Replication command is received for container %s "
             + "without source or target datanodes.", containerID);
+
+    ContainerReplicator replicator =
+        replicateCommand.getTargetDatanode() == null ?
+            downloadReplicator : pushReplicator;
 
     ReplicationTask task = new ReplicationTask(replicateCommand, replicator);
     supervisor.addTask(task);

@@ -65,7 +65,7 @@ public class ReplicationSupervisor {
    * or queued for download. Tracked so we don't schedule > 1
    * concurrent download for the same container.
    */
-  private final Set<ReplicationTask> inFlight;
+  private final Set<AbstractReplicationTask> inFlight;
 
   @VisibleForTesting
   ReplicationSupervisor(
@@ -100,7 +100,7 @@ public class ReplicationSupervisor {
   /**
    * Queue an asynchronous download of the given container.
    */
-  public void addTask(ReplicationTask task) {
+  public void addTask(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
       executor.execute(new TaskRunner(task));
     }
@@ -175,12 +175,6 @@ public class ReplicationSupervisor {
           }
         }
 
-        // TODO - remove this commented blocks and put replicator choice into
-        //  the cmd
-        // task.setStatus(Status.IN_PROGRESS);
-        // ContainerReplicator replicator = pull ?
-        //     pullReplicator : pushReplicator;
-        // replicator.replicate(task);
         task.setStatus(Status.IN_PROGRESS);
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
