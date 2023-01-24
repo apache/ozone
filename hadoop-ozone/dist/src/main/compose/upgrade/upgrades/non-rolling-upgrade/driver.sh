@@ -26,27 +26,24 @@ set -u
 : "${OZONE_UPGRADE_FROM}"
 : "${OZONE_UPGRADE_TO}"
 : "${TEST_DIR}"
-: "${OZONE_UPGRADE_CALLBACK}"
 set +u
 
 echo "--- RUNNING NON-ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
 
-# Prepare OMs before upgrade unless this variable is not 'true'.
-: "${OZONE_PREPARE_OMS:='true'}"
-
-# Default compose cluster to use. May be overridden by callback.sh.
-source "$TEST_DIR"/compose/ha/load.sh
 source "$TEST_DIR"/testlib.sh
-[[ -f "$OZONE_UPGRADE_CALLBACK" ]] && source "$OZONE_UPGRADE_CALLBACK"
 
 prepare_oms() {
-  if [[ "$OZONE_PREPARE_OMS" = 'true' ]]; then
+  # 1.1.0 Is the earliest version we support upgrade/downgrade to, but it did
+  # not have OM prepare.
+  if [[ "$OZONE_UPGRADE_FROM" != '1.1.0' ]]; then
     execute_robot_test scm upgrade/prepare.robot
   fi
 }
 
 set_downgrade_om_args() {
-  if [[ "$OZONE_PREPARE_OMS" = 'true' ]]; then
+  # 1.1.0 Is the earliest version we support upgrade/downgrade to, but it did
+  # not have OM prepare.
+  if [[ "$OZONE_UPGRADE_FROM" != '1.1.0' ]]; then
     export OM_HA_ARGS='--downgrade'
   else
     export OM_HA_ARGS='--'
@@ -55,6 +52,7 @@ set_downgrade_om_args() {
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 OUTPUT_NAME="$OZONE_UPGRADE_FROM"
+# This will also the docker compose cluster to use.
 callback setup
 export OM_HA_ARGS='--'
 prepare_for_image "$OZONE_UPGRADE_FROM"

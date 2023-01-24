@@ -69,11 +69,28 @@ prepare_for_image() {
 ## @param The name of the function to run.
 callback() {
   local func="$1"
-  if [[ "$(type -t "$func")" = function ]]; then
-    "$func"
-  else
-    echo "Skipping callback $func. No function implementation found."
-  fi
+
+  set -u
+  : "${OZONE_UPGRADE_CALLBACK}"
+  : "${TEST_DIR}"
+  set +u
+
+  _run_callback "$OZONE_UPGRADE_CALLBACK" "$func"
+  _run_callback "$TEST_DIR"/upgrades/non-rolling-upgrade/common "$func"
+}
+
+_run_callback() {
+  local script="$1"
+  local func="$2"
+
+  (
+    source "$script"
+    if [[ "$(type -t "$func")" = function ]]; then
+      "$func"
+    else
+      echo "Skipping callback $func. No function implementation found."
+    fi
+  )
 }
 
 ## @description Sets up and runs the test defined by "$1"/test.sh.

@@ -17,66 +17,21 @@
 
 source "$TEST_DIR"/testlib.sh
 
-# Helper function, not a callback.
-_check_hdds_mlvs() {
-  mlv="$1"
-  check_scm_mlv scm "$mlv"
-  check_dn_mlv dn1 "$mlv"
-  check_dn_mlv dn2 "$mlv"
-  check_dn_mlv dn3 "$mlv"
-}
-
-# Helper function, not a callback.
-_check_om_mlvs() {
-  mlv="$1"
-  check_om_mlv om1 "$mlv"
-  check_om_mlv om2 "$mlv"
-  check_om_mlv om3 "$mlv"
-}
-
 setup() {
-  # OM preparation is not implemented until 1.2.0.
-  export OZONE_OM_PREPARE='false'
-}
-
-with_old_version() {
-  generate old1
-  validate old1
+  # Ozone 1.1.0 did not support SCM HA.
+  source "$TEST_DIR"/compose/om-ha/load.sh
 }
 
 with_new_version_pre_finalized() {
+  # Ozone 1.1.0 did not have the upgrade framework yet, so cannot check
+  # metadata layout versions in that version.
   _check_hdds_mlvs 0
   _check_om_mlvs 0
-
-  validate old1
-  # HDDS-6261: overwrite the same keys intentionally
-  generate old1 --exclude create-volume-and-bucket
-
-  generate new1
-  validate new1
-}
-
-with_old_version_downgraded() {
-  validate old1
-  validate new1
-
-  generate old2
-  validate old2
-
-  # HDDS-6261: overwrite the same keys again to trigger the precondition check
-  # that exists <= 1.1.0 OM
-  generate old1 --exclude create-volume-and-bucket
 }
 
 with_new_version_finalized() {
   _check_hdds_mlvs 2
-  # In Ozone 1.2.0, OM has only one layout version.
+  # In Ozone 1.2.0, OM has only one layout initial layout version, so no
+  # increase should happen here.
   _check_om_mlvs 0
-
-  validate old1
-  validate new1
-  validate old2
-
-  generate new2
-  validate new2
 }
