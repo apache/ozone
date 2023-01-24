@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

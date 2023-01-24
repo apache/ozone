@@ -180,6 +180,7 @@ public class DatanodeStateMachine implements Closeable {
         container.getController(),
         new TarContainerPacker(), container.getVolumeSet());
     ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
+        container.getContainerSet(),
         importer,
         new SimpleContainerDownloader(conf, dnCertClient));
     ContainerReplicator pushReplicator = new PushReplicator(
@@ -192,9 +193,7 @@ public class DatanodeStateMachine implements Closeable {
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
-    supervisor =
-        new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, pushReplicator, replicationConfig, clock);
+    supervisor = new ReplicationSupervisor(context, replicationConfig, clock);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -217,7 +216,8 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
-        .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
+        .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
+            replicatorMetrics, pushReplicator))
         .addHandler(new ReconstructECContainersCommandHandler(conf,
             ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(

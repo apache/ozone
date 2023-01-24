@@ -69,6 +69,9 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             supervisor.getReplicationRequestCount())
         .addGauge(Interns.info("numTimeoutReplications",
             "Number of replication requests timed out before being processed"),
-            supervisor.getReplicationTimeoutCount());
+            supervisor.getReplicationTimeoutCount())
+        .addGauge(Interns.info("numSkippedReplications",
+            "Number of replication requests skipped as the container is "
+            + "already present"), supervisor.getReplicationSkippedCount());
   }
 }
