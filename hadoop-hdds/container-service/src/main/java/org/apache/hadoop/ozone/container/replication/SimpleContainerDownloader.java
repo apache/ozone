@@ -37,9 +37,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator.CONTAINER_COPY_DIR;
-
-
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
  * from the first available datanode.
@@ -70,7 +67,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
     if (downloadDir == null) {
       downloadDir = Paths.get(System.getProperty("java.io.tmpdir"))
-              .resolve(CONTAINER_COPY_DIR);
+              .resolve(ContainerImporter.CONTAINER_COPY_DIR);
     }
 
     final List<DatanodeDetails> shuffledDatanodes =
@@ -118,9 +115,9 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            downloadDir, securityConfig, certClient, compression);
+            securityConfig, certClient, compression);
 
-    result = grpcReplicationClient.download(containerId)
+    result = grpcReplicationClient.download(containerId, downloadDir)
         .whenComplete((r, ex) -> {
           try {
             grpcReplicationClient.close();

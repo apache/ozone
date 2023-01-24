@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,14 +54,17 @@ public class RatisUnderReplicationHandler
   private final PlacementPolicy placementPolicy;
   private final NodeManager nodeManager;
   private final long currentContainerSize;
+  private final ReplicationManager replicationManager;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
-      final ConfigurationSource conf, final NodeManager nodeManager) {
+      final ConfigurationSource conf, final NodeManager nodeManager,
+      final ReplicationManager replicationManager) {
     this.placementPolicy = placementPolicy;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
   }
 
   /**
@@ -230,11 +234,29 @@ public class RatisUnderReplicationHandler
   private Map<DatanodeDetails, SCMCommand<?>> createReplicationCommands(
       long containerID, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) {
+    final boolean push = replicationManager.getConfig().isPush()
+        && targets.size() <= sources.size();
+    // TODO if we need multiple commands per source datanode, we need a small
+    // interface change
     Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-    for (DatanodeDetails target : targets) {
-      ReplicateContainerCommand command =
-          new ReplicateContainerCommand(containerID, sources);
-      commands.put(target, command);
+
+    if (push) {
+      Collections.shuffle(sources);
+      for (Iterator<DatanodeDetails> srcIter = sources.iterator(),
+              targetIter = targets.iterator();
+          srcIter.hasNext() && targetIter.hasNext();) {
+        DatanodeDetails source = srcIter.next();
+        DatanodeDetails target = targetIter.next();
+        ReplicateContainerCommand command =
+            ReplicateContainerCommand.toTarget(containerID, target);
+        commands.put(source, command);
+      }
+    } else {
+      for (DatanodeDetails target : targets) {
+        ReplicateContainerCommand command =
+            ReplicateContainerCommand.fromSources(containerID, sources);
+        commands.put(target, command);
+      }
     }
 
     return commands;

@@ -82,8 +82,12 @@ public class TestReplicationSupervisor {
   };
   private final AtomicReference<ContainerReplicator> replicatorRef =
       new AtomicReference<>();
-  private final ContainerReplicator mutableReplicator =
+  private final AtomicReference<ContainerReplicator> pushReplicatorRef =
+      new AtomicReference<>();
+  private final ContainerReplicator pullReplicator =
       task -> replicatorRef.get().replicate(task);
+  private final ContainerReplicator pushReplicator =
+      task -> pushReplicatorRef.get().replicate(task);
 
   private ContainerSet set;
 
@@ -251,8 +255,8 @@ public class TestReplicationSupervisor {
   @Test
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, mutableReplicator,
-            newDirectExecutorService(), clock);
+        new ReplicationSupervisor(set, context, pullReplicator,
+            pushReplicator, newDirectExecutorService(), clock);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
@@ -271,10 +275,12 @@ public class TestReplicationSupervisor {
     Mockito.when(volumeSet.getVolumesList())
         .thenReturn(Collections.singletonList(
             new HddsVolume.Builder(testDir).conf(conf).build()));
-    ContainerReplicator replicatorFactory =
-        new DownloadAndImportReplicator(conf, set, null, moc, null, volumeSet);
+    ContainerImporter importer =
+        new ContainerImporter(conf, set, null, null, volumeSet);
+    ContainerReplicator replicator =
+        new DownloadAndImportReplicator(importer, moc);
 
-    replicatorRef.set(replicatorFactory);
+    replicatorRef.set(replicator);
 
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(DownloadAndImportReplicator.LOG);
@@ -340,8 +346,8 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, mutableReplicator, executor,
-            clock);
+        new ReplicationSupervisor(set, context, pullReplicator, pushReplicator,
+            executor, clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }
@@ -353,7 +359,7 @@ public class TestReplicationSupervisor {
 
   private static ReplicateContainerCommand createCommand(long containerId) {
     ReplicateContainerCommand cmd =
-        new ReplicateContainerCommand(containerId, emptyList());
+        ReplicateContainerCommand.forTest(containerId);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
   }

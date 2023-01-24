@@ -576,7 +576,7 @@ public class TestReplicationManager {
     sources.add(MockDatanodeDetails.randomDatanodeDetails());
 
 
-    ReplicateContainerCommand command = new ReplicateContainerCommand(
+    ReplicateContainerCommand command = ReplicateContainerCommand.fromSources(
         containerInfo.getContainerID(), sources);
     command.setReplicaIndex(1);
 
@@ -611,7 +611,7 @@ public class TestReplicationManager {
     containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
         HddsProtos.LifeCycleState.CLOSED, 10, 20);
 
-    command = new ReplicateContainerCommand(
+    command = ReplicateContainerCommand.fromSources(
         containerInfo.getContainerID(), sources);
     replicationManager.sendDatanodeCommand(command, containerInfo, target);
 

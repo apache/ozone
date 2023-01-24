@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -48,7 +48,8 @@ public class ReplicationSupervisor {
       LoggerFactory.getLogger(ReplicationSupervisor.class);
 
   private final ContainerSet containerSet;
-  private final ContainerReplicator replicator;
+  private final ContainerReplicator pullReplicator;
+  private final ContainerReplicator pushReplicator;
   private final ExecutorService executor;
   private final StateContext context;
   private final Clock clock;
@@ -63,16 +64,18 @@ public class ReplicationSupervisor {
    * or queued for download. Tracked so we don't schedule > 1
    * concurrent download for the same container.
    */
-  private final KeySetView<Object, Boolean> containersInFlight;
+  private final Set<ReplicationTask> inFlight;
 
   @VisibleForTesting
   ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ExecutorService executor,
+      ContainerReplicator pullReplicator, ContainerReplicator pushReplicator,
+      ExecutorService executor,
       Clock clock) {
     this.containerSet = containerSet;
-    this.replicator = replicator;
-    this.containersInFlight = ConcurrentHashMap.newKeySet();
+    this.pullReplicator = pullReplicator;
+    this.pushReplicator = pushReplicator;
+    this.inFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
     this.clock = clock;
@@ -80,22 +83,24 @@ public class ReplicationSupervisor {
 
   public ReplicationSupervisor(
       ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ReplicationConfig replicationConfig,
-      Clock clock) {
-    this(containerSet, context, replicator, new ThreadPoolExecutor(
-        replicationConfig.getReplicationMaxStreams(),
-        replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("ContainerReplicationThread-%d")
-            .build()), clock);
+      ContainerReplicator pullReplicator, ContainerReplicator pushReplicator,
+      ReplicationConfig replicationConfig, Clock clock) {
+    this(containerSet, context, pullReplicator, pushReplicator,
+        new ThreadPoolExecutor(
+            replicationConfig.getReplicationMaxStreams(),
+            replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(),
+            new ThreadFactoryBuilder().setDaemon(true)
+                .setNameFormat("ContainerReplicationThread-%d")
+                .build()),
+        clock);
   }
 
   /**
    * Queue an asynchronous download of the given container.
    */
   public void addTask(ReplicationTask task) {
-    if (containersInFlight.add(task.getContainerId())) {
+    if (inFlight.add(task)) {
       executor.execute(new TaskRunner(task));
     }
   }
@@ -125,7 +130,7 @@ public class ReplicationSupervisor {
    * @return Count of in-flight replications.
    */
   public int getInFlightReplications() {
-    return containersInFlight.size();
+    return inFlight.size();
   }
 
   /**
@@ -170,37 +175,35 @@ public class ReplicationSupervisor {
           }
         }
 
-        if (containerSet.getContainer(task.getContainerId()) != null) {
+        final boolean pull = task.getTarget() == null;
+        if (containerSet.getContainer(task.getContainerId()) != null && pull) {
           LOG.debug("Container {} has already been downloaded.", containerId);
           return;
         }
 
-        task.setStatus(Status.DOWNLOADING);
+        task.setStatus(Status.IN_PROGRESS);
+        ContainerReplicator replicator = pull ? pullReplicator : pushReplicator;
         replicator.replicate(task);
 
         if (task.getStatus() == Status.FAILED) {
-          LOG.error(
-              "Container {} can't be downloaded from any of the datanodes.",
-              containerId);
+          LOG.error("Failed {}", this);
           failureCounter.incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
-          LOG.info("Container {} is replicated.", containerId);
+          LOG.info("Successful {}", this);
           successCounter.incrementAndGet();
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
-        LOG.error("Encountered error while replicating container {}.",
-            containerId, e);
+        LOG.error("Failed {}", this, e);
         failureCounter.incrementAndGet();
       } finally {
-        containersInFlight.remove(containerId);
+        inFlight.remove(task);
       }
     }
 
     @Override
     public String toString() {
-      return "replicate container command for container "
-          + task.getContainerId();
+      return task.getCommand().toString();
     }
   }
 

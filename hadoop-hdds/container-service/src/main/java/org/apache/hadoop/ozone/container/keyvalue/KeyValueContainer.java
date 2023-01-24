@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -518,7 +518,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     Path destContainerDir =
         Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
             hddsVolume.getHddsRootDir().toString(), idDir, containerId));
-    Path tmpDir = DownloadAndImportReplicator.getUntarDirectory(hddsVolume);
+    Path tmpDir = ContainerImporter.getUntarDirectory(hddsVolume);
     writeLock();
     try {
       //copy the values from the input stream to the final destination

@@ -68,6 +68,7 @@ OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
 
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=5s
 OZONE-SITE.XML_hdds.scm.replication.event.timeout=10s
+OZONE-SITE.XML_hdds.scm.replication.push=true
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s

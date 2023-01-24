@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
@@ -60,12 +62,10 @@ public class GrpcReplicationClient implements AutoCloseable {
 
   private final IntraDatanodeProtocolServiceStub client;
 
-  private final Path workingDirectory;
-
   private final ContainerProtos.CopyContainerCompressProto compression;
 
   public GrpcReplicationClient(
-      String host, int port, Path workingDir,
+      String host, int port,
       SecurityConfig secConfig, CertificateClient certClient,
       String compression)
       throws IOException {
@@ -92,12 +92,11 @@ public class GrpcReplicationClient implements AutoCloseable {
     }
     channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
-    workingDirectory = workingDir;
     this.compression =
         ContainerProtos.CopyContainerCompressProto.valueOf(compression);
   }
 
-  public CompletableFuture<Path> download(long containerId) {
+  public CompletableFuture<Path> download(long containerId, Path dir) {
     CopyContainerRequestProto request =
         CopyContainerRequestProto.newBuilder()
             .setContainerID(containerId)
@@ -108,7 +107,7 @@ public class GrpcReplicationClient implements AutoCloseable {
 
     CompletableFuture<Path> response = new CompletableFuture<>();
 
-    Path destinationPath = getWorkingDirectory()
+    Path destinationPath = dir
         .resolve(ContainerUtils.getContainerTarName(containerId));
 
     client.download(request,
@@ -117,8 +116,9 @@ public class GrpcReplicationClient implements AutoCloseable {
     return response;
   }
 
-  private Path getWorkingDirectory() {
-    return workingDirectory;
+  public StreamObserver<SendContainerRequest> upload(
+      StreamObserver<SendContainerResponse> responseObserver) {
+    return client.upload(responseObserver);
   }
 
   public void shutdown() {

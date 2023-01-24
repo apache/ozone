@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -128,7 +129,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         //replica.
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(
-              new ReplicateContainerCommand(container.getContainerID(),
+              ReplicateContainerCommand.fromSources(container.getContainerID(),
                   datanodesWithContainer)));
         }
       }
@@ -202,16 +203,16 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     ContainerController controller =
         new ContainerController(containerSet, handlers);
 
-    ContainerReplicator replicator =
-        new DownloadAndImportReplicator(conf, containerSet,
-            controller,
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker(), null);
+    ContainerImporter importer = new ContainerImporter(conf, containerSet,
+        controller, new TarContainerPacker(), null);
+    ContainerReplicator replicator = new DownloadAndImportReplicator(importer,
+        new SimpleContainerDownloader(conf, null));
 
     ReplicationServer.ReplicationConfig replicationConfig
         = conf.getObject(ReplicationServer.ReplicationConfig.class);
     supervisor = new ReplicationSupervisor(containerSet, null,
-        replicator, replicationConfig, Clock.system(ZoneId.systemDefault()));
+        replicator, null, replicationConfig,
+        Clock.system(ZoneId.systemDefault()));
   }
 
   private void replicateContainer(long counter) throws Exception {
