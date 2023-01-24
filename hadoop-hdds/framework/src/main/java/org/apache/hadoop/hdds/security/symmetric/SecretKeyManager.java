@@ -22,7 +22,8 @@ import static java.util.stream.Collectors.toList;
  * rotation and destruction.
  */
 public class SecretKeyManager {
-  private static final Logger LOG = LoggerFactory.getLogger(SecretKeyManager.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SecretKeyManager.class);
 
   private final SecretKeyState state;
   private final Duration rotationDuration;
@@ -80,6 +81,10 @@ public class SecretKeyManager {
           sortedKeys);
     }
 
+    // First, update the SecretKey state to make it visible immediately on the
+    // current instance.
+    state.updateKeysInternal(currentKey, sortedKeys);
+    // Then replicate the SecretKey state in all instances.
     state.updateKeys(currentKey, sortedKeys);
   }
 
@@ -89,23 +94,18 @@ public class SecretKeyManager {
    * @return true if rotation actually happens, false if it doesn't.
    */
   public synchronized boolean checkAndRotate() throws TimeoutException {
-    ManagedSecretKey newCurrentKey = null;
-    List<ManagedSecretKey> updatedKeys = null;
-
     ManagedSecretKey currentKey = state.getCurrentKey();
     if (shouldRotate(currentKey)) {
-      newCurrentKey = generateSecretKey();
-      updatedKeys = state.getAllKeys()
+
+      ManagedSecretKey newCurrentKey = generateSecretKey();
+      List<ManagedSecretKey> updatedKeys = state.getAllKeys()
           .stream().filter(x -> !x.isExpired())
           .collect(toList());
       updatedKeys.add(newCurrentKey);
-    }
 
-    if (newCurrentKey != null) {
       LOG.info("SecretKey rotation is happening, new key generated {}",
           newCurrentKey);
       state.updateKeys(newCurrentKey, updatedKeys);
-      return true;
     }
     return false;
   }

@@ -40,7 +40,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Sets.newHashSet;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.function.Function.identity;
@@ -54,7 +53,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests cases for {@link SecretKeyState} implementation.
+ * Tests cases for {@link SecretKeyManager} implementation.
  */
 public class SecretKeyManagerTest {
   private final static Duration VALIDITY_DURATION = Duration.ofDays(3);
@@ -239,12 +238,23 @@ public class SecretKeyManagerTest {
     }
 
     @Override
+    public ManagedSecretKey getKeyById(UUID id) {
+      return allKeys.get(id);
+    }
+
+    @Override
     public void updateKeys(ManagedSecretKey currentKey,
                            List<ManagedSecretKey> allKeys) {
       this.currentKey = currentKey;
       this.allKeys = allKeys.stream().collect(
           toMap(ManagedSecretKey::getId, identity()));
       keyStore.save(allKeys);
+    }
+
+    @Override
+    public void updateKeysInternal(ManagedSecretKey currentKey,
+                                   List<ManagedSecretKey> sortedKeys) {
+      updateKeys(currentKey, sortedKeys);
     }
   }
 

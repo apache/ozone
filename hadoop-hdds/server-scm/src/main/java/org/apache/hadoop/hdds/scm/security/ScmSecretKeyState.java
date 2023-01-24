@@ -77,8 +77,24 @@ public class ScmSecretKeyState implements SecretKeyState {
   }
 
   @Override
+  public ManagedSecretKey getKeyById(UUID id) {
+    lock.readLock().lock();
+    try {
+      return allKeys.get(id);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
   public void updateKeys(ManagedSecretKey newCurrentKey,
                          List<ManagedSecretKey> newAllKeys) {
+    updateKeysInternal(newCurrentKey, newAllKeys);
+  }
+
+  @Override
+  public void updateKeysInternal(ManagedSecretKey newCurrentKey,
+                                 List<ManagedSecretKey> newAllKeys) {
     LOG.info("Updating keys with currentKey={}, all keys={}", newCurrentKey,
         newAllKeys);
     lock.writeLock().lock();

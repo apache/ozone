@@ -20,10 +20,9 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
-import javax.annotation.Nonnull;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -42,11 +41,22 @@ public interface SecretKeyState {
   Set<ManagedSecretKey> getAllKeys();
 
   /**
+   * Get SecretKey by id.
+   */
+  ManagedSecretKey getKeyById(UUID id);
+
+  /**
    * Update the SecretKeys.
-   * This is a short-hand for replicating SecretKeys across all SCM instances
+   * This method replicates SecretKeys across all SCM instances
    * after each rotation.
    */
   @Replicate
   void updateKeys(ManagedSecretKey currentKey,
                   List<ManagedSecretKey> allKeys) throws TimeoutException;
+
+  /**
+   * Update the SecretKeys on this instance only.
+   */
+  void updateKeysInternal(ManagedSecretKey currentKey,
+                          List<ManagedSecretKey> allKeys);
 }

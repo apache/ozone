@@ -43,7 +43,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 
 /**
- * A background service running in SCM to maintain the SecretKet life-cycle.
+ * A background service running in SCM to maintain the SecretKeys lifecycle.
  */
 public class SecretKeyManagerService implements SCMService, Runnable {
   public static final Logger LOG =
@@ -58,9 +58,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
    */
   private final Lock serviceLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
-  private Duration rotationCheckDuration;
 
-  private ScheduledExecutorService scheduler;
+  private final Duration rotationCheckDuration;
+  private final ScheduledExecutorService scheduler;
 
   @SuppressWarnings("parameternumber")
   public SecretKeyManagerService(SCMContext scmContext,
@@ -88,6 +88,8 @@ public class SecretKeyManagerService implements SCMService, Runnable {
         HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
         HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT);
     rotationCheckDuration = Duration.parse(rotationCheckDurationStr);
+
+    start();
   }
 
   @Override
@@ -122,6 +124,10 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   @Override
   public void run() {
+    if (!shouldRun()) {
+      return;
+    }
+
     try {
       boolean rotated = secretKeyManager.checkAndRotate();
       if (rotated) {
@@ -140,7 +146,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
   }
 
   @Override
-  public void start() throws SCMServiceException {
+  public void start() {
+    LOG.info("Scheduling rotation checker with interval {} seconds",
+        rotationCheckDuration.toMillis() / 1000);
     scheduler.scheduleAtFixedRate(this,0, rotationCheckDuration.toMillis(),
         TimeUnit.MILLISECONDS);
   }
