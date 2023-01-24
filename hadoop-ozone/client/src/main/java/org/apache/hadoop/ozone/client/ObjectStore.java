@@ -30,7 +30,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -127,9 +129,13 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws IOException {
     OzoneVolume volume = getS3Volume();
+    String bucketLayoutFromConfig  = conf.getTrimmed(
+        OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY,
+        OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT);
+    BucketLayout bucketLayout = OmUtils
+        .validateBucketLayout(bucketLayoutFromConfig);
     volume.createBucket(bucketName,
-        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
-            .build());
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build());
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
