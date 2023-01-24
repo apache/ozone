@@ -29,7 +29,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
