@@ -56,6 +56,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -332,6 +333,7 @@ public class TestObjectPut {
 
     // THEN
     Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    Mockito.verify(protocol).createDirectory(any(), any(), any());
   }
 
   @Test
@@ -370,7 +372,8 @@ public class TestObjectPut {
     final OS3Exception exception = Assertions.assertThrows(OS3Exception.class,
         () -> objEndpoint
             .put(bucketname, path, length, partNumber, uploadId, body));
-    Assertions.assertEquals("InvalidRequest", exception.getCode());
-    Assertions.assertEquals(400, exception.getHttpCode());
+    Assertions.assertEquals("Conflict", exception.getCode());
+    Assertions.assertEquals(409, exception.getHttpCode());
+    Mockito.verify(protocol, times(1)).createDirectory(any(), any(), any());
   }
 }

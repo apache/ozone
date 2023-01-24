@@ -63,7 +63,12 @@ public final class S3GatewayConfigKeys {
       "ozone.s3g.kerberos.keytab.file";
   public static final String OZONE_S3G_KERBEROS_PRINCIPAL_KEY =
       "ozone.s3g.kerberos.principal";
-  public static final boolean OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED = true;
+  /**
+   * Configuration key that enables creation of directory instead of 0 byte
+   * file if bucket layout is FSO. Default value is <code>true</code>
+   */
+  public static final String OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED =
+      "ozone.s3g.fso.directory.creation";
 
   /**
    * Never constructed.

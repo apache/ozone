@@ -200,7 +200,8 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       OzoneBucket bucket = volume.getBucket(bucketName);
       if (length == 0 &&
-          OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED &&
+          ozoneConfiguration
+              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, true) &&
           bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
         // create directory
@@ -257,8 +258,8 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ResultCodes.FILE_ALREADY_EXISTS == ex.getResult()) {
-        throw newError(S3ErrorTable.INVALID_REQUEST, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.FILE_ALREADY_EXISTS) {
+        throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
       }
       throw ex;
     } catch (Exception ex) {
