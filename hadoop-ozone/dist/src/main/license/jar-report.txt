@@ -34,7 +34,6 @@ share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
-share/ozone/lib/curator-test.jar
 share/ozone/lib/derby.jar
 share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
