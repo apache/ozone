@@ -193,6 +193,28 @@ public final class HddsConfigKeys {
       "hdds.x509.renew.grace.duration";
 
   public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
+  public static final String HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX = "-next";
+  public static final String HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX = "-previous";
+
+  public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
+      "hdds.container.replication.compression";
+  public static final String HDDS_X509_ROOTCA_CERTIFICATE_FILE =
+      "hdds.x509.rootca.certificate.file";
+
+  public static final String HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT =
+      "";
+
+  public static final String HDDS_X509_ROOTCA_PUBLIC_KEY_FILE =
+      "hdds.x509.rootca.public.key.file";
+
+  public static final String HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT =
+      "";
+
+  public static final String HDDS_X509_ROOTCA_PRIVATE_KEY_FILE =
+      "hdds.x509.rootca.private.key.file";
+
+  public static final String HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT =
+      "";
 
   /**
    * Do not instantiate.
@@ -213,6 +235,19 @@ public final class HddsConfigKeys {
   public static final String HDDS_GRPC_TLS_TEST_CERT = "hdds.grpc.tls" +
       ".test.cert";
   public static final boolean HDDS_GRPC_TLS_TEST_CERT_DEFAULT = false;
+
+  /**
+   * The default time interval used to check if either of the truststore or
+   * keystore certificates file has changed and needs reloading.
+   */
+  public static final String HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL =
+      "hdds.security.ssl.keystore.reload.interval";
+  public static final String HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL =
+      "hdds.security.ssl.truststore.reload.interval";
+  public static final String
+      HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
+  public static final String
+      HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
 
   // Comma separated acls (users, groups) allowing clients accessing
   // datanode container protocol

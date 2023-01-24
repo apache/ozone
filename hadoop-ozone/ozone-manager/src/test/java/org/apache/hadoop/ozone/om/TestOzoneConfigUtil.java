@@ -20,8 +20,6 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -55,7 +53,7 @@ public class TestOzoneConfigUtil {
         .resolveReplicationConfigPreference(noneType, zeroFactor,
             clientECReplicationConfig, bucketECConfig, ratis3ReplicationConfig);
     // Client has no preference, so we should bucket defaults as we passed.
-    Assert.assertEquals(bucketECConfig.getEcReplicationConfig(),
+    Assert.assertEquals(bucketECConfig.getReplicationConfig(),
         replicationConfig);
   }
 
@@ -92,19 +90,17 @@ public class TestOzoneConfigUtil {
    */
   @Test
   public void testResolveClientSideRepConfigWhenBucketHasEC3() {
+    ReplicationConfig ratisReplicationConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
     DefaultReplicationConfig ratisBucketDefaults =
-        new DefaultReplicationConfig(ReplicationType.RATIS,
-            ReplicationFactor.THREE);
+        new DefaultReplicationConfig(ratisReplicationConfig);
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(noneType, zeroFactor,
             clientECReplicationConfig, ratisBucketDefaults,
             ratis3ReplicationConfig);
     // Client has no preference of type and bucket has ratis defaults, so it
     // should return ratis.
-    Assert.assertEquals(ratisBucketDefaults.getType().name(),
-        replicationConfig.getReplicationType().name());
-    Assert.assertEquals(ratisBucketDefaults.getFactor(),
-        ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()));
+    Assert.assertEquals(ratisReplicationConfig, replicationConfig);
   }
 
   @Test

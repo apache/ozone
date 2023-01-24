@@ -392,7 +392,7 @@ public class TestContainerCommandsEC {
     createKeyAndWriteData(keyString, bucket);
     ECReconstructionCoordinator coordinator =
         new ECReconstructionCoordinator(config, certClient,
-            ECReconstructionMetrics.create());
+            null, ECReconstructionMetrics.create());
 
     ECReconstructionMetrics metrics = coordinator.getECReconstructionMetrics();
     OzoneKeyDetails key = bucket.getKey(keyString);
@@ -569,7 +569,7 @@ public class TestContainerCommandsEC {
     Assert.assertThrows(IOException.class, () -> {
       ECReconstructionCoordinator coordinator =
           new ECReconstructionCoordinator(config, certClient,
-              ECReconstructionMetrics.create());
+              null, ECReconstructionMetrics.create());
       coordinator.reconstructECContainerGroup(conID,
           (ECReplicationConfig) containerPipeline.getReplicationConfig(),
           sourceNodeMap, targetNodeMap);
@@ -628,11 +628,11 @@ public class TestContainerCommandsEC {
     conf.setFromObject(writableECContainerProviderConfig);
 
     OzoneManager.setTestSecureOmFlag(true);
-    certClient = new CertificateClientTestImpl(config);
+    certClient = new CertificateClientTestImpl(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(NUM_DN)
         .setScmId(SCM_ID).setClusterId(CLUSTER_ID)
-        .setCertificateClient(new CertificateClientTestImpl(conf))
+        .setCertificateClient(certClient)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
@@ -681,10 +681,10 @@ public class TestContainerCommandsEC {
     SecurityConfig conf = new SecurityConfig(tweakedConfig);
     long tokenLifetime = TimeUnit.DAYS.toMillis(1);
     containerTokenGenerator = new ContainerTokenSecretManager(
-        conf, tokenLifetime, "1");
+        conf, tokenLifetime);
     containerTokenGenerator.start(certClient);
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
-        conf, tokenLifetime, "1");
+        conf, tokenLifetime);
     blockTokenGenerator.start(certClient);
     containerToken = containerTokenGenerator
         .generateToken(ANY_USER, new ContainerID(containerID));

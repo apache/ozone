@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -104,6 +103,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -111,6 +111,7 @@ import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkV
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,6 +186,25 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+      Container container, ContainerCommandRequestProto msg)
+      throws StorageContainerException {
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    checkContainerOpen(kvContainer);
+
+    if (msg.hasWriteChunk()) {
+      BlockID blockID =
+          BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+
+      return chunkManager.getStreamDataChannel(kvContainer,
+          blockID, metrics);
+    } else {
+      throw new StorageContainerException("Malformed request.",
+          ContainerProtos.Result.IO_EXCEPTION);
+    }
+  }
+
+  @Override
   public void stop() {
     chunkManager.shutdown();
     blockManager.shutdown();
@@ -233,6 +253,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleDeleteChunk(request, kvContainer);
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
+    case StreamInit:
+      return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
     case CompactChunk:
@@ -257,6 +279,35 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public BlockManager getBlockManager() {
     return this.blockManager;
+  }
+
+  ContainerCommandResponseProto handleStreamInit(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
+    final BlockID blockID;
+    if (request.hasWriteChunk()) {
+      WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed {} request. trace ID: {}",
+            request.getCmdType(), request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    String path = null;
+    try {
+      checkContainerOpen(kvContainer);
+      path = chunkManager
+          .streamInit(kvContainer, blockID);
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    }
+
+    return getSuccessResponseBuilder(request)
+        .setMessage(path)
+        .build();
   }
 
   /**
@@ -329,13 +380,11 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void populateContainerPathFields(KeyValueContainer container)
-      throws IOException {
+  private void populateContainerPathFields(KeyValueContainer container,
+      HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
+    HddsVolume containerVolume = hddsVolume;
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          container.getContainerData().getMaxSize());
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
       container.populatePathFields(idDir, containerVolume);
@@ -962,8 +1011,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
+      final TarContainerPacker packer) throws IOException {
     Preconditions.checkState(originalContainerData instanceof
         KeyValueContainerData, "Should be KeyValueContainerData instance");
 
@@ -973,7 +1021,8 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
 
-    populateContainerPathFields(container);
+    HddsVolume targetVolume = originalContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;

@@ -100,6 +100,9 @@ enum Type {
   GetSmallFile = 16;
   CloseContainer = 17;
   GetCommittedBlockLength = 18;
+
+  StreamInit = 19;
+  StreamWrite = 20;
 }
 
 
@@ -378,6 +381,7 @@ message ChunkInfo {
   required uint64 len = 3;
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
+  optional bytes stripeChecksum = 6;
 }
 
 message ChunkInfoList {
@@ -400,7 +404,7 @@ enum ChecksumType {
 
 message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
-  required ChunkInfo chunkData = 2;
+  optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
 }
 
@@ -473,11 +477,20 @@ message GetSmallFileResponseProto {
   required ReadChunkResponseProto data = 1;
 }
 
+enum CopyContainerCompressProto {
+  NO_COMPRESSION = 1;
+  GZIP = 2;
+  LZ4 = 3;
+  SNAPPY = 4;
+  ZSTD = 5;
+}
+
 message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
   optional uint64 len = 3;
   optional uint32 version = 4;
+  optional CopyContainerCompressProto compression = 5;
 }
 
 message CopyContainerResponseProto {

@@ -18,35 +18,45 @@
 package org.apache.hadoop.hdds.scm;
 
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-import java.util.stream.Collectors;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This policy implements a set of invariants which are common
  * for all basic placement policies, acts as the repository of helper
  * functions which are common to placement policies.
  */
-public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
+public abstract class SCMCommonPlacementPolicy implements
+        PlacementPolicy<ContainerReplica> {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
@@ -347,6 +357,22 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   }
 
   /**
+   * Default implementation to return the max number of replicas per rack.
+   * For simple policies that are not rack aware
+   * we return numReplicas, from this default implementation.
+   *
+   * @param numReplicas - The desired replica counts
+   * @param numberOfRacks - The desired number of racks
+   * @return The max number of replicas per rack
+   */
+  protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    return numReplicas / numberOfRacks
+            + Math.min(numReplicas % numberOfRacks, 1);
+  }
+
+
+
+  /**
    * This default implementation handles rack aware policies and non rack
    * aware policies. If a future placement policy needs to check more than racks
    * to validate the policy (eg node groups, HDFS like upgrade domain) this
@@ -363,6 +389,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   public ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
+    // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
@@ -372,22 +399,22 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
         return invalidPlacement;
       }
     }
-    // We have a network topology so calculate if it is satisfied or not.
-    int numRacks = 1;
+    Map<Node, Long> currentRackCount = dns.stream()
+            .collect(Collectors.groupingBy(this::getPlacementGroup,
+                    Collectors.counting()));
     final int maxLevel = topology.getMaxLevel();
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
-    numRacks = topology.getNumOfNodes(maxLevel - 1);
-    final long currentRackCount = dns.stream()
-        .map(d -> topology.getAncestor(d, 1))
-        .distinct()
-        .count();
-
+    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
+    int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
+            Math.min(requiredRacks, numRacks));
     return new ContainerPlacementStatusDefault(
-        (int)currentRackCount, requiredRacks, numRacks);
+        currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
+            currentRackCount.values().stream().map(Long::intValue)
+                    .collect(Collectors.toList()));
   }
 
   /**
@@ -425,5 +452,145 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       }
     }
     return false;
+  }
+
+  /**
+   * Given a set of replicas of a container which are
+   * neither over underreplicated nor overreplicated,
+   * return a set of replicas to copy to another node to fix misreplication.
+   * @param replicas: Map of replicas with value signifying if
+   *                  replica can be copied
+   */
+  @Override
+  public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+         Map<ContainerReplica, Boolean> replicas) {
+    Map<Node, List<ContainerReplica>> placementGroupReplicaIdMap
+            = replicas.keySet().stream()
+            .collect(Collectors.groupingBy(replica ->
+                    getPlacementGroup(replica.getDatanodeDetails())));
+
+    int totalNumberOfReplicas = replicas.size();
+    int requiredNumberOfPlacementGroups =
+            getRequiredRackCount(totalNumberOfReplicas);
+    Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
+    List<List<ContainerReplica>> replicaSet = placementGroupReplicaIdMap
+            .values().stream()
+            .sorted((o1, o2) -> Integer.compare(o2.size(), o1.size()))
+            .limit(requiredNumberOfPlacementGroups)
+            .collect(Collectors.toList());
+    for (List<ContainerReplica> replicaList: replicaSet) {
+      int maxReplicasPerPlacementGroup = getMaxReplicasPerRack(
+              totalNumberOfReplicas, requiredNumberOfPlacementGroups);
+      int numberOfReplicasToBeCopied = Math.max(0,
+              replicaList.size() - maxReplicasPerPlacementGroup);
+      totalNumberOfReplicas -= maxReplicasPerPlacementGroup;
+      requiredNumberOfPlacementGroups -= 1;
+      if (numberOfReplicasToBeCopied > 0) {
+        List<ContainerReplica> replicasToBeCopied = replicaList.stream()
+                .filter(replicas::get)
+                .limit(numberOfReplicasToBeCopied)
+                .collect(Collectors.toList());
+        if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
+          Node rack = replicaList.size() > 0 ? this.getPlacementGroup(
+                  replicaList.get(0).getDatanodeDetails()) : null;
+          LOG.warn("Not enough copyable replicas available in rack {}. " +
+                  "Required number of Replicas to be copied: {}." +
+                  " Available Replicas to be copied: {}",
+                  rack, numberOfReplicasToBeCopied,
+                  replicasToBeCopied.size());
+        }
+        copyReplicaSet.addAll(replicasToBeCopied);
+      }
+    }
+    return copyReplicaSet;
+  }
+
+  protected Node getPlacementGroup(DatanodeDetails dn) {
+    return nodeManager.getClusterNetworkTopologyMap().getAncestor(dn, 1);
+  }
+
+  /**
+   * Given a set of replicas, expectedCount for Each replica,
+   * number of unique replica indexes. Replicas to be deleted for fixing over
+   * replication is computed.
+   * The algorithm starts with creating a replicaIdMap which contains the
+   * replicas grouped by replica Index. A placementGroup Map is created which
+   * groups replicas based on their rack & the replicas within the rack
+   * are further grouped based on the replica Index.
+   * A placement Group Count Map is created which keeps
+   * track of the count of replicas in each rack.
+   * We iterate through overreplicated replica indexes sorted in descending
+   * order based on their current replication factor in a descending factor.
+   * For each replica Index the replica is removed from the rack which contains
+   * the most replicas, in order to achieve this the racks are put
+   * into priority queue & are based on the number of replicas they have.
+   * The replica is removed from the rack with maximum replicas & the replica
+   * to be removed is also removed from the maps created above &
+   * the count for rack is reduced.
+   * The set of replicas computed are then returned by the function.
+   * @param replicas: Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica: Replication factor of each
+   *    *                                     unique replica
+   * @return Set of replicas to be removed are computed.
+   */
+  @Override
+  public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+    Map<Integer, Set<ContainerReplica>> replicaIdMap = new HashMap<>();
+    Map<Node, Map<Integer, Set<ContainerReplica>>> placementGroupReplicaIdMap
+            = new HashMap<>();
+    Map<Node, Integer> placementGroupCntMap = new HashMap<>();
+    for (ContainerReplica replica:replicas) {
+      Integer replicaId = replica.getReplicaIndex();
+      Node placementGroup = getPlacementGroup(replica.getDatanodeDetails());
+      replicaIdMap.computeIfAbsent(replicaId, (rid) -> Sets.newHashSet())
+              .add(replica);
+      placementGroupCntMap.compute(placementGroup,
+              (group, cnt) -> (cnt == null ? 0 : cnt) + 1);
+      placementGroupReplicaIdMap.computeIfAbsent(placementGroup,
+              (pg) -> Maps.newHashMap()).computeIfAbsent(replicaId, (rid) ->
+                      Sets.newHashSet()).add(replica);
+    }
+
+    Set<ContainerReplica> replicasToRemove = new HashSet<>();
+    List<Integer> sortedRIDList = replicaIdMap.keySet().stream()
+            .filter(rid -> replicaIdMap.get(rid).size() >
+                    expectedCountPerUniqueReplica)
+            .sorted((o1, o2) -> Integer.compare(replicaIdMap.get(o2).size(),
+                    replicaIdMap.get(o1).size()))
+            .collect(Collectors.toList());
+    for (Integer rid : sortedRIDList) {
+      if (replicaIdMap.get(rid).size() <= expectedCountPerUniqueReplica) {
+        break;
+      }
+      Queue<Node> pq = new PriorityQueue<>((o1, o2) ->
+              Integer.compare(placementGroupCntMap.get(o2),
+                      placementGroupCntMap.get(o1)));
+      pq.addAll(placementGroupReplicaIdMap.entrySet()
+              .stream()
+              .filter(nodeMapEntry -> nodeMapEntry.getValue().containsKey(rid))
+              .map(Map.Entry::getKey)
+              .collect(Collectors.toList()));
+
+      while (replicaIdMap.get(rid).size() > expectedCountPerUniqueReplica) {
+        Node rack = pq.poll();
+        Set<ContainerReplica> replicaSet =
+                placementGroupReplicaIdMap.get(rack).get(rid);
+        if (replicaSet.size() > 0) {
+          ContainerReplica r = replicaSet.stream().findFirst().get();
+          replicasToRemove.add(r);
+          replicaSet.remove(r);
+          replicaIdMap.get(rid).remove(r);
+          placementGroupCntMap.compute(rack,
+                  (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
+          if (replicaSet.size() == 0) {
+            placementGroupReplicaIdMap.get(rack).remove(rid);
+          } else {
+            pq.add(rack);
+          }
+        }
+      }
+    }
+    return replicasToRemove;
   }
 }

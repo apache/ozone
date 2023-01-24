@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -104,6 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -203,6 +205,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .setClusterId(clusterId)
+        .setDataStreamMinPacketSize(1024)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -342,12 +345,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = null;
     store.createVolume(volumeName);
 
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "10GB", "10000"));
     store.getVolume(volumeName).createBucket(bucketName);
-    volume = store.getVolume(volumeName);
-    Assert.assertEquals(10 * GB, volume.getQuotaInBytes());
-    Assert.assertEquals(10000L, volume.getQuotaInNamespace());
     OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
@@ -365,6 +363,12 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket ozoneBucket2 =
         store.getVolume(volumeName).getBucket(bucketName2);
     Assert.assertEquals(1024L, ozoneBucket2.getQuotaInBytes());
+
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+        "10GB", "10000"));
+    volume = store.getVolume(volumeName);
+    Assert.assertEquals(10 * GB, volume.getQuotaInBytes());
+    Assert.assertEquals(10000L, volume.getQuotaInNamespace());
 
     LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
         " spaceQuota because volume spaceQuota is not cleared.",
@@ -404,8 +408,6 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "10GB", "1000"));
     store.getVolume(volumeName).createBucket(bucketName);
 
     // test bucket set quota 0
@@ -952,14 +954,15 @@ public abstract class TestOzoneRpcClientAbstract {
     volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
+    bucket.setQuota(OzoneQuota.parseQuota("1 B", "100"));
 
     // Test bucket quota.
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota(Long.MAX_VALUE + " B", "100"));
     bucketName = UUID.randomUUID().toString();
     volume.createBucket(bucketName);
     bucket = volume.getBucket(bucketName);
     bucket.setQuota(OzoneQuota.parseQuota("1 B", "100"));
+    store.getVolume(volumeName).setQuota(
+        OzoneQuota.parseQuota(Long.MAX_VALUE + " B", "100"));
 
     // Test bucket quota: write key.
     // The remaining quota does not satisfy a block size, so the write fails.
@@ -1082,6 +1085,7 @@ public abstract class TestOzoneRpcClientAbstract {
   static Stream<BucketLayout> bucketLayouts() {
     return Stream.of(
         BucketLayout.OBJECT_STORE,
+        BucketLayout.LEGACY,
         BucketLayout.FILE_SYSTEM_OPTIMIZED
     );
   }
@@ -1172,6 +1176,101 @@ public abstract class TestOzoneRpcClientAbstract {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
   }
 
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testBucketUsedNamespace(BucketLayout layout) throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(layout)
+        .build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    String keyName1 = UUID.randomUUID().toString();
+    String keyName2 = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName1, ONE, value, valueLength);
+    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    // Test create a file twice will not increase usedNamespace twice
+    writeKey(bucket, keyName1, ONE, value, valueLength);
+    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    writeKey(bucket, keyName2, ONE, value, valueLength);
+    Assert.assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+    bucket.deleteKey(keyName1);
+    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    bucket.deleteKey(keyName2);
+    Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+
+    RpcClient client = new RpcClient(cluster.getConf(), null);
+    String directoryName1 = UUID.randomUUID().toString();
+    String directoryName2 = UUID.randomUUID().toString();
+
+    client.createDirectory(volumeName, bucketName, directoryName1);
+    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    // Test create a directory twice will not increase usedNamespace twice
+    client.createDirectory(volumeName, bucketName, directoryName2);
+    Assert.assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+    client.deleteKey(volumeName, bucketName,
+        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName1), false);
+    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    client.deleteKey(volumeName, bucketName,
+        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName2), false);
+    Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+
+    String multiComponentsDir = "dir1/dir2/dir3/dir4";
+    client.createDirectory(volumeName, bucketName, multiComponentsDir);
+    Assert.assertEquals(OzoneFSUtils.getFileCount(multiComponentsDir),
+        getBucketUsedNamespace(volumeName, bucketName));
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testMissingParentBucketUsedNamespace(BucketLayout layout)
+      throws IOException {
+    // when will put a key that contain not exist directory only FSO buckets
+    // and LEGACY buckets with ozone.om.enable.filesystem.paths set to true
+    // will create missing directories.
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(layout)
+        .build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    if (layout.equals(BucketLayout.LEGACY)) {
+      OzoneConfiguration conf = cluster.getConf();
+      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+      cluster.setConf(conf);
+    }
+
+    // the directory "/dir1", ""/dir1/dir2/", "/dir1/dir2/dir3/"
+    // will be created automatically
+    String missingParentKeyName = "dir1/dir2/dir3/file1";
+    writeKey(bucket, missingParentKeyName, ONE, value, valueLength);
+    if (layout.equals(BucketLayout.OBJECT_STORE)) {
+      // for OBJECT_STORE bucket, missing parent will not be
+      // created automatically
+      Assert.assertEquals(1, getBucketUsedNamespace(volumeName, bucketName));
+    } else {
+      Assert.assertEquals(OzoneFSUtils.getFileCount(missingParentKeyName),
+          getBucketUsedNamespace(volumeName, bucketName));
+    }
+  }
+
+  private long getBucketUsedNamespace(String volume, String bucket)
+      throws IOException {
+    return store.getVolume(volume).getBucket(bucket).getUsedNamespace();
+  }
+
   @Test
   public void testVolumeUsedNamespace() throws IOException {
     String volumeName = UUID.randomUUID().toString();
@@ -1212,8 +1311,8 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(0L, volumeWithLinkedBucket.getUsedNamespace());
 
     // Reset volume quota, the original usedNamespace needs to remain the same
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        100 + " GB", "100"));
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseNameSpaceQuota(
+        "100"));
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getUsedNamespace());
 
@@ -1224,7 +1323,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testBucketUsedNamespace() throws IOException {
+  public void testBucketQuotaInNamespace() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String key1 = UUID.randomUUID().toString();
@@ -1791,7 +1890,8 @@ public abstract class TestOzoneRpcClientAbstract {
         KeyValueContainerData cData =
             (KeyValueContainerData) container.getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
-          db.getStore().getMetadataTable().put(cData.bcsIdKey(), newBCSID);
+          db.getStore().getMetadataTable().put(cData.getBcsIdKey(),
+              newBCSID);
         }
         container.updateBlockCommitSequenceId(newBCSID);
         index++;

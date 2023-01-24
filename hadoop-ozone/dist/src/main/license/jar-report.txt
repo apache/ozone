@@ -265,3 +265,4 @@ share/ozone/lib/token-provider.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/weld-servlet.Final.jar
 share/ozone/lib/woodstox-core.jar
+share/ozone/lib/zstd-jni.jar
