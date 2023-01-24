@@ -122,9 +122,9 @@ public class DatanodeStateMachine implements Closeable {
   private final MeasuredReplicator replicatorMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
   private final ECReconstructionMetrics ecReconstructionMetrics;
-  // There is a test in TestECContainerRecovery that access this field via
-  // reflection, so it can mock a method on it.
-  private final ECReconstructionCoordinator ecReconstructionCoordinator;
+  // This is an instance variable as mockito needs to access it in a test
+  private final ReconstructECContainersCommandHandler
+      reconstructECContainersCommandHandler;
 
   private final DatanodeQueueMetrics queueMetrics;
   /**
@@ -201,9 +201,15 @@ public class DatanodeStateMachine implements Closeable {
 
     ecReconstructionMetrics = ECReconstructionMetrics.create();
 
-    ecReconstructionCoordinator = new ECReconstructionCoordinator(conf,
-        certClient, context, ecReconstructionMetrics);
+    ECReconstructionCoordinator ecReconstructionCoordinator =
+        new ECReconstructionCoordinator(conf, certClient, context,
+            ecReconstructionMetrics);
 
+    // This is created as an instance variable as Mockito needs to access it in
+    // a test. The test mocks it in a running mini-cluster.
+    reconstructECContainersCommandHandler =
+        new ReconstructECContainersCommandHandler(conf, supervisor,
+        ecReconstructionCoordinator);
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
@@ -213,8 +219,7 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
             replicatorMetrics, pushReplicator))
-        .addHandler(new ReconstructECContainersCommandHandler(conf, supervisor,
-            ecReconstructionCoordinator))
+        .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock))
         .addHandler(new ClosePipelineCommandHandler())
