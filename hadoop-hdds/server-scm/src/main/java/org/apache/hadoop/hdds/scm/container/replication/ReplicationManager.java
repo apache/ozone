@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -522,7 +523,7 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-  public Map<DatanodeDetails, SCMCommand<?>> processUnderReplicatedContainer(
+  Set<Pair<DatanodeDetails, SCMCommand<?>>> processUnderReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -547,7 +548,7 @@ public class ReplicationManager implements SCMService {
         pendingOps, result, ratisMaintenanceMinReplicas);
   }
 
-  public Map<DatanodeDetails, SCMCommand<?>> processOverReplicatedContainer(
+  Set<Pair<DatanodeDetails, SCMCommand<?>>> processOverReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(

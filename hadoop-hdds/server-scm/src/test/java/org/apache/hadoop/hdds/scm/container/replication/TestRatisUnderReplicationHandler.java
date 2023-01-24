@@ -44,7 +44,6 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -220,7 +219,7 @@ public class TestRatisUnderReplicationHandler {
         new RatisUnderReplicationHandler(policy, conf, nodeManager,
             replicationManager);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
         handler.processAndCreateCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
     Assert.assertEquals(expectNumCommands, commands.size());
