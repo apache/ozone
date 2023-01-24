@@ -506,6 +506,19 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getRenameKey(String volume, String bucket, long objectID);
 
   /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @return DB directory key as String.
+   */
+  String getOpenFileNamePrefix(long volumeId, long bucketId,
+      long parentObjectId, String fileName);
+
+  /**
    * Returns the DB key name of a multipart upload key in OM metadata store.
    *
    * @param volumeId       - ID of the volume

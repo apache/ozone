@@ -155,12 +155,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   // Metric for list users in tenant operation
   private @Metric MutableCounterLong numTenantTenantUserLists;
 
+  private @Metric MutableCounterLong numRecoverLease;
+
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
   private @Metric MutableCounterLong getNumGetKeyInfoFails;
+
+  private @Metric MutableCounterLong numRecoverLeaseFails;
 
   // Metrics for total amount of data written
   private @Metric MutableCounterLong totalDataCommitted;
@@ -1306,6 +1310,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incEcBucketCreateFailsTotal() {
     ecBucketCreateFailsTotal.incr();
+  }
+
+  public void incNumRecoverLease() {
+    numKeyOps.incr();
+    numFSOps.incr();
+    numRecoverLease.incr();
+  }
+
+  public void incNumRecoverLeaseFails() {
+    numRecoverLeaseFails.incr();
   }
 
   public void unRegister() {
