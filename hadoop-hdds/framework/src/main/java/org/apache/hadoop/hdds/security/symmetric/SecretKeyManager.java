@@ -96,7 +96,6 @@ public class SecretKeyManager {
   public synchronized boolean checkAndRotate() throws TimeoutException {
     ManagedSecretKey currentKey = state.getCurrentKey();
     if (shouldRotate(currentKey)) {
-
       ManagedSecretKey newCurrentKey = generateSecretKey();
       List<ManagedSecretKey> updatedKeys = state.getAllKeys()
           .stream().filter(x -> !x.isExpired())

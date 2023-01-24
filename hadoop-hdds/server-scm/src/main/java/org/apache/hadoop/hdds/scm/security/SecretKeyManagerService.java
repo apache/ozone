@@ -5,9 +5,9 @@
  * licenses this file to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -21,12 +21,12 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.security.symmetric.LocalSecretKeyStore;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyStore;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -149,12 +149,17 @@ public class SecretKeyManagerService implements SCMService, Runnable {
   public void start() {
     LOG.info("Scheduling rotation checker with interval {} seconds",
         rotationCheckDuration.toMillis() / 1000);
-    scheduler.scheduleAtFixedRate(this,0, rotationCheckDuration.toMillis(),
+    scheduler.scheduleAtFixedRate(this, 0, rotationCheckDuration.toMillis(),
         TimeUnit.MILLISECONDS);
   }
 
   @Override
   public void stop() {
     scheduler.shutdownNow();
+  }
+
+  public static boolean isSecretKeyEnable(SecurityConfig conf) {
+    return conf.isSecurityEnabled() &&
+        conf.isBlockTokenEnabled() && conf.isContainerTokenEnabled();
   }
 }
