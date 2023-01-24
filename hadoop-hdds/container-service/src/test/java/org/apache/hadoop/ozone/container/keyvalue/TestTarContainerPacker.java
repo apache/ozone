@@ -59,6 +59,7 @@ import org.junit.runners.Parameterized;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
+import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
 
 /**
  * Test the tar/untar for a given container.
@@ -199,15 +200,18 @@ public class TestTarContainerPacker {
       InputStream uncompressed = packer.decompress(input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
+      boolean first = true;
       TarArchiveEntry entry;
       Map<String, TarArchiveEntry> entries = new HashMap<>();
       while ((entry = tarStream.getNextTarEntry()) != null) {
+        if (first) {
+          Assert.assertEquals(CONTAINER_FILE_NAME, entry.getName());
+          first = false;
+        }
         entries.put(entry.getName(), entry);
       }
 
-      Assert.assertTrue(
-          entries.containsKey("container.yaml"));
-
+      Assert.assertTrue(entries.containsKey(CONTAINER_FILE_NAME));
     } finally {
       if (tarStream != null) {
         tarStream.close();

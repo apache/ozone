@@ -67,7 +67,7 @@ public class TarContainerPacker
 
   static final String DB_DIR_NAME = "db";
 
-  private static final String CONTAINER_FILE_NAME = "container.yaml";
+  static final String CONTAINER_FILE_NAME = "container.yaml";
 
   private final String compression;
 
@@ -167,13 +167,13 @@ public class TarContainerPacker
     KeyValueContainerData containerData = container.getContainerData();
 
     try (ArchiveOutputStream archiveOutput = tar(compress(output))) {
+      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
+          archiveOutput);
+
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
-          archiveOutput);
-
-      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
     } catch (CompressorException e) {
       throw new IOException(
@@ -263,6 +263,7 @@ public class TarContainerPacker
     // empty.
     ArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
+    archiveOutput.closeArchiveEntry();
 
     // Add files in the directory.
     try (Stream<Path> dirEntries = Files.list(dir)) {
