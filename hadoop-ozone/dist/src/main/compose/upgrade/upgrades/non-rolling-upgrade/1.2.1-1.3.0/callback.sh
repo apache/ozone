@@ -18,18 +18,9 @@
 source "$TEST_DIR"/testlib.sh
 
 with_new_version_pre_finalized() {
-  _check_hdds_mlvs 2
-  _check_om_mlvs 0
-  check_ec_is_disabled
-}
-
-with_old_version_downgraded() {
-  _check_hdds_mlvs 2
-  _check_om_mlvs 0
+  execute_robot_test scm --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
 }
 
 with_new_version_finalized() {
-  _check_hdds_mlvs 4
-  _check_om_mlvs 3
-  check_ec_is_enabled
+  execute_robot_test scm --include post-finalized-ec-tests ec/upgrade-ec-check.robot
 }

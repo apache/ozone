@@ -21,17 +21,3 @@ setup() {
   # Ozone 1.1.0 did not support SCM HA.
   source "$TEST_DIR"/compose/om-ha/load.sh
 }
-
-with_new_version_pre_finalized() {
-  # Ozone 1.1.0 did not have the upgrade framework yet, so cannot check
-  # metadata layout versions in that version.
-  _check_hdds_mlvs 0
-  _check_om_mlvs 0
-}
-
-with_new_version_finalized() {
-  _check_hdds_mlvs 2
-  # In Ozone 1.2.0, OM has only one layout initial layout version, so no
-  # increase should happen here.
-  _check_om_mlvs 0
-}

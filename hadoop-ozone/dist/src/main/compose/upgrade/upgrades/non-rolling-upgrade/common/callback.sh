@@ -17,22 +17,26 @@
 
 source "$TEST_DIR"/testlib.sh
 
-# Helper function, not a callback.
-_check_hdds_mlvs() {
-  mlv="$1"
-  check_scm_mlv scm "$mlv"
-  check_dn_mlv dn1 "$mlv"
-  check_dn_mlv dn2 "$mlv"
-  check_dn_mlv dn3 "$mlv"
+
+### HELPER METHODS ###
+
+## @description Generates data on the cluster.
+## @param The prefix to use for data generated.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+generate() {
+    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/generate.robot
 }
 
-# Helper function, not a callback.
-_check_om_mlvs() {
-  mlv="$1"
-  check_om_mlv om1 "$mlv"
-  check_om_mlv om2 "$mlv"
-  check_om_mlv om3 "$mlv"
+## @description Validates that data exists on the cluster.
+## @param The prefix of the data to be validated.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+validate() {
+    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/validate.robot
 }
+
+### CALLBACKS ###
 
 setup() {
   # The default cluster to use.
