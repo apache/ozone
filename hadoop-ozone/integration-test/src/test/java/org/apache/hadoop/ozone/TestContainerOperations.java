@@ -132,4 +132,30 @@ public class TestContainerOperations {
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
     }
   }
+
+  @Test
+  public void testDatanodeUsageInfoContainerCount() throws IOException {
+    DatanodeDetails dn = cluster.getStorageContainerManager()
+            .getScmNodeManager()
+            .getAllNodes()
+            .get(0);
+    dn.setCurrentVersion(0);
+
+    List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+            storageClient.getDatanodeUsageInfo(
+                    dn.getIpAddress(), dn.getUuidString());
+
+    assertEquals(1, usageInfoList.size());
+    assertEquals(0, usageInfoList.get(0).getContainerCount());
+
+    storageClient.createContainer(HddsProtos
+            .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
+            .ONE, OzoneConsts.OZONE);
+
+    usageInfoList = storageClient.getDatanodeUsageInfo(
+                    dn.getIpAddress(), dn.getUuidString());
+
+    assertEquals(1, usageInfoList.size());
+    assertEquals(1, usageInfoList.get(0).getContainerCount());
+  }
 }
