@@ -136,7 +136,8 @@ public class ReplicationSupervisor {
    */
   public int getInFlightReplications(
       Class<? extends AbstractReplicationTask> taskClass) {
-    return taskCounter.get(taskClass).get();
+    AtomicInteger counter = taskCounter.get(taskClass);
+    return counter == null ? 0 : counter.get();
   }
 
   /**
