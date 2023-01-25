@@ -585,27 +585,29 @@ public class BlockOutputStream extends OutputStream {
 
   @Override
   public void close() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0) {
-      try {
-        handleFlush(true);
-      } catch (ExecutionException e) {
-        handleExecutionException(e);
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        handleInterruptedException(ex, true);
-      } catch (Throwable e) {
-        String msg = "Failed to flush. error: " + e.getMessage();
-        LOG.error(msg, e);
-        throw e;
-      } finally {
-        cleanup(false);
+    if (xceiverClientFactory != null && xceiverClient != null) {
+      if (bufferPool != null && bufferPool.getSize() > 0) {
+        try {
+          handleFlush(true);
+        } catch (ExecutionException e) {
+          handleExecutionException(e);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+          handleInterruptedException(ex, true);
+        } catch (Throwable e) {
+          String msg = "Failed to flush. error: " + e.getMessage();
+          LOG.error(msg, e);
+          throw e;
+        } finally {
+          cleanup(true);
+        }
+        // TODO: Turn the below buffer empty check on when Standalone pipeline
+        // is removed in the write path in tests
+        // Preconditions.checkArgument(buffer.position() == 0);
+        // bufferPool.checkBufferPoolEmpty();
+      } else {
+        cleanup(true);
       }
-      // TODO: Turn the below buffer empty check on when Standalone pipeline
-      // is removed in the write path in tests
-      // Preconditions.checkArgument(buffer.position() == 0);
-      // bufferPool.checkBufferPoolEmpty();
-
     }
   }
 
