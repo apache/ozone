@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,9 +35,9 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 
@@ -84,10 +85,10 @@ public class TestUnderReplicatedProcessor {
     targetNodes.add(MockDatanodeDetails.randomDatanodeDetails());
     byte[] missingIndexes = {4, 5};
 
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-    commands.put(MockDatanodeDetails.randomDatanodeDetails(),
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+    commands.add(Pair.of(MockDatanodeDetails.randomDatanodeDetails(),
         new ReconstructECContainersCommand(container.getContainerID(),
-            sourceNodes, targetNodes, missingIndexes, repConfig));
+            sourceNodes, targetNodes, missingIndexes, repConfig)));
 
     Mockito.when(replicationManager
             .processUnderReplicatedContainer(any()))
@@ -115,8 +116,8 @@ public class TestUnderReplicatedProcessor {
         container.getContainerID(), sourceDns);
     rcc.setReplicaIndex(3);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-    commands.put(targetDn, rcc);
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+    commands.add(Pair.of(targetDn, rcc));
 
     Mockito.when(replicationManager
             .processUnderReplicatedContainer(any()))

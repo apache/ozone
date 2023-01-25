@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.collections.iterators.LoopingIterator;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,11 +36,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -77,7 +77,6 @@ public class RatisUnderReplicationHandler
    * @param result Health check result indicating under replication.
    * @param minHealthyForMaintenance Number of healthy replicas that must be
    *                                 available for a DN to enter maintenance
-   *
    * @return Returns the key value pair of destination dn where the command gets
    * executed and the command itself. If an empty map is returned, it indicates
    * the container is no longer unhealthy and can be removed from the unhealthy
@@ -85,7 +84,7 @@ public class RatisUnderReplicationHandler
    * should be retried later.
    */
   @Override
-  public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
+  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int minHealthyForMaintenance)
       throws IOException {
@@ -109,7 +108,7 @@ public class RatisUnderReplicationHandler
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
     if (!verifyUnderReplication(replicaCount)) {
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
 
     // find sources that can provide replicas
@@ -118,7 +117,7 @@ public class RatisUnderReplicationHandler
     if (sourceDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no healthy replicas " +
           "were found.", containerInfo);
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
 
     // find targets to send replicas to
@@ -127,7 +126,7 @@ public class RatisUnderReplicationHandler
     if (targetDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no eligible targets " +
           "were found.", containerInfo);
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
 
     return createReplicationCommands(containerInfo.getContainerID(),
@@ -231,31 +230,28 @@ public class RatisUnderReplicationHandler
         replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
   }
 
-  private Map<DatanodeDetails, SCMCommand<?>> createReplicationCommands(
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createReplicationCommands(
       long containerID, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) {
-    final boolean push = replicationManager.getConfig().isPush()
-        && targets.size() <= sources.size();
-    // TODO if we need multiple commands per source datanode, we need a small
-    // interface change
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
+    final boolean push = replicationManager.getConfig().isPush();
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
 
     if (push) {
       Collections.shuffle(sources);
-      for (Iterator<DatanodeDetails> srcIter = sources.iterator(),
+      for (Iterator<DatanodeDetails> srcIter = new LoopingIterator(sources),
               targetIter = targets.iterator();
           srcIter.hasNext() && targetIter.hasNext();) {
         DatanodeDetails source = srcIter.next();
         DatanodeDetails target = targetIter.next();
         ReplicateContainerCommand command =
             ReplicateContainerCommand.toTarget(containerID, target);
-        commands.put(source, command);
+        commands.add(Pair.of(source, command));
       }
     } else {
       for (DatanodeDetails target : targets) {
         ReplicateContainerCommand command =
             ReplicateContainerCommand.fromSources(containerID, sources);
-        commands.put(target, command);
+        commands.add(Pair.of(target, command));
       }
     }
 

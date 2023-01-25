@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -34,7 +35,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,7 +77,7 @@ public class RatisOverReplicationHandler
    * delete replicas on those datanodes.
    */
   @Override
-  public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
+  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int minHealthyForMaintenance) throws
       IOException {
@@ -115,7 +115,7 @@ public class RatisOverReplicationHandler
 
     // verify that this container is actually over replicated
     if (!verifyOverReplication(replicaCount)) {
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
 
     // get number of excess replicas
@@ -132,7 +132,7 @@ public class RatisOverReplicationHandler
     if (eligibleReplicas.size() == 0) {
       LOG.info("Did not find any replicas that are eligible to be deleted for" +
           " container {}.", containerInfo);
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
 
     return createCommands(containerInfo, eligibleReplicas, excess);
@@ -214,10 +214,10 @@ public class RatisOverReplicationHandler
         .collect(Collectors.toList());
   }
 
-  private Map<DatanodeDetails, SCMCommand<?>> createCommands(
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createCommands(
       ContainerInfo containerInfo, List<ContainerReplica> replicas,
       int excess) {
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
 
     /*
     Over replication means we have enough healthy replicas, so unhealthy
@@ -231,8 +231,8 @@ public class RatisOverReplicationHandler
       }
       if (!ReplicationManager.compareState(
           containerInfo.getState(), replica.getState())) {
-        commands.put(replica.getDatanodeDetails(),
-            createDeleteCommand(containerInfo));
+        commands.add(Pair.of(replica.getDatanodeDetails(),
+            createDeleteCommand(containerInfo)));
         unhealthyReplicas.add(replica);
         excess--;
       }
@@ -253,8 +253,8 @@ public class RatisOverReplicationHandler
 
       if (super.isPlacementStatusActuallyEqualAfterRemove(replicaSet, replica,
           containerInfo.getReplicationFactor().getNumber())) {
-        commands.put(replica.getDatanodeDetails(),
-            createDeleteCommand(containerInfo));
+        commands.add(Pair.of(replica.getDatanodeDetails(),
+            createDeleteCommand(containerInfo)));
         excess--;
       }
     }
