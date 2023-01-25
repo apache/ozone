@@ -63,7 +63,7 @@ public class TestHSync {
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
 
-  private static final OzoneConfiguration conf = new OzoneConfiguration();
+  private static OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeAll
   public static void init() throws Exception {

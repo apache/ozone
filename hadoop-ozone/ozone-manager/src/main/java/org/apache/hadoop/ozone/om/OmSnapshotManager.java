@@ -75,7 +75,8 @@ public final class OmSnapshotManager implements AutoCloseable {
             .getStore()
             .getRocksDBCheckpointDiffer();
 
-    this.rocksDB = createRocksDbForSnapshotDiff(ozoneManager.getConfiguration());
+    this.rocksDB =
+        createRocksDbForSnapshotDiff(ozoneManager.getConfiguration());
     this.snapshotDiffManager = new SnapshotDiffManager(rocksDB, differ);
 
     // size of lru cache
