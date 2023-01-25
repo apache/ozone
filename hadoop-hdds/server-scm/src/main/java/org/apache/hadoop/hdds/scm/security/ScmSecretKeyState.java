@@ -39,7 +39,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.Objects.requireNonNull;
 
-public class ScmSecretKeyState implements SecretKeyState {
+/**
+ * SCM implementation of {@link SecretKeyState}.
+ */
+public final class ScmSecretKeyState implements SecretKeyState {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmSecretKeyState.class);
 
@@ -109,6 +112,9 @@ public class ScmSecretKeyState implements SecretKeyState {
     }
   }
 
+  /**
+   * Builder for {@link ScmSecretKeyState}.
+   */
   public static class Builder {
 
     private SecretKeyStore secretKeyStore;

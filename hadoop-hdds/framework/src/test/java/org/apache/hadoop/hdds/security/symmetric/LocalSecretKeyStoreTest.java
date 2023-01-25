@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Test cases for {@link LocalSecretKeyStore}
+ * Test cases for {@link LocalSecretKeyStore}.
  */
 public class LocalSecretKeyStoreTest {
   private SecretKeyStore secretKeyStore;

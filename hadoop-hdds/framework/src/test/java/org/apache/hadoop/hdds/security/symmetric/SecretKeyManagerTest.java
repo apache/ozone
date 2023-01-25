@@ -55,9 +55,9 @@ import static org.mockito.Mockito.when;
  * Tests cases for {@link SecretKeyManager} implementation.
  */
 public class SecretKeyManagerTest {
-  private final static Duration VALIDITY_DURATION = Duration.ofDays(3);
-  private final static Duration ROTATION_DURATION = Duration.ofDays(1);
-  private final static String ALGORITHM = "HmacSHA256";
+  private static final Duration VALIDITY_DURATION = Duration.ofDays(3);
+  private static final Duration ROTATION_DURATION = Duration.ofDays(1);
+  private static final String ALGORITHM = "HmacSHA256";
 
   private SecretKeyStore mockedKeyStore;
 
@@ -222,7 +222,7 @@ public class SecretKeyManagerTest {
     private Map<UUID, ManagedSecretKey> allKeys;
     private SecretKeyStore keyStore;
 
-    public TestSecretKeyState(SecretKeyStore keyStore) {
+    TestSecretKeyState(SecretKeyStore keyStore) {
       this.keyStore = keyStore;
     }
 
@@ -242,18 +242,18 @@ public class SecretKeyManagerTest {
     }
 
     @Override
-    public void updateKeys(ManagedSecretKey currentKey,
-                           List<ManagedSecretKey> allKeys) {
-      this.currentKey = currentKey;
-      this.allKeys = allKeys.stream().collect(
+    public void updateKeys(ManagedSecretKey newCurrentKey,
+                           List<ManagedSecretKey> newAllKeys) {
+      this.currentKey = newCurrentKey;
+      this.allKeys = newAllKeys.stream().collect(
           toMap(ManagedSecretKey::getId, identity()));
-      keyStore.save(allKeys);
+      keyStore.save(newAllKeys);
     }
 
     @Override
-    public void updateKeysInternal(ManagedSecretKey currentKey,
-                                   List<ManagedSecretKey> sortedKeys) {
-      updateKeys(currentKey, sortedKeys);
+    public void updateKeysInternal(ManagedSecretKey newCurrentKey,
+                                   List<ManagedSecretKey> newAllKeys) {
+      updateKeys(newCurrentKey, newAllKeys);
     }
   }
 

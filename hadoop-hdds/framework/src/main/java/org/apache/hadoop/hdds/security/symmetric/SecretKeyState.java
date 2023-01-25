@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.security.symmetric;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 

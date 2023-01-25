@@ -61,7 +61,8 @@ import static java.util.stream.Collectors.toList;
  * JSON file on local file system.
  */
 public class LocalSecretKeyStore implements SecretKeyStore {
-  private static final Logger LOG = LoggerFactory.getLogger(LocalSecretKeyStore.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(LocalSecretKeyStore.class);
 
   private final Path secretKeysFile;
   private final ObjectMapper mapper;
