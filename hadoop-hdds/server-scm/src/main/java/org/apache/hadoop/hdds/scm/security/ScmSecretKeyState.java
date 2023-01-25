@@ -29,11 +29,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -67,10 +66,10 @@ public class ScmSecretKeyState implements SecretKeyState {
   }
 
   @Override
-  public Set<ManagedSecretKey> getAllKeys() {
+  public List<ManagedSecretKey> getAllKeys() {
     lock.readLock().lock();
     try {
-      return new HashSet<>(allKeys.values());
+      return new ArrayList<>(allKeys.values());
     } finally {
       lock.readLock().unlock();
     }

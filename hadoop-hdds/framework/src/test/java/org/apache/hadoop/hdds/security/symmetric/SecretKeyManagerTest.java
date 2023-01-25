@@ -30,11 +30,10 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
@@ -112,7 +111,7 @@ public class SecretKeyManagerTest {
 
     if (expectedCurrentKey != null) {
       assertEquals(state.getCurrentKey(), expectedCurrentKey);
-      Set<ManagedSecretKey> allKeys = state.getAllKeys();
+      List<ManagedSecretKey> allKeys = state.getAllKeys();
       assertSameKeys(expectedLoadedKeys, allKeys);
     } else {
       // expect the current key is newly generated.
@@ -233,8 +232,8 @@ public class SecretKeyManagerTest {
     }
 
     @Override
-    public Set<ManagedSecretKey> getAllKeys() {
-      return new HashSet<>(allKeys.values());
+    public List<ManagedSecretKey> getAllKeys() {
+      return new ArrayList<>(allKeys.values());
     }
 
     @Override

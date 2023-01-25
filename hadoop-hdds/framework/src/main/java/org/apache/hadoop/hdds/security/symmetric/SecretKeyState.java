@@ -38,7 +38,7 @@ public interface SecretKeyState {
   /**
    * @return all the keys that managed by this manager.
    */
-  Set<ManagedSecretKey> getAllKeys();
+  List<ManagedSecretKey> getAllKeys();
 
   /**
    * Get SecretKey by id.

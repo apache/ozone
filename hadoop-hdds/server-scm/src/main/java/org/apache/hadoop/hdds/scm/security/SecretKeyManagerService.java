@@ -97,12 +97,20 @@ public class SecretKeyManagerService implements SCMService, Runnable {
     serviceLock.lock();
     try {
       if (scmContext.isLeaderReady()) {
-        try {
-          secretKeyManager.initialize();
-        } catch (TimeoutException e) {
-          // todo: handle properly
-          LOG.error("Timeout updating SecretKeys to raft.", e);
+
+        // Initialize SecretKeys if for first time leader.
+        if (secretKeyManager.initialize()) {
+          // replicate the initialized SecretKeys to followers.
+          scheduler.schedule(() -> {
+            try {
+              secretKeyManager.flushInitializedState();
+            } catch (TimeoutException e) {
+              throw new RuntimeException(
+                  "Timeout replicating initialized state.", e);
+            }
+          }, 0, TimeUnit.SECONDS);
         }
+
         serviceStatus = ServiceStatus.RUNNING;
       } else {
         serviceStatus = ServiceStatus.PAUSING;

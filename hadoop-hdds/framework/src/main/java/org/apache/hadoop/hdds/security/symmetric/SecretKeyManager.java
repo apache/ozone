@@ -1,6 +1,5 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
-import org.apache.hadoop.hdds.HddsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +25,7 @@ public class SecretKeyManager {
       LoggerFactory.getLogger(SecretKeyManager.class);
 
   private final SecretKeyState state;
+  private boolean pendingInititializedState = false;
   private final Duration rotationDuration;
   private final Duration validityDuration;
   private final SecretKeyStore keyStore;
@@ -57,9 +57,9 @@ public class SecretKeyManager {
    *
    * @throws TimeoutException can possibly occur when replicating the state.
    */
-  public synchronized void initialize() throws TimeoutException {
+  public synchronized boolean initialize() {
     if (state.getCurrentKey() != null) {
-      return;
+      return false;
     }
 
     List<ManagedSecretKey> sortedKeys = keyStore.load()
@@ -84,8 +84,17 @@ public class SecretKeyManager {
     // First, update the SecretKey state to make it visible immediately on the
     // current instance.
     state.updateKeysInternal(currentKey, sortedKeys);
-    // Then replicate the SecretKey state in all instances.
-    state.updateKeys(currentKey, sortedKeys);
+    // Then, remember to replicate SecretKey states to all instances.
+    pendingInititializedState = true;
+    return true;
+  }
+
+  public synchronized void flushInitializedState() throws TimeoutException {
+    if (pendingInititializedState) {
+      LOG.info("Replicating initialized state.");
+      state.updateKeys(state.getCurrentKey(), state.getAllKeys());
+      pendingInititializedState = false;
+    }
   }
 
   /**
@@ -94,6 +103,8 @@ public class SecretKeyManager {
    * @return true if rotation actually happens, false if it doesn't.
    */
   public synchronized boolean checkAndRotate() throws TimeoutException {
+    flushInitializedState();
+
     ManagedSecretKey currentKey = state.getCurrentKey();
     if (shouldRotate(currentKey)) {
       ManagedSecretKey newCurrentKey = generateSecretKey();
