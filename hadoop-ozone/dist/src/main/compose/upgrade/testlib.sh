@@ -53,12 +53,13 @@ create_data_dirs() {
 
 ## @description Prepares to run an image with `start_docker_env`.
 ## @param the version of Ozone to be run.
-##   If this is equal to `OZONE_CURRENT_VERSION`, then the ozone runner image wil be used.
+##   If this is equal to the string 'current', then the ozone runner image will
+#    be used.
 ##   Else, a binary image will be used.
 prepare_for_image() {
   local image_version="$1"
 
-  if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
+  if [[ "$image_version" = 'current' ]]; then
       prepare_for_runner_image
   else
       prepare_for_binary_image "$image_version"
@@ -98,14 +99,16 @@ _run_callback() {
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
-  # Export variables needed by test, since it is run in a subshell.
-  local test_dir="$_upgrade_dir/upgrades/$1"
+  local upgrade_type="$1"
   export OZONE_UPGRADE_FROM="$2"
   export OZONE_UPGRADE_TO="$3"
-  local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
+
+  # Export variables needed by test, since it is run in a subshell.
+  local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
+  local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"
   export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
-  export OZONE_VOLUME="$test_subdir"/data
-  export RESULT_DIR="$test_subdir"/result
+  export OZONE_VOLUME="$test_subdir"/"$OZONE_UPGRADE_TO"/data
+  export RESULT_DIR="$test_subdir"/"$OZONE_UPGRADE_TO"/result
 
   if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1
