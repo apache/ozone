@@ -116,6 +116,8 @@
       <artifactId>curator-framework</artifactId>
       <scope>runtime</scope>
       <version>2.4.0</version>
+      <!-- These were excluded as non of them is used in the HttpFS module, but all of them would be a new unnecessary
+       dependency to the Ozone project, we would also need to update the jar-report.txt with that. -->
       <exclusions>
         <exclusion>
           <groupId>org.apache.commons</groupId>
