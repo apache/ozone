@@ -53,6 +53,7 @@ public class TestOMKeysDeleteResponseWithFSO
 
   private List<OmKeyInfo> dirDeleteList = new ArrayList<>();
   private List<String> dirDBKeys = new ArrayList<>();
+  private List<String> dirDelDBKeys = new ArrayList<>();
   private long volId;
 
   @Override
@@ -82,6 +83,8 @@ public class TestOMKeysDeleteResponseWithFSO
         bucketName, dirInfo, dir);
     dirDeleteList.add(dirKeyInfo);
     dirDBKeys.add(dirOzoneDBKey);
+    dirDelDBKeys.add(omMetadataManager.getOzoneDeletePathKey(
+        dirKeyInfo.getObjectID(), dirOzoneDBKey));
 
     // create set of keys directly under the bucket
     String ozoneDBKey = "";
@@ -150,10 +153,12 @@ public class TestOMKeysDeleteResponseWithFSO
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(dirDBKey);
       Assert.assertNull(repeatedOmKeyInfo);
+    }
 
+    for (String dirDelDBKey : dirDelDBKeys) {
       // dir added to the deleted dir table, for deep cleanups
       OmKeyInfo omDirInfo =
-          omMetadataManager.getDeletedDirTable().get(dirDBKey);
+          omMetadataManager.getDeletedDirTable().get(dirDelDBKey);
       Assert.assertNotNull(omDirInfo);
     }
 

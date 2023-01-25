@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -42,6 +41,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
@@ -71,7 +71,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -359,10 +358,12 @@ public class LegacyReplicationManager {
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
+    LegacyReplicationManagerConfiguration legacyConf = conf
+        .getObject(LegacyReplicationManagerConfiguration.class);
     this.inflightReplication = new InflightMap(InflightType.REPLICATION,
-        rmConf.getContainerInflightReplicationLimit());
+        legacyConf.getContainerInflightReplicationLimit());
     this.inflightDeletion = new InflightMap(InflightType.DELETION,
-        rmConf.getContainerInflightDeletionLimit());
+        legacyConf.getContainerInflightDeletionLimit());
     this.inflightMoveFuture = new ConcurrentHashMap<>();
     this.minHealthyForMaintenance = rmConf.getMaintenanceReplicaMinimum();
     this.clock = clock;
@@ -1696,55 +1697,7 @@ public class LegacyReplicationManager {
    * Configuration used by the Replication Manager.
    */
   @ConfigGroup(prefix = "hdds.scm.replication")
-  public static class ReplicationManagerConfiguration {
-    /**
-     * The frequency in which ReplicationMonitor thread should run.
-     */
-    @Config(key = "thread.interval",
-        type = ConfigType.TIME,
-        defaultValue = "300s",
-        tags = {SCM, OZONE},
-        description = "There is a replication monitor thread running inside " +
-            "SCM which takes care of replicating the containers in the " +
-            "cluster. This property is used to configure the interval in " +
-            "which that thread runs."
-    )
-    private long interval = Duration.ofSeconds(300).toMillis();
-
-    /**
-     * Timeout for container replication & deletion command issued by
-     * ReplicationManager.
-     */
-    @Config(key = "event.timeout",
-        type = ConfigType.TIME,
-        defaultValue = "30m",
-        tags = {SCM, OZONE},
-        description = "Timeout for the container replication/deletion commands "
-            + "sent  to datanodes. After this timeout the command will be "
-            + "retried.")
-    private long eventTimeout = Duration.ofMinutes(30).toMillis();
-    public void setInterval(Duration interval) {
-      this.interval = interval.toMillis();
-    }
-
-    public void setEventTimeout(Duration timeout) {
-      this.eventTimeout = timeout.toMillis();
-    }
-
-    /**
-     * The number of container replica which must be available for a node to
-     * enter maintenance.
-     */
-    @Config(key = "maintenance.replica.minimum",
-        type = ConfigType.INT,
-        defaultValue = "2",
-        tags = {SCM, OZONE},
-        description = "The minimum number of container replicas which must " +
-            " be available for a node to enter maintenance. If putting a " +
-            " node into maintenance reduces the available replicas for any " +
-            " container below this level, the node will remain in the " +
-            " entering maintenance state until a new replica is created.")
-    private int maintenanceReplicaMinimum = 2;
+  public static class LegacyReplicationManagerConfiguration {
 
     @Config(key = "container.inflight.replication.limit",
         type = ConfigType.INT,
@@ -1772,10 +1725,6 @@ public class LegacyReplicationManager {
       this.containerInflightDeletionLimit = deletionLimit;
     }
 
-    public void setMaintenanceReplicaMinimum(int replicaCount) {
-      this.maintenanceReplicaMinimum = replicaCount;
-    }
-
     public int getContainerInflightReplicationLimit() {
       return containerInflightReplicationLimit;
     }
@@ -1784,17 +1733,6 @@ public class LegacyReplicationManager {
       return containerInflightDeletionLimit;
     }
 
-    public long getInterval() {
-      return interval;
-    }
-
-    public long getEventTimeout() {
-      return eventTimeout;
-    }
-
-    public int getMaintenanceReplicaMinimum() {
-      return maintenanceReplicaMinimum;
-    }
   }
 
   protected void notifyStatusChanged() {

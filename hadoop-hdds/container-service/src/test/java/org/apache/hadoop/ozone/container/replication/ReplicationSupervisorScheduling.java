@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,12 +26,13 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Helper to check scheduling efficiency.
@@ -43,6 +46,9 @@ public class ReplicationSupervisorScheduling {
 
   @Test
   public void test() throws InterruptedException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationServer.ReplicationConfig replicationConfig
+        = conf.getObject(ReplicationServer.ReplicationConfig.class);
     List<DatanodeDetails> datanodes = new ArrayList<>();
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -69,7 +75,7 @@ public class ReplicationSupervisorScheduling {
 
     ContainerSet cs = new ContainerSet(1000);
 
-    ReplicationSupervisor rs = new ReplicationSupervisor(cs,
+    ReplicationSupervisor rs = new ReplicationSupervisor(cs, null,
 
         //simplified executor emulating the current sequential download +
         //import.
@@ -107,7 +113,7 @@ public class ReplicationSupervisorScheduling {
             }
           }
 
-        }, 10);
+        }, replicationConfig, Clock.system(ZoneId.systemDefault()));
 
     final long start = System.currentTimeMillis();
 
@@ -120,8 +126,8 @@ public class ReplicationSupervisorScheduling {
     rs.shutdownAfterFinish();
     final long executionTime = System.currentTimeMillis() - start;
     System.out.println(executionTime);
-    Assert.assertTrue("Execution was too slow : " + executionTime + " ms",
-        executionTime < 100_000);
+    Assertions.assertTrue(executionTime < 100_000,
+        "Execution was too slow : " + executionTime + " ms");
   }
 
 }

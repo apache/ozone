@@ -17,7 +17,9 @@
  */
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +59,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -102,10 +107,14 @@ public class ECReconstructionCoordinator implements Closeable {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
   private final ContainerClientMetrics clientMetrics;
+  private final ECReconstructionMetrics metrics;
+  private final StateContext context;
 
   public ECReconstructionCoordinator(ConfigurationSource conf,
-                                     CertificateClient certificateClient)
-      throws IOException {
+      CertificateClient certificateClient,
+      StateContext context,
+      ECReconstructionMetrics metrics) throws IOException {
+    this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
@@ -121,6 +130,7 @@ public class ECReconstructionCoordinator implements Closeable {
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
     tokenHelper = new TokenHelper(conf, certificateClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
+    this.metrics = metrics;
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -152,9 +162,12 @@ public class ECReconstructionCoordinator implements Closeable {
       }
 
       // 2. Reconstruct and transfer to targets
-      for (BlockLocationInfo blockLocationInfo : blockLocationInfoMap
-          .values()) {
-        reconstructECBlockGroup(blockLocationInfo, repConfig, targetNodeMap);
+      for (Map.Entry<Long, BlockLocationInfo> blockLocationInfoEntry
+          : blockLocationInfoMap.entrySet()) {
+        Long key = blockLocationInfoEntry.getKey();
+        BlockLocationInfo blockLocationInfo = blockLocationInfoEntry.getValue();
+        reconstructECBlockGroup(blockLocationInfo, repConfig,
+            targetNodeMap, blockDataMap.get(key));
       }
 
       // 3. Close containers
@@ -162,8 +175,13 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
+      metrics.incReconstructionTotal();
+      metrics.incBlockGroupReconstructionTotal(blockLocationInfoMap.size());
     } catch (Exception e) {
       // Any exception let's delete the recovering containers.
+      metrics.incReconstructionFailsTotal();
+      metrics.incBlockGroupReconstructionFailsTotal(
+          blockLocationInfoMap.size());
       LOG.warn(
           "Exception while reconstructing the container {}. Cleaning up"
               + " all the recovering containers in the reconstruction process.",
@@ -173,8 +191,10 @@ public class ECReconstructionCoordinator implements Closeable {
       for (DatanodeDetails dn : recoveringContainersCreatedDNs) {
         try {
           containerOperationClient
-              .deleteRecoveringContainer(containerID, dn, repConfig,
-                  containerToken);
+              .deleteContainerInState(containerID, dn, repConfig,
+                  containerToken, ImmutableSet.of(
+                          ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+                          ContainerProtos.ContainerDataProto.State.RECOVERING));
           if (LOG.isDebugEnabled()) {
             LOG.debug("Deleted the container {}, at the target: {}",
                 containerID, dn);
@@ -189,9 +209,22 @@ public class ECReconstructionCoordinator implements Closeable {
 
   }
 
-  void reconstructECBlockGroup(BlockLocationInfo blockLocationInfo,
+  ECBlockOutputStream getECBlockOutputstream(
+      BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
+      ECReplicationConfig repConfig, int replicaIndex, BufferPool bufferPool,
+      OzoneClientConfig configuration) throws IOException {
+    return new ECBlockOutputStream(blockLocationInfo.getBlockID(),
+            this.containerOperationClient.getXceiverClientManager(),
+            this.containerOperationClient
+                    .singleNodePipeline(datanodeDetails, repConfig,
+                            replicaIndex), bufferPool, configuration,
+            blockLocationInfo.getToken(), clientMetrics);
+  }
+
+  @VisibleForTesting
+  public void reconstructECBlockGroup(BlockLocationInfo blockLocationInfo,
       ECReplicationConfig repConfig,
-      SortedMap<Integer, DatanodeDetails> targetMap)
+      SortedMap<Integer, DatanodeDetails> targetMap, BlockData[] blockDataGroup)
       throws IOException {
     long safeBlockGroupLength = blockLocationInfo.getLength();
     List<Integer> missingContainerIndexes = new ArrayList<>(targetMap.keySet());
@@ -239,14 +272,12 @@ public class ECReconstructionCoordinator implements Closeable {
                   .getStreamBufferSize()),
               ByteStringConversion.createByteBufferConversion(false));
       for (int i = 0; i < toReconstructIndexes.size(); i++) {
+        int replicaIndex = toReconstructIndexes.get(i);
         DatanodeDetails datanodeDetails =
-            targetMap.get(toReconstructIndexes.get(i));
-        targetBlockStreams[i] =
-            new ECBlockOutputStream(blockLocationInfo.getBlockID(),
-                this.containerOperationClient.getXceiverClientManager(),
-                this.containerOperationClient
-                    .singleNodePipeline(datanodeDetails, repConfig), bufferPool,
-                configuration, blockLocationInfo.getToken(), clientMetrics);
+            targetMap.get(replicaIndex);
+        targetBlockStreams[i] = getECBlockOutputstream(blockLocationInfo,
+                datanodeDetails, repConfig, replicaIndex, bufferPool,
+                configuration);
         bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
         // Make sure it's clean. Don't want to reuse the erroneously returned
         // buffers from the pool.
@@ -270,8 +301,8 @@ public class ECReconstructionCoordinator implements Closeable {
 
       try {
         for (ECBlockOutputStream targetStream : targetBlockStreams) {
-          targetStream
-              .executePutBlock(true, true, blockLocationInfo.getLength());
+          targetStream.executePutBlock(true, true,
+              blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream,
               targetStream.getCurrentPutBlkResponseFuture());
         }
@@ -444,5 +475,15 @@ public class ECReconstructionCoordinator implements Closeable {
       blockGroupLen = Math.min(putBlockLen, blockGroupLen);
     }
     return blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen;
+  }
+
+  public ECReconstructionMetrics getECReconstructionMetrics() {
+    return this.metrics;
+  }
+
+  OptionalLong getTermOfLeaderSCM() {
+    return Optional.ofNullable(context)
+        .map(StateContext::getTermOfLeaderSCM)
+        .orElse(OptionalLong.empty());
   }
 }

@@ -25,6 +25,10 @@ public interface OmMetadataReaderMetrics {
 
   void incNumKeyLookupFails();
 
+  void incNumGetKeyInfo();
+
+  void incNumGetKeyInfoFails();
+
   void incNumListStatus();
 
   void incNumListStatusFails();

@@ -27,6 +27,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -62,7 +63,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyOutputStream extends OutputStream {
+public class KeyOutputStream extends OutputStream implements Syncable {
 
   private OzoneClientConfig config;
 
@@ -70,7 +71,7 @@ public class KeyOutputStream extends OutputStream {
    * Defines stream action while calling handleFlushOrClose.
    */
   enum StreamAction {
-    FLUSH, CLOSE, FULL
+    FLUSH, HSYNC, CLOSE, FULL
   }
 
   public static final Logger LOG =
@@ -440,6 +441,22 @@ public class KeyOutputStream extends OutputStream {
     handleFlushOrClose(StreamAction.FLUSH);
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    checkNotClosed();
+    handleFlushOrClose(StreamAction.HSYNC);
+    //TODO HDDS-7593: send hsyncKey to update length;
+    //     where the hsyncKey op is similar to
+    //     blockOutputStreamEntryPool.commitKey(offset)
+    //     except that hsyncKey only updates the key length
+    //     instead of committing it.
+  }
+
   /**
    * Close or Flush the latest outputStream depending upon the action.
    * This function gets called when while write is going on, the current stream
@@ -499,6 +516,9 @@ public class KeyOutputStream extends OutputStream {
       break;
     case FLUSH:
       entry.flush();
+      break;
+    case HSYNC:
+      entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");

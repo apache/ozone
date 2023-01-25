@@ -223,6 +223,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return list of snapshot
+   */
+  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
    * Recover trash allows the user to recover the keys
    * that were marked as deleted, but not actually deleted by Ozone Manager.
    * @param volumeName - The volume name.
@@ -436,7 +445,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
       getBucketIterator();
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator();
+      getKeyIterator() throws IOException;
 
   /**
    * Given parent object id and path component name, return the corresponding
@@ -450,6 +459,16 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOzonePathKey(long volumeId, long bucketId,
                          long parentObjectId, String pathComponentName);
+
+  /**
+   * Given ozone path key, component id, return the corresponding 
+   * DB path key for delete table.
+   *
+   * @param objectId - object Id
+   * @param pathKey   - path key of component
+   * @return DB Delete directory key as String.
+   */
+  String getOzoneDeletePathKey(long objectId, String pathKey);
 
   /**
    * Returns DB key name of an open file in OM metadata store. Should be

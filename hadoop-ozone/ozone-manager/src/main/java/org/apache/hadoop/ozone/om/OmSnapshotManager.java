@@ -36,7 +36,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -77,7 +77,12 @@ public final class OmSnapshotManager {
   OmSnapshotManager(OzoneManager ozoneManager) {
     this.ozoneManager = ozoneManager;
 
-    this.snapshotDiffManager = new SnapshotDiffManager();
+    // Pass in the differ
+    final RocksDBCheckpointDiffer differ = ozoneManager
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer();
+    this.snapshotDiffManager = new SnapshotDiffManager(differ);
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
@@ -165,7 +170,9 @@ public final class OmSnapshotManager {
 
     // Write snapshot generation (latest sequence number) to compaction log.
     // This will be used for DAG reconstruction as snapshotGeneration.
-    dbCpDiffer.appendSequenceNumberToCompactionLog(dbLatestSequenceNumber);
+    dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
+        snapshotInfo.getSnapshotID(),
+        snapshotInfo.getCreationTime());
 
     // Set compaction log filename to the latest DB sequence number
     // right after taking the RocksDB checkpoint for Ozone snapshot.
@@ -268,7 +275,8 @@ public final class OmSnapshotManager {
     try {
       final OmSnapshot fs = snapshotCache.get(fsKey);
       final OmSnapshot ts = snapshotCache.get(tsKey);
-      return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts);
+      return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
+          fsInfo, tsInfo);
     } catch (ExecutionException | RocksDBException e) {
       throw new IOException(e.getCause());
     }

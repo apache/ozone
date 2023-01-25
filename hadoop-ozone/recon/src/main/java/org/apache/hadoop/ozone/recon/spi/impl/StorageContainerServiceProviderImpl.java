@@ -41,6 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
@@ -155,6 +156,12 @@ public class StorageContainerServiceProviderImpl
     return scmClient.getContainerCount();
   }
 
+  @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.getContainerCount(state);
+  }
+
   public String getScmDBSnapshotUrl() {
     return scmDBSnapshotUrl;
   }
@@ -194,7 +201,8 @@ public class StorageContainerServiceProviderImpl
             try (SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
                 hostAddress, grpcPort, configuration,
                 new ReconCertificateClient(new SecurityConfig(configuration),
-                    reconStorage.getReconCertSerialId()))) {
+                    reconStorage.getReconCertSerialId(),
+                    reconStorage.getClusterID(), reconStorage.getReconId()))) {
               downloadClient.download(targetFile.toPath()).get();
             } catch (ExecutionException | InterruptedException e) {
               LOG.error("Rocks DB checkpoint downloading failed", e);
@@ -215,4 +223,12 @@ public class StorageContainerServiceProviderImpl
     }
     return null;
   }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.getListOfContainers(startContainerID, count, state);
+  }
+
 }

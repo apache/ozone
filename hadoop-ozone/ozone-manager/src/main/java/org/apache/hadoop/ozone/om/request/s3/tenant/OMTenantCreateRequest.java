@@ -152,6 +152,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String volumeName = request.getVolumeName();
     // Validate volume name
     OmUtils.validateVolumeName(volumeName);
+
+    final String dbVolumeKey = ozoneManager.getMetadataManager()
+        .getVolumeKey(volumeName);
+
+    // Check volume existence
+    if (ozoneManager.getMetadataManager().getVolumeTable()
+        .isExist(dbVolumeKey)) {
+      LOG.debug("volume: '{}' already exists", volumeName);
+      throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
+    }
+
     // TODO: Refactor this and OMVolumeCreateRequest to improve maintainability.
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
         .setVolume(volumeName)

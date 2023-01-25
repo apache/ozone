@@ -20,7 +20,9 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -36,10 +38,12 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -52,24 +56,24 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -85,6 +89,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -100,6 +105,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKP
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -255,8 +261,6 @@ public class TestRootedOzoneFileSystem {
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
-    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
-        TrashPolicy.class);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
@@ -312,6 +316,44 @@ public class TestRootedOzoneFileSystem {
 
     // Cleanup
     fs.delete(grandparent, true);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDirWithECEnabled()
+          throws Exception {
+    String key = "object-dir/object-name1";
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    new ECReplicationConfig("RS-3-2-1024"),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+
+    List<String> dirs = Arrays.asList(volumeName, bucketName, "object-dir",
+            "object-name1");
+    for (int size = 1; size <= dirs.size(); size++) {
+      String path = "/" + dirs.subList(0, size).stream()
+              .collect(Collectors.joining("/"));
+      Path parent = new Path(path);
+      // Wait until the filestatus is updated
+      if (!enabledFileSystemPaths) {
+        GenericTestUtils.waitFor(() -> {
+          try {
+            fs.getFileStatus(parent);
+            return true;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 1000, 120000);
+      }
+      FileStatus fileStatus = fs.getFileStatus(parent);
+      Assert.assertEquals((size == dirs.size() - 1 &&
+           !bucketLayout.isFileSystemOptimized()) || size == dirs.size(),
+           fileStatus.isErasureCoded());
+    }
+
   }
 
   @Test
@@ -1523,39 +1565,6 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(volume1.setOwner(prevOwner));
   }
 
-  /**
-   * Check that  files are moved to trash since it is enabled by
-   * fs.rename(src, dst, options).
-   */
-  @Test
-  @Flaky({"HDDS-5819", "HDDS-6451"})
-  public void testRenameToTrashEnabled() throws IOException {
-    // Create a file
-    String testKeyName = "testKey2";
-    Path path = new Path(bucketPath, testKeyName);
-    try (FSDataOutputStream stream = fs.create(path)) {
-      stream.write(1);
-    }
-
-    // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(path);
-
-    // Construct paths
-    String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
-    Path userTrashCurrent = new Path(userTrash, "Current");
-    String key = path.toString().substring(1);
-    Path trashPath = new Path(userTrashCurrent, key);
-    // Trash Current directory should still have been created.
-    Assert.assertTrue(ofs.exists(userTrashCurrent));
-    // Check under trash, the key should be present
-    Assert.assertTrue(ofs.exists(trashPath));
-
-    // Cleanup
-    ofs.delete(trashRoot, true);
-  }
-
   @Test
   public void testFileDelete() throws Exception {
     Path grandparent = new Path(bucketPath, "testBatchDelete");
@@ -1600,7 +1609,6 @@ public class TestRootedOzoneFileSystem {
    * 3.Create a second Key in different bucket and verify deletion.
    * @throws Exception
    */
-  @Ignore
   @Test
   public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
@@ -1635,21 +1643,26 @@ public class TestRootedOzoneFileSystem {
     long prevNumTrashAtomicDirRenames = getOMMetrics()
         .getNumTrashAtomicDirRenames();
 
+    // Construct paths for first key
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Construct paths for second key in different bucket
+    Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
+    Path userTrash2 = new Path(trashRoot2, username);
+    Path trashPath2 = new Path(userTrashCurrent, testKeyName + "1");
+
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(keyPath1);
     // for key in second bucket
     trash.moveToTrash(keyPath2);
 
-    // Construct paths for first key
-    String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
-    Path trashPath = getTrashKeyPath(keyPath1, userTrash);
-
-    // Construct paths for second key in different bucket
-    Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
-    Path userTrash2 = new Path(trashRoot2, username);
-    Path trashPath2 = getTrashKeyPath(keyPath2, userTrash2);
+    // key should either be present in Current or checkpointDir
+    Assert.assertTrue(ofs.exists(trashPath)
+        || ofs.listStatus(ofs.listStatus(userTrash)[0].getPath()).length > 0);
 
 
     // Wait until the TrashEmptier purges the keys
@@ -1967,6 +1980,61 @@ public class TestRootedOzoneFileSystem {
     }
 
   }
+
+
+  @Test
+  public void testCreateAndCheckECFileDiskUsage() throws Exception {
+    String key = "eckeytest";
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, volumeName);
+    Path bucketPathTest = new Path(volPathTest, bucketName);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    new ECReplicationConfig("RS-3-2-1024"),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+    // make sure the disk usage matches the expected value
+    Path filePath = new Path(bucketPathTest, key);
+    ContentSummary contentSummary = ofs.getContentSummary(filePath);
+    long length = contentSummary.getLength();
+    long spaceConsumed = contentSummary.getSpaceConsumed();
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
+            new ECReplicationConfig(3, 2, RS, 1024));
+    Assert.assertEquals(expectDiskUsage, spaceConsumed);
+    //clean up
+    ofs.delete(filePath, true);
+  }
+
+
+  @Test
+  public void testCreateAndCheckRatisFileDiskUsage() throws Exception {
+    String key = "ratiskeytest";
+    Path volPathTest = new Path(OZONE_URI_DELIMITER, volumeName);
+    Path bucketPathTest = new Path(volPathTest, bucketName);
+    Path filePathTest = new Path(bucketPathTest, key);
+
+    // write some test data into bucket
+    try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
+            getBucket(bucketName).createKey(key, 1,
+                    RatisReplicationConfig.getInstance(
+                            HddsProtos.ReplicationFactor.THREE),
+                    new HashMap<>())) {
+      outputStream.write(RandomUtils.nextBytes(1));
+    }
+    // make sure the disk usage matches the expected value
+    ContentSummary contentSummary = ofs.getContentSummary(filePathTest);
+    long length = contentSummary.getLength();
+    long spaceConsumed = contentSummary.getSpaceConsumed();
+    long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
+            RatisReplicationConfig.getInstance(
+                    HddsProtos.ReplicationFactor.THREE));
+    Assert.assertEquals(expectDiskUsage, spaceConsumed);
+    //clean up
+    ofs.delete(filePathTest, true);
+  }
+
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
     // This test is only meaningful when ACL is enabled

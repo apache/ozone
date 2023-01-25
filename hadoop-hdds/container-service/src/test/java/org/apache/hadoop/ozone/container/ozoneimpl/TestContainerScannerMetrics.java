@@ -17,35 +17,42 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.hdfs.util.Canceler;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * This test verifies the container scanner metrics functionality.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 public class TestContainerScannerMetrics {
 
   private final AtomicLong containerIdSeq = new AtomicLong(100);
@@ -65,12 +72,18 @@ public class TestContainerScannerMetrics {
   private ContainerScannerConfiguration conf;
   private ContainerController controller;
 
-  @Before
+  @BeforeEach
   public void setup() {
     conf = newInstanceOf(ContainerScannerConfiguration.class);
     conf.setMetadataScanInterval(0);
     conf.setDataScanInterval(0);
+    conf.setEnabled(true);
     controller = mockContainerController();
+  }
+
+  @AfterEach
+  public void tearDown() {
+    OnDemandContainerScanner.shutdown();
   }
 
   @Test
@@ -126,15 +139,54 @@ public class TestContainerScannerMetrics {
     assertNull(DefaultMetricsSystem.instance().getSource(name));
   }
 
+  @Test
+  public void testOnDemandScannerMetrics() throws Exception {
+    OnDemandContainerScanner.init(conf, controller);
+    ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
+    resultFutureList.add(OnDemandContainerScanner.scanContainer(corruptData));
+    resultFutureList.add(
+        OnDemandContainerScanner.scanContainer(corruptMetadata));
+    resultFutureList.add(OnDemandContainerScanner.scanContainer(healthy));
+    waitOnScannerToFinish(resultFutureList);
+    OnDemandScannerMetrics metrics = OnDemandContainerScanner.getMetrics();
+    //Containers with shouldScanData = false shouldn't increase
+    // the number of scanned containers
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertEquals(2, metrics.getNumContainersScanned());
+  }
+
+  private void waitOnScannerToFinish(
+      ArrayList<Optional<Future<?>>> resultFutureList)
+      throws ExecutionException, InterruptedException {
+    for (Optional<Future<?>> future : resultFutureList) {
+      if (future.isPresent()) {
+        future.get().get();
+      }
+    }
+  }
+
+  @Test
+  public void testOnDemandScannerMetricsUnregisters() {
+    OnDemandContainerScanner.init(conf, controller);
+    String metricsName = OnDemandContainerScanner.getMetrics().getName();
+    assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
+    OnDemandContainerScanner.shutdown();
+    OnDemandContainerScanner.scanContainer(healthy);
+    assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
+  }
+
   private ContainerController mockContainerController() {
     // healthy container
-    setupMockContainer(healthy, true, true, true);
+    ContainerTestUtils.setupMockContainer(healthy,
+        true, true, true, containerIdSeq);
 
     // unhealthy container (corrupt data)
-    setupMockContainer(corruptData, true, true, false);
+    ContainerTestUtils.setupMockContainer(corruptData,
+        true, true, false, containerIdSeq);
 
     // unhealthy container (corrupt metadata)
-    setupMockContainer(corruptMetadata, false, false, false);
+    ContainerTestUtils.setupMockContainer(corruptMetadata,
+        false, false, false, containerIdSeq);
 
     Collection<Container<?>> containers = Arrays.asList(
         healthy, corruptData, corruptMetadata);
@@ -144,17 +196,4 @@ public class TestContainerScannerMetrics {
 
     return mock;
   }
-
-  private void setupMockContainer(
-      Container<ContainerData> c, boolean shouldScanData,
-      boolean scanMetaDataSuccess, boolean scanDataSuccess) {
-    ContainerData data = mock(ContainerData.class);
-    when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
-    when(c.getContainerData()).thenReturn(data);
-    when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
-  }
-
 }

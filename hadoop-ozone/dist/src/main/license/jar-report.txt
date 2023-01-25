@@ -28,7 +28,6 @@ share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-lang.jar
 share/ozone/lib/commons-logging.jar
-share/ozone/lib/commons-math3.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
@@ -80,7 +79,6 @@ share/ozone/lib/hk2-api.jar
 share/ozone/lib/hk2-locator.jar
 share/ozone/lib/hk2-utils.jar
 share/ozone/lib/hppc.jar
-share/ozone/lib/htrace-core4-incubating.jar
 share/ozone/lib/httpasyncclient.jar
 share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
@@ -219,6 +217,7 @@ share/ozone/lib/ozone-filesystem-common.jar
 share/ozone/lib/ozone-filesystem-hadoop2.jar
 share/ozone/lib/ozone-filesystem-hadoop3.jar
 share/ozone/lib/ozone-filesystem.jar
+share/ozone/lib/ozone-filesystem-hadoop3-client.jar
 share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar
@@ -260,11 +259,11 @@ share/ozone/lib/slf4j-api.jar
 share/ozone/lib/slf4j-reload4j.jar
 share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
-share/ozone/lib/spring-beans.RELEASE.jar
-share/ozone/lib/spring-core.RELEASE.jar
-share/ozone/lib/spring-jcl.RELEASE.jar
-share/ozone/lib/spring-jdbc.RELEASE.jar
-share/ozone/lib/spring-tx.RELEASE.jar
+share/ozone/lib/spring-beans.jar
+share/ozone/lib/spring-core.jar
+share/ozone/lib/spring-jcl.jar
+share/ozone/lib/spring-jdbc.jar
+share/ozone/lib/spring-tx.jar
 share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/stax-ex.jar
@@ -272,3 +271,4 @@ share/ozone/lib/token-provider.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/weld-servlet.Final.jar
 share/ozone/lib/woodstox-core.jar
+share/ozone/lib/zstd-jni.jar

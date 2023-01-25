@@ -35,6 +35,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public final class FileStatusAdapter {
 
   private final long length;
+  private final long diskConsumed;
   private final Path path;
   private final boolean isdir;
   private final short blockReplication;
@@ -47,12 +48,19 @@ public final class FileStatusAdapter {
   private final Path symlink;
   private final BlockLocation[] blockLocations;
 
+  private final boolean isEncrypted;
+
+  private final boolean isErasureCoded;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public FileStatusAdapter(long length, Path path, boolean isdir,
-      short blockReplication, long blocksize, long modificationTime,
-      long accessTime, short permission, String owner,
-      String group, Path symlink, BlockLocation[] locations) {
+  public FileStatusAdapter(long length, long diskConsumed, Path path,
+      boolean isdir, short blockReplication, long blocksize,
+      long modificationTime, long accessTime, short permission,
+      String owner, String group, Path symlink,
+      BlockLocation[] locations, boolean isEncrypted,
+      boolean isErasureCoded) {
     this.length = length;
+    this.diskConsumed = diskConsumed;
     this.path = path;
     this.isdir = isdir;
     this.blockReplication = blockReplication;
@@ -64,6 +72,8 @@ public final class FileStatusAdapter {
     this.group = group;
     this.symlink = symlink;
     this.blockLocations = locations.clone();
+    this.isEncrypted = isEncrypted;
+    this.isErasureCoded = isErasureCoded;
   }
 
 
@@ -73,6 +83,10 @@ public final class FileStatusAdapter {
 
   public boolean isDir() {
     return isdir;
+  }
+
+  public boolean isFile() {
+    return !isdir;
   }
 
   public short getBlockReplication() {
@@ -111,9 +125,44 @@ public final class FileStatusAdapter {
     return length;
   }
 
+  public long getDiskConsumed() {
+    return diskConsumed;
+  }
+
+  public boolean isEncrypted() {
+    return isEncrypted;
+  }
+
+  public boolean isErasureCoded() {
+    return isErasureCoded;
+  }
+
   @SuppressFBWarnings("EI_EXPOSE_REP")
   public BlockLocation[] getBlockLocations() {
     return blockLocations;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getClass().getSimpleName())
+        .append("{")
+        .append("path=").append(path)
+        .append("; isDirectory=").append(isdir);
+    if (isFile()) {
+      sb.append("; length=").append(length)
+              .append("; diskConsumed= ").append(getDiskConsumed())
+          .append("; blockReplication=").append(blockReplication)
+          .append("; blocksize=").append(blocksize);
+    }
+    sb.append("; accessTime=").append(accessTime)
+        .append("; owner=").append(owner)
+        .append("; group=").append(group)
+        .append("; permission=").append(permission)
+        .append("; isSymlink=").append(getSymlink())
+        .append("}");
+    
+    return sb.toString();
   }
 
 }

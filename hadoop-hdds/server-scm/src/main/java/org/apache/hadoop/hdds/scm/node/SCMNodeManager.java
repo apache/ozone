@@ -394,16 +394,16 @@ public class SCMNodeManager implements NodeManager {
         addEntryToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
-        LOG.info("Registered Data node : {}", datanodeDetails);
+        LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
         scmNodeEventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
       } catch (NodeAlreadyExistsException e) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Datanode is already registered. Datanode: {}",
-              datanodeDetails.toString());
+              datanodeDetails);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
-            datanodeDetails.toString());
+            datanodeDetails);
       }
     } else {
       // Update datanode if it is registered but the ip or hostname changes
@@ -543,9 +543,11 @@ public class SCMNodeManager implements NodeManager {
     if (opStateDiffers(reportedDn, scmStatus)) {
       if (scmContext.isLeader()) {
         LOG.info("Scheduling a command to update the operationalState " +
-                "persisted on {} as the reported value does not " +
+                "persisted on {} as the reported value ({}, {}) does not " +
                 "match the value stored in SCM ({}, {})",
             reportedDn,
+            reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
 
@@ -563,9 +565,11 @@ public class SCMNodeManager implements NodeManager {
         }
       } else {
         LOG.info("Update the operationalState saved in follower SCM " +
-                "for {} as the reported value does not " +
+                "for {} as the reported value ({}, {}) does not " +
                 "match the value stored in SCM ({}, {})",
             reportedDn,
+            reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
 
@@ -698,10 +702,12 @@ public class SCMNodeManager implements NodeManager {
    *
    * @param datanodeDetails
    * @param commandQueueReportProto
+   * @param commandsToBeSent
    */
   @Override
   public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandQueueReportProto) {
+      CommandQueueReportProto commandQueueReportProto,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     LOG.debug("Processing Command Queue Report from [datanode={}]",
         datanodeDetails.getHostName());
     if (LOG.isTraceEnabled()) {
@@ -712,8 +718,11 @@ public class SCMNodeManager implements NodeManager {
     try {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
       if (commandQueueReportProto != null) {
-        datanodeInfo.setCommandCounts(commandQueueReportProto);
+        datanodeInfo.setCommandCounts(commandQueueReportProto,
+            commandsToBeSent);
         metrics.incNumNodeCommandQueueReportProcessed();
+        scmNodeEventPublisher.fireEvent(
+            SCMEvents.DATANODE_COMMAND_COUNT_UPDATED, datanodeDetails);
       }
     } catch (NodeNotFoundException e) {
       metrics.incNumNodeCommandQueueReportProcessingFailed();
@@ -729,10 +738,23 @@ public class SCMNodeManager implements NodeManager {
    * @param cmdType
    * @return The queued count or -1 if no data has been received from the DN.
    */
+  @Override
   public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException {
     DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
     return datanodeInfo.getCommandCount(cmdType);
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
   }
 
   /**

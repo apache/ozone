@@ -55,6 +55,18 @@ public final class ClusterStateResponse {
   private int containers;
 
   /**
+   * Total count of missing containers in the cluster.
+   */
+  @JsonProperty("missingContainers")
+  private int missingContainers;
+
+  /**
+   * Total count of open containers in the cluster.
+   */
+  @JsonProperty("openContainers")
+  private int openContainers;
+
+  /**
    * Total count of volumes in the cluster.
    */
   @JsonProperty("volumes")
@@ -90,6 +102,8 @@ public final class ClusterStateResponse {
     this.healthyDatanodes = b.healthyDatanodes;
     this.storageReport = b.storageReport;
     this.containers = b.containers;
+    this.missingContainers = b.missingContainers;
+    this.openContainers = b.openContainers;
   }
 
   /**
@@ -102,6 +116,8 @@ public final class ClusterStateResponse {
     private int healthyDatanodes;
     private DatanodeStorageReport storageReport;
     private int containers;
+    private int missingContainers;
+    private int openContainers;
     private long volumes;
     private long buckets;
     private long keys;
@@ -109,6 +125,8 @@ public final class ClusterStateResponse {
     public Builder() {
       // Default values
       this.containers = 0;
+      this.missingContainers = 0;
+      this.openContainers = 0;
       this.volumes = 0;
       this.buckets = 0;
       this.keys = 0;
@@ -139,6 +157,16 @@ public final class ClusterStateResponse {
 
     public Builder setContainers(int containers) {
       this.containers = containers;
+      return this;
+    }
+
+    public Builder setMissingContainers(int missingContainers) {
+      this.missingContainers = missingContainers;
+      return this;
+    }
+
+    public Builder setOpenContainers(int openContainers) {
+      this.openContainers = openContainers;
       return this;
     }
 
@@ -186,6 +214,14 @@ public final class ClusterStateResponse {
 
   public long getVolumes() {
     return volumes;
+  }
+
+  public int getMissingContainers() {
+    return missingContainers;
+  }
+
+  public int getOpenContainers() {
+    return openContainers;
   }
 
   public long getBuckets() {

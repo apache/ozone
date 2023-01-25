@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -37,7 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * OM volume management code.
+ * Volume Manager implementation.
  */
 public class VolumeManagerImpl implements VolumeManager {
   private static final Logger LOG =
@@ -45,22 +44,10 @@ public class VolumeManagerImpl implements VolumeManager {
 
   private final OMMetadataManager metadataManager;
 
-  /**
-   * Constructor.
-   * @param conf - Ozone configuration.
-   * @throws IOException
-   */
-  public VolumeManagerImpl(OMMetadataManager metadataManager,
-      OzoneConfiguration conf) {
+  public VolumeManagerImpl(OMMetadataManager metadataManager) {
     this.metadataManager = metadataManager;
   }
 
-  /**
-   * Gets the volume information.
-   * @param volume - Volume name.
-   * @return VolumeArgs or exception is thrown.
-   * @throws IOException
-   */
   @Override
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
     Preconditions.checkNotNull(volume);
@@ -86,9 +73,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
@@ -100,12 +84,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-  /**
-   * Returns list of ACLs for given Ozone object.
-   *
-   * @param obj Ozone object.
-   * @throws IOException if there is error.
-   */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     Objects.requireNonNull(obj);
@@ -138,13 +116,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-  /**
-   * Check access for given ozoneObject.
-   *
-   * @param ozObject object for which access needs to be checked.
-   * @param context Context object encapsulating all user related information.
-   * @return true if user has access else false.
-   */
   @Override
   public boolean checkAccess(OzoneObj ozObject, RequestContext context)
       throws OMException {

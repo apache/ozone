@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -54,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Refr
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -116,7 +119,9 @@ public class DatanodeStateMachine implements Closeable {
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
   private final MeasuredReplicator replicatorMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
+  private final ECReconstructionMetrics ecReconstructionMetrics;
 
+  private final DatanodeQueueMetrics queueMetrics;
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -136,6 +141,7 @@ public class DatanodeStateMachine implements Closeable {
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
 
+    Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
     layoutStorage = new DatanodeLayoutStorage(conf,
         datanodeDetails.getUuidString());
@@ -177,31 +183,34 @@ public class DatanodeStateMachine implements Closeable {
         conf.getObject(ReplicationConfig.class);
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), context,
-            replicatorMetrics, replicationConfig);
+            replicatorMetrics, replicationConfig, clock);
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
 
+    ecReconstructionMetrics = ECReconstructionMetrics.create();
+
     ECReconstructionCoordinator ecReconstructionCoordinator =
-        new ECReconstructionCoordinator(conf, certClient);
+        new ECReconstructionCoordinator(conf, certClient, context,
+            ecReconstructionMetrics);
     ecReconstructionSupervisor =
         new ECReconstructionSupervisor(container.getContainerSet(), context,
             replicationConfig.getReplicationMaxStreams(),
-            ecReconstructionCoordinator);
+            ecReconstructionCoordinator, clock);
 
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
-        .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
+        .addHandler(new DeleteBlocksCommandHandler(getContainer(),
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
         .addHandler(new ReconstructECContainersCommandHandler(conf,
             ecReconstructionSupervisor))
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getContainerDeleteThreads()))
+            dnConf.getContainerDeleteThreads(), clock))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))
@@ -220,6 +229,8 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(PipelineReportsProto.class)
         .addPublisherFor(CRLStatusReport.class)
         .build();
+
+    queueMetrics = DatanodeQueueMetrics.create(this);
   }
 
   private int getEndPointTaskThreadPoolSize() {
@@ -378,6 +389,7 @@ public class DatanodeStateMachine implements Closeable {
     }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
+    ecReconstructionMetrics.unRegister();
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -411,6 +423,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (commandDispatcher != null) {
       commandDispatcher.stop();
+    }
+
+    if (queueMetrics != null) {
+      DatanodeQueueMetrics.unRegister();
     }
   }
 
@@ -703,5 +719,9 @@ public class DatanodeStateMachine implements Closeable {
 
   public ConfigurationSource getConf() {
     return conf;
+  }
+
+  public DatanodeQueueMetrics getQueueMetrics() {
+    return queueMetrics;
   }
 }

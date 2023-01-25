@@ -138,7 +138,8 @@ public final class SnapshotInfo implements Auditable {
                        String pathPreviousSnapshotID,
                        String globalPreviousSnapshotID,
                        String snapshotPath,
-                       String checkpointDir) {
+                       String checkpointDir,
+                       long dbTxSequenceNumber) {
     this.snapshotID = snapshotID;
     this.name = name;
     this.volumeName = volumeName;
@@ -150,6 +151,7 @@ public final class SnapshotInfo implements Auditable {
     this.globalPreviousSnapshotID = globalPreviousSnapshotID;
     this.snapshotPath = snapshotPath;
     this.checkpointDir = checkpointDir;
+    this.dbTxSequenceNumber = dbTxSequenceNumber;
   }
 
   public void setName(String name) {
@@ -267,6 +269,7 @@ public final class SnapshotInfo implements Auditable {
     private String globalPreviousSnapshotID;
     private String snapshotPath;
     private String checkpointDir;
+    private long dbTxSequenceNumber;
 
     public Builder() {
       // default values
@@ -329,6 +332,11 @@ public final class SnapshotInfo implements Auditable {
       return this;
     }
 
+    public Builder setDbTxSequenceNumber(long dbTxSequenceNumber) {
+      this.dbTxSequenceNumber = dbTxSequenceNumber;
+      return this;
+    }
+
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
@@ -342,7 +350,8 @@ public final class SnapshotInfo implements Auditable {
           pathPreviousSnapshotID,
           globalPreviousSnapshotID,
           snapshotPath,
-          checkpointDir
+          checkpointDir,
+          dbTxSequenceNumber
       );
     }
   }
@@ -363,7 +372,8 @@ public final class SnapshotInfo implements Auditable {
         .setPathPreviousSnapshotID(pathPreviousSnapshotID)
         .setGlobalPreviousSnapshotID(globalPreviousSnapshotID)
         .setSnapshotPath(snapshotPath)
-        .setCheckpointDir(checkpointDir);
+        .setCheckpointDir(checkpointDir)
+        .setDbTxSequenceNumber(dbTxSequenceNumber);
     return sib.build();
   }
 
@@ -388,10 +398,12 @@ public final class SnapshotInfo implements Auditable {
         .setGlobalPreviousSnapshotID(snapshotInfoProto.
             getGlobalPreviousSnapshotID())
         .setSnapshotPath(snapshotInfoProto.getSnapshotPath())
-        .setCheckpointDir(snapshotInfoProto.getCheckpointDir());
+        .setCheckpointDir(snapshotInfoProto.getCheckpointDir())
+        .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
 
     return osib.build();
   }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -451,14 +463,15 @@ public final class SnapshotInfo implements Auditable {
    * Factory for making standard instance.
    */
   public static SnapshotInfo newInstance(String volumeName,
-      String bucketName, String snapshotName) {
+                                         String bucketName,
+                                         String snapshotName,
+                                         String snapshotId) {
     SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
-    String id = UUID.randomUUID().toString();
     long initialTime = Time.now();
     if (StringUtils.isBlank(snapshotName)) {
       snapshotName = generateName(initialTime);
     }
-    builder.setSnapshotID(id)
+    builder.setSnapshotID(snapshotId)
         .setName(snapshotName)
         .setCreationTime(initialTime)
         .setDeletionTime(INVALID_TIMESTAMP)
@@ -467,7 +480,7 @@ public final class SnapshotInfo implements Auditable {
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setCheckpointDir(getCheckpointDirName(id));
+        .setCheckpointDir(getCheckpointDirName(snapshotId));
     return builder.build();
   }
 
