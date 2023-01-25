@@ -17,8 +17,19 @@
 
 source "$TEST_DIR"/testlib.sh
 
+
+with_old_version() {
+  # 1.2.0 was the first version with the upgrade framework where we can check
+  # finalization status.
+  execute_robot_test scm --test 'Check Finalized' upgrade/check-finalization.robot
+}
+
 with_new_version_pre_finalized() {
   execute_robot_test scm --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
+}
+
+with_old_version_downgraded() {
+  execute_robot_test scm --test 'Check Finalized' upgrade/check-finalization.robot
 }
 
 with_new_version_finalized() {
