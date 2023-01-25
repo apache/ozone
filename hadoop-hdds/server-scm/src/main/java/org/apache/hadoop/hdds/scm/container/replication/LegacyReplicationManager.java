@@ -871,7 +871,7 @@ public class LegacyReplicationManager {
       // check whether {Existing replicas + Target_Dn - Source_Dn}
       // satisfies current placement policy
       if (!isPolicySatisfiedAfterMove(cif, srcDn, targetDn,
-          currentReplicas.stream().collect(Collectors.toList()))) {
+          new ArrayList<>(currentReplicas))) {
         ret.complete(MoveResult.PLACEMENT_POLICY_NOT_SATISFIED);
         return ret;
       }
@@ -905,8 +905,7 @@ public class LegacyReplicationManager {
   private boolean isPolicySatisfiedAfterMove(ContainerInfo cif,
                     DatanodeDetails srcDn, DatanodeDetails targetDn,
                     final List<ContainerReplica> replicas) {
-    Set<ContainerReplica> movedReplicas =
-        replicas.stream().collect(Collectors.toSet());
+    Set<ContainerReplica> movedReplicas = new HashSet<>(replicas);
     movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
     movedReplicas.add(ContainerReplica.newBuilder()
         .setDatanodeDetails(targetDn)
@@ -1368,8 +1367,7 @@ public class LegacyReplicationManager {
         cif.getReplicationConfig().getRequiredNodes();
     ContainerPlacementStatus currentCPS =
         getPlacementStatus(replicaSet, replicationFactor);
-    Set<ContainerReplica> newReplicaSet = replicaSet.
-        stream().collect(Collectors.toSet());
+    Set<ContainerReplica> newReplicaSet = new HashSet<>(replicaSet);
     newReplicaSet.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
     ContainerPlacementStatus newCPS =
         getPlacementStatus(newReplicaSet, replicationFactor);

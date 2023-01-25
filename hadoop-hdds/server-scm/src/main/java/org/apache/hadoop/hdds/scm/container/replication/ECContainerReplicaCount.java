@@ -324,7 +324,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     for (Integer i : decommissionIndexes.keySet()) {
       missing.remove(i);
     }
-    return missing.stream().collect(Collectors.toList());
+    return new ArrayList<>(missing);
   }
 
   /**

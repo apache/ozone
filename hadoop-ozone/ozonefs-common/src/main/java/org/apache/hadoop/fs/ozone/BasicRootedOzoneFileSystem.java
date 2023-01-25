@@ -786,9 +786,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     do {
       tmpStatusList =
           adapter.listStatus(pathToKey(f), false, startPath,
-              numEntries, uri, workingDir, getUsername())
-              .stream()
-              .collect(Collectors.toList());
+              numEntries, uri, workingDir, getUsername());
 
       if (!tmpStatusList.isEmpty()) {
         if (startPath.isEmpty() || !statuses.getLast().getPath().toString()
