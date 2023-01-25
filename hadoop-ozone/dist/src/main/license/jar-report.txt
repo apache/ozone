@@ -28,14 +28,12 @@ share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-lang.jar
 share/ozone/lib/commons-logging.jar
-share/ozone/lib/commons-math.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
-share/ozone/lib/curator-test.jar
 share/ozone/lib/derby.jar
 share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
@@ -145,7 +143,6 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
-share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
@@ -179,8 +176,6 @@ share/ozone/lib/libthrift.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
 share/ozone/lib/log4j-api.jar
 share/ozone/lib/log4j-core.jar
-share/ozone/lib/log4j.jar
-share/ozone/lib/mail.jar
 share/ozone/lib/metainf-services.jar
 share/ozone/lib/metrics-core.jar
 share/ozone/lib/netty-buffer.Final.jar
@@ -203,7 +198,6 @@ share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/netty-transport-classes-epoll.Final.jar
 share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
-share/ozone/lib/netty.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar
 share/ozone/lib/okio.jar
@@ -260,7 +254,6 @@ share/ozone/lib/simpleclient_common.jar
 share/ozone/lib/simpleclient_dropwizard.jar
 share/ozone/lib/simpleclient.jar
 share/ozone/lib/slf4j-api.jar
-share/ozone/lib/slf4j-log4j12.jar
 share/ozone/lib/slf4j-reload4j.jar
 share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
