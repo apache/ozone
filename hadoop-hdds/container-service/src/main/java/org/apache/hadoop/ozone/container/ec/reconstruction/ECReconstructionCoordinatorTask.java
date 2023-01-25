@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * This is the actual EC reconstruction coordination task.
@@ -88,5 +89,22 @@ public class ECReconstructionCoordinatorTask
   @Override
   public void run() {
     runTask();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ECReconstructionCoordinatorTask that = (ECReconstructionCoordinatorTask) o;
+    return getContainerId() == that.getContainerId();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getContainerId());
   }
 }
