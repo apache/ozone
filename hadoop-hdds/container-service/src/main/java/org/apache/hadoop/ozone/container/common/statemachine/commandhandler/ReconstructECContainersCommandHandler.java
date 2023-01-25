@@ -74,8 +74,8 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    // TODO - needs to find reconstruction and replication separately
-    return supervisor.getInFlightReplications();
+    return supervisor
+        .getInFlightReplications(ECReconstructionCoordinatorTask.class);
   }
 
   public ConfigurationSource getConf() {
