@@ -332,7 +332,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       excludeList.addPipeline(pipelineId);
     }
     // just clean up the current stream.
-    streamEntry.cleanup(retryFailure);
+    streamEntry.cleanup(!retryFailure);
 
     // discard all subsequent blocks the containers and pipelines which
     // are in the exclude list so that, the very next retry should never
