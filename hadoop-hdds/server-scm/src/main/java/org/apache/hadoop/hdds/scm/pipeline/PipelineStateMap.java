@@ -106,9 +106,8 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (pipeline.isClosed()) {
-      LOG.warn("Adding container {} to pipeline={} in CLOSED state." +
-          " This happens only for some exceptional cases." +
-          " Check for the previous exceptions.", containerID, pipelineID);
+      throw new InvalidPipelineStateException(String.format(
+          "Cannot add container to pipeline=%s in closed state", pipelineID));
     }
     pipeline2container.get(pipelineID).add(containerID);
   }
@@ -350,7 +349,7 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (!pipeline.isClosed()) {
-      throw new IOException(
+      throw new InvalidPipelineStateException(
           String.format("Pipeline with %s is not yet closed", pipelineID));
     }
 
