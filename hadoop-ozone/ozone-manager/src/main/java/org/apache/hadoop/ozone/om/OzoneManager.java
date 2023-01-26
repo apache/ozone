@@ -47,6 +47,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
@@ -73,6 +74,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -395,7 +397,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
-  private final String defaultBucketLayout;
+  private final BucketLayout defaultBucketLayout;
   private ReplicationConfig defaultReplicationConfig;
 
   private boolean isS3MultiTenancyEnabled;
@@ -510,20 +512,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
 
-    this.defaultBucketLayout =
+    String defaultBucketLayoutString =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
             OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT);
 
-    if (!defaultBucketLayout.equals(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name()) &&
-        !defaultBucketLayout.equals(BucketLayout.OBJECT_STORE.name()) &&
-        !defaultBucketLayout.equals(BucketLayout.LEGACY.name())
-    ) {
-      throw new ConfigurationException(
-          defaultBucketLayout +
-              " is not a valid default bucket layout. Supported values are " +
-              BucketLayout.FILE_SYSTEM_OPTIMIZED + ", " +
-              BucketLayout.OBJECT_STORE + ", " + BucketLayout.LEGACY + ".");
+    boolean bucketLayoutValid = Arrays.stream(BucketLayout.values())
+        .anyMatch(layout -> layout.name().equals(defaultBucketLayoutString));
+    if (bucketLayoutValid) {
+      this.defaultBucketLayout =
+          BucketLayout.fromString(defaultBucketLayoutString);
+
+      if (!defaultBucketLayout.isLegacy() &&
+          !versionManager.isAllowed(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)) {
+        LOG.warn("{} configured to non-legacy bucket layout {} when Ozone " +
+            "Manager is pre-finalized for bucket layout support. Legacy " +
+            "buckets will be created by default until Ozone Manager is " +
+            "finalized.", OZONE_DEFAULT_BUCKET_LAYOUT, defaultBucketLayout);
+      }
+    } else {
+      throw new ConfigurationException(defaultBucketLayoutString +
+          " is not a valid default bucket layout. Supported values are " +
+          Arrays.stream(BucketLayout.values())
+              .map(Enum::toString).collect(Collectors.joining(", ")));
     }
 
     // Validates the default server-side replication configs.
@@ -4251,7 +4261,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         replication, configuration);
   }
 
-  public String getOMDefaultBucketLayout() {
+  public BucketLayout getOMDefaultBucketLayout() {
     return this.defaultBucketLayout;
   }
 
