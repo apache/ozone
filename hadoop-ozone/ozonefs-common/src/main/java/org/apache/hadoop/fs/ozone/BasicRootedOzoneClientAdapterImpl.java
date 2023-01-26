@@ -635,32 +635,43 @@ public class BasicRootedOzoneClientAdapterImpl
       Path qualifiedPath, String userName) throws IOException {
     incrementCounter(Statistic.OBJECTS_QUERY, 1);
     OFSPath ofsPath = new OFSPath(path);
-    String key = ofsPath.getKeyName();
     if (ofsPath.isRoot()) {
       return getFileStatusAdapterForRoot(uri);
     } else if (ofsPath.isVolume()) {
       OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
       return getFileStatusAdapterForVolume(volume, uri);
     } else {
-      try {
-        OzoneBucket bucket = getBucket(ofsPath, false);
-        if (ofsPath.isSnapshotPath()) {
-          OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-          return getFileStatusAdapterWithSnapshotIndicator(
-              volume, bucket, uri);
-        } else {
-          OzoneFileStatus status = bucket.getFileStatus(key);
-          return toFileStatusAdapter(status, userName, uri, qualifiedPath,
-              ofsPath.getNonKeyPath());
-        }
-      } catch (OMException e) {
-        if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
-          throw new FileNotFoundException(key + ": No such file or directory!");
-        } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
-          throw new FileNotFoundException(key + ": Bucket doesn't exist!");
-        }
-        throw e;
+      return getFileStatusForKeyOrSnapshot(
+          ofsPath, uri, qualifiedPath, userName);
+    }
+  }
+
+  /**
+   * Check OFSPath to determine whether we are on a bucket path
+   * or a snapshot path and return FileStatusAdapter.
+   */
+  private FileStatusAdapter getFileStatusForKeyOrSnapshot(
+      OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
+      throws IOException {
+    String key = ofsPath.getKeyName();
+    try {
+      OzoneBucket bucket = getBucket(ofsPath, false);
+      if (ofsPath.isSnapshotPath()) {
+        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+        return getFileStatusAdapterWithSnapshotIndicator(
+            volume, bucket, uri);
+      } else {
+        OzoneFileStatus status = bucket.getFileStatus(key);
+        return toFileStatusAdapter(status, userName, uri, qualifiedPath,
+            ofsPath.getNonKeyPath());
       }
+    } catch (OMException e) {
+      if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+        throw new FileNotFoundException(key + ": No such file or directory!");
+      } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
+        throw new FileNotFoundException(key + ": Bucket doesn't exist!");
+      }
+      throw e;
     }
   }
 
