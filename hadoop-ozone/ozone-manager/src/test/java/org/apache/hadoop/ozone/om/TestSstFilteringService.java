@@ -205,8 +205,7 @@ public class TestSstFilteringService {
 
     String dbSnapshots = rocksDbDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     String snapshotDirName =
-        dbSnapshots + OM_KEY_PREFIX + OM_DB_NAME + snapshotInfo
-            .getCheckpointDirName();
+        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
 
     for (LiveFileMetaData file : allFiles) {
       File sstFile =
