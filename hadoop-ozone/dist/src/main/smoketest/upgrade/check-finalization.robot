@@ -21,12 +21,24 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 
 *** Test Cases ***
 Check Finalized
+    [Tags]    finalized
     ${result} =        Execute      ozone admin om finalizationstatus
                        Log    ${result}
-                       Should Contain Any    ${result}    ALREADY_FINALIZED FINALIZATION_DONE
+                       Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
 
 
     ${result} =        Execute      ozone admin scm finalizationstatus
                        Log    ${result}
-                       Should Contain Any    ${result}    ALREADY_FINALIZED
+                       Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
+
+Check Pre Finalized
+    [Tags]    pre-finalized
+    ${result} =        Execute      ozone admin om finalizationstatus
+                       Log    ${result}
+                       Should Contain Any    ${result}    FINALIZATION_REQUIRED
+
+
+    ${result} =        Execute      ozone admin scm finalizationstatus
+                       Log    ${result}
+                       Should Contain Any    ${result}    FINALIZATION_REQUIRED
 

@@ -51,7 +51,7 @@ with_old_version() {
 }
 
 with_new_version_pre_finalized() {
-  execute_robot_test scm --test 'Check Pre Finalized' upgrade/check-finalization.robot
+  execute_robot_test scm --include pre-finalized upgrade/check-finalization.robot
   validate old1
   # HDDS-6261: overwrite the same keys intentionally
   generate old1 --exclude create-volume-and-bucket
@@ -73,7 +73,7 @@ with_old_version_downgraded() {
 }
 
 with_new_version_finalized() {
-  execute_robot_test scm --test 'Check Finalized' upgrade/check-finalization.robot
+  execute_robot_test scm --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1
   validate old2
