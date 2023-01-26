@@ -46,8 +46,7 @@ public interface SecretKeyState {
 
   /**
    * Update the SecretKeys.
-   * This method replicates SecretKeys across all SCM instances
-   * after each rotation.
+   * This method replicates SecretKeys across all SCM instances.
    */
   @Replicate
   void updateKeys(ManagedSecretKey currentKey,
