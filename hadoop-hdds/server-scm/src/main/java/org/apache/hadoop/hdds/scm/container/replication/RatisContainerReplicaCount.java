@@ -454,6 +454,21 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
+   * Checks whether insufficient replication is because of some replicas
+   * being on datanodes that were decommissioned.
+   * @param includePendingAdd if pending adds should be considered
+   * @return true if there is insufficient replication and it's because of
+   * decommissioning.
+   */
+  public boolean inSufficientDueToDecommission(boolean includePendingAdd) {
+    if (isSufficientlyReplicated(includePendingAdd)) {
+      return false;
+    }
+    int delta = redundancyDelta(true, includePendingAdd);
+    return decommissionCount >= delta;
+  }
+
+  /**
    * How many more replicas can be lost before the container is
    * unreadable, assuming any infligh deletes will complete. For containers
    * which are under-replicated due to decommission

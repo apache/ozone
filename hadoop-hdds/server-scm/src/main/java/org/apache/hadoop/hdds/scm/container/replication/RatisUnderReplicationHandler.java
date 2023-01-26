@@ -91,18 +91,8 @@ public class RatisUnderReplicationHandler
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated Ratis container {}", containerInfo);
 
-    // count pending adds and deletes
-    int pendingAdd = 0, pendingDelete = 0;
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd++;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete++;
-      }
-    }
     RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(containerInfo, replicas, pendingAdd,
-            pendingDelete, containerInfo.getReplicationFactor().getNumber(),
+        new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
             minHealthyForMaintenance);
 
     // verify that this container is still under replicated and we don't have

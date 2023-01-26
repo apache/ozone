@@ -98,28 +98,22 @@ public class RatisOverReplicationHandler
         )
         .collect(Collectors.toSet());
 
-    // count pending adds and deletes
-    int pendingAdd = 0, pendingDelete = 0;
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd++;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete++;
-      }
-    }
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(containerInfo, healthyReplicas,
-            pendingAdd, pendingDelete,
-            containerInfo.getReplicationFactor().getNumber(),
-            minHealthyForMaintenance);
+            pendingOps, minHealthyForMaintenance);
 
     // verify that this container is actually over replicated
     if (!verifyOverReplication(replicaCount)) {
       return Collections.emptySet();
     }
 
-    // get number of excess replicas
-    int excess = replicaCount.getExcessRedundancy(true);
+    // count pending deletes
+    int pendingDelete = 0;
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        pendingDelete++;
+      }
+    }
     LOG.info("Container {} is over replicated. Actual replica count is {}, " +
             "with {} pending delete(s). Expected replica count is {}.",
         containerInfo.containerID(),
@@ -135,6 +129,8 @@ public class RatisOverReplicationHandler
       return Collections.emptySet();
     }
 
+    // get number of excess replicas
+    int excess = replicaCount.getExcessRedundancy(true);
     return createCommands(containerInfo, eligibleReplicas, excess);
   }
 
