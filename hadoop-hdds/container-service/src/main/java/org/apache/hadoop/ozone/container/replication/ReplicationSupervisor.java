@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -59,9 +61,13 @@ public class ReplicationSupervisor {
   /**
    * A set of container IDs that are currently being downloaded
    * or queued for download. Tracked so we don't schedule > 1
-   * concurrent download for the same container.
+   * concurrent download for the same container. Note that the uniqueness of a
+   * task is defined by the tasks equals and hashCode methods.
    */
   private final Set<AbstractReplicationTask> inFlight;
+
+  private final Map<Class, AtomicInteger> taskCounter =
+      new ConcurrentHashMap<>();
 
   @VisibleForTesting
   ReplicationSupervisor(
@@ -90,7 +96,16 @@ public class ReplicationSupervisor {
    */
   public void addTask(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
+      taskCounter.computeIfAbsent(task.getClass(),
+          k -> new AtomicInteger()).incrementAndGet();
       executor.execute(new TaskRunner(task));
+    }
+  }
+
+  private void decrementTaskCounter(AbstractReplicationTask task) {
+    AtomicInteger counter = taskCounter.get(task.getClass());
+    if (counter != null) {
+      counter.decrementAndGet();
     }
   }
 
@@ -113,12 +128,25 @@ public class ReplicationSupervisor {
   }
 
   /**
-   * Get the number of containers currently being downloaded
-   * or scheduled for download.
+   * Given the Class of a AbstractReplicationTask, return the count of tasks
+   * currently inflight (queued or running) for that type of task.
    *
-   * @return Count of in-flight replications.
+   * @param taskClass The Class of the tasks to get a count for.
+   * @return Count of in-flight replications for the type of task.
    */
-  public int getInFlightReplications() {
+  public int getInFlightReplications(
+      Class<? extends AbstractReplicationTask> taskClass) {
+    AtomicInteger counter = taskCounter.get(taskClass);
+    return counter == null ? 0 : counter.get();
+  }
+
+  /**
+   * Returns a count of all inflight replication tasks across all task types.
+   * Note that `getInFlightReplications(Class taskClass) allows for the .count
+   * of replications for a given class to be retrieved.
+   * @return Total replication tasks queued or running in the supervisor
+   */
+  public int getTotalInFlightReplications() {
     return inFlight.size();
   }
 
@@ -181,6 +209,7 @@ public class ReplicationSupervisor {
         failureCounter.incrementAndGet();
       } finally {
         inFlight.remove(task);
+        decrementTaskCounter(task);
       }
     }
 

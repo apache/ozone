@@ -91,7 +91,7 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return supervisor.getInFlightReplications();
+    return supervisor.getInFlightReplications(ReplicationTask.class);
   }
 
   @Override
