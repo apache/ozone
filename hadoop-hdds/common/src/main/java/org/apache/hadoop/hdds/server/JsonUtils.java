@@ -78,7 +78,7 @@ public final class JsonUtils {
    * Deserialize a list of elements from a given string,
    * each element in the list is in the given type.
    *
-   * @param str         json string.
+   * @param str json string.
    * @param elementType element type.
    * @return List of elements of type elementType
    * @throws IOException
