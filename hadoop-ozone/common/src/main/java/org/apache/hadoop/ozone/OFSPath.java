@@ -267,9 +267,9 @@ public class OFSPath {
   /**
    * If volume and bucket names are not empty and the key name
    * only contains the snapshot indicator, then return true.
-   * e.g. /vol/bucket/.snapshot is a snapshot indicator.
+   * e.g. /vol/bucket/.snapshot is a snapshot path.
    */
-  public boolean isSnapshotIndicator() {
+  public boolean isSnapshotPath() {
     if (keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
       String[] keyNames = keyName.split(OZONE_URI_DELIMITER);
 

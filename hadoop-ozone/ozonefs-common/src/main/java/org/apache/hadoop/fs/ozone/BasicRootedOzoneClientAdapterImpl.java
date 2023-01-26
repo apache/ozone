@@ -644,7 +644,7 @@ public class BasicRootedOzoneClientAdapterImpl
     } else {
       try {
         OzoneBucket bucket = getBucket(ofsPath, false);
-        if (ofsPath.isSnapshotIndicator()) {
+        if (ofsPath.isSnapshotPath()) {
           OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
           return getFileStatusAdapterWithSnapshotIndicator(
               volume, bucket, uri);
@@ -866,7 +866,7 @@ public class BasicRootedOzoneClientAdapterImpl
           recursive, startBucket, numEntries, uri, workingDir, username);
     }
 
-    if (ofsPath.isSnapshotIndicator()) {
+    if (ofsPath.isSnapshotPath()) {
       return listStatusBucketSnapshot(ofsPath.getVolumeName(),
           ofsPath.getBucketName(), uri);
     }
