@@ -169,3 +169,7 @@ OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
 # change or let all OMs write to AccessController if this dev flag is set.
 #
 OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true
+
+OZONE-SITE.XML_hdds.secret.key.rotate.duration=PT5M
+OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=PT1M
+OZONE-SITE.XML_hdds.secret.key.expiry.duration=PT1H
