@@ -134,6 +134,7 @@ public class SecretKeyManager {
       LOG.info("SecretKey rotation is happening, new key generated {}",
           newCurrentKey);
       state.updateKeys(newCurrentKey, updatedKeys);
+      return true;
     }
     return false;
   }

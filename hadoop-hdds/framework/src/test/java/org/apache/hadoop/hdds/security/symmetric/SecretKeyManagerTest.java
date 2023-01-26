@@ -167,10 +167,10 @@ public class SecretKeyManagerTest {
             ROTATION_DURATION, VALIDITY_DURATION, ALGORITHM);
 
     // Set the initial state.
-    state.updateKeys(initialCurrentKey, initialKeys);
+    state.updateKeysInternal(initialCurrentKey, initialKeys);
     Mockito.reset(mockedKeyStore);
 
-    assertEquals(lifeCycleManager.checkAndRotate(), expectRotate);
+    assertEquals(expectRotate, lifeCycleManager.checkAndRotate());
 
     if (expectRotate) {
       // Verify rotation behavior.
