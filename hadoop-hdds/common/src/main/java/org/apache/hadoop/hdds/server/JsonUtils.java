@@ -91,7 +91,7 @@ public final class JsonUtils {
   }
 
   /**
-   * Utility to sequentially write a large collection of items a file.
+   * Utility to sequentially write a large collection of items to a file.
    */
   public static <T> void writeToFile(Iterable<T> items, File file)
       throws IOException {
