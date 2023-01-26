@@ -52,8 +52,6 @@ set_downgrade_om_args() {
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 OUTPUT_NAME="$OZONE_UPGRADE_FROM"
-# This will also the docker compose cluster to use.
-callback setup
 export OM_HA_ARGS='--'
 prepare_for_image "$OZONE_UPGRADE_FROM"
 

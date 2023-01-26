@@ -38,9 +38,11 @@ validate() {
 
 ### CALLBACKS ###
 
-setup() {
+# @description Prints the file to source to load the corresponding docker
+# compose cluster for this test.
+get_cluster_setup_file() {
   # The default cluster to use.
-  source "$TEST_DIR"/compose/ha/load.sh
+  echo "$TEST_DIR"/compose/ha/load.sh
 }
 
 with_old_version() {

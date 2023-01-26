@@ -17,11 +17,6 @@
 
 set -e -o pipefail
 
-# Fail if required variables are not set.
-set -u
-: "${OZONE_CURRENT_VERSION}"
-set +u
-
 _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Cumulative result of all tests run with run_test function.
@@ -29,7 +24,6 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 : "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
 : "${OZONE_VOLUME_OWNER:=}"
-: "${OZONE_CURRENT_VERSION:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
 # export for docker-compose
@@ -59,6 +53,8 @@ create_data_dirs() {
 prepare_for_image() {
   local image_version="$1"
 
+  source "$(callback get_cluster_setup_file)"
+
   if [[ "$image_version" = 'current' ]]; then
       prepare_for_runner_image
   else
@@ -76,8 +72,12 @@ callback() {
   : "${TEST_DIR}"
   set +u
 
-  _run_callback "$OZONE_UPGRADE_CALLBACK" "$func"
-  _run_callback "$TEST_DIR"/upgrades/non-rolling-upgrade/common "$func"
+  # If this upgrade has no callbacks for custom testing, only the common ones
+  # will be run.
+  if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
+    _run_callback "$OZONE_UPGRADE_CALLBACK" "$func"
+  fi
+  _run_callback "$TEST_DIR"/upgrades/non-rolling-upgrade/common/callback.sh "$func"
 }
 
 _run_callback() {
@@ -85,11 +85,15 @@ _run_callback() {
   local func="$2"
 
   (
-    source "$script"
-    if [[ "$(type -t "$func")" = function ]]; then
-      "$func"
+    if [[ -f "$script" ]]; then
+      source "$script"
+      if [[ "$(type -t "$func")" = function ]]; then
+        "$func"
+      else
+        echo "Skipping callback $func. No function implementation found."
+      fi
     else
-      echo "Skipping callback $func. No function implementation found."
+        echo "Skipping callback $func. No script $script found."
     fi
   )
 }

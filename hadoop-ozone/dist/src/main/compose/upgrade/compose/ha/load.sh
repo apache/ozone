@@ -15,9 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source "$TEST_DIR"/testlib.sh
+# Fail if required variables are not set.
+set -u
+: "${OZONE_VOLUME}"
+: "${TEST_DIR}"
+set +u
 
-get_cluster_setup_file() {
-  # Ozone 1.1.0 did not support SCM HA.
-  source "$TEST_DIR"/compose/om-ha/load.sh
-}
+source "$TEST_DIR/testlib.sh"
+
+export COMPOSE_FILE="$TEST_DIR/compose/ha/docker-compose.yaml"
+export OM_SERVICE_ID=omservice
+create_data_dirs "${OZONE_VOLUME}"/{om1,om2,om3,dn1,dn2,dn3,dn4,dn5,recon,s3g,scm}
+
+echo "Using docker cluster defined in $COMPOSE_FILE"
