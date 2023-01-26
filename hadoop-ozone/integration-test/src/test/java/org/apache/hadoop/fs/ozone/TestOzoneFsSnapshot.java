@@ -175,13 +175,11 @@ public class TestOzoneFsSnapshot {
    * 4th case: snapshot name length is more than 64 chars
    */
   @ParameterizedTest
-  @ValueSource(strings = {"snapa?b", "1234", "invalidURI",
+  @ValueSource(strings = {"snapa?b", "1234",
       "snap156808943643007724443266605711479126926050896107709081166294"})
   public void testCreateSnapshotFailure(String snapshotName)
       throws Exception {
-    if (snapshotName.equals("invalidURI")) {
-      bucketPath += "/bucket/";
-    }
+
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", bucketPath, snapshotName});
     // Asserts that create request failed
@@ -195,6 +193,16 @@ public class TestOzoneFsSnapshot {
         new String[]{"-createSnapshot"});
     // Asserts that create request failed since mandatory params not passed
     Assertions.assertEquals(-1, res);
+  }
+
+  @Test
+  public void testCreateSnapshotInvalidURI() throws Exception {
+
+    int res = ToolRunner.run(shell,
+        new String[]{"-createSnapshot", "invalidURI"});
+    // Asserts that create request failed since
+    // invalid volume-bucket URI passed
+    Assertions.assertEquals(1, res);
   }
 
   /**
