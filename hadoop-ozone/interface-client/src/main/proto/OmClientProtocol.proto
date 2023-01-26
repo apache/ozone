@@ -1662,22 +1662,22 @@ message SetRangerServiceVersionRequest {
 }
 
 message CreateSnapshotRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
   optional string snapshotName = 3;
   optional string snapshotId = 4;
 }
 
 message ListSnapshotRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
 }
 
 message SnapshotDiffRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string fromSnapshot = 3;
-  required string toSnapshot = 4;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
 }
 
 message DeleteTenantRequest {
@@ -1718,7 +1718,7 @@ message SetRangerServiceVersionResponse {
 }
 
 message CreateSnapshotResponse {
-  required SnapshotInfo snapshotInfo = 1;
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message ListSnapshotResponse {
@@ -1727,14 +1727,14 @@ message ListSnapshotResponse {
 
 
 message SnapshotDiffResponse {
-  required SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional SnapshotDiffReportProto snapshotDiffReport = 1;
 }
 
 message SnapshotDiffReportProto {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string fromSnapshot = 3;
-  required string toSnapshot = 4;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   repeated DiffReportEntryProto diffList = 5;
 }
 
@@ -1745,8 +1745,8 @@ message DiffReportEntryProto {
     DELETE= 3;
     RENAME = 4;
   }
-  required DiffTypeProto diffType = 1;
-  required string sourcePath = 2;
+  optional DiffTypeProto diffType = 1;
+  optional string sourcePath = 2;
   optional string targetPath = 3;
 }
 
