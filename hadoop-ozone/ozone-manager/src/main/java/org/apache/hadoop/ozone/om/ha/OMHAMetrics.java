@@ -36,7 +36,6 @@ public final class OMHAMetrics implements MetricsSource {
 
     OzoneManagerHALeaderState("Leader active state " +
         "of OzoneManager node (1 leader, 0 follower)"),
-    State("OM State (leader or follower)"),
     NodeId("OM node Id");
 
     private final String description;
@@ -58,12 +57,10 @@ public final class OMHAMetrics implements MetricsSource {
   private static final class OMHAInfo {
 
     private long ozoneManagerHALeaderState;
-    private String state;
     private String nodeId;
 
     OMHAInfo() {
       this.ozoneManagerHALeaderState = 0L;
-      this.state = "";
       this.nodeId = "";
     }
 
@@ -73,14 +70,6 @@ public final class OMHAMetrics implements MetricsSource {
 
     public void setOzoneManagerHALeaderState(long ozoneManagerHALeaderState) {
       this.ozoneManagerHALeaderState = ozoneManagerHALeaderState;
-    }
-
-    public String getState() {
-      return state;
-    }
-
-    public void setState(String state) {
-      this.state = state;
     }
 
     public String getNodeId() {
@@ -131,21 +120,17 @@ public final class OMHAMetrics implements MetricsSource {
 
     if (currNodeId.equals(leaderId)) {
       omhaInfo.setNodeId(currNodeId);
-      omhaInfo.setState("leader");
       omhaInfo.setOzoneManagerHALeaderState(1);
 
       recordBuilder
           .tag(OMHAMetricsInfo.NodeId, currNodeId)
-          .tag(OMHAMetricsInfo.State, "leader")
           .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, 1);
     } else {
       omhaInfo.setNodeId(currNodeId);
-      omhaInfo.setState("follower");
       omhaInfo.setOzoneManagerHALeaderState(0);
 
       recordBuilder
           .tag(OMHAMetricsInfo.NodeId, currNodeId)
-          .tag(OMHAMetricsInfo.State, "follower")
           .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, 0);
     }
     recordBuilder.endRecord();
@@ -154,11 +139,6 @@ public final class OMHAMetrics implements MetricsSource {
   @VisibleForTesting
   public String getOmhaInfoNodeId() {
     return omhaInfo.getNodeId();
-  }
-
-  @VisibleForTesting
-  public String getOmhaInfoState() {
-    return omhaInfo.getState();
   }
 
   @VisibleForTesting

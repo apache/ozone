@@ -119,13 +119,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     if (randomOM.getOMNodeId()
         .equals(leaderOM.getOMNodeId())) {
-      Assertions.assertEquals("leader",
-          omhaMetrics.getOmhaInfoState());
       Assertions.assertEquals(1L,
           omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
     } else {
-      Assertions.assertEquals("follower",
-          omhaMetrics.getOmhaInfoState());
       Assertions.assertEquals(0L,
           omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
     }
