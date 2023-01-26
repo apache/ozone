@@ -133,7 +133,12 @@ public class TestReplicationManager {
         nodeManager,
         clock,
         legacyReplicationManager,
-        containerReplicaPendingOps);
+        containerReplicaPendingOps) {
+      @Override
+      protected void startSubServices() {
+        // do not start any threads for processing
+      }
+    };
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
