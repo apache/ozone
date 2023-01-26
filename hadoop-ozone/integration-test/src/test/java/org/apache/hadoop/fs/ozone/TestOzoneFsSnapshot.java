@@ -247,44 +247,27 @@ public class TestOzoneFsSnapshot {
 
   @Test
   public void testDeleteBucketWithSnapshot() throws Exception {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
-    String key = "key-" + RandomStringUtils.randomNumeric(5);
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshotName = createSnapshot();
 
-    String testVolBucket = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
-    String testKey = testVolBucket + OM_KEY_PREFIX + key;
+    String keyPath = bucketPath + OM_KEY_PREFIX + key;
+    String snapshotPath = bucketWithSnapshotIndicatorPath
+        + OM_KEY_PREFIX + snapshotName;
 
-    createVolBuckKey(testVolBucket, testKey);
+    int res = ToolRunner.run(shell,
+            new String[]{"-rm", "-r", "-skipTrash", keyPath});
+    Assertions.assertEquals(0, res);
 
-    OzoneFsShell shell = new OzoneFsShell(clientConf);
-    try {
-      int res = ToolRunner.run(shell,
-              new String[]{"-createSnapshot", testVolBucket, snapshotName});
-      // Asserts that create request succeeded
-      assertEquals(0, res);
+    res = ToolRunner.run(shell,
+            new String[]{"-rm", "-r", "-skipTrash", bucketPath});
+    Assertions.assertEquals(1, res);
 
-      res = ToolRunner.run(shell,
-              new String[]{"-rm", "-r", "-skipTrash", testKey});
-      assertEquals(0, res);
+    res = ToolRunner.run(shell,
+            new String[]{"-ls", bucketPath});
+    Assertions.assertEquals(0, res);
 
-      res = ToolRunner.run(shell,
-              new String[]{"-rm", "-r", "-skipTrash", testVolBucket});
-      assertEquals(1, res);
-
-      res = ToolRunner.run(shell,
-              new String[]{"-ls", testVolBucket});
-      assertEquals(0, res);
-
-      String snapshotPath = testVolBucket + OM_KEY_PREFIX + ".snapshot"
-              + OM_KEY_PREFIX + snapshotName + OM_KEY_PREFIX;
-      res = ToolRunner.run(shell,
-              new String[]{"-ls", snapshotPath});
-      assertEquals(0, res);
-
-    } finally {
-      shell.close();
-    }
+    res = ToolRunner.run(shell,
+            new String[]{"-ls", snapshotPath});
+    Assertions.assertEquals(0, res);
   }
 
   private String createSnapshot() throws Exception {
