@@ -181,6 +181,64 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void misMatchedReplicasOfRatisContainerShouldBeClosed()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    // Container is closed but replicas are open
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSING, 0, 0, 0);
+    ContainerReplica closedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.CLOSED);
+    replicas.add(closedReplica);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+
+    Mockito.verify(eventPublisher, Mockito.times(3))
+        .fireEvent(any(), any());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    /*
+    Though over replicated, this container should not be added to over
+    replicated queue until all replicas are closed.
+     */
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testUnderReplicatedQuasiClosedContainerWithUnhealthyReplica()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    // Container is closed but replicas are open
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSING, 0);
+    ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(quasiClosedReplica);
+    replicas.add(unhealthyReplica);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+
+    Mockito.verify(eventPublisher, Mockito.times(1))
+        .fireEvent(any(), any());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
   public void testHealthyContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
