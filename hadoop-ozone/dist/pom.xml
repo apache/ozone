@@ -105,16 +105,6 @@
                   <artifactId>protobuf-java</artifactId>
                   <version>${grpc.protobuf-compile.version}</version>
                 </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-auth</artifactId>
-                  <version>${hadoop2.version}</version>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-annotations</artifactId>
-                  <version>${hadoop2.version}</version>
-                </artifactItem>
               </artifactItems>
             </configuration>
           </execution>
