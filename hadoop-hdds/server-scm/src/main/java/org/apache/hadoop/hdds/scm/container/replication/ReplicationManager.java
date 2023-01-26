@@ -265,10 +265,6 @@ public class ReplicationManager implements SCMService {
       metrics = ReplicationManagerMetrics.create(this);
       legacyReplicationManager.setMetrics(metrics);
       containerReplicaPendingOps.setReplicationMetrics(metrics);
-      replicationMonitor = new Thread(this::run);
-      replicationMonitor.setName("ReplicationMonitor");
-      replicationMonitor.setDaemon(true);
-      replicationMonitor.start();
       startSubServices();
     } else {
       LOG.info("Replication Monitor Thread is already running.");
@@ -311,7 +307,13 @@ public class ReplicationManager implements SCMService {
    * Create Replication Manager sub services such as Over and Under Replication
    * processors.
    */
-  private void startSubServices() {
+  @VisibleForTesting
+  protected void startSubServices() {
+    replicationMonitor = new Thread(this::run);
+    replicationMonitor.setName("ReplicationMonitor");
+    replicationMonitor.setDaemon(true);
+    replicationMonitor.start();
+
     underReplicatedProcessorThread = new Thread(underReplicatedProcessor);
     underReplicatedProcessorThread.setName("Under Replicated Processor");
     underReplicatedProcessorThread.setDaemon(true);
