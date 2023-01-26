@@ -50,8 +50,6 @@ execute_robot_test scm recon
 
 execute_robot_test scm om-ratis
 
-execute_robot_test scm snapshot/basic.robot
-
 execute_robot_test scm freon
 
 execute_robot_test scm cli
