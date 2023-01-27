@@ -18,29 +18,18 @@
 
 package org.apache.hadoop.hdds.security.symmetric;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.crypto.SecretKey;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
@@ -136,7 +125,8 @@ public class LocalSecretKeyStore implements SecretKeyStore {
     private UUID id;
     private Instant creationTime;
     private Instant expiryTime;
-    private SecretKey secretKey;
+    private String algorithm;
+    private byte[] encoded;
 
     /**
      * Used by Jackson when deserializing.
@@ -148,10 +138,12 @@ public class LocalSecretKeyStore implements SecretKeyStore {
       id = object.getId();
       creationTime = object.getCreationTime();
       expiryTime = object.getExpiryTime();
-      secretKey = object.getSecretKey();
+      algorithm = object.getSecretKey().getAlgorithm();
+      encoded = object.getSecretKey().getEncoded();
     }
 
     public ManagedSecretKey toObject() {
+      SecretKey secretKey = new SecretKeySpec(this.encoded, this.algorithm);
       return new ManagedSecretKey(id, creationTime,
           expiryTime, secretKey);
     }
@@ -180,48 +172,20 @@ public class LocalSecretKeyStore implements SecretKeyStore {
       this.expiryTime = expiryTime;
     }
 
-    @JsonSerialize(using = SecretKeySerializer.class)
-    @JsonDeserialize(using = SecretKeyDeserializer.class)
-    public SecretKey getSecretKey() {
-      return secretKey;
+    public String getAlgorithm() {
+      return algorithm;
     }
 
-    public void setSecretKey(SecretKey secretKey) {
-      this.secretKey = secretKey;
-    }
-  }
-
-  private static class SecretKeySerializer extends StdSerializer<SecretKey> {
-    SecretKeySerializer() {
-      super(SecretKey.class);
+    public void setAlgorithm(String algorithm) {
+      this.algorithm = algorithm;
     }
 
-    @Override
-    public void serialize(SecretKey value, JsonGenerator gen,
-                          SerializerProvider provider) throws IOException {
-      ByteArrayOutputStream bos = new ByteArrayOutputStream();
-      ObjectOutputStream oos = new ObjectOutputStream(bos);
-      oos.writeObject(value);
-      gen.writeBinary(bos.toByteArray());
-    }
-  }
-
-  private static class SecretKeyDeserializer extends
-      StdDeserializer<SecretKey> {
-    SecretKeyDeserializer() {
-      super(SecretKey.class);
+    public byte[] getEncoded() {
+      return encoded;
     }
 
-    @Override
-    public SecretKey deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException {
-      ByteArrayInputStream bis = new ByteArrayInputStream(p.getBinaryValue());
-      ObjectInputStream ois = new ObjectInputStream(bis);
-      try {
-        return (SecretKey) ois.readObject();
-      } catch (ClassNotFoundException e) {
-        throw new IllegalStateException("Error reading SecretKey", e);
-      }
+    public void setEncoded(byte[] encoded) {
+      this.encoded = encoded;
     }
   }
 }
