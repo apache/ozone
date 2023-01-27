@@ -26,14 +26,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
-
-import static org.awaitility.Awaitility.await;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.RocksCheckpoint;
-
 import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * RocksDB Checkpoint Manager, used to create and cleanup checkpoints.
