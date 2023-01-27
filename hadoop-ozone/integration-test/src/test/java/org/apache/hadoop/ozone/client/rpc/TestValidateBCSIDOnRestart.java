@@ -227,13 +227,13 @@ public class TestValidateBCSIDOnRestart {
       // modify the bcsid for the container in the ROCKS DB thereby inducing
       // corruption
       db.getStore().getMetadataTable()
-          .put(keyValueContainerData.bcsIdKey(), 0L);
+          .put(keyValueContainerData.getBcsIdKey(), 0L);
     }
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be
     // marked unhealthy
     index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
-    cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // Make sure the container is marked unhealthy
     Assert.assertTrue(
             cluster.getHddsDatanodes().get(index)

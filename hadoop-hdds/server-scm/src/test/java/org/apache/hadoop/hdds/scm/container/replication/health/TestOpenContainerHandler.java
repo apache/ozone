@@ -118,7 +118,7 @@ public class TestOpenContainerHandler {
         ratisReplicationConfig, 1, CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())
@@ -136,7 +136,7 @@ public class TestOpenContainerHandler {
         ratisReplicationConfig, 1, OPEN);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.OPEN, 1, 2, 3);
+            ContainerReplicaProto.State.OPEN, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())
@@ -154,7 +154,7 @@ public class TestOpenContainerHandler {
         ratisReplicationConfig, 1, OPEN);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
         .createReplicas(containerInfo.containerID(),
-            ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.EMPTY_LIST)
         .setReport(new ReplicationManagerReport())

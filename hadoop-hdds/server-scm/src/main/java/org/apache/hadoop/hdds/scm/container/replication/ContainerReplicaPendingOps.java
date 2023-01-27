@@ -28,9 +28,11 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
@@ -47,11 +49,19 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
   private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
+  private final ConcurrentHashMap<PendingOpType, AtomicLong>
+      pendingOpCount = new ConcurrentHashMap<>();
+  private ReplicationManagerMetrics replicationMetrics = null;
+  private List<ContainerReplicaPendingOpsSubscriber> subscribers =
+      new ArrayList<>();
 
   public ContainerReplicaPendingOps(final ConfigurationSource conf,
       Clock clock) {
     this.config = conf;
     this.clock = clock;
+    for (PendingOpType opType: PendingOpType.values()) {
+      pendingOpCount.put(opType, new AtomicLong(0));
+    }
   }
 
   /**
@@ -108,7 +118,15 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeAddReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    return completeOp(ADD, containerID, target, replicaIndex);
+    boolean completed = completeOp(ADD, containerID, target, replicaIndex);
+    if (isMetricsNotNull() && completed) {
+      if (replicaIndex > 0) {
+        replicationMetrics.incrEcReplicasCreatedTotal();
+      } else if (replicaIndex == 0) {
+        replicationMetrics.incrNumReplicationCmdsCompleted();
+      }
+    }
+    return completed;
   }
 
 
@@ -122,7 +140,15 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    return completeOp(DELETE, containerID, target, replicaIndex);
+    boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
+    if (isMetricsNotNull() && completed) {
+      if (replicaIndex > 0) {
+        replicationMetrics.incrEcReplicasDeletedTotal();
+      } else if (replicaIndex == 0) {
+        replicationMetrics.incrNumDeletionCmdsCompleted();
+      }
+    }
+    return completed;
   }
 
   /**
@@ -144,6 +170,9 @@ public class ContainerReplicaPendingOps {
    */
   public void removeExpiredEntries(long expiryMilliSeconds) {
     for (ContainerID containerID : pendingOps.keySet()) {
+      // List of expired ops that subscribers will be notified about
+      List<ContainerReplicaOp> expiredOps = new ArrayList<>();
+
       // Rather than use an entry set, we get the map entry again. This is
       // to protect against another thread modifying the value after this
       // iterator started. Once we lock on the ContainerID object, no other
@@ -163,6 +192,9 @@ public class ContainerReplicaPendingOps {
           if (op.getScheduledEpochMillis() + expiryMilliSeconds
               < clock.millis()) {
             iterator.remove();
+            expiredOps.add(op);
+            pendingOpCount.get(op.getOpType()).decrementAndGet();
+            updateTimeoutMetrics(op);
           }
         }
         if (ops.size() == 0) {
@@ -170,6 +202,27 @@ public class ContainerReplicaPendingOps {
         }
       } finally {
         lock.unlock();
+      }
+
+      // notify if there are expired ops
+      if (!expiredOps.isEmpty()) {
+        notifySubscribers(expiredOps, containerID, true);
+      }
+    }
+  }
+
+  private void updateTimeoutMetrics(ContainerReplicaOp op) {
+    if (op.getOpType() == ADD && isMetricsNotNull()) {
+      if (op.getReplicaIndex() > 0) {
+        replicationMetrics.incrEcReplicaCreateTimeoutTotal();
+      } else if (op.getReplicaIndex() == 0) {
+        replicationMetrics.incrNumReplicationCmdsTimeout();
+      }
+    } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
+      if (op.getReplicaIndex() > 0) {
+        replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
+      } else if (op.getReplicaIndex() == 0) {
+        replicationMetrics.incrNumDeletionCmdsTimeout();
       }
     }
   }
@@ -183,6 +236,7 @@ public class ContainerReplicaPendingOps {
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
           target, replicaIndex, clock.millis()));
+      pendingOpCount.get(opType).incrementAndGet();
     } finally {
       lock.unlock();
     }
@@ -191,6 +245,8 @@ public class ContainerReplicaPendingOps {
   private boolean completeOp(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex) {
     boolean found = false;
+    // List of completed ops that subscribers will be notified about
+    List<ContainerReplicaOp> completedOps = new ArrayList<>();
     Lock lock = writeLock(containerID);
     lock.lock();
     try {
@@ -203,7 +259,9 @@ public class ContainerReplicaPendingOps {
               && op.getTarget().equals(target)
               && op.getReplicaIndex() == replicaIndex) {
             found = true;
+            completedOps.add(op);
             iterator.remove();
+            pendingOpCount.get(op.getOpType()).decrementAndGet();
           }
         }
         if (ops.size() == 0) {
@@ -213,7 +271,38 @@ public class ContainerReplicaPendingOps {
     } finally {
       lock.unlock();
     }
+
+    if (found) {
+      notifySubscribers(completedOps, containerID, false);
+    }
     return found;
+  }
+
+  /**
+   * Notifies subscribers about the specified ops by calling
+   * ContainerReplicaPendingOpsSubscriber#opCompleted.
+   *
+   * @param ops the ops to send notifications for
+   * @param containerID the container that ops belong to
+   * @param timedOut true if the ops (each one) expired, false if they completed
+   */
+  private void notifySubscribers(List<ContainerReplicaOp> ops,
+      ContainerID containerID, boolean timedOut) {
+    for (ContainerReplicaOp op : ops) {
+      for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
+        subscriber.opCompleted(op, containerID, timedOut);
+      }
+    }
+  }
+
+  /**
+   * Registers a subscriber that will be notified about completed ops.
+   *
+   * @param subscriber object that wants to subscribe
+   */
+  public void registerSubscriber(
+      ContainerReplicaPendingOpsSubscriber subscriber) {
+    subscribers.add(subscriber);
   }
 
   private Lock writeLock(ContainerID containerID) {
@@ -224,4 +313,16 @@ public class ContainerReplicaPendingOps {
     return stripedLock.get(containerID).readLock();
   }
 
+  private boolean isMetricsNotNull() {
+    return replicationMetrics != null;
+  }
+
+  public void setReplicationMetrics(
+      ReplicationManagerMetrics replicationMetrics) {
+    this.replicationMetrics = replicationMetrics;
+  }
+
+  public long getPendingOpCount(PendingOpType opType) {
+    return pendingOpCount.get(opType).get();
+  }
 }

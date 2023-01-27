@@ -127,6 +127,16 @@ public final class TestDataUtil {
     return createVolumeAndBucket(cluster, BucketLayout.LEGACY);
   }
 
+  public static OzoneBucket createBucket(MiniOzoneCluster cluster,
+      String vol, BucketArgs bucketArgs, String bukName)
+      throws IOException {
+    OzoneClient client = cluster.getClient();
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume volume = objectStore.getVolume(vol);
+    volume.createBucket(bukName, bucketArgs);
+    return volume.getBucket(bukName);
+  }
+
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
       BucketLayout bucketLayout) throws IOException {
     final int attempts = 5;

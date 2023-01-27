@@ -320,7 +320,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException {
+      Iterable<? extends Long> containerIDs) throws IOException {
     getScm().checkAdminAccess(null);
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
@@ -763,9 +763,9 @@ public class SCMClientProtocolServer implements
         // In case, there is no ratis, there is no ratis role.
         // This will just print the hostname with ratis port as the default
         // behaviour.
-        String adddress = scm.getSCMHANodeDetails().getLocalNodeDetails()
+        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
             .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(adddress));
+        builder.setRatisPeerRoles(Arrays.asList(address));
       }
       return builder.build();
     } catch (Exception ex) {
@@ -1121,6 +1121,20 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     return scm.getContainerManager().getContainers().size();
+  }
+
+  @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(state).size();
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(
+        ContainerID.valueOf(startContainerID), count, state);
   }
 
   /**

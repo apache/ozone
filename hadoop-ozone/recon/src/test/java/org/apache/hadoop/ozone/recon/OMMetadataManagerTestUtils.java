@@ -183,11 +183,11 @@ public final class OMMetadataManagerTestUtils {
             .build());
   }
 
-  @SuppressWarnings("checkstyle:parameternumber")
   /**
    * Write a key on OM instance.
    * @throw IOException while writing.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   public static void writeKeyToOm(OMMetadataManager omMetadataManager,
                                     String key,
                                     String bucket,
@@ -233,7 +233,8 @@ public final class OMMetadataManagerTestUtils {
                                   long bucketObjectId,
                                   long volumeObjectId,
                                   List<OmKeyLocationInfoGroup> locationVersions,
-                                  BucketLayout bucketLayout)
+                                  BucketLayout bucketLayout,
+                                  long dataSize)
           throws IOException {
 
     String omKey;
@@ -248,12 +249,35 @@ public final class OMMetadataManagerTestUtils {
                     .setBucketName(bucketName)
                     .setVolumeName(volName)
                     .setKeyName(keyName)
+                    .setDataSize(dataSize)
                     .setOmKeyLocationInfos(locationVersions)
                     .setReplicationConfig(
                         StandaloneReplicationConfig.getInstance(ONE))
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)
                     .build());
+  }
+
+  /**
+   * Write a directory as key on OM instance.
+   * We don't need to set size.
+   * @throws IOException
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeDirToOm(OMMetadataManager omMetadataManager,
+                                  String key,
+                                  String bucket,
+                                  String volume,
+                                  String fileName,
+                                  long objectID,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  BucketLayout bucketLayout)
+      throws IOException {
+    writeKeyToOm(omMetadataManager, key, bucket, volume,
+        fileName, objectID, parentObjectId, bucketObjectId,
+        volumeObjectId, 0, bucketLayout);
   }
 
   public static void writeDirToOm(OMMetadataManager omMetadataManager,

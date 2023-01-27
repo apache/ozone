@@ -84,7 +84,9 @@ final class AWSV4AuthValidator {
     byte[] kRegion = sign(kDate, regionName);
     byte[] kService = sign(kRegion, serviceName);
     byte[] kSigning = sign(kService, "aws4_request");
-    LOG.info(Hex.encode(kSigning));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(Hex.encode(kSigning));
+    }
     return kSigning;
   }
 

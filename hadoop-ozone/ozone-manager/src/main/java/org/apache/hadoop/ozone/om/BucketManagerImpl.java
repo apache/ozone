@@ -21,7 +21,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -40,73 +39,23 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
- * OM bucket manager.
+ * Implementation for {@link BucketManager}
+ *
+ * BucketManager uses MetadataDB to store bucket level information.
+ * Keys used in BucketManager for storing data into MetadataDB
+ * for BucketInfo:
+ * {volume/bucket} -> bucketInfo
  */
 public class BucketManagerImpl implements BucketManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketManagerImpl.class);
 
-  /**
-   * OMMetadataManager is used for accessing OM MetadataDB and ReadWriteLock.
-   */
   private final OMMetadataManager metadataManager;
-  private final KeyProviderCryptoExtension kmsProvider;
 
-  /**
-   * Constructs BucketManager.
-   *
-   * @param metadataManager
-   */
   public BucketManagerImpl(OMMetadataManager metadataManager) {
-    this(metadataManager, null, false);
-  }
-
-  public BucketManagerImpl(OMMetadataManager metadataManager,
-                           KeyProviderCryptoExtension kmsProvider) {
-    this(metadataManager, kmsProvider, false);
-  }
-
-  public BucketManagerImpl(OMMetadataManager metadataManager,
-      KeyProviderCryptoExtension kmsProvider, boolean isRatisEnabled) {
     this.metadataManager = metadataManager;
-    this.kmsProvider = kmsProvider;
   }
 
-  KeyProviderCryptoExtension getKMSProvider() {
-    return kmsProvider;
-  }
-
-  /**
-   * MetadataDB is maintained in MetadataManager and shared between
-   * BucketManager and VolumeManager. (and also by BlockManager)
-   *
-   * BucketManager uses MetadataDB to store bucket level information.
-   *
-   * Keys used in BucketManager for storing data into MetadataDB
-   * for BucketInfo:
-   * {volume/bucket} -> bucketInfo
-   *
-   * Work flow of create bucket:
-   *
-   * -> Check if the Volume exists in metadataDB, if not throw
-   * VolumeNotFoundException.
-   * -> Else check if the Bucket exists in metadataDB, if so throw
-   * BucketExistException
-   * -> Else update MetadataDB with VolumeInfo.
-   */
-
-  /**
-   * Returns Bucket Information.
-   *
-   * @param volumeName - Name of the Volume.
-   * @param bucketName - Name of the Bucket.
-   * @return OmBucketInfo
-   * @throws IOException The exception thrown could be:
-   * 1. OMException VOLUME_NOT_FOUND when the parent volume doesn't exist.
-   * 2. OMException BUCKET_NOT_FOUND when the parent volume exists, but bucket
-   * doesn't.
-   * 3. Other exceptions, e.g. IOException thrown from getBucketTable().get().
-   */
   @Override
   public OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException {
@@ -148,9 +97,6 @@ public class BucketManagerImpl implements BucketManager {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
       String startBucket, String bucketPrefix, int maxNumOfBuckets)
@@ -161,14 +107,6 @@ public class BucketManagerImpl implements BucketManager {
 
   }
 
-  /**
-   * Add acl for Ozone object. Return true if acl is added successfully else
-   * false.
-   *
-   * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl to be added.
-   * @throws IOException if there is error.
-   */
   @Override
   public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     Objects.requireNonNull(obj);
@@ -208,14 +146,6 @@ public class BucketManagerImpl implements BucketManager {
     return changed;
   }
 
-  /**
-   * Remove acl for Ozone object. Return true if acl is removed successfully
-   * else false.
-   *
-   * @param obj Ozone object.
-   * @param acl Ozone acl to be removed.
-   * @throws IOException if there is error.
-   */
   @Override
   public boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     Objects.requireNonNull(obj);
@@ -253,14 +183,6 @@ public class BucketManagerImpl implements BucketManager {
     return removed;
   }
 
-  /**
-   * Acls to be set for given Ozone object. This operations reset ACL for given
-   * object to list of ACLs provided in argument.
-   *
-   * @param obj Ozone object.
-   * @param acls List of acls.
-   * @throws IOException if there is error.
-   */
   @Override
   public boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
     Objects.requireNonNull(obj);
@@ -295,12 +217,6 @@ public class BucketManagerImpl implements BucketManager {
     return true;
   }
 
-  /**
-   * Returns list of ACLs for given Ozone object.
-   *
-   * @param obj Ozone object.
-   * @throws IOException if there is error.
-   */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     Objects.requireNonNull(obj);
@@ -333,13 +249,6 @@ public class BucketManagerImpl implements BucketManager {
     }
   }
 
-  /**
-   * Check access for given ozoneObject.
-   *
-   * @param ozObject object for which access needs to be checked.
-   * @param context Context object encapsulating all user related information.
-   * @return true if user has access else false.
-   */
   @Override
   public boolean checkAccess(OzoneObj ozObject, RequestContext context)
       throws OMException {

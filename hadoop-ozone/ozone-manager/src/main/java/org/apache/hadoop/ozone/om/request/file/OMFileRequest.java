@@ -283,10 +283,10 @@ public final class OMFileRequest {
    * the directory search result code.
    */
   public static class OMPathInfoWithFSO extends OMPathInfo {
-    private String leafNodeName;
+    private final String leafNodeName;
+    private final String fileExistsInPath;
     private long lastKnownParentId;
     private long leafNodeObjectId;
-    private String fileExistsInPath;
 
     public OMPathInfoWithFSO(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
@@ -335,9 +335,9 @@ public final class OMFileRequest {
    * the directory search result code.
    */
   public static class OMPathInfo {
-    private OMDirectoryResult directoryResult;
-    private List<String> missingParents;
-    private List<OzoneAcl> acls;
+    private final OMDirectoryResult directoryResult;
+    private final List<String> missingParents;
+    private final List<OzoneAcl> acls;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
         List<OzoneAcl> aclList) {
@@ -346,7 +346,7 @@ public final class OMFileRequest {
       this.acls = aclList;
     }
 
-    public List getMissingParents() {
+    public List<String> getMissingParents() {
       return missingParents;
     }
 
@@ -567,7 +567,8 @@ public final class OMFileRequest {
    * @return multipartFileKey
    * @throws IOException DB failure
    */
-  public static String addToOpenFileTable(OMMetadataManager omMetadataMgr,
+  public static String addToOpenFileTableForMultipart(
+      OMMetadataManager omMetadataMgr,
       BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID,
       long volumeId, long bucketId) throws IOException {
 

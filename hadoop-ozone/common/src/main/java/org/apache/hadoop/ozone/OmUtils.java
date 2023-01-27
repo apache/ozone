@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -36,11 +35,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import org.apache.commons.lang3.StringUtils;
@@ -273,6 +276,7 @@ public final class OmUtils {
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
       // Although indirectly the Ranger sync service task could invoke write
       // operation SetRangerServiceVersion.
+    case GetKeyInfo:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -321,16 +325,6 @@ public final class OmUtils {
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
-    }
-  }
-
-  public static byte[] getMD5Digest(String input) throws IOException {
-    try {
-      MessageDigest md = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
-      return md.digest(input.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException ex) {
-      throw new IOException("Error creating an instance of MD5 digest.\n" +
-          "This could possibly indicate a faulty JRE");
     }
   }
 
@@ -794,5 +788,39 @@ public final class OmUtils {
     }
     printString.append("]");
     return printString.toString();
+  }
+
+  public static String format(List<ServiceInfo> nodes, int port,
+                              String leaderId) {
+    StringBuilder sb = new StringBuilder();
+    // Ensuring OM's are printed in correct order
+    List<ServiceInfo> omNodes = nodes.stream()
+        .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
+        .sorted(Comparator.comparing(ServiceInfo::getHostname))
+        .collect(Collectors.toList());
+    int count = 0;
+    for (ServiceInfo info : omNodes) {
+      // Printing only the OM's running
+      if (info.getNodeType() == HddsProtos.NodeType.OM) {
+        String role =
+            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
+                "FOLLOWER";
+        sb.append(
+            String.format(
+                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
+                info.getHostname(),
+                info.getOmRoleInfo().getNodeId(),
+                port,
+                role
+            ));
+        count++;
+      }
+    }
+    // Print Stand-alone if only one OM exists
+    if (count == 1) {
+      return "STANDALONE";
+    } else {
+      return sb.toString();
+    }
   }
 }

@@ -22,8 +22,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -31,7 +32,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Typ
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for {@link ContainerUtils}.
@@ -57,4 +58,13 @@ public class TestContainerUtils {
     assertEquals("<redacted>", dataBuffers.getBuffers(0).toString(UTF_8));
   }
 
+  @Test
+  public void testTarName() throws IOException {
+    long containerId = 100;
+    String tarName = "container-100.tar";
+    assertEquals(tarName, ContainerUtils.getContainerTarName(containerId));
+
+    assertEquals(containerId,
+        ContainerUtils.retrieveContainerIdFromTarName(tarName));
+  }
 }

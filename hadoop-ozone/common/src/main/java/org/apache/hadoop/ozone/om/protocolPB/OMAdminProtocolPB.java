@@ -27,7 +27,7 @@ import org.apache.hadoop.security.KerberosInfo;
  * Protocol used for communication between OMs.
  */
 @ProtocolInfo(protocolName =
-    "org.apache.hadoop.ozone.om.protocol.OzoneManagerMetadataProtocol",
+    "org.apache.hadoop.ozone.om.protocol.OMAdminProtocol",
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
