@@ -20,15 +20,18 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 
+import static org.awaitility.Awaitility.await;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.RocksCheckpoint;
 
+import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +88,8 @@ public class RDBCheckpointManager implements Closeable {
       LOG.info("Created checkpoint at {} in {} milliseconds",
               checkpointPath, duration);
 
+      waitForCheckpointDirectoryExist(checkpointPath.toFile());
+
       return new RocksDBCheckpoint(
           checkpointPath,
           currentTime,
@@ -94,6 +99,21 @@ public class RDBCheckpointManager implements Closeable {
       LOG.error("Unable to create RocksDB Snapshot.", e);
     }
     return null;
+  }
+
+  /**
+   * Wait for checkpoint directory gets created for 10 secs.
+   * <p>
+   * By default, Awaitility waits for 10 seconds and then throw
+   * a ConditionTimeoutException if the condition has not been fulfilled.
+   * The default poll interval and poll delay is 100 milliseconds.
+   */
+  private void waitForCheckpointDirectoryExist(File file) throws IOException {
+    try {
+      await().until(file::exists);
+    } catch (ConditionTimeoutException exception) {
+      LOG.info("Checkpoint directory didn't get created in 10 secs.");
+    }
   }
 
   /**
