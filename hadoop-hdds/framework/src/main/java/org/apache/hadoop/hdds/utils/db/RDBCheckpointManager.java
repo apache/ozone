@@ -111,7 +111,8 @@ public class RDBCheckpointManager implements Closeable {
     try {
       await().until(file::exists);
     } catch (ConditionTimeoutException exception) {
-      LOG.info("Checkpoint directory didn't get created in 10 secs.");
+      LOG.info("Checkpoint directory: {} didn't get created in 10 secs.",
+          file.getAbsolutePath());
     }
   }
 
