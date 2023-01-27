@@ -18,7 +18,12 @@
 
 package org.apache.hadoop.hdds.security.symmetric;
 
+import com.google.protobuf.ByteString;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
@@ -81,5 +86,37 @@ public final class ManagedSecretKey implements Serializable {
   public String toString() {
     return "SecretKey(id = " + id + ", creation at: "
         + creationTime + ", expire at: " + expiryTime + ")";
+  }
+
+  /**
+   * @return the protobuf message to deserialize this object.
+   */
+  public SCMSecurityProtocolProtos.ManagedSecretKey toProtobuf() {
+    HddsProtos.UUID id = HddsProtos.UUID.newBuilder()
+        .setMostSigBits(this.id.getMostSignificantBits())
+        .setLeastSigBits(this.id.getLeastSignificantBits())
+        .build();
+
+    return SCMSecurityProtocolProtos.ManagedSecretKey.newBuilder()
+        .setId(id)
+        .setCreationTime(this.creationTime.toEpochMilli())
+        .setExpiryTime(this.expiryTime.toEpochMilli())
+        .setAlgorithm(this.secretKey.getAlgorithm())
+        .setEncoded(ByteString.copyFrom(this.secretKey.getEncoded()))
+        .build();
+  }
+
+  /**
+   * Create a {@link ManagedSecretKey} from a given protobuf message.
+   */
+  public static ManagedSecretKey fromProtobuf(
+      SCMSecurityProtocolProtos.ManagedSecretKey message) {
+    UUID id = new UUID(message.getId().getMostSigBits(),
+        message.getId().getLeastSigBits());
+    Instant creationTime = Instant.ofEpochMilli(message.getCreationTime());
+    Instant expiryTime = Instant.ofEpochMilli(message.getExpiryTime());
+    SecretKey secretKey = new SecretKeySpec(message.getEncoded().toByteArray(),
+        message.getAlgorithm());
+    return new ManagedSecretKey(id, creationTime, expiryTime, secretKey);
   }
 }
