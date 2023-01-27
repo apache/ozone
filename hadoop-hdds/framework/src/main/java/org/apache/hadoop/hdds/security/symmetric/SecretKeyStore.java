@@ -22,7 +22,9 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Interface for SecretKey storage component.
+ * Interface for SecretKey storage component, which is responsible for saving
+ * the SecretKeys states persistently to ensure they're not lost during
+ * restarts.
  */
 public interface SecretKeyStore {
   List<ManagedSecretKey> load();

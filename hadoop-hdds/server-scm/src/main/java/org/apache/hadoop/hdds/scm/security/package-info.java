@@ -17,10 +17,6 @@
  */
 
 /**
- * Encapsulate classes dealing with symmetric key algorithms.
- */
-
-/**
  * Encapsulate classes dealing with security concern in SCM.
  */
 package org.apache.hadoop.hdds.scm.security;
