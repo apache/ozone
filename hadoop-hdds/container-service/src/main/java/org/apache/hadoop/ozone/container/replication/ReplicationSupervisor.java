@@ -18,12 +18,13 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +48,10 @@ public class ReplicationSupervisor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
+
+  private static final Comparator TASK_RUNNER_COMPARATOR = Comparator
+      .comparingInt(TaskRunner::getTaskPriority)
+      .thenComparing(TaskRunner::getTaskQueueTime);
 
   private final ExecutorService executor;
   private final StateContext context;
@@ -84,7 +89,7 @@ public class ReplicationSupervisor {
         new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
+            new PriorityBlockingQueue<>(),
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("ContainerReplicationThread-%d")
                 .build()),
@@ -153,7 +158,7 @@ public class ReplicationSupervisor {
   /**
    * An executable form of a replication task with status handling.
    */
-  public final class TaskRunner implements Runnable {
+  public final class TaskRunner implements Comparable, Runnable {
     private final AbstractReplicationTask task;
 
     public TaskRunner(AbstractReplicationTask task) {
@@ -216,6 +221,19 @@ public class ReplicationSupervisor {
     @Override
     public String toString() {
       return task.toString();
+    }
+
+    public int getTaskPriority() {
+      return task.getPriority();
+    }
+
+    public long getTaskQueueTime() {
+      return task.getQueued().toEpochMilli();
+    }
+
+    @Override
+    public int compareTo(Object o) {
+      return TASK_RUNNER_COMPARATOR.compare(this, o);
     }
   }
 
