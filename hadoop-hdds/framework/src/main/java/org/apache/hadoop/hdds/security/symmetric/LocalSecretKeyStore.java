@@ -97,7 +97,7 @@ public class LocalSecretKeyStore implements SecretKeyStore {
 
   @Override
   public synchronized void save(Collection<ManagedSecretKey> secretKeys) {
-    setFileOwnerPermissions(secretKeysFile);
+    setFileOwnerPermissions();
 
     List<ManagedSecretKeyDto> dtos = secretKeys.stream()
         .map(ManagedSecretKeyDto::new)
@@ -116,16 +116,16 @@ public class LocalSecretKeyStore implements SecretKeyStore {
     LOG.info("Saved {} to file {}", secretKeys, secretKeysFile);
   }
 
-  private void setFileOwnerPermissions(Path path) {
+  private void setFileOwnerPermissions() {
     Set<PosixFilePermission> permissions = newHashSet(OWNER_READ, OWNER_WRITE);
     try {
-      if (!Files.exists(path)) {
-        if (!Files.exists(path.getParent())) {
-          Files.createDirectories(path.getParent());
+      if (!Files.exists(secretKeysFile)) {
+        if (!Files.exists(secretKeysFile.getParent())) {
+          Files.createDirectories(secretKeysFile.getParent());
         }
-        Files.createFile(path);
+        Files.createFile(secretKeysFile);
       }
-      Files.setPosixFilePermissions(path, permissions);
+      Files.setPosixFilePermissions(secretKeysFile, permissions);
     } catch (IOException e) {
       throw new IllegalStateException("Error setting secret keys file" +
           " permission: " + secretKeysFile, e);
