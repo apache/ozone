@@ -27,13 +27,17 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -92,6 +96,9 @@ public class LocalSecretKeyStoreTest {
     assertEqualKeys(keys, reloadedKeys);
   }
 
+  /**
+   * Verifies that secret keys are overwritten by subsequent writes.
+   */
   @Test
   public void testOverwrite() throws Exception {
     List<ManagedSecretKey> initialKeys =
@@ -107,31 +114,69 @@ public class LocalSecretKeyStoreTest {
     assertEqualKeys(updatedKeys, secretKeyStore.load());
   }
 
-  private void assertEqualKeys(List<ManagedSecretKey> keys,
-                         List<ManagedSecretKey> reloadedKeys) {
-    assertEquals(keys.size(), reloadedKeys.size());
-    for (int i = 0; i < keys.size(); i++) {
-      ManagedSecretKey key = keys.get(i);
-      ManagedSecretKey reloadedKey = reloadedKeys.get(i);
+  /**
+   * This scenario verifies if an existing secret keys file can be loaded.
+   * The intention of this is to ensure a saved file can be loaded after
+   * future changes to {@link ManagedSecretKey} schema.
+   *
+   * Please don't just change the content of test_secret_keys.json if this
+   * test fails, instead, analyse the backward-compatibility of the change.
+   */
+  @Test
+  public void testLoadExistingFile() throws Exception {
+    // copy test file content to the backing file.
+    ClassLoader cl = Thread.currentThread().getContextClassLoader();
+    try (
+        InputStream is = cl.getResourceAsStream("test_secret_keys.json")
+    ) {
+      Files.copy(is, testSecretFile, StandardCopyOption.REPLACE_EXISTING);
+    }
 
-      assertEquals(key.getId(), reloadedKey.getId());
-      assertEquals(key.getCreationTime().toEpochMilli(),
-          reloadedKey.getCreationTime().toEpochMilli());
-      assertEquals(key.getExpiryTime(),
-          reloadedKey.getExpiryTime());
-      assertEquals(key.getSecretKey(), reloadedKey.getSecretKey());
+    Instant date = Instant.parse("2007-12-03T10:15:30.00Z");
+    ManagedSecretKey secretKey = new ManagedSecretKey(
+        UUID.fromString("78864cfb-793b-4157-8ad6-714c9f950a16"),
+        date,
+        date.plus(Duration.ofHours(1)),
+        new SecretKeySpec(
+            Base64.getDecoder().decode(
+                "YSeCdJRB4RclxoeE69ENmTe2Cv8ybyKhHP3mq4M1r8o="),
+            "HmacSHA256"
+        ));
+
+    List<ManagedSecretKey> expectedKeys = newArrayList(secretKey);
+    assertEqualKeys(expectedKeys, secretKeyStore.load());
+  }
+
+  private void assertEqualKeys(List<ManagedSecretKey> expected,
+                               List<ManagedSecretKey> actual) {
+    assertEquals(expected.size(), actual.size());
+    for (int i = 0; i < expected.size(); i++) {
+      ManagedSecretKey expectedKey = expected.get(i);
+      ManagedSecretKey actualKey = actual.get(i);
+
+      assertEquals(expectedKey.getId(), actualKey.getId());
+      assertEquals(expectedKey.getCreationTime().toEpochMilli(),
+          actualKey.getCreationTime().toEpochMilli());
+      assertEquals(expectedKey.getExpiryTime(),
+          actualKey.getExpiryTime());
+      assertEquals(expectedKey.getSecretKey(), actualKey.getSecretKey());
     }
   }
 
   private static ManagedSecretKey generateKey(String algorithm)
       throws Exception {
+    return generateKey(algorithm, Instant.now());
+  }
+
+  private static ManagedSecretKey generateKey(String algorithm,
+                                              Instant creationTime)
+      throws Exception {
     KeyGenerator keyGen = KeyGenerator.getInstance(algorithm);
     SecretKey secretKey = keyGen.generateKey();
-    Instant now = Instant.now();
     return new ManagedSecretKey(
         UUID.randomUUID(),
-        now,
-        now.plus(Duration.ofHours(1)),
+        creationTime,
+        creationTime.plus(Duration.ofHours(1)),
         secretKey
     );
   }
