@@ -44,9 +44,9 @@ public class RDBCheckpointManager implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointManager.class);
   private final String checkpointNamePrefix;
-  private static final Duration pollDelayDuration = Duration.ZERO;
-  private static final Duration pollIntervalDuration = Duration.ofMillis(100);
-  private static final Duration pollMaxDuration = Duration.ofSeconds(5);
+  private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
+  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
+  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(5);
 
   /**
    * Create a checkpoint manager with a prefix to be added to the
@@ -114,9 +114,9 @@ public class RDBCheckpointManager implements Closeable {
   private void waitForCheckpointDirectoryExist(File file) throws IOException {
     Instant start = Instant.now();
     try {
-      with().atMost(pollMaxDuration)
-          .pollDelay(pollDelayDuration)
-          .pollInterval(pollIntervalDuration)
+      with().atMost(POLL_MAX_DURATION)
+          .pollDelay(POLL_DELAY_DURATION)
+          .pollInterval(POLL_INTERVAL_DURATION)
           .await()
           .until(file::exists);
       LOG.info("Waited for {} milliseconds for checkpoint directory {}" +
