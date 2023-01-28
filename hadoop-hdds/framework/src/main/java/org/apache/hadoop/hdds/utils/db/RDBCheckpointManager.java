@@ -32,18 +32,21 @@ import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.awaitility.Awaitility.await;
+import static org.awaitility.Awaitility.with;
 
 /**
  * RocksDB Checkpoint Manager, used to create and cleanup checkpoints.
  */
 public class RDBCheckpointManager implements Closeable {
-
+  private final RocksDatabase db;
   private final RocksCheckpoint checkpoint;
   public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointManager.class);
   private final String checkpointNamePrefix;
+  private static final Duration pollDelayDuration = Duration.ZERO;
+  private static final Duration pollIntervalDuration = Duration.ofMillis(100);
+  private static final Duration pollMaxDuration = Duration.ofSeconds(5);
 
   /**
    * Create a checkpoint manager with a prefix to be added to the
@@ -52,6 +55,7 @@ public class RDBCheckpointManager implements Closeable {
    * @param checkpointPrefix prefix string.
    */
   public RDBCheckpointManager(RocksDatabase db, String checkpointPrefix) {
+    this.db = db;
     this.checkpointNamePrefix = checkpointPrefix;
     this.checkpoint = db.createCheckpoint();
   }
@@ -81,13 +85,16 @@ public class RDBCheckpointManager implements Closeable {
       checkpoint.createCheckpoint(checkpointPath);
       //Best guesstimate here. Not accurate.
       final long latest = checkpoint.getLatestSequenceNumber();
-      Instant end = Instant.now();
 
+      Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
-      LOG.info("Created checkpoint at {} in {} milliseconds",
+      LOG.info("Created checkpoint in rocksDB at {} in {} milliseconds",
               checkpointPath, duration);
 
-      waitForCheckpointDirectoryExist(checkpointPath.toFile());
+      // Wait for checkpoint directory to be created if it doesn't exist.
+      if (!checkpointPath.toFile().exists()) {
+        waitForCheckpointDirectoryExist(checkpointPath.toFile());
+      }
 
       return new RocksDBCheckpoint(
           checkpointPath,
@@ -101,17 +108,23 @@ public class RDBCheckpointManager implements Closeable {
   }
 
   /**
-   * Wait for checkpoint directory gets created for 10 secs.
-   * <p>
-   * By default, Awaitility waits for 10 seconds and then throw
-   * a ConditionTimeoutException if the condition has not been fulfilled.
-   * The default poll interval and poll delay is 100 milliseconds.
+   * Wait for checkpoint directory to be created for 5 secs with 100 millis
+   * poll interval.
    */
   private void waitForCheckpointDirectoryExist(File file) throws IOException {
+    Instant start = Instant.now();
     try {
-      await().until(file::exists);
+      with().atMost(pollMaxDuration)
+          .pollDelay(pollDelayDuration)
+          .pollInterval(pollIntervalDuration)
+          .await()
+          .until(file::exists);
+      LOG.info("Waited for {} milliseconds for checkpoint directory {}" +
+              " availability.",
+          Duration.between(start, Instant.now()).toMillis(),
+          file.getAbsoluteFile());
     } catch (ConditionTimeoutException exception) {
-      LOG.info("Checkpoint directory: {} didn't get created in 10 secs.",
+      LOG.info("Checkpoint directory: {} didn't get created in 5 secs.",
           file.getAbsolutePath());
     }
   }

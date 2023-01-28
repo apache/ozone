@@ -42,11 +42,10 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -55,7 +54,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
@@ -71,9 +69,9 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * Tests Snapshot Restore function.
  */
-
+@Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
-  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String OM_SERVICE_ID = "om-service-test-1";
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static MiniOzoneCluster cluster = null;
   private static String volumeName;
@@ -83,8 +81,6 @@ public class TestOzoneSnapshotRestore {
   private static File metaDir;
   private static OzoneManager leaderOzoneManager;
   private static OzoneBucket ozoneBucket;
-  @Rule
-  public Timeout timeout = new Timeout(500, TimeUnit.SECONDS);
   private OzoneConfiguration clientConf;
 
   private static Stream<Arguments> bucketTypes() {
@@ -232,11 +228,11 @@ public class TestOzoneSnapshotRestore {
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
 
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assert.assertEquals(5, volBucketKeyCount);
+    Assertions.assertEquals(5, volBucketKeyCount);
 
     deleteKeys(buck);
     int delKeyCount = keyCount(buck, keyPrefix);
-    Assert.assertEquals(0, delKeyCount);
+    Assertions.assertEquals(0, delKeyCount);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
             + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -247,8 +243,7 @@ public class TestOzoneSnapshotRestore {
     }
 
     int finalKeyCount = keyCount(buck, keyPrefix);
-    Assert.assertEquals(5, finalKeyCount);
-
+    Assertions.assertEquals(5, finalKeyCount);
   }
 
   @ParameterizedTest
@@ -276,7 +271,7 @@ public class TestOzoneSnapshotRestore {
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
 
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assert.assertEquals(5, volBucketKeyCount);
+    Assertions.assertEquals(5, volBucketKeyCount);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
             + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -287,8 +282,7 @@ public class TestOzoneSnapshotRestore {
     }
 
     int finalKeyCount = keyCount(buck2, keyPrefix);
-    Assert.assertEquals(5, finalKeyCount);
-
+    Assertions.assertEquals(5, finalKeyCount);
   }
 
   @ParameterizedTest
@@ -320,7 +314,7 @@ public class TestOzoneSnapshotRestore {
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
 
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assert.assertEquals(5, volBucketKeyCount);
+    Assertions.assertEquals(5, volBucketKeyCount);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
             + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -331,8 +325,6 @@ public class TestOzoneSnapshotRestore {
     }
 
     int finalKeyCount = keyCount(buck2, keyPrefix);
-    Assert.assertEquals(5, finalKeyCount);
-
+    Assertions.assertEquals(5, finalKeyCount);
   }
-
 }
