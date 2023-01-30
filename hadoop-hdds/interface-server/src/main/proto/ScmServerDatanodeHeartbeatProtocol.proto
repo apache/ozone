@@ -415,6 +415,7 @@ message ReplicateContainerCommandProto {
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
   optional int32 replicaIndex = 4;
+  optional DatanodeDetailsProto target = 5;
 }
 
 /**

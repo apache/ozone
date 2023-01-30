@@ -84,12 +84,12 @@ public class TestObjectStore {
     store.createVolume(sampleVolumeName);
     OzoneVolume volume = store.getVolume(sampleVolumeName);
 
-    // Case 1: Bucket layout: Empty and OM default bucket layout: LEGACY
+    // Case 1: Bucket layout: Empty and OM default bucket layout: FSO
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     volume.createBucket(sampleBucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(sampleBucketName);
     Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.LEGACY,
+    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 2: Bucket layout: OBJECT_STORE

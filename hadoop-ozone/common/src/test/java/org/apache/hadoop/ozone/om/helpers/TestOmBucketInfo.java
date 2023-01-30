@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 
@@ -145,7 +146,7 @@ public class TestOmBucketInfo {
             "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
             OzoneAcl.AclScope.ACCESS)))
         .setDefaultReplicationConfig(
-            new DefaultReplicationConfig(ReplicationType.EC,
+            new DefaultReplicationConfig(
                 new ECReplicationConfig(3, 2))).build();
     protobuf = omBucketInfo.getProtobuf();
 
@@ -161,10 +162,8 @@ public class TestOmBucketInfo {
     recovered = OmBucketInfo.getFromProtobuf(protobuf);
     Assert.assertEquals(ReplicationType.EC,
         recovered.getDefaultReplicationConfig().getType());
-    ECReplicationConfig config =
-        recovered.getDefaultReplicationConfig().getEcReplicationConfig();
-    Assert.assertNotNull(config);
-    Assert.assertEquals(3, config.getData());
-    Assert.assertEquals(2, config.getParity());
+    ReplicationConfig config =
+        recovered.getDefaultReplicationConfig().getReplicationConfig();
+    Assert.assertEquals(new ECReplicationConfig(3, 2), config);
   }
 }

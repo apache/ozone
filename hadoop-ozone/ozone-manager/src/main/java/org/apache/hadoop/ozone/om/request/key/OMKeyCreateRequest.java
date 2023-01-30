@@ -305,7 +305,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
       omBucketInfo.incrUsedNamespace(numMissingParents);
 

@@ -32,12 +32,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
@@ -51,22 +49,12 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   public static final Logger LOG =
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
-  private final Path workingDirectory;
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
   private final String compression;
 
-  public SimpleContainerDownloader(ConfigurationSource conf,
-      CertificateClient certClient) {
-    String workDirString =
-        conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
-
-    if (workDirString == null) {
-      workingDirectory = Paths.get(System.getProperty("java.io.tmpdir"))
-          .resolve("container-copy");
-    } else {
-      workingDirectory = Paths.get(workDirString);
-    }
+  public SimpleContainerDownloader(
+      ConfigurationSource conf, CertificateClient certClient) {
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
     this.compression = CopyContainerCompression.getConf(conf).toString();
@@ -74,7 +62,13 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   @Override
   public Path getContainerDataFromReplicas(
-      long containerId, List<DatanodeDetails> sourceDatanodes) {
+      long containerId, List<DatanodeDetails> sourceDatanodes,
+      Path downloadDir) {
+
+    if (downloadDir == null) {
+      downloadDir = Paths.get(System.getProperty("java.io.tmpdir"))
+              .resolve(ContainerImporter.CONTAINER_COPY_DIR);
+    }
 
     final List<DatanodeDetails> shuffledDatanodes =
         shuffleDatanodes(sourceDatanodes);
@@ -82,7 +76,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
         CompletableFuture<Path> result =
-            downloadContainer(containerId, datanode);
+            downloadContainer(containerId, datanode, downloadDir);
         return result.get();
       } catch (ExecutionException | IOException e) {
         LOG.error("Error on replicating container: {} from {}/{}", containerId,
@@ -115,13 +109,15 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   @VisibleForTesting
   protected CompletableFuture<Path> downloadContainer(
-      long containerId, DatanodeDetails datanode) throws IOException {
+      long containerId, DatanodeDetails datanode, Path downloadDir)
+      throws IOException {
     CompletableFuture<Path> result;
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            workingDirectory, securityConfig, certClient, compression);
-    result = grpcReplicationClient.download(containerId)
+            securityConfig, certClient, compression);
+
+    result = grpcReplicationClient.download(containerId, downloadDir)
         .whenComplete((r, ex) -> {
           try {
             grpcReplicationClient.close();

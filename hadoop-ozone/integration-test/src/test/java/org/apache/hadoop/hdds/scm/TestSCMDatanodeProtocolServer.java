@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -39,8 +38,7 @@ public class TestSCMDatanodeProtocolServer {
     OzoneStorageContainerManager scm =
         Mockito.mock(OzoneStorageContainerManager.class);
 
-    ReplicateContainerCommand command = new ReplicateContainerCommand(1L,
-        Collections.emptyList());
+    ReplicateContainerCommand command = ReplicateContainerCommand.forTest(1);
     command.setTerm(5L);
     command.setDeadline(1234L);
     StorageContainerDatanodeProtocolProtos.SCMCommandProto proto =

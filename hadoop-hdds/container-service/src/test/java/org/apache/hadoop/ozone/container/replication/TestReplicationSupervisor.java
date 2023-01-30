@@ -18,8 +18,11 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -32,16 +35,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
@@ -78,8 +89,12 @@ public class TestReplicationSupervisor {
   };
   private final AtomicReference<ContainerReplicator> replicatorRef =
       new AtomicReference<>();
-  private final ContainerReplicator mutableReplicator =
+  private final AtomicReference<ContainerReplicator> pushReplicatorRef =
+      new AtomicReference<>();
+  private final ContainerReplicator pullReplicator =
       task -> replicatorRef.get().replicate(task);
+  private final ContainerReplicator pushReplicator =
+      task -> pushReplicatorRef.get().replicate(task);
 
   private ContainerSet set;
 
@@ -130,7 +145,7 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(3, supervisor.getReplicationRequestCount());
       Assert.assertEquals(3, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
       Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(3, set.containerCount());
 
@@ -160,7 +175,8 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(4, supervisor.getReplicationRequestCount());
       Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(3, supervisor.getReplicationSkippedCount());
+      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
       Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(1, set.containerCount());
     } finally {
@@ -183,7 +199,7 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(1, supervisor.getReplicationRequestCount());
       Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(1, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
       Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(0, set.containerCount());
       Assert.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
@@ -203,12 +219,18 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(1L));
       supervisor.addTask(createTask(2L));
       supervisor.addTask(createTask(3L));
+      supervisor.addTask(createECTask(4L));
+      supervisor.addTask(createECTask(5L));
 
       //THEN
       Assert.assertEquals(0, supervisor.getReplicationRequestCount());
       Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
       Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(3, supervisor.getInFlightReplications());
+      Assert.assertEquals(5, supervisor.getTotalInFlightReplications());
+      Assert.assertEquals(3, supervisor.getInFlightReplications(
+          ReplicationTask.class));
+      Assert.assertEquals(2, supervisor.getInFlightReplications(
+          ECReconstructionCoordinatorTask.class));
       Assert.assertEquals(0, supervisor.getQueueSize());
       Assert.assertEquals(0, set.containerCount());
     } finally {
@@ -230,14 +252,14 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(3L));
 
       //THEN
-      Assert.assertEquals(3, supervisor.getInFlightReplications());
+      Assert.assertEquals(3, supervisor.getTotalInFlightReplications());
       Assert.assertEquals(2, supervisor.getQueueSize());
       // Sleep 4s, wait all tasks processed
       try {
         Thread.sleep(4000);
       } catch (InterruptedException e) {
       }
-      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
       Assert.assertEquals(0, supervisor.getQueueSize());
     } finally {
       supervisor.stop();
@@ -245,23 +267,33 @@ public class TestReplicationSupervisor {
   }
 
   @Test
-  public void testDownloadAndImportReplicatorFailure() {
+  public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, mutableReplicator,
-            newDirectExecutorService(), clock);
+        new ReplicationSupervisor(context, newDirectExecutorService(), clock);
 
+    OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
     Path res = Paths.get("file:/tmp/no-such-file");
     Mockito.when(
-        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
+        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList(),
+            Mockito.any(Path.class)))
         .thenReturn(res);
 
-    ContainerReplicator replicatorFactory =
-        new DownloadAndImportReplicator(set, null, moc, null);
+    final String testDir = GenericTestUtils.getTempPath(
+        TestReplicationSupervisor.class.getSimpleName() +
+            "-" + UUID.randomUUID().toString());
+    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+    Mockito.when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(
+            new HddsVolume.Builder(testDir).conf(conf).build()));
+    ContainerImporter importer =
+        new ContainerImporter(conf, set, null, null, volumeSet);
+    ContainerReplicator replicator =
+        new DownloadAndImportReplicator(set, importer, moc);
 
-    replicatorRef.set(replicatorFactory);
+    replicatorRef.set(replicator);
 
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(DownloadAndImportReplicator.LOG);
@@ -280,13 +312,13 @@ public class TestReplicationSupervisor {
 
     ReplicateContainerCommand cmd = createCommand(1);
     cmd.setDeadline(clock.millis() + 10000);
-    ReplicationTask task1 = new ReplicationTask(cmd);
+    ReplicationTask task1 = new ReplicationTask(cmd, replicatorRef.get());
     cmd = createCommand(2);
     cmd.setDeadline(clock.millis() + 20000);
-    ReplicationTask task2 = new ReplicationTask(cmd);
+    ReplicationTask task2 = new ReplicationTask(cmd, replicatorRef.get());
     cmd = createCommand(3);
     // No deadline set
-    ReplicationTask task3 = new ReplicationTask(cmd);
+    ReplicationTask task3 = new ReplicationTask(cmd, replicatorRef.get());
     // no deadline set
 
     clock.fastForward(15000);
@@ -298,7 +330,7 @@ public class TestReplicationSupervisor {
     Assert.assertEquals(3, supervisor.getReplicationRequestCount());
     Assert.assertEquals(2, supervisor.getReplicationSuccessCount());
     Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getInFlightReplications());
+    Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
     Assert.assertEquals(0, supervisor.getQueueSize());
     Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
     Assert.assertEquals(2, set.containerCount());
@@ -327,22 +359,55 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, context, mutableReplicator, executor,
-            clock);
+        new ReplicationSupervisor(context, executor, clock);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }
 
-  private static ReplicationTask createTask(long containerId) {
+  private ReplicationTask createTask(long containerId) {
     ReplicateContainerCommand cmd = createCommand(containerId);
-    return new ReplicationTask(cmd);
+    return new ReplicationTask(cmd, replicatorRef.get());
+  }
+
+  private ECReconstructionCoordinatorTask createECTask(long containerId) {
+    return new ECReconstructionCoordinatorTask(null,
+        createReconstructionCmd(containerId));
   }
 
   private static ReplicateContainerCommand createCommand(long containerId) {
     ReplicateContainerCommand cmd =
-        new ReplicateContainerCommand(containerId, emptyList());
+        ReplicateContainerCommand.forTest(containerId);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
+  }
+
+  private static ECReconstructionCommandInfo createReconstructionCmd(
+      long containerId) {
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources
+        = new ArrayList<>();
+    sources.add(new ReconstructECContainersCommand
+        .DatanodeDetailsAndReplicaIndex(
+            MockDatanodeDetails.randomDatanodeDetails(), 1));
+    sources.add(new ReconstructECContainersCommand
+        .DatanodeDetailsAndReplicaIndex(
+        MockDatanodeDetails.randomDatanodeDetails(), 2));
+    sources.add(new ReconstructECContainersCommand
+        .DatanodeDetailsAndReplicaIndex(
+        MockDatanodeDetails.randomDatanodeDetails(), 3));
+
+    byte[] missingIndexes = new byte[1];
+    missingIndexes[0] = 4;
+
+    List<DatanodeDetails> target = Collections.singletonList(
+        MockDatanodeDetails.randomDatanodeDetails());
+    ReconstructECContainersCommand cmd =
+        new ReconstructECContainersCommand(containerId,
+            sources,
+            target,
+            missingIndexes,
+            new ECReplicationConfig(3, 2));
+
+    return new ECReconstructionCommandInfo(cmd);
   }
 
   /**
@@ -359,10 +424,13 @@ public class TestReplicationSupervisor {
 
     @Override
     public void replicate(ReplicationTask task) {
-      Assert.assertNull(set.getContainer(task.getContainerId()));
+      if (set.getContainer(task.getContainerId()) != null) {
+        task.setStatus(AbstractReplicationTask.Status.SKIPPED);
+        return;
+      }
 
       // assumes same-thread execution
-      Assert.assertEquals(1, supervisor.getInFlightReplications());
+      Assert.assertEquals(1, supervisor.getTotalInFlightReplications());
 
       KeyValueContainerData kvcd =
           new KeyValueContainerData(task.getContainerId(),

@@ -101,7 +101,8 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
           bucketKey, omBucketInfo);
     }
 
-    OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
+    OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
+        batchOperation,
         getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID(), volumeId,
         bucketId);
 
