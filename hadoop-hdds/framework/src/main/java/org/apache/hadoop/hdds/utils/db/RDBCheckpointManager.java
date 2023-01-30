@@ -82,8 +82,13 @@ public class RDBCheckpointManager implements Closeable {
 
       Path checkpointPath = Paths.get(parentDir, checkpointDir);
       Instant start = Instant.now();
+
+      // Flush the DB WAL and mem table.
+      db.flushWal(true);
+      db.flush();
+
       checkpoint.createCheckpoint(checkpointPath);
-      //Best guesstimate here. Not accurate.
+      // Best guesstimate here. Not accurate.
       final long latest = checkpoint.getLatestSequenceNumber();
 
       Instant end = Instant.now();
@@ -91,10 +96,7 @@ public class RDBCheckpointManager implements Closeable {
       LOG.info("Created checkpoint in rocksDB at {} in {} milliseconds",
               checkpointPath, duration);
 
-      // Wait for checkpoint directory to be created if it doesn't exist.
-      if (!checkpointPath.toFile().exists()) {
-        waitForCheckpointDirectoryExist(checkpointPath.toFile());
-      }
+      waitForCheckpointDirectoryExist(checkpointPath.toFile());
 
       return new RocksDBCheckpoint(
           checkpointPath,

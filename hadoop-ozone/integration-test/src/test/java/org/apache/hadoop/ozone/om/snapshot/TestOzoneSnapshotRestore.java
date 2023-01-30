@@ -63,7 +63,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -98,7 +97,7 @@ public class TestOzoneSnapshotRestore {
   }
 
   @BeforeEach
-  private void init() throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
@@ -200,7 +199,7 @@ public class TestOzoneSnapshotRestore {
       // Copy key from source to destination path
       int res = ToolRunner.run(shell,
               new String[]{"-cp", sourcePath, destPath});
-      assertEquals(0, res);
+      Assertions.assertEquals(0, res);
     } finally {
       shell.close();
     }
