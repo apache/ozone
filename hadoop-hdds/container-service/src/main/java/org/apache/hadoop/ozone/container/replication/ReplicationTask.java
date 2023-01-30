@@ -39,6 +39,7 @@ public class ReplicationTask extends AbstractReplicationTask {
   public ReplicationTask(ReplicateContainerCommand cmd,
                          ContainerReplicator replicator) {
     super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
+    setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
   }

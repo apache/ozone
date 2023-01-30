@@ -71,6 +71,7 @@ import javax.annotation.Nonnull;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
+import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
@@ -442,6 +443,7 @@ public class TestReplicationSupervisor {
       } catch (InterruptedException e) {
         fail("Interrupted waiting for the completion latch to be released");
       }
+      setStatus(DONE);
     }
   }
 
@@ -465,6 +467,7 @@ public class TestReplicationSupervisor {
     @Override
     public void runTask() {
       completeList.add(name);
+      setStatus(DONE);
       completeLatch.countDown();
     }
   }
@@ -560,7 +563,7 @@ public class TestReplicationSupervisor {
 
       try {
         set.addContainer(kvc);
-        task.setStatus(ReplicationTask.Status.DONE);
+        task.setStatus(DONE);
       } catch (Exception e) {
         Assert.fail("Unexpected error: " + e.getMessage());
       }
