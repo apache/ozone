@@ -20,10 +20,11 @@ package org.apache.hadoop.ozone.container.replication;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
+
+import org.apache.commons.io.output.CountingOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
@@ -53,14 +54,19 @@ public class PushReplicator implements ContainerReplicator {
 
     source.prepare(containerID);
 
-    OutputStream output = null;
+    CountingOutputStream output = null;
     try {
-      output = uploader.startUpload(containerID, target, fut);
+      output = new CountingOutputStream(
+          uploader.startUpload(containerID, target, fut));
       source.copyData(containerID, output, NO_COMPRESSION.name());
       fut.get();
+      task.setTransferredBytes(output.getByteCount());
       task.setStatus(Status.DONE);
     } catch (Exception e) {
       LOG.warn("Container {} replication was unsuccessful.", containerID, e);
+      if (output != null) {
+        task.setTransferredBytes(output.getByteCount());
+      }
       task.setStatus(Status.FAILED);
     } finally {
       // output may have already been closed, ignore such errors
