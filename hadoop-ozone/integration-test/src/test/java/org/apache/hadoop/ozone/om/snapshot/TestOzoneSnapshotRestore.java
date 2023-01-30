@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -39,7 +38,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -71,15 +69,10 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 @Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
-  private static BucketLayout bucketLayout = BucketLayout.LEGACY;
-  private static MiniOzoneCluster cluster = null;
-  private static String volumeName;
-  private static String bucketName;
-  private static OzoneManagerProtocol writeClient;
-  private static ObjectStore store;
-  private static File metaDir;
-  private static OzoneManager leaderOzoneManager;
-  private static OzoneBucket ozoneBucket;
+  private MiniOzoneCluster cluster;
+  private ObjectStore store;
+  private File metaDir;
+  private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
 
   private static Stream<Arguments> bucketTypes() {
@@ -111,12 +104,6 @@ public class TestOzoneSnapshotRestore {
             .build();
     cluster.waitForClusterToBeReady();
 
-    // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil
-            .createVolumeAndBucket(cluster, bucketLayout);
-    volumeName = ozoneBucket.getVolumeName();
-    bucketName = ozoneBucket.getName();
-
     leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
@@ -127,7 +114,6 @@ public class TestOzoneSnapshotRestore {
 
     OzoneClient client = cluster.getClient();
     store = client.getObjectStore();
-    writeClient = store.getClientProxy().getOzoneManagerClient();
 
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
             .getInternalState(leaderOzoneManager, "keyManager");
