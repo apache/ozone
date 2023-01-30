@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,9 +51,9 @@ public class ReplicationSupervisor {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
 
-  private static final Comparator TASK_RUNNER_COMPARATOR = Comparator
-      .comparing(TaskRunner::getTaskPriority)
-      .thenComparing(TaskRunner::getTaskQueueTime);
+  private static final Comparator<TaskRunner> TASK_RUNNER_COMPARATOR =
+      Comparator.comparing(TaskRunner::getTaskPriority)
+          .thenComparing(TaskRunner::getTaskQueueTime);
 
   private final ExecutorService executor;
   private final StateContext context;
@@ -244,7 +245,24 @@ public class ReplicationSupervisor {
 
     @Override
     public int compareTo(Object o) {
-      return TASK_RUNNER_COMPARATOR.compare(this, o);
+      return TASK_RUNNER_COMPARATOR.compare(this, (TaskRunner) o);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(task);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      TaskRunner that = (TaskRunner) o;
+      return task.equals(that.task);
     }
   }
 
