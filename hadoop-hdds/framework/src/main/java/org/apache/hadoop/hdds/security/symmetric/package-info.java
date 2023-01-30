@@ -57,7 +57,6 @@
  * </ul>
  *
  * <p/>
- * The overall design is documented
- * <a href=https://docs.google.com/document/d/1es32PId8XwDGONSRmp_NLvbSeALlf-fyXp0RJB5O3hg>here</a>.
+ * The overall design is documented <a href=http://surl.li/epvkc>here</a>.
  */
 package org.apache.hadoop.hdds.security.symmetric;

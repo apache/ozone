@@ -30,7 +30,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static java.time.Duration.between;
-import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 

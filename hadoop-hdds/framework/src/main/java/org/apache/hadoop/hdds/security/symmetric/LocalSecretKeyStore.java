@@ -50,6 +50,8 @@ import static java.util.stream.Collectors.toList;
  * JSON file on local file system.
  */
 public class LocalSecretKeyStore implements SecretKeyStore {
+  public static final Set<PosixFilePermission> SECRET_KEYS_PERMISSIONS =
+      newHashSet(OWNER_READ, OWNER_WRITE);
   private static final Logger LOG =
       LoggerFactory.getLogger(LocalSecretKeyStore.class);
 
@@ -86,7 +88,7 @@ public class LocalSecretKeyStore implements SecretKeyStore {
 
   @Override
   public synchronized void save(Collection<ManagedSecretKey> secretKeys) {
-    setFileOwnerPermissions();
+    createSecretKeyFiles();
 
     List<ManagedSecretKeyDto> dtos = secretKeys.stream()
         .map(ManagedSecretKeyDto::new)
@@ -103,8 +105,7 @@ public class LocalSecretKeyStore implements SecretKeyStore {
     LOG.info("Saved {} to file {}", secretKeys, secretKeysFile);
   }
 
-  private void setFileOwnerPermissions() {
-    Set<PosixFilePermission> permissions = newHashSet(OWNER_READ, OWNER_WRITE);
+  private void createSecretKeyFiles() {
     try {
       if (!Files.exists(secretKeysFile)) {
         if (!Files.exists(secretKeysFile.getParent())) {
@@ -112,7 +113,7 @@ public class LocalSecretKeyStore implements SecretKeyStore {
         }
         Files.createFile(secretKeysFile);
       }
-      Files.setPosixFilePermissions(secretKeysFile, permissions);
+      Files.setPosixFilePermissions(secretKeysFile, SECRET_KEYS_PERMISSIONS);
     } catch (IOException e) {
       throw new IllegalStateException("Error setting secret keys file" +
           " permission: " + secretKeysFile, e);

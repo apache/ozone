@@ -92,13 +92,13 @@ public final class ManagedSecretKey implements Serializable {
    * @return the protobuf message to deserialize this object.
    */
   public SCMSecurityProtocolProtos.ManagedSecretKey toProtobuf() {
-    HddsProtos.UUID id = HddsProtos.UUID.newBuilder()
+    HddsProtos.UUID uuid = HddsProtos.UUID.newBuilder()
         .setMostSigBits(this.id.getMostSignificantBits())
         .setLeastSigBits(this.id.getLeastSignificantBits())
         .build();
 
     return SCMSecurityProtocolProtos.ManagedSecretKey.newBuilder()
-        .setId(id)
+        .setId(uuid)
         .setCreationTime(this.creationTime.toEpochMilli())
         .setExpiryTime(this.expiryTime.toEpochMilli())
         .setAlgorithm(this.secretKey.getAlgorithm())
