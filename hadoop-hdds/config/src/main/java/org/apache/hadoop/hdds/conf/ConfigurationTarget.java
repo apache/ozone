@@ -44,7 +44,7 @@ public interface ConfigurationTarget {
     set(name, Boolean.toString(value));
   }
 
-  default <T extends Enum<T>>void setEnum(String name, T value) {
+  default <T extends Enum<T>> void setEnum(String name, T value) {
     set(name, value.name());
   }
 
