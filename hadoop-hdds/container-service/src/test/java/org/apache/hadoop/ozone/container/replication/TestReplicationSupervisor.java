@@ -403,11 +403,23 @@ public class TestReplicationSupervisor {
     expectedOrder.add("LOW_5");
     expectedOrder.add("LOW_10");
 
+    // Before unblocking the queue, check the queue count for the OrderedTask.
+    // We loaded 3 High / normal priority and 2 low. The counter should not
+    // include the low counts.
+    Assert.assertEquals(3,
+        supervisor.getInFlightReplications(OrderedTask.class));
+    Assert.assertEquals(1,
+        supervisor.getInFlightReplications(BlockingTask.class));
+
     // Unblock the queue
     completeRunning.countDown();
     // Wait for all tasks to complete
     tasksCompleteLatch.await();
     Assert.assertEquals(expectedOrder, completionOrder);
+    Assert.assertEquals(0,
+        supervisor.getInFlightReplications(OrderedTask.class));
+    Assert.assertEquals(0,
+        supervisor.getInFlightReplications(BlockingTask.class));
   }
 
   private static class BlockingTask extends AbstractReplicationTask {

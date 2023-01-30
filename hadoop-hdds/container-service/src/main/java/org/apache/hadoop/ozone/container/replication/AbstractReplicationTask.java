@@ -53,7 +53,7 @@ public abstract class AbstractReplicationTask {
 
   private final long term;
 
-  private int priority = NORMAL.getNumber();
+  private ReplicationCommandPriority priority = NORMAL;
 
   protected AbstractReplicationTask(long containerID,
       long deadlineMsSinceEpoch, long term) {
@@ -110,15 +110,14 @@ public abstract class AbstractReplicationTask {
    *                 this task.
    */
   public void setPriority(ReplicationCommandPriority priority) {
-    this.priority = priority.getNumber();
+    this.priority = priority;
   }
 
   /**
    * Returns the priority of the task. A lower number indicates a higher
    * priority.
    */
-  public int getPriority() {
+  public ReplicationCommandPriority getPriority() {
     return priority;
   }
-
 }

@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -50,7 +51,7 @@ public class ReplicationSupervisor {
       LoggerFactory.getLogger(ReplicationSupervisor.class);
 
   private static final Comparator TASK_RUNNER_COMPARATOR = Comparator
-      .comparingInt(TaskRunner::getTaskPriority)
+      .comparing(TaskRunner::getTaskPriority)
       .thenComparing(TaskRunner::getTaskQueueTime);
 
   private final ExecutorService executor;
@@ -101,13 +102,23 @@ public class ReplicationSupervisor {
    */
   public void addTask(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
-      taskCounter.computeIfAbsent(task.getClass(),
-          k -> new AtomicInteger()).incrementAndGet();
+      if (task.getPriority() != ReplicationCommandPriority.LOW) {
+        // Low priority tasks are not included in the replication queue sizes
+        // returned to SCM in the heartbeat, so we only update the count for
+        // priorities other than low.
+        taskCounter.computeIfAbsent(task.getClass(),
+            k -> new AtomicInteger()).incrementAndGet();
+      }
       executor.execute(new TaskRunner(task));
     }
   }
 
   private void decrementTaskCounter(AbstractReplicationTask task) {
+    if (task.getPriority() == ReplicationCommandPriority.LOW) {
+      // LOW tasks are not included in the counter, so skip decrementing the
+      // counter.
+      return;
+    }
     AtomicInteger counter = taskCounter.get(task.getClass());
     if (counter != null) {
       counter.decrementAndGet();
@@ -223,7 +234,7 @@ public class ReplicationSupervisor {
       return task.toString();
     }
 
-    public int getTaskPriority() {
+    public ReplicationCommandPriority getTaskPriority() {
       return task.getPriority();
     }
 
