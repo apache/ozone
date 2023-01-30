@@ -94,8 +94,10 @@ public class TestS3GetSecretRequest {
   private static final String USER_BOB_SHORT = "bob";
   private static final String ACCESS_ID_BOB =
       OMMultiTenantManager.getDefaultAccessId(TENANT_ID, USER_BOB_SHORT);
+  private static final String USER_CAROL = "carol@EXAMPLE.COM";
 
   private UserGroupInformation ugiAlice;
+  private UserGroupInformation ugiCarol;
 
   private OMMultiTenantManager omMultiTenantManager;
   private Tenant tenant;
@@ -109,6 +111,9 @@ public class TestS3GetSecretRequest {
         "DEFAULT");
     ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
     Assert.assertEquals("alice", ugiAlice.getShortUserName());
+
+    ugiCarol = UserGroupInformation.createRemoteUser(USER_CAROL);
+    Assert.assertEquals("carol", ugiCarol.getShortUserName());
 
     ozoneManager = mock(OzoneManager.class);
 
@@ -195,145 +200,64 @@ public class TestS3GetSecretRequest {
   @Test
   public void testGetSecretOfAnotherUserAsAdmin() throws IOException {
 
-    // This effectively makes alice an admin.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    // This effectively makes alice an S3 admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
-    // 1. Get secret of "bob@EXAMPLE.COM" (as an admin).
-    long txLogIndex = 1;
-
-    // Run preExecute
-    S3GetSecretRequest s3GetSecretRequest =
-        new S3GetSecretRequest(
-            new S3GetSecretRequest(
-                s3GetSecretRequest(ACCESS_ID_BOB)
-            ).preExecute(ozoneManager)
-        );
-
-    // Run validateAndUpdateCache
-    OMClientResponse omClientResponse =
-        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
-
-    // Check response type and cast
-    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
-    final S3GetSecretResponse s3GetSecretResponse =
-        (S3GetSecretResponse) omClientResponse;
-
-    // Check response
-    final S3SecretValue s3SecretValue = s3GetSecretResponse.getS3SecretValue();
-    Assert.assertEquals(ACCESS_ID_BOB, s3SecretValue.getKerberosID());
-    final String awsSecret = s3SecretValue.getAwsSecret();
-    Assert.assertNotNull(awsSecret);
-
-    final GetS3SecretResponse getS3SecretResponse =
-        s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
-    // The secret inside should be the same.
-    final S3Secret s3Secret = getS3SecretResponse.getS3Secret();
-    Assert.assertEquals(ACCESS_ID_BOB, s3Secret.getKerberosID());
-    Assert.assertEquals(awsSecret, s3Secret.getAwsSecret());
+    processSuccessSecretRequest(ACCESS_ID_BOB, 1, true);
   }
 
   @Test
   public void testGetOwnSecretAsNonAdmin() throws IOException {
 
     // This effectively makes alice a regular user.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(false);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
-    // 1. Get secret of "alice" (as herself).
-    long txLogIndex = 1;
-
-    // Run preExecute
-    S3GetSecretRequest s3GetSecretRequest1 =
-        new S3GetSecretRequest(
-            new S3GetSecretRequest(
-                s3GetSecretRequest(USER_ALICE)
-            ).preExecute(ozoneManager)
-        );
-
-    // Run validateAndUpdateCache
-    OMClientResponse omClientResponse =
-        s3GetSecretRequest1.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
-
-    // Check response type and cast
-    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
-    final S3GetSecretResponse s3GetSecretResponse =
-        (S3GetSecretResponse) omClientResponse;
-
-    // Check response
-    final S3SecretValue s3SecretValue = s3GetSecretResponse.getS3SecretValue();
-    Assert.assertEquals(USER_ALICE, s3SecretValue.getKerberosID());
-    final String awsSecret1 = s3SecretValue.getAwsSecret();
-    Assert.assertNotNull(awsSecret1);
-
-    final GetS3SecretResponse getS3SecretResponse =
-        s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
-    // The secret inside should be the same.
-    final S3Secret s3Secret1 = getS3SecretResponse.getS3Secret();
-    Assert.assertEquals(USER_ALICE, s3Secret1.getKerberosID());
-    Assert.assertEquals(awsSecret1, s3Secret1.getAwsSecret());
+    final S3Secret s3Secret1 = processSuccessSecretRequest(
+        USER_ALICE, 1, true);
 
 
     // 2. Get secret of "alice" (as herself) again.
-    ++txLogIndex;
+    final S3Secret s3Secret2 = processSuccessSecretRequest(
+        USER_ALICE, 2, false);
 
-    // Run preExecute
-    S3GetSecretRequest s3GetSecretRequest2 =
-        new S3GetSecretRequest(
-            new S3GetSecretRequest(
-                s3GetSecretRequest(USER_ALICE)
-            ).preExecute(ozoneManager)
-        );
-
-    // Run validateAndUpdateCache
-    OMClientResponse omClientResponse2 =
-        s3GetSecretRequest2.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
-
-    // Check response type and cast
-    Assert.assertTrue(omClientResponse2 instanceof S3GetSecretResponse);
-    final S3GetSecretResponse s3GetSecretResponse2 =
-        (S3GetSecretResponse) omClientResponse2;
-
-    // Check response
-    Assert.assertNull(s3GetSecretResponse2.getS3SecretValue());
-
-    final GetS3SecretResponse getS3SecretResponse2 =
-        s3GetSecretResponse2.getOMResponse().getGetS3SecretResponse();
-    // The secret inside should be the same.
-    final S3Secret s3Secret2 = getS3SecretResponse2.getS3Secret();
-    Assert.assertEquals(USER_ALICE, s3Secret2.getKerberosID());
-
-    // Should get the same secret as the first request's.
-    Assert.assertEquals(awsSecret1, s3Secret2.getAwsSecret());
+    Assert.assertEquals(s3Secret1.getAwsSecret(), s3Secret2.getAwsSecret());
   }
 
   @Test
   public void testGetSecretOfAnotherUserAsNonAdmin() throws IOException {
 
     // This effectively makes alice a regular user.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(false);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
     // Get secret of "bob@EXAMPLE.COM" (as another regular user).
     // Run preExecute, expect USER_MISMATCH
-    try {
-      new S3GetSecretRequest(
-          s3GetSecretRequest(ACCESS_ID_BOB)
-      ).preExecute(ozoneManager);
-    } catch (OMException omEx) {
-      Assert.assertEquals(ResultCodes.USER_MISMATCH, omEx.getResult());
-      return;
-    }
+    processFailedSecretRequest(ACCESS_ID_BOB);
+  }
 
-    Assert.fail("Should have thrown OMException because alice should not have "
-        + "the permission to get bob's secret in this test case!");
+  @Test
+  public void testGetSecretOfAnotherUserAsS3Admin() throws IOException {
+    // This effectively makes alice an S3 admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+
+    processSuccessSecretRequest(USER_CAROL, 1, true);
+  }
+
+  @Test
+  public void testGetSecretOfAnotherUserAsOzoneAdmin() throws IOException {
+    // This effectively makes alice an admin but not S3 admin.
+    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
+
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+    processFailedSecretRequest(USER_CAROL);
+    processSuccessSecretRequest(USER_ALICE, 2, false);
   }
 
   @Test
   public void testGetSecretWithTenant() throws IOException {
 
-    // This effectively makes alice an admin.
-    when(ozoneManager.isAdmin(ugiAlice)).thenReturn(true);
+    // This effectively makes alice an S3 admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
     // Make alice a non-delegated admin
     when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, false))
         .thenReturn(true);
@@ -447,5 +371,63 @@ public class TestS3GetSecretRequest {
         s3Secret.getAwsSecret());
     Assert.assertEquals(originalS3Secret.getKerberosID(),
         s3Secret.getKerberosID());
+  }
+
+
+  private S3Secret processSuccessSecretRequest(
+      String userPrincipalId,
+      int txLogIndex,
+      boolean shouldHaveResponse) throws IOException {
+    S3GetSecretRequest s3GetSecretRequest =
+        new S3GetSecretRequest(
+            new S3GetSecretRequest(
+                s3GetSecretRequest(userPrincipalId)
+            ).preExecute(ozoneManager)
+        );
+
+    // Run validateAndUpdateCache
+    OMClientResponse omClientResponse =
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
+            txLogIndex, ozoneManagerDoubleBufferHelper);
+
+    // Check response type and cast
+    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    final S3GetSecretResponse s3GetSecretResponse =
+        (S3GetSecretResponse) omClientResponse;
+
+    // Check response
+    if (shouldHaveResponse) {
+      // Check response
+      final S3SecretValue s3SecretValue =
+          s3GetSecretResponse.getS3SecretValue();
+      Assert.assertEquals(userPrincipalId, s3SecretValue.getKerberosID());
+      final String awsSecret1 = s3SecretValue.getAwsSecret();
+      Assert.assertNotNull(awsSecret1);
+    } else {
+      Assert.assertNull(s3GetSecretResponse.getS3SecretValue());
+    }
+
+    final GetS3SecretResponse getS3SecretResponse =
+        s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
+    // The secret inside should be the same.
+    final S3Secret s3Secret = getS3SecretResponse.getS3Secret();
+    Assert.assertEquals(userPrincipalId, s3Secret.getKerberosID());
+
+    return s3Secret;
+  }
+
+  private void processFailedSecretRequest(String userPrincipalId)
+      throws IOException {
+    try {
+      new S3GetSecretRequest(
+          s3GetSecretRequest(userPrincipalId)
+      ).preExecute(ozoneManager);
+    } catch (OMException omEx) {
+      Assert.assertEquals(ResultCodes.USER_MISMATCH, omEx.getResult());
+      return;
+    }
+
+    Assert.fail("Should have thrown OMException because alice should not have "
+        + "the permission to get bob's secret in this test case!");
   }
 }

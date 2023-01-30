@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -111,11 +113,20 @@ public class TestOMDBUpdatesHandler {
     reconOmMetadataManager.getKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_two", secondKey);
 
+
+    Text tester = new Text("tester");
+    OzoneTokenIdentifier identifier =
+        new OzoneTokenIdentifier(tester, tester, tester);
+    identifier.setOmCertSerialId("certID");
+    identifier.setOmServiceId("");
+
+    omMetadataManager.getDelegationTokenTable().put(identifier, 12345L);
+
     List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(3, events.size());
+    assertEquals(4, events.size());
 
     OMDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());
@@ -313,17 +324,17 @@ public class TestOMDBUpdatesHandler {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     final RocksDatabase rocksDB = rdbStore.getDb();
     // Get all updates from source DB
-    TransactionLogIterator transactionLogIterator =
+    ManagedTransactionLogIterator logIterator =
         rocksDB.getUpdatesSince(getUpdatesSince);
     List<byte[]> writeBatches = new ArrayList<>();
 
-    while (transactionLogIterator.isValid()) {
+    while (logIterator.get().isValid()) {
       TransactionLogIterator.BatchResult result =
-          transactionLogIterator.getBatch();
+          logIterator.get().getBatch();
       result.writeBatch().markWalTerminationPoint();
       WriteBatch writeBatch = result.writeBatch();
       writeBatches.add(writeBatch.data());
-      transactionLogIterator.next();
+      logIterator.get().next();
     }
     return writeBatches;
   }

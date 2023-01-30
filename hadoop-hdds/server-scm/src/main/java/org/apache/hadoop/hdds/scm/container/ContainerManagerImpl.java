@@ -58,34 +58,20 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 
 /**
- * TODO: Add javadoc.
+ * {@link ContainerManager} implementation in SCM server.
  */
 public class ContainerManagerImpl implements ContainerManager {
 
-  /*
-   * TODO: Introduce container level locks.
-   */
-
-  /**
-   *
-   */
   private static final Logger LOG = LoggerFactory.getLogger(
       ContainerManagerImpl.class);
 
   /**
-   *
+   * Limit the number of on-going ratis operations.
    */
-  // Limit the number of on-going ratis operations.
   private final Lock lock;
 
-  /**
-   *
-   */
   private final PipelineManager pipelineManager;
 
-  /**
-   *
-   */
   private final ContainerStateManager containerStateManager;
 
   private final SCMHAManager haManager;
@@ -162,9 +148,6 @@ public class ContainerManagerImpl implements ContainerManager {
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    // TODO: Remove the null check, startID should not be null. Fix the unit
-    //  test before removing the check.
-    final long start = startID == null ? 0 : startID.getId();
     final List<ContainerID> containersIds =
         new ArrayList<>(containerStateManager.getContainerIDs());
     Collections.sort(containersIds);
@@ -172,7 +155,7 @@ public class ContainerManagerImpl implements ContainerManager {
     lock.lock();
     try {
       containers = containersIds.stream()
-          .filter(id -> id.getId() >= start).limit(count)
+          .filter(id -> id.compareTo(startID) >= 0).limit(count)
           .map(containerStateManager::getContainer)
           .collect(Collectors.toList());
     } finally {
@@ -189,6 +172,27 @@ public class ContainerManagerImpl implements ContainerManager {
       containers = containerStateManager.getContainerIDs(state).stream()
           .map(containerStateManager::getContainer)
           .filter(Objects::nonNull).collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
+  }
+
+  @Override
+  public List<ContainerInfo> getContainers(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    final List<ContainerID> containersIds =
+        new ArrayList<>(containerStateManager.getContainerIDs(state));
+    Collections.sort(containersIds);
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containersIds.stream()
+          .filter(id -> id.compareTo(startID) >= 0).limit(count)
+          .map(containerStateManager::getContainer)
+          .collect(Collectors.toList());
     } finally {
       lock.unlock();
     }
@@ -477,9 +481,5 @@ public class ContainerManagerImpl implements ContainerManager {
   @VisibleForTesting
   public SCMHAManager getSCMHAManager() {
     return haManager;
-  }
-
-  public Set<ContainerID> getContainerIDs() {
-    return containerStateManager.getContainerIDs();
   }
 }

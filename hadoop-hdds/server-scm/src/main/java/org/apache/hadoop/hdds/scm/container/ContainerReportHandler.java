@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -187,7 +188,11 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             // This is a new Container not in the nodeManager -> dn map yet
             nodeManager.addContainer(datanodeDetails, cid);
           }
-          processSingleReplica(datanodeDetails, container, replica, publisher);
+          if (container == null || ContainerReportValidator
+                  .validate(container, datanodeDetails, replica)) {
+            processSingleReplica(datanodeDetails, container,
+                    replica, publisher);
+          }
         }
         // Anything left in expectedContainersInDatanode was not in the full
         // report, so it is now missing on the DN. We need to remove it from the
@@ -204,8 +209,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   /**
-   * Processes the ContainerReport, unknown container reported
-   * that will be deleted by SCM.
+   * Processes the ContainerReport.
+   * Any unknown container reported by DN and not present in SCM
+   * containerSet will either be logged as an error or deleted based on
+   * unknownContainerHandleAction.
    *
    * @param datanodeDetails Datanode from which this report was received
    * @param container ContainerInfo representing the container

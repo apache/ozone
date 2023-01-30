@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-
 import org.junit.Assert;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+
 import org.junit.Test;
 
 /**
@@ -31,59 +31,43 @@ import org.junit.Test;
 public class TestAuthorizationV2HeaderParser {
 
   @Test
-  public void testAuthHeaderV2() throws OS3Exception {
-    try {
-      String auth = "AWS accessKey:signature";
-      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-      final SignatureInfo signatureInfo = v2.parseSignature();
-      assertEquals(signatureInfo.getAwsAccessId(), "accessKey");
-      assertEquals(signatureInfo.getSignature(), "signature");
-    } catch (OS3Exception ex) {
-      fail("testAuthHeaderV2 failed");
-    }
+  public void testAuthHeaderV2() throws MalformedResourceException {
+    String auth = "AWS accessKey:signature";
+    AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+    final SignatureInfo signatureInfo = v2.parseSignature();
+    assertEquals(signatureInfo.getAwsAccessId(), "accessKey");
+    assertEquals(signatureInfo.getSignature(), "signature");
   }
 
   @Test
-  public void testIncorrectHeader1() throws OS3Exception {
+  public void testIncorrectHeader1() throws MalformedResourceException {
     String auth = "AAA accessKey:signature";
     AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
     Assert.assertNull(v2.parseSignature());
 
   }
 
-  @Test
-  public void testIncorrectHeader2() throws OS3Exception {
-    try {
-      String auth = "AWS :accessKey";
-      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-      Assert.assertNull(v2.parseSignature());
-      fail("testIncorrectHeader");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
+  @Test(expected = MalformedResourceException.class)
+  public void testIncorrectHeader2() throws MalformedResourceException {
+    String auth = "AWS :accessKey";
+    AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+    Assert.assertNull(v2.parseSignature());
+    fail("testIncorrectHeader");
   }
 
-  @Test
-  public void testIncorrectHeader3() throws OS3Exception {
-    try {
-      String auth = "AWS :signature";
-      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-      Assert.assertNull(v2.parseSignature());
-      fail("testIncorrectHeader");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
+  @Test(expected = MalformedResourceException.class)
+  public void testIncorrectHeader3() throws MalformedResourceException {
+    String auth = "AWS :signature";
+    AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+    Assert.assertNull(v2.parseSignature());
+    fail("testIncorrectHeader");
   }
 
-  @Test
-  public void testIncorrectHeader4() throws OS3Exception {
-    try {
-      String auth = "AWS accessKey:";
-      AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-      Assert.assertNull(v2.parseSignature());
-      fail("testIncorrectHeader");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
+  @Test(expected = MalformedResourceException.class)
+  public void testIncorrectHeader4() throws MalformedResourceException {
+    String auth = "AWS accessKey:";
+    AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
+    Assert.assertNull(v2.parseSignature());
+    fail("testIncorrectHeader");
   }
 }

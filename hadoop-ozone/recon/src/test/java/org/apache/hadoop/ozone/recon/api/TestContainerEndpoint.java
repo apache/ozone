@@ -83,7 +83,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
@@ -411,7 +410,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetMissingContainers() throws IOException, TimeoutException {
-    Response response = containerEndpoint.getMissingContainers();
+    Response response = containerEndpoint.getMissingContainers(1000);
 
     MissingContainersResponse responseObject =
         (MissingContainersResponse) response.getEntity();
@@ -419,35 +418,34 @@ public class TestContainerEndpoint {
     assertEquals(0, responseObject.getTotalCount());
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
-    // Add missing containers to the database
-    long missingSince = System.currentTimeMillis();
-    UnhealthyContainers missing = new UnhealthyContainers();
-    missing.setContainerId(1L);
-    missing.setInStateSince(missingSince);
-    missing.setActualReplicaCount(0);
-    missing.setExpectedReplicaCount(3);
-    missing.setReplicaDelta(3);
-    missing.setContainerState(
-        ContainerSchemaDefinition.UnHealthyContainerStates.MISSING.toString());
-    ArrayList<UnhealthyContainers> missingList =
-        new ArrayList<UnhealthyContainers>();
-    missingList.add(missing);
-    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
+    putContainerInfos(5);
+    uuid1 = newDatanode("host1", "127.0.0.1");
+    uuid2 = newDatanode("host2", "127.0.0.2");
+    uuid3 = newDatanode("host3", "127.0.0.3");
+    uuid4 = newDatanode("host4", "127.0.0.4");
+    createUnhealthyRecords(5, 0, 0, 0);
 
-    putContainerInfos(1);
-    // Add container history for id 1
-    final UUID u1 = newDatanode("host1", "127.0.0.1");
-    final UUID u2 = newDatanode("host2", "127.0.0.2");
-    final UUID u3 = newDatanode("host3", "127.0.0.3");
-    final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L);
+    Response responseWithLimit = containerEndpoint.getMissingContainers(3);
+    MissingContainersResponse responseWithLimitObject
+            = (MissingContainersResponse) responseWithLimit.getEntity();
+    assertEquals(3, responseWithLimitObject.getTotalCount());
+    MissingContainerMetadata containerWithLimit =
+            responseWithLimitObject.getContainers().stream().findFirst()
+                    .orElse(null);
+    Assert.assertNotNull(containerWithLimit);
 
-    response = containerEndpoint.getMissingContainers();
+    Collection<MissingContainerMetadata> recordsWithLimit
+            = responseWithLimitObject.getContainers();
+    List<MissingContainerMetadata> missingWithLimit
+            = new ArrayList<>(recordsWithLimit);
+    assertEquals(3, missingWithLimit.size());
+    assertEquals(1L, missingWithLimit.get(0).getContainerID());
+    assertEquals(2L, missingWithLimit.get(1).getContainerID());
+    assertEquals(3L, missingWithLimit.get(2).getContainerID());
+
+    response = containerEndpoint.getMissingContainers(1000);
     responseObject = (MissingContainersResponse) response.getEntity();
-    assertEquals(1, responseObject.getTotalCount());
+    assertEquals(5, responseObject.getTotalCount());
     MissingContainerMetadata container =
         responseObject.getContainers().stream().findFirst().orElse(null);
     Assert.assertNotNull(container);
@@ -456,7 +454,6 @@ public class TestContainerEndpoint {
     assertEquals(keyCount, container.getKeys());
     assertEquals(pipelineID.getId(), container.getPipelineID());
     assertEquals(3, container.getReplicas().size());
-    assertEquals(missingSince, container.getMissingSince());
 
     Set<String> datanodes = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList("host2", "host3", "host4")));

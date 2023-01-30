@@ -23,12 +23,12 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.Assert;
-import org.rocksdb.ColumnFamilyOptions;
 
 import java.io.File;
 import java.io.IOException;
@@ -89,7 +89,7 @@ public class TestDBStoreBuilder {
         .setName("Test.db")
         .setPath(tempDir)
         .addTable("FIRST")
-        .addTable("FIRST", new ColumnFamilyOptions())
+        .addTable("FIRST", new ManagedColumnFamilyOptions())
         .build();
     // Building should succeed without error.
 
@@ -176,7 +176,7 @@ public class TestDBStoreBuilder {
           new DBColumnFamilyDefinition<>(sampleTableName,
               String.class, new StringCodec(), Long.class, new LongCodec());
       {
-        ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
+        ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
         // reverse the default option for check
         cfOptions.setForceConsistencyChecks(
             !cfOptions.forceConsistencyChecks());
@@ -220,7 +220,7 @@ public class TestDBStoreBuilder {
         if (Arrays.equals(cfFamily.getHandle().getName(),
             sampleTableName.getBytes(StandardCharsets.UTF_8))) {
           // get the default value
-          boolean defaultValue = new ColumnFamilyOptions()
+          boolean defaultValue = new ManagedColumnFamilyOptions()
               .forceConsistencyChecks();
 
           // the value should be different from the default value

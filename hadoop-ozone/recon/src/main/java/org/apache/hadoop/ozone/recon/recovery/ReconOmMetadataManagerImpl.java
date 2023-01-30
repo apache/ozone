@@ -109,7 +109,15 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
         FileUtils.deleteDirectory(oldDBLocation);
       }
     }
-    initializeNewRdbStore(newDbLocation);
+    DBStore current = getStore();
+    try {
+      initializeNewRdbStore(newDbLocation);
+    } finally {
+      // Always close DBStore if it's replaced.
+      if (current != null && current != getStore()) {
+        current.close();
+      }
+    }
   }
 
   @Override

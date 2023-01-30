@@ -96,6 +96,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -638,6 +640,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setGetContainerCountResponse(getContainerCount(
                   request.getGetContainerCountRequest()))
           .build();
+      case GetClosedContainerCount:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerCountResponse(getClosedContainerCount(
+                request.getGetContainerCountRequest()))
+            .build();
       case GetContainerReplicas:
         return ScmContainerLocationResponse.newBuilder()
           .setCmdType(request.getCmdType())
@@ -646,6 +655,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
+      case ResetDeletedBlockRetryCount:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setResetDeletedBlockRetryCountResponse(
+                  getResetDeletedBlockRetryCount(
+                      request.getResetDeletedBlockRetryCountRequest()))
+              .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1137,5 +1154,24 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerCountResponseProto.newBuilder()
       .setContainerCount(impl.getContainerCount())
       .build();
+  }
+
+  public GetContainerCountResponseProto getClosedContainerCount(
+      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+          request) throws IOException {
+
+    return GetContainerCountResponseProto.newBuilder()
+        .setContainerCount(impl.getContainerCount(
+            HddsProtos.LifeCycleState.CLOSED))
+        .build();
+  }
+
+  public ResetDeletedBlockRetryCountResponseProto
+      getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
+      request) throws IOException {
+    return ResetDeletedBlockRetryCountResponseProto.newBuilder()
+        .setResetCount(impl.resetDeletedBlockRetryCount(
+            request.getTransactionIdList()))
+        .build();
   }
 }

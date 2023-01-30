@@ -42,6 +42,11 @@ import java.util.Iterator;
  */
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
+  public TestOMKeyCreateRequestWithFSO(boolean setKeyPathLock,
+                                       boolean setFileSystemPaths) {
+    super(setKeyPathLock, setFileSystemPaths);
+  }
+
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
@@ -159,6 +164,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
+  @Override
+  protected OMKeyCreateRequest getOMKeyCreateRequest(
+      OMRequest omRequest, BucketLayout layout) {
+    return new OMKeyCreateRequestWithFSO(omRequest, layout);
+  }
+  
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;

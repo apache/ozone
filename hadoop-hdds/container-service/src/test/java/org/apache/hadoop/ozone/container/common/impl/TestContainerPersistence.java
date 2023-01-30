@@ -147,7 +147,7 @@ public class TestContainerPersistence {
 
   @Before
   public void setupPaths() throws IOException {
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, SCM_ID, SCM_ID, conf);

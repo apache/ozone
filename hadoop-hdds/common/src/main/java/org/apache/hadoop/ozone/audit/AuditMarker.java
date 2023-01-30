@@ -24,7 +24,8 @@ import org.apache.logging.log4j.MarkerManager;
  */
 public enum AuditMarker {
   WRITE(MarkerManager.getMarker("WRITE")),
-  READ(MarkerManager.getMarker("READ"));
+  READ(MarkerManager.getMarker("READ")),
+  AUTH(MarkerManager.getMarker("AUTH")),;
 
   private Marker marker;
 

@@ -30,8 +30,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
@@ -86,7 +86,7 @@ public class  TestMultiRaftSetup {
         false);
     init(3, conf);
     waitForPipelineCreated(2);
-    Assert.assertEquals(2, pipelineManager.getPipelines(ReplicationConfig
+    Assertions.assertEquals(2, pipelineManager.getPipelines(ReplicationConfig
         .fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
             ReplicationFactor.THREE)).size());
     assertNotSamePeers();
@@ -102,12 +102,10 @@ public class  TestMultiRaftSetup {
     waitForPipelineCreated(1);
     // datanode pipeline limit is set to 2, but only one set of 3 pipelines
     // will be created. Further pipeline creation should fail
-    Assert.assertEquals(1, pipelineManager.getPipelines(RATIS_THREE).size());
-    try {
-      pipelineManager.createPipeline(RATIS_THREE);
-      Assert.fail();
-    } catch (IOException ex) {
-    }
+    Assertions.assertEquals(1,
+        pipelineManager.getPipelines(RATIS_THREE).size());
+    Assertions.assertThrows(IOException.class, () ->
+        pipelineManager.createPipeline(RATIS_THREE));
     shutdown();
   }
 
@@ -123,20 +121,18 @@ public class  TestMultiRaftSetup {
     // For example, with d1,d2, d3, d4, d5, only d1 d2 d3 and d1 d4 d5 can form
     // pipeline as the none of peers from any of existing pipelines will be
     // repeated
-    Assert.assertEquals(2, pipelineManager.getPipelines(RATIS_THREE).size());
+    Assertions.assertEquals(2,
+        pipelineManager.getPipelines(RATIS_THREE).size());
     List<DatanodeDetails> dns = nodeManager.getAllNodes().stream()
         .filter((dn) -> nodeManager.getPipelinesCount(dn) > 2).collect(
             Collectors.toList());
-    Assert.assertEquals(1, dns.size());
-    try {
-      pipelineManager.createPipeline(RATIS_THREE);
-      Assert.fail();
-    } catch (IOException ex) {
-    }
+    Assertions.assertEquals(1, dns.size());
+    Assertions.assertThrows(IOException.class, () ->
+        pipelineManager.createPipeline(RATIS_THREE));
     Collection<PipelineID> pipelineIds = nodeManager.getPipelines(dns.get(0));
     // Only one dataode should have 3 pipelines in total, 1 RATIS ONE pipeline
     // and 2 RATIS 3 pipeline
-    Assert.assertEquals(3, pipelineIds.size());
+    Assertions.assertEquals(3, pipelineIds.size());
     List<Pipeline> pipelines = new ArrayList<>();
     pipelineIds.forEach((id) -> {
       try {
@@ -144,21 +140,21 @@ public class  TestMultiRaftSetup {
       } catch (PipelineNotFoundException pnfe) {
       }
     });
-    Assert.assertEquals(1, pipelines.stream()
+    Assertions.assertEquals(1, pipelines.stream()
         .filter((p) -> (p.getReplicationConfig().getRequiredNodes() == 1))
-        .collect(Collectors.toList()).size());
-    Assert.assertEquals(2, pipelines.stream()
+        .count());
+    Assertions.assertEquals(2, pipelines.stream()
         .filter((p) -> (p.getReplicationConfig().getRequiredNodes() == 3))
-        .collect(Collectors.toList()).size());
+        .count());
     shutdown();
   }
   private void assertNotSamePeers() {
     nodeManager.getAllNodes().forEach((dn) -> {
       Collection<DatanodeDetails> peers = nodeManager.getPeerList(dn);
-      Assert.assertFalse(peers.contains(dn));
+      Assertions.assertFalse(peers.contains(dn));
       List<DatanodeDetails> trimList = nodeManager.getAllNodes();
       trimList.remove(dn);
-      Assert.assertTrue(peers.containsAll(trimList));
+      Assertions.assertTrue(peers.containsAll(trimList));
     });
   }
 

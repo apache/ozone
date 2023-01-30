@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -28,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
@@ -50,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +64,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -67,11 +73,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
+import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
 /**
@@ -351,9 +361,8 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanode, containerReport);
 
-    final ContainerReportsProto fullReport = TestContainerReportHandler
-        .getContainerReportsProto(containerTwo.containerID(), CLOSED,
-            datanode.getUuidString());
+    final ContainerReportsProto fullReport = getContainerReportsProto(
+            containerTwo.containerID(), CLOSED, datanode.getUuidString());
     final ContainerReportFromDatanode fcr = new ContainerReportFromDatanode(
         datanode, fullReport);
 
@@ -401,28 +410,99 @@ public class TestIncrementalContainerReportHandler {
   }
 
   private static IncrementalContainerReportProto
+      getIncrementalContainerReportProto(ContainerReplicaProto replicaProto) {
+    final IncrementalContainerReportProto.Builder crBuilder =
+            IncrementalContainerReportProto.newBuilder();
+    return crBuilder.addReport(replicaProto).build();
+  }
+
+  private static IncrementalContainerReportProto
+      getIncrementalContainerReportProto(
+            final ContainerID containerId,
+            final ContainerReplicaProto.State state,
+            final String originNodeId,
+            final boolean hasReplicaIndex,
+            final int replicaIndex) {
+    final ContainerReplicaProto.Builder replicaProto =
+            ContainerReplicaProto.newBuilder()
+                    .setContainerID(containerId.getId())
+                    .setState(state)
+                    .setOriginNodeId(originNodeId)
+                    .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
+                    .setSize(5368709120L)
+                    .setUsed(2000000000L)
+                    .setKeyCount(100000000L)
+                    .setReadCount(100000000L)
+                    .setWriteCount(100000000L)
+                    .setReadBytes(2000000000L)
+                    .setWriteBytes(2000000000L)
+                    .setBlockCommitSequenceId(10000L)
+                    .setDeleteTransactionId(0);
+    if (hasReplicaIndex) {
+      replicaProto.setReplicaIndex(replicaIndex);
+    }
+    return getIncrementalContainerReportProto(replicaProto.build());
+  }
+
+  private static IncrementalContainerReportProto
       getIncrementalContainerReportProto(
           final ContainerID containerId,
           final ContainerReplicaProto.State state,
           final String originNodeId) {
-    final IncrementalContainerReportProto.Builder crBuilder =
-        IncrementalContainerReportProto.newBuilder();
-    final ContainerReplicaProto replicaProto =
-        ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getId())
-            .setState(state)
-            .setOriginNodeId(originNodeId)
-            .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
-            .setSize(5368709120L)
-            .setUsed(2000000000L)
-            .setKeyCount(100000000L)
-            .setReadCount(100000000L)
-            .setWriteCount(100000000L)
-            .setReadBytes(2000000000L)
-            .setWriteBytes(2000000000L)
-            .setBlockCommitSequenceId(10000L)
-            .setDeleteTransactionId(0)
-            .build();
-    return crBuilder.addReport(replicaProto).build();
+    return getIncrementalContainerReportProto(containerId, state, originNodeId,
+            false, 0);
+  }
+
+  private void testReplicaIndexUpdate(ContainerInfo container,
+         DatanodeDetails dn, int replicaIndex,
+         Map<DatanodeDetails, Integer> expectedReplicaMap) {
+    final IncrementalContainerReportProto containerReport =
+            getIncrementalContainerReportProto(container.containerID(),
+                    ContainerReplicaProto.State.CLOSED, dn.getUuidString(),
+                    true, replicaIndex);
+    final IncrementalContainerReportFromDatanode containerReportFromDatanode =
+            new IncrementalContainerReportFromDatanode(dn, containerReport);
+    final IncrementalContainerReportHandler reportHandler =
+            new IncrementalContainerReportHandler(nodeManager,
+                    containerManager, scmContext);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+    Assert.assertEquals(containerStateManager
+            .getContainerReplicas(container.containerID()).stream()
+            .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
+                    ContainerReplica::getReplicaIndex)), expectedReplicaMap);
+
+  }
+
+  @Test
+  public void testECReplicaIndexValidation() throws NodeNotFoundException,
+          IOException, TimeoutException {
+    List<DatanodeDetails> dns = IntStream.range(0, 5)
+        .mapToObj(i -> randomDatanodeDetails()).collect(Collectors.toList());
+    dns.stream().forEach(dn -> nodeManager.register(dn, null, null));
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo container = getECContainer(LifeCycleState.CLOSED,
+            PipelineID.randomId(), replicationConfig);
+    nodeManager.addContainer(dns.get(0), container.containerID());
+    nodeManager.addContainer(dns.get(1), container.containerID());
+    nodeManager.addContainer(dns.get(2), container.containerID());
+    nodeManager.addContainer(dns.get(3), container.containerID());
+    nodeManager.addContainer(dns.get(4), container.containerID());
+    containerStateManager.addContainer(container.getProtobuf());
+    Set<ContainerReplica> replicas =
+            HddsTestUtils.getReplicasWithReplicaIndex(container.containerID(),
+                    ContainerReplicaProto.State.CLOSED,
+                    HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT,
+                    HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT,
+                    1000000L,
+                    dns.toArray(new DatanodeDetails[0]));
+    Map<DatanodeDetails, Integer> replicaMap = replicas.stream()
+            .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
+                    ContainerReplica::getReplicaIndex));
+    replicas.forEach(r -> containerStateManager.updateContainerReplica(
+            container.containerID(), r));
+    testReplicaIndexUpdate(container, dns.get(0), 0, replicaMap);
+    testReplicaIndexUpdate(container, dns.get(0), 6, replicaMap);
+    replicaMap.put(dns.get(0), 2);
+    testReplicaIndexUpdate(container, dns.get(0), 2, replicaMap);
   }
 }

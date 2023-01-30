@@ -32,6 +32,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -58,18 +59,31 @@ class TokenHelper {
     boolean blockTokenEnabled = securityConfig.isBlockTokenEnabled();
     boolean containerTokenEnabled = securityConfig.isContainerTokenEnabled();
 
-    if (blockTokenEnabled || containerTokenEnabled) {
+    // checking certClient != null instead of securityConfig.isSecurityEnabled()
+    // to allow integration test without full kerberos etc. setup
+    boolean securityEnabled = certClient != null;
+
+    if (securityEnabled && (blockTokenEnabled || containerTokenEnabled)) {
       user = UserGroupInformation.getCurrentUser().getShortUserName();
 
       long expiryTime = conf.getTimeDuration(
           HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
           HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
           TimeUnit.MILLISECONDS);
-      String certId = certClient.getCertificate().getSerialNumber().toString();
+      long certificateGracePeriod = Duration.parse(
+          conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
+              HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT))
+          .toMillis();
+      if (expiryTime > certificateGracePeriod) {
+        throw new IllegalArgumentException("Certificate grace period " +
+            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+            " should be greater than maximum block/container token lifetime " +
+            HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
+      }
 
       if (blockTokenEnabled) {
         blockTokenMgr = new OzoneBlockTokenSecretManager(
-            securityConfig, expiryTime, certId);
+            securityConfig, expiryTime);
         blockTokenMgr.start(certClient);
       } else {
         blockTokenMgr = null;
@@ -77,7 +91,7 @@ class TokenHelper {
 
       if (containerTokenEnabled) {
         containerTokenMgr = new ContainerTokenSecretManager(
-            securityConfig, expiryTime, certId);
+            securityConfig, expiryTime);
         containerTokenMgr.start(certClient);
       } else {
         containerTokenMgr = null;

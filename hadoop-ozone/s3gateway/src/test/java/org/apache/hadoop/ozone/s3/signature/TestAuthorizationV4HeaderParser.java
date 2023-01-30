@@ -20,14 +20,15 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import java.time.LocalDate;
 
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.ozone.test.LambdaTestUtils;
 
 import static java.time.temporal.ChronoUnit.DAYS;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+
 import org.junit.Assert;
+
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -63,39 +64,30 @@ public class TestAuthorizationV4HeaderParser {
         signatureInfo.getSignature());
   }
 
-  @Test
-  public void testV4HeaderMissingParts() {
-    try {
-      String auth = "AWS4-HMAC-SHA256 " +
-          "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
-          "SignedHeaders=host;range;x-amz-date,";
-      AuthorizationV4HeaderParser v4 =
-          new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
-      v4.parseSignature();
-      fail("Exception is expected in case of malformed header");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
+  @Test(expected = MalformedResourceException.class)
+  public void testV4HeaderMissingParts() throws MalformedResourceException {
+    String auth = "AWS4-HMAC-SHA256 " +
+        "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
+        "SignedHeaders=host;range;x-amz-date,";
+    AuthorizationV4HeaderParser v4 =
+        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+    v4.parseSignature();
+  }
+
+  @Test(expected = MalformedResourceException.class)
+  public void testV4HeaderInvalidCredential()
+      throws MalformedResourceException {
+    String auth = "AWS4-HMAC-SHA256 " +
+        "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
+        "SignedHeaders=host;range;x-amz-date, " +
+        "Signature=fe5f80f77d5fa3beca038a248ff027";
+    AuthorizationV4HeaderParser v4 =
+        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+    v4.parseSignature();
   }
 
   @Test
-  public void testV4HeaderInvalidCredential() {
-    try {
-      String auth = "AWS4-HMAC-SHA256 " +
-          "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
-          "SignedHeaders=host;range;x-amz-date, " +
-          "Signature=fe5f80f77d5fa3beca038a248ff027";
-      AuthorizationV4HeaderParser v4 =
-          new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
-      v4.parseSignature();
-      fail("Exception is expected in case of malformed header");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
-  }
-
-  @Test
-  public void testV4HeaderWithoutSpace() throws OS3Exception {
+  public void testV4HeaderWithoutSpace() throws MalformedResourceException {
 
     String auth =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
@@ -118,7 +110,8 @@ public class TestAuthorizationV4HeaderParser {
   }
 
   @Test
-  public void testV4HeaderDateValidationSuccess() throws OS3Exception {
+  public void testV4HeaderDateValidationSuccess()
+      throws MalformedResourceException {
     // Case 1: valid date within range.
     LocalDate now = LocalDate.now();
     String dateStr = DATE_FORMATTER.format(now);
@@ -138,21 +131,22 @@ public class TestAuthorizationV4HeaderParser {
     // Case 1: Empty date.
     LocalDate now = LocalDate.now();
     String dateStr = "";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> testRequestWithSpecificDate(dateStr));
 
     // Case 2: Date after yesterday.
     String dateStr2 = DATE_FORMATTER.format(now.plus(2, DAYS));
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> testRequestWithSpecificDate(dateStr2));
 
     // Case 3: Date before yesterday.
     String dateStr3 = DATE_FORMATTER.format(now.minus(2, DAYS));
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> testRequestWithSpecificDate(dateStr3));
   }
 
-  private void testRequestWithSpecificDate(String dateStr) throws OS3Exception {
+  private void testRequestWithSpecificDate(String dateStr)
+      throws MalformedResourceException {
     String auth =
         "AWS4-HMAC-SHA256 Credential=ozone/" + dateStr + "/us-east-1/s3" +
             "/aws4_request,"
@@ -179,7 +173,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
     String auth2 =
@@ -187,7 +181,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
             .parseSignature());
   }
@@ -200,7 +194,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
 
@@ -210,7 +204,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
             .parseSignature());
   }
@@ -223,7 +217,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
 
@@ -233,7 +227,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
             .parseSignature());
 
@@ -243,7 +237,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
             .parseSignature());
   }
@@ -256,7 +250,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=;;,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
 
@@ -266,7 +260,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
             .parseSignature());
 
@@ -276,7 +270,7 @@ public class TestAuthorizationV4HeaderParser {
             + "=x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
             .parseSignature());
 
@@ -286,7 +280,7 @@ public class TestAuthorizationV4HeaderParser {
             + "=,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
             .parseSignature());
   }
@@ -299,7 +293,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
 
@@ -309,7 +303,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
             .parseSignature());
 
@@ -319,7 +313,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + ""
             + "=";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
             .parseSignature());
   }
@@ -332,7 +326,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
 
@@ -363,7 +357,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
             .parseSignature());
 
@@ -373,7 +367,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    LambdaTestUtils.intercept(OS3Exception.class, "",
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
             .parseSignature());
   }

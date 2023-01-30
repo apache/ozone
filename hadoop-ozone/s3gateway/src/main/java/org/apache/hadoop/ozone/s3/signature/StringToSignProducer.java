@@ -249,6 +249,7 @@ public final class StringToSignProducer {
     try {
       return S3Utils.urlEncode(str)
           .replaceAll("\\+", "%20")
+          .replaceAll("\\*", "%2A")
           .replaceAll("%7E", "~");
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);

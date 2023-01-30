@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.security.acl;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -29,11 +30,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 /**
@@ -50,7 +48,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManager prefixManager;
-  private Collection<String> ozAdmins;
+  private OzoneAdmins ozAdmins;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
@@ -58,7 +56,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
   public OzoneNativeAuthorizer(VolumeManager volumeManager,
       BucketManager bucketManager, KeyManager keyManager,
-      PrefixManager prefixManager, Collection<String> ozoneAdmins) {
+      PrefixManager prefixManager, OzoneAdmins ozoneAdmins) {
     this.volumeManager = volumeManager;
     this.bucketManager = bucketManager;
     this.keyManager = keyManager;
@@ -200,12 +198,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.prefixManager = prefixManager;
   }
 
-  public void setOzoneAdmins(Collection<String> ozoneAdmins) {
+  public void setOzoneAdmins(OzoneAdmins ozoneAdmins) {
     this.ozAdmins = ozoneAdmins;
   }
 
-  public Collection<String> getOzoneAdmins() {
-    return Collections.unmodifiableCollection(this.ozAdmins);
+  public OzoneAdmins getOzoneAdmins() {
+    return ozAdmins;
   }
 
   public void setAllowListAllVolumes(boolean allowListAllVolumes) {
@@ -234,12 +232,6 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return false;
     }
 
-    if (ozAdmins.contains(callerUgi.getShortUserName()) ||
-        ozAdmins.contains(callerUgi.getUserName()) ||
-        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      return true;
-    }
-
-    return false;
+    return ozAdmins.isAdmin(callerUgi);
   }
 }

@@ -1,5 +1,5 @@
 Apache Ozone
-Copyright 2021 The Apache Software Foundation
+Copyright 2022 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -495,7 +495,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Source: https://bouncycastle.org/license.html
 
-log4j:log4j
+ch.qos.reload4j:reload4j
 ====================
 
 Apache log4j

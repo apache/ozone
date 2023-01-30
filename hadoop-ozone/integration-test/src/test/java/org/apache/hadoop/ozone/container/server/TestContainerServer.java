@@ -87,7 +87,8 @@ public class TestContainerServer {
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
-    caClient = new DNCertificateClient(new SecurityConfig(CONF));
+    caClient = new DNCertificateClient(new SecurityConfig(CONF),
+        null, null, null, null);
   }
 
   @Test
@@ -123,7 +124,7 @@ public class TestContainerServer {
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         caClient, null);
   }
 
@@ -190,7 +191,7 @@ public class TestContainerServer {
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
-      ContainerSet containerSet = new ContainerSet();
+      ContainerSet containerSet = new ContainerSet(1000);
       VolumeSet volumeSet = mock(MutableVolumeSet.class);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();

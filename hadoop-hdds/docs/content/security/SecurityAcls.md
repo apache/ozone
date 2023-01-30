@@ -26,8 +26,13 @@ icon: transfer
 -->
 
 Ozone supports a set of native ACLs. These ACLs can be used independently 
-of ozone ACL plugin such as Ranger. If Apache Ranger plugin for Ozone is 
-enabled, then ACL will be checked with Ranger.
+of ozone ACL plugin such as Ranger.
+Add the following properties to the ozone-site.xml to enable native ACLs.
+
+Property|Value
+--------|------------------------------------------------------------
+ozone.acl.enabled         | true
+ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.OzoneNativeAuthorizer
 
 Ozone ACLs are a super set of Posix and S3 ACLs.
 

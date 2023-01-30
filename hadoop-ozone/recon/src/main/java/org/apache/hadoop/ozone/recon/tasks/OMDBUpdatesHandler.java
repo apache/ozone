@@ -30,18 +30,18 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class used to listen on OM RocksDB updates.
  */
-public class OMDBUpdatesHandler extends WriteBatch.Handler {
+public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
@@ -50,7 +50,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private Map<String, OMDBUpdateEvent> omdbLatestUpdateEvents
+  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
       = new HashMap<>();
   private OMDBDefinition omdbDefinition;
 
@@ -93,6 +93,15 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
+    // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
+    // and assuming to typecast as String while de-serializing will throw error.
+    // omdbLatestUpdateEvents defines map key as String type to store in its map
+    // and to change to Object as key will have larger impact considering all
+    // ReconOmTasks. Currently, this table is not needed to sync in Recon OM DB
+    // snapshot as this table data not being used currently in Recon.
+    // When this table data will be needed, all events for this table will be
+    // saved using Object as key and new task will also retrieve using Object
+    // as key.
     Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
     Optional<Class> valueType = omdbDefinition.getValueType(tableName);
     if (keyType.isPresent() && valueType.isPresent()) {
@@ -100,7 +109,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
       builder.setAction(action);
-      String key = (String) codecRegistry.asObject(keyBytes, keyType.get());
+      Object key = codecRegistry.asObject(keyBytes, keyType.get());
       builder.setKey(key);
 
       // Put new
@@ -114,7 +123,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
       } else {
-        // Recon does not add entries to cache and it is safer to always use
+        // Recon does not add entries to cache, and it is safer to always use
         // getSkipCache in Recon.
         oldValue = table.getSkipCache(key);
       }

@@ -102,6 +102,15 @@ public class TestOzoneAuditLogger {
           .withResult(SUCCESS)
           .withException(null).build();
 
+  private static final AuditMessage AUTH_FAIL_MSG =
+      new AuditMessage.Builder()
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.READ_VOLUME)
+          .withParams(PARAMS)
+          .withResult(FAILURE)
+          .withException(null).build();
+
   @AfterAll
   public static void tearDown() {
     File file = new File("audit.log");
@@ -160,6 +169,14 @@ public class TestOzoneAuditLogger {
     AUDIT.logReadFailure(READ_FAIL_MSG);
     String expected =
         "ERROR | OMAudit | ? | " + READ_FAIL_MSG.getFormattedMessage();
+    verifyLog(expected);
+  }
+
+  @Test
+  public void verifyDefaultLogLevelForAuthFailure() throws IOException {
+    AUDIT.logAuthFailure(AUTH_FAIL_MSG);
+    String expected =
+        "ERROR | OMAudit | ? | " + AUTH_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
   }
 

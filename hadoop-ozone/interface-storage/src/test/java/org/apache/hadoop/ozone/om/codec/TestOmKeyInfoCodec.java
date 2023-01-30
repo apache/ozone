@@ -40,7 +40,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
+
 
 /**
  * This class tests OmKeyInfoCodec.
@@ -92,43 +92,36 @@ public class TestOmKeyInfoCodec {
   }
 
   @Test
-  public void test() {
+  public void test() throws IOException {
     testOmKeyInfoCodecWithoutPipeline(1);
     testOmKeyInfoCodecWithoutPipeline(2);
     testOmKeyInfoCodecCompatibility(1);
     testOmKeyInfoCodecCompatibility(2);
   }
 
-  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum) {
+  public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
+      throws IOException {
     OmKeyInfoCodec codec = new OmKeyInfoCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
-    try {
-      byte[] rawData = codec.toPersistedFormat(originKey);
-      OmKeyInfo key = codec.fromPersistedFormat(rawData);
-      System.out.println("Chunk number = " + chunkNum +
-          ", Serialized key size without pipeline = " + rawData.length);
-      assertNull(key.getLatestVersionLocations().getLocationList().get(0)
-          .getPipeline());
-      assertNotNull(key.getFileChecksum());
-      assertEquals(key.getFileChecksum(), checksum);
-    } catch (IOException e) {
-      fail("Should success");
-    }
+    byte[] rawData = codec.toPersistedFormat(originKey);
+    OmKeyInfo key = codec.fromPersistedFormat(rawData);
+    System.out.println("Chunk number = " + chunkNum +
+        ", Serialized key size without pipeline = " + rawData.length);
+    assertNull(key.getLatestVersionLocations().getLocationList().get(0)
+        .getPipeline());
+    assertNotNull(key.getFileChecksum());
+    assertEquals(key.getFileChecksum(), checksum);
   }
 
-  public void testOmKeyInfoCodecCompatibility(int chunkNum) {
+  public void testOmKeyInfoCodecCompatibility(int chunkNum) throws IOException {
     OmKeyInfoCodec codecWithoutPipeline = new OmKeyInfoCodec(true);
     OmKeyInfoCodec codecWithPipeline = new OmKeyInfoCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
-    try {
-      byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
-      OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
-      System.out.println("Chunk number = " + chunkNum +
-          ", Serialized key size with pipeline = " + rawData.length);
-      assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
-          .getPipeline());
-    } catch (IOException e) {
-      fail("Should success");
-    }
+    byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
+    OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
+    System.out.println("Chunk number = " + chunkNum +
+        ", Serialized key size with pipeline = " + rawData.length);
+    assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
+        .getPipeline());
   }
 }

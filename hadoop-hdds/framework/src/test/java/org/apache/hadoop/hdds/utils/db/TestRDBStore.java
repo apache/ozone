@@ -35,13 +35,13 @@ import java.util.Set;
 import org.apache.hadoop.hdds.StringUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -56,21 +56,22 @@ public class TestRDBStore {
           "Fourth", "Fifth",
           "Sixth");
   private RDBStore rdbStore = null;
-  private DBOptions options = null;
+  private ManagedDBOptions options = null;
   private Set<TableConfig> configSet;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
-    options = new DBOptions();
+    options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 
     Statistics statistics = new Statistics();
     statistics.setStatsLevel(StatsLevel.ALL);
-    options = options.setStatistics(statistics);
+    options.setStatistics(statistics);
     configSet = new HashSet<>();
     for (String name : families) {
-      TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      TableConfig newConfig = new TableConfig(name,
+          new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
     rdbStore = new RDBStore(tempDir, options, configSet);
@@ -331,13 +332,14 @@ public class TestRDBStore {
     rdbStore.close();
 
     // Reopen DB with the last column family removed.
-    options = new DBOptions();
+    options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
     configSet = new HashSet<>();
     List<String> familiesMinusOne = families.subList(0, families.size() - 1);
     for (String name : familiesMinusOne) {
-      TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      TableConfig newConfig = new TableConfig(name,
+          new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
     rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet);

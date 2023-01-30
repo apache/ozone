@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,35 +115,15 @@ public final class ContainerTestHelper {
    * @param pipeline - A set of machines where this container lives.
    * @param blockID - Block ID of the chunk.
    * @param datalen - Length of data.
-   * @param token - block token.
    * @return ContainerCommandRequestProto
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen, String token)
+      Pipeline pipeline, BlockID blockID, int datalen)
       throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
-    return getWriteChunkRequest(pipeline, blockID, datalen, 0, token);
-  }
-
-  /**
-   * Returns a writeChunk Request.
-   *
-   * @param pipeline - A set of machines where this container lives.
-   * @param blockID - Block ID of the chunk.
-   * @param datalen - Length of data.
-   * @param token - block token.
-   * @return ContainerCommandRequestProto
-   */
-  public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen, int seq, String token)
-      throws IOException {
-    Builder builder = newWriteChunkRequestBuilder(pipeline, blockID, datalen,
-        seq);
-    if (!Strings.isNullOrEmpty(token)) {
-      builder.setEncodedToken(token);
-    }
-    return builder.build();
+    return newWriteChunkRequestBuilder(pipeline, blockID, datalen)
+        .build();
   }
 
   public static ContainerCommandRequestProto getListBlockRequest(
@@ -176,9 +155,9 @@ public final class ContainerTestHelper {
   }
 
   public static Builder newWriteChunkRequestBuilder(Pipeline pipeline,
-      BlockID blockID, int datalen, int seq) throws IOException {
+      BlockID blockID, int datalen) throws IOException {
     ChunkBuffer data = getData(datalen);
-    return newWriteChunkRequestBuilder(pipeline, blockID, data, seq);
+    return newWriteChunkRequestBuilder(pipeline, blockID, data, 0);
   }
 
   public static Builder newWriteChunkRequestBuilder(
@@ -312,20 +291,6 @@ public final class ContainerTestHelper {
     return getContainerCommandRequestBuilder(containerID, pipeline).build();
   }
 
-  /**
-   * Returns a create container command with token. There are a bunch of
-   * tests where we need to just send a request and get a reply.
-   *
-   * @return ContainerCommandRequestProto.
-   */
-  public static ContainerCommandRequestProto getCreateContainerRequest(
-      long containerID, Pipeline pipeline, Token<?> token) throws IOException {
-    LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline)
-        .setEncodedToken(token.encodeToUrlString())
-        .build();
-  }
-
   private static Builder getContainerCommandRequestBuilder(long containerID,
       Pipeline pipeline) throws IOException {
     Builder request =
@@ -412,25 +377,7 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    return getPutBlockRequest(pipeline, null, writeRequest);
-  }
-
-  /**
-   * Returns the PutBlockRequest for test purpose.
-   * @param pipeline - pipeline.
-   * @param token - token.
-   * @param writeRequest - Write Chunk Request.
-   * @return - Request
-   */
-  public static ContainerCommandRequestProto getPutBlockRequest(
-      Pipeline pipeline, String token,
-      ContainerProtos.WriteChunkRequestProto writeRequest)
-      throws IOException {
-    Builder builder = newPutBlockRequestBuilder(pipeline, writeRequest);
-    if (!Strings.isNullOrEmpty(token)) {
-      builder.setEncodedToken(token);
-    }
-    return builder.build();
+    return newPutBlockRequestBuilder(pipeline, writeRequest).build();
   }
 
   public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
@@ -523,19 +470,29 @@ public final class ContainerTestHelper {
    * Returns a close container request.
    * @param pipeline - pipeline
    * @param containerID - ID of the container.
+   * @param token - container token
    * @return ContainerCommandRequestProto.
    */
   public static ContainerCommandRequestProto getCloseContainer(
-      Pipeline pipeline, long containerID) throws IOException {
-    return ContainerCommandRequestProto.newBuilder()
+      Pipeline pipeline, long containerID, Token<?> token) throws IOException {
+    Builder builder = ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.CloseContainer)
         .setContainerID(containerID)
         .setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
-        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
-        .build();
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString());
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    return builder.build();
   }
 
+  public static ContainerCommandRequestProto getCloseContainer(
+      Pipeline pipeline, long containerID) throws IOException {
+    return getCloseContainer(pipeline, containerID, null);
+  }
   /**
    * Returns a simple request without traceId.
    * @param pipeline - pipeline
@@ -597,6 +554,18 @@ public final class ContainerTestHelper {
 
   public static String getFixedLengthString(String string, int length) {
     return String.format("%1$" + length + "s", string);
+  }
+
+  public static byte[] generateData(int length, boolean random) {
+    final byte[] data = new byte[length];
+    if (random) {
+      ThreadLocalRandom.current().nextBytes(data);
+    } else {
+      for (int i = 0; i < length; i++) {
+        data[i] = (byte) i;
+      }
+    }
+    return data;
   }
 
   /**

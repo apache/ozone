@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
@@ -52,37 +53,26 @@ public class TestOMMultiTenantManagerImpl {
 
   private OMMultiTenantManagerImpl tenantManager;
   private static final String TENANT_ID = "tenant1";
+  private OMMetadataManager omMetadataManager;
+  private OzoneConfiguration conf;
+  private OzoneManager ozoneManager;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Before
   public void setUp() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
     conf.set(OZONE_OM_TENANT_DEV_SKIP_RANGER, "true");
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
+    omMetadataManager = new OmMetadataManagerImpl(conf);
 
-    final String bucketNamespaceName = TENANT_ID;
-    final String bucketNamespacePolicyName =
-        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(TENANT_ID);
-    final String bucketPolicyName =
-        OMMultiTenantManager.getDefaultBucketPolicyName(TENANT_ID);
-    final String userRoleName =
-        OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID);
-    final String adminRoleName =
-        OMMultiTenantManager.getDefaultAdminRoleName(TENANT_ID);
-    final OmDBTenantState omDBTenantState = new OmDBTenantState(TENANT_ID,
-        bucketNamespaceName, userRoleName, adminRoleName,
-        bucketNamespacePolicyName, bucketPolicyName);
+    createTenantInDB(TENANT_ID);
+    assignUserToTenantInDB(TENANT_ID, "seed-accessId1", "seed-user1", false,
+        false);
 
-    omMetadataManager.getTenantStateTable().put(TENANT_ID, omDBTenantState);
-
-    omMetadataManager.getTenantAccessIdTable().put("seed-accessId1",
-        new OmDBAccessIdInfo(TENANT_ID, "seed-user1", false, false));
-
-    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = Mockito.mock(OzoneManager.class);
     Mockito.when(ozoneManager.getMetadataManager())
         .thenReturn(omMetadataManager);
 
@@ -98,9 +88,35 @@ public class TestOMMultiTenantManagerImpl {
         .thenReturn(ozoneConfiguration);
 
     tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
-    assertEquals(1, tenantManager.getTenantCache().size());
-    assertEquals(1, tenantManager.getTenantCache().get(TENANT_ID)
-        .getAccessIdInfoMap().size());
+  }
+
+  /**
+   * Tests rebuilding the tenant cache on restart.
+   */
+  @Test
+  public void testReloadCache() throws IOException {
+    // Create a tenant with multiple users.
+    CachedTenantState expectedTenant2State = createTenant("tenant2");
+    assignUserToTenant(expectedTenant2State, "access2", "user2", false, false);
+    assignUserToTenant(expectedTenant2State, "access3", "user2", true, false);
+    assignUserToTenant(expectedTenant2State, "access4", "user2", true, true);
+
+    // Create a tenant with no users.
+    CachedTenantState expectedTenant3State = createTenant("tenant3");
+
+    // Reload the cache as part of new object creation.
+    OMMultiTenantManagerImpl tenantManager2 =
+        new OMMultiTenantManagerImpl(ozoneManager, conf);
+    // Check that the cache was restored correctly.
+    // Setup created a tenant in addition to the ones created for this test.
+    assertEquals(3, tenantManager2.getTenantCache().size());
+    // Check tenant2
+    assertEquals(expectedTenant2State, tenantManager.getTenantCache()
+        .get("tenant2"));
+    // Check tenant3
+    assertEquals(expectedTenant3State, tenantManager.getTenantCache()
+        .get("tenant3"));
+
   }
 
   @Test
@@ -155,5 +171,69 @@ public class TestOMMultiTenantManagerImpl {
         "seed-accessId1");
     assertTrue(optionalTenant.isPresent());
     assertEquals(TENANT_ID, optionalTenant.get());
+  }
+
+  /**
+   * @return A new {@link CachedTenantState} object expected to match the one
+   * created by the cache.
+   */
+  private CachedTenantState createTenant(String tenantId) throws IOException {
+    final String userRoleName =
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+    final String adminRoleName =
+        OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
+    createTenantInDB(tenantId, userRoleName, adminRoleName);
+    tenantManager.getCacheOp().createTenant(tenantId, userRoleName,
+        adminRoleName);
+
+    return new CachedTenantState(tenantId, userRoleName, adminRoleName);
+  }
+
+  private void createTenantInDB(String tenantId) throws IOException {
+    final String userRoleName =
+        OMMultiTenantManager.getDefaultUserRoleName(tenantId);
+    final String adminRoleName =
+        OMMultiTenantManager.getDefaultAdminRoleName(tenantId);
+    createTenantInDB(tenantId, userRoleName, adminRoleName);
+  }
+
+  private void createTenantInDB(String tenantId, String userRoleName,
+      String adminRoleName) throws IOException {
+    final String bucketNamespaceName = tenantId;
+    final String bucketNamespacePolicyName =
+        OMMultiTenantManager.getDefaultBucketNamespacePolicyName(tenantId);
+    final String bucketPolicyName =
+        OMMultiTenantManager.getDefaultBucketPolicyName(tenantId);
+    final OmDBTenantState omDBTenantState = new OmDBTenantState(tenantId,
+        bucketNamespaceName, userRoleName, adminRoleName,
+        bucketNamespacePolicyName, bucketPolicyName);
+
+    omMetadataManager.getTenantStateTable().put(tenantId, omDBTenantState);
+  }
+
+  /**
+   * The {@link CachedTenantState} parameter will be updated to match the
+   * expected update performed by the cache.
+   */
+  private void assignUserToTenant(
+      CachedTenantState tenantState, String accessId, String user,
+      boolean isAdmin, boolean isDelegatedAdmin) throws IOException {
+    assignUserToTenantInDB(tenantState.getTenantId(), accessId, user, isAdmin,
+        isDelegatedAdmin);
+    tenantManager.getCacheOp().assignUserToTenant(user,
+        tenantState.getTenantId(), accessId);
+    if (isAdmin) {
+      tenantManager.getCacheOp().assignTenantAdmin(accessId, isDelegatedAdmin);
+    }
+
+    tenantState.getAccessIdInfoMap().put(accessId,
+        new CachedTenantState.CachedAccessIdInfo(user, isAdmin));
+  }
+
+  private void assignUserToTenantInDB(String tenantId, String accessId,
+      String user, boolean isAdmin, boolean isDelegatedAdmin)
+      throws IOException {
+    omMetadataManager.getTenantAccessIdTable().put(accessId,
+        new OmDBAccessIdInfo(tenantId, user, isAdmin, isDelegatedAdmin));
   }
 }

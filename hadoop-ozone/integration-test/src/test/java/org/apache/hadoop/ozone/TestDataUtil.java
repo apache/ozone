@@ -23,6 +23,7 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Scanner;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -99,8 +100,16 @@ public final class TestDataUtil {
   public static void createKey(OzoneBucket bucket, String keyName,
       ReplicationFactor repFactor, ReplicationType repType, String content)
       throws IOException {
+    ReplicationConfig repConfig = ReplicationConfig
+        .fromTypeAndFactor(repType, repFactor);
+    createKey(bucket, keyName, repConfig, content);
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+      ReplicationConfig repConfig, String content)
+      throws IOException {
     try (OutputStream stream = bucket
-        .createKey(keyName, content.length(), repType, repFactor,
+        .createKey(keyName, content.length(), repConfig,
             new HashMap<>())) {
       stream.write(content.getBytes(UTF_8));
     }
@@ -116,6 +125,16 @@ public final class TestDataUtil {
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster)
       throws IOException {
     return createVolumeAndBucket(cluster, BucketLayout.LEGACY);
+  }
+
+  public static OzoneBucket createBucket(MiniOzoneCluster cluster,
+      String vol, BucketArgs bucketArgs, String bukName)
+      throws IOException {
+    OzoneClient client = cluster.getClient();
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume volume = objectStore.getVolume(vol);
+    volume.createBucket(bukName, bucketArgs);
+    return volume.getBucket(bukName);
   }
 
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,

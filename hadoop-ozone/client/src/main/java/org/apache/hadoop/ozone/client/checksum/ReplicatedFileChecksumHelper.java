@@ -71,15 +71,17 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
          blockIdx++) {
       OmKeyLocationInfo keyLocationInfo =
           getKeyLocationInfoList().get(blockIdx);
-      currentLength += keyLocationInfo.getLength();
       if (currentLength > getLength()) {
         return;
       }
 
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
-            "Fail to get block MD5 for " + keyLocationInfo);
+            "Fail to get block checksum for " + keyLocationInfo
+                + ", checksum combine mode : {}" + getCombineMode());
       }
+
+      currentLength += keyLocationInfo.getLength();
     }
   }
 
@@ -89,6 +91,12 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
    */
   private boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
       throws IOException {
+    // for each block, send request
+    List<ContainerProtos.ChunkInfo> chunkInfos =
+        getChunkInfos(keyLocationInfo);
+    if (chunkInfos.size() == 0) {
+      return false;
+    }
 
     long blockNumBytes = keyLocationInfo.getLength();
 
@@ -96,11 +104,10 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       blockNumBytes = getRemaining();
     }
     setRemaining(getRemaining() - blockNumBytes);
-    // for each block, send request
-    List<ContainerProtos.ChunkInfo> chunkInfos =
-        getChunkInfos(keyLocationInfo);
+
     ContainerProtos.ChecksumData checksumData =
         chunkInfos.get(0).getChecksumData();
+    setChecksumType(checksumData.getType());
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     setBytesPerCRC(bytesPerChecksum);
 
@@ -171,8 +178,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       throws IOException {
     AbstractBlockChecksumComputer blockChecksumComputer =
         new ReplicatedBlockChecksumComputer(chunkInfoList);
-    // TODO: support composite CRC
-    blockChecksumComputer.compute();
+    blockChecksumComputer.compute(getCombineMode());
 
     return blockChecksumComputer.getOutByteBuffer();
   }

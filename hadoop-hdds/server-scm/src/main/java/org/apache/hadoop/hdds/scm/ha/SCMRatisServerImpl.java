@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
@@ -250,6 +249,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public List<String> getRatisRoles() throws IOException {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
+    RaftPeer leader = getLeader();
     List<String> ratisRoles = new ArrayList<>();
     for (RaftPeer peer : peers) {
       InetAddress peerInetAddress = null;
@@ -260,12 +260,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
             peer.getAddress());
       }
-      boolean isLocal = false;
-      if (peerInetAddress != null) {
-        isLocal = NetUtils.isLocalAddress(peerInetAddress);
-      }
       ratisRoles.add((peer.getAddress() == null ? "" :
-              peer.getAddress().concat(isLocal ?
+          peer.getAddress().concat(peer.equals(leader) ?
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
                   ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
                   .concat(":".concat(peer.getId().toString()))
@@ -353,4 +349,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }
 
+  private RaftPeer getLeader() {
+    if (division.getInfo().isLeader()) {
+      return division.getPeer();
+    } else {
+      ByteString leaderId = division.getInfo().getRoleInfoProto()
+          .getFollowerInfo().getLeaderInfo().getId().getId();
+      return leaderId.isEmpty() ? null :
+          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+    }
+  }
 }

@@ -27,8 +27,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -61,7 +63,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyOutputStream extends OutputStream {
+public class KeyOutputStream extends OutputStream implements Syncable {
 
   private OzoneClientConfig config;
 
@@ -69,7 +71,7 @@ public class KeyOutputStream extends OutputStream {
    * Defines stream action while calling handleFlushOrClose.
    */
   enum StreamAction {
-    FLUSH, CLOSE, FULL
+    FLUSH, HSYNC, CLOSE, FULL
   }
 
   public static final Logger LOG =
@@ -89,11 +91,7 @@ public class KeyOutputStream extends OutputStream {
 
   private long clientID;
 
-  /**
-   * A constructor for testing purpose only.
-   */
-  @VisibleForTesting
-  public KeyOutputStream() {
+  public KeyOutputStream(ContainerClientMetrics clientMetrics) {
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -101,7 +99,7 @@ public class KeyOutputStream extends OutputStream {
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool();
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics);
   }
 
   @VisibleForTesting
@@ -137,7 +135,8 @@ public class KeyOutputStream extends OutputStream {
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
+      boolean unsafeByteBufferConversion,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     blockOutputStreamEntryPool =
@@ -149,7 +148,8 @@ public class KeyOutputStream extends OutputStream {
             isMultipart, handler.getKeyInfo(),
             unsafeByteBufferConversion,
             xceiverClientManager,
-            handler.getId());
+            handler.getId(),
+            clientMetrics);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -441,6 +441,22 @@ public class KeyOutputStream extends OutputStream {
     handleFlushOrClose(StreamAction.FLUSH);
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    checkNotClosed();
+    handleFlushOrClose(StreamAction.HSYNC);
+    //TODO HDDS-7593: send hsyncKey to update length;
+    //     where the hsyncKey op is similar to
+    //     blockOutputStreamEntryPool.commitKey(offset)
+    //     except that hsyncKey only updates the key length
+    //     instead of committing it.
+  }
+
   /**
    * Close or Flush the latest outputStream depending upon the action.
    * This function gets called when while write is going on, the current stream
@@ -501,6 +517,9 @@ public class KeyOutputStream extends OutputStream {
     case FLUSH:
       entry.flush();
       break;
+    case HSYNC:
+      entry.hsync();
+      break;
     default:
       throw new IOException("Invalid Operation");
     }
@@ -552,6 +571,7 @@ public class KeyOutputStream extends OutputStream {
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
+    private ContainerClientMetrics clientMetrics;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -652,6 +672,15 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
+
+    public ContainerClientMetrics getClientMetrics() {
+      return clientMetrics;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
@@ -664,7 +693,8 @@ public class KeyOutputStream extends OutputStream {
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion);
+          unsafeByteBufferConversion,
+          clientMetrics);
     }
 
   }

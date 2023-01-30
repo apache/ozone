@@ -601,6 +601,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
       ancestorGen = 0;
     }
     Node scopeNode = getNode(finalScope);
+    if (scopeNode == null) {
+      throw new IllegalArgumentException(String.format("No nodes with Scope: " +
+              "%s exists", finalScope));
+    }
 
     // check overlap of excludedScopes and finalScope
     List<String> mutableExcludedScopes = null;

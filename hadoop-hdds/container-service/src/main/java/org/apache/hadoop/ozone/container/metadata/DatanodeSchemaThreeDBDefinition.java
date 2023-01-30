@@ -24,11 +24,11 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
-import org.rocksdb.ColumnFamilyOptions;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
@@ -101,7 +101,8 @@ public class DatanodeSchemaThreeDBDefinition
     DatanodeDBProfile dbProfile = DatanodeDBProfile
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
-    ColumnFamilyOptions cfOptions = dbProfile.getColumnFamilyOptions(config);
+    ManagedColumnFamilyOptions cfOptions =
+        dbProfile.getColumnFamilyOptions(config);
     // Use prefix seek to mitigating seek overhead.
     // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
     cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
@@ -147,9 +148,13 @@ public class DatanodeSchemaThreeDBDefinition
         + separator;
   }
 
-  private static int getContainerKeyPrefixLength() {
+  public static int getContainerKeyPrefixLength() {
     return FixedLengthStringUtils.string2Bytes(
         getContainerKeyPrefix(0L)).length;
+  }
+
+  public static String getKeyWithoutPrefix(String keyWithPrefix) {
+    return keyWithPrefix.substring(keyWithPrefix.indexOf(separator) + 1);
   }
 
   private void setSeparator(String keySeparator) {

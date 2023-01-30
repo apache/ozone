@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.rocksdb.ColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 
 import java.io.IOException;
 
@@ -40,7 +40,7 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
 
   private final Codec<VALUE> valueCodec;
 
-  private ColumnFamilyOptions cfOptions;
+  private ManagedColumnFamilyOptions cfOptions;
 
   public DBColumnFamilyDefinition(
       String tableName,
@@ -84,11 +84,11 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
     return valueCodec;
   }
 
-  public ColumnFamilyOptions getCfOptions() {
+  public ManagedColumnFamilyOptions getCfOptions() {
     return this.cfOptions;
   }
 
-  public void setCfOptions(ColumnFamilyOptions cfOptions) {
+  public void setCfOptions(ManagedColumnFamilyOptions cfOptions) {
     this.cfOptions = cfOptions;
   }
 }

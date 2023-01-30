@@ -32,6 +32,8 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -41,8 +43,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.junit.Assert;
 import org.junit.Rule;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -66,7 +66,7 @@ public class TestRDBTableStore {
   private static final int PREFIX_LENGTH = 9;
   @Rule
   private RDBStore rdbStore = null;
-  private DBOptions options = null;
+  private ManagedDBOptions options = null;
   private static byte[][] bytesOf;
 
   @TempDir
@@ -92,21 +92,22 @@ public class TestRDBTableStore {
 
   @BeforeEach
   public void setUp() throws Exception {
-    options = new DBOptions();
+    options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 
     Statistics statistics = new Statistics();
     statistics.setStatsLevel(StatsLevel.ALL);
-    options = options.setStatistics(statistics);
+    options.setStatistics(statistics);
 
     Set<TableConfig> configSet = new HashSet<>();
     for (String name : families) {
-      TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      TableConfig newConfig = new TableConfig(name,
+          new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
     for (String name : prefixedFamilies) {
-      ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
+      ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
       cfOptions.useFixedLengthPrefixExtractor(PREFIX_LENGTH);
 
       TableConfig newConfig = new TableConfig(name, cfOptions);

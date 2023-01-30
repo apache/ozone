@@ -66,6 +66,13 @@ Verify Bucket 1 Owner
     ${result} =         Execute          ozone sh bucket info /tenantone/bucket-test1 | jq -r '.owner'
                         Should Be Equal  ${result}       testuser
 
+Put, get and delete a key in the tenant bucket
+                        Execute                 echo "Randomtext" > /tmp/testfile
+                        Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-object --bucket bucket-test1 --key mykey --body /tmp/testfile  0
+                        Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} head-object --bucket bucket-test1 --key mykey  0
+                        Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object --bucket bucket-test1 --key mykey  0
+
+
 SetSecret Success with Cluster Admin
     ${output} =         Execute          ozone tenant user setsecret 'tenantone$testuser' --secret=somesecret1
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'

@@ -19,11 +19,14 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.hashcodegenerator.StringOMHashCodeGeneratorImpl;
+import org.apache.hadoop.ozone.om.hashcodegenerator.OMHashCodeGenerator;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PATH_LOCK;
 
 /**
  * Implementation of OzoneLockStrategy interface. Concrete strategy for OBS
@@ -31,67 +34,77 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
 
+  // TODO: need to make this pluggable and allow users to configure the
+  //  preferred hash code generation mechanism.
+  private OMHashCodeGenerator omHashCodeGenerator =
+      new StringOMHashCodeGeneratorImpl();
+
   @Override
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
-                                  OzoneManagerLock.Resource resource,
                                   String volumeName, String bucketName,
                                   String keyName) throws IOException {
-    boolean acquiredLock;
-
-    acquiredLock = omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
-        volumeName, bucketName);
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+
+    boolean acquiredLock = omMetadataManager.getLock().acquireReadLock(
+        BUCKET_LOCK, volumeName, bucketName);
 
     Preconditions.checkArgument(acquiredLock,
         "BUCKET_LOCK should be acquired!");
 
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
-        .acquireWriteLock(resource, volumeName, bucketName, keyName);
+        .acquireWriteHashedLock(KEY_PATH_LOCK,
+            String.valueOf(resourceHashCode));
 
     return acquiredLock;
   }
 
   @Override
   public void releaseWriteLock(OMMetadataManager omMetadataManager,
-                               OzoneManagerLock.Resource resource,
                                String volumeName, String bucketName,
-                               String keyName) throws IOException {
-    omMetadataManager.getLock()
-        .releaseWriteLock(resource, volumeName, bucketName, keyName);
+                               String keyName) {
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
+    omMetadataManager.getLock().releaseWriteHashedLock(KEY_PATH_LOCK,
+        String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
-
-    return;
   }
 
   @Override
   public boolean acquireReadLock(OMMetadataManager omMetadataManager,
-                                 OzoneManagerLock.Resource resource,
                                  String volumeName, String bucketName,
                                  String keyName) throws IOException {
-    boolean acquiredLock;
-
-    acquiredLock = omMetadataManager.getLock()
-        .acquireReadLock(BUCKET_LOCK, volumeName, bucketName);
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+
+    boolean acquiredLock = omMetadataManager.getLock().acquireReadLock(
+        BUCKET_LOCK, volumeName, bucketName);
 
     Preconditions.checkArgument(acquiredLock,
         "BUCKET_LOCK should be acquired!");
 
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
-        .acquireReadLock(resource, volumeName, bucketName, keyName);
+        .acquireReadHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
     return acquiredLock;
   }
 
   @Override
   public void releaseReadLock(OMMetadataManager omMetadataManager,
-                              OzoneManagerLock.Resource resource,
                               String volumeName, String bucketName,
-                              String keyName) throws IOException {
+                              String keyName) {
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(KEY_PATH_LOCK, volumeName, bucketName, keyName);
+    long resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock()
-        .releaseReadLock(resource, volumeName, bucketName, keyName);
+        .releaseReadHashedLock(KEY_PATH_LOCK, String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);

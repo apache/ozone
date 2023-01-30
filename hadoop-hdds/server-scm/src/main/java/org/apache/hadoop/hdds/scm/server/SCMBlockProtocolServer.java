@@ -262,13 +262,13 @@ public class SCMBlockProtocolServer implements
       }
     }
     for (BlockGroup bg : keyBlocksInfoList) {
-      auditMap.put("KeyBlockToDelete", bg.toString());
       List<DeleteBlockResult> blockResult = new ArrayList<>();
       for (BlockID b : bg.getBlockIDList()) {
         blockResult.add(new DeleteBlockResult(b, resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
+    auditMap.put("KeyBlockToDelete", keyBlocksInfoList.toString());
     if (e == null) {
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap));

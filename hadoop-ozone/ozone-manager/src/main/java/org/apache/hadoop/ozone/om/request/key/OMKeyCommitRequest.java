@@ -218,25 +218,43 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
-      // Update the block length for each block
-      omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      // Update the block length for each block, return the allocated but
+      // uncommitted blocks
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
+          locationInfoList, false);
+
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
+      // if keyToDelete isn't null, usedNamespace needn't check and
+      // increase.
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
       } else {
-        // if keyToDelete isn't null, usedNamespace needn't check and
-        // increase.
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
-      checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+
+      // let the uncommitted blocks pretend as key's old version blocks
+      // which will be deleted as RepeatedOmKeyInfo
+      OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
+          omKeyInfo);
+      if (pseudoKeyInfo != null) {
+        if (oldKeyVersionsToDelete != null) {
+          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
+        } else {
+          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
+        }
+      }
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -311,6 +329,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (omKeyInfo.getKeyLocationVersions().size() == 1) {
         omMetrics.incNumKeys();
       }
+      if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeysTotal();
+      }
       omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
       LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
               bucketName, keyName);
@@ -318,6 +339,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     case FAILURE:
       LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
               volumeName, bucketName, keyName, exception);
+      if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeyCreateFailsTotal();
+      }
       omMetrics.incNumKeyCommitFails();
       break;
     default:

@@ -20,9 +20,12 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -69,12 +72,40 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Test
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
+      throws Exception {
+    OMRequest omRequest = createFileRequest(volumeName, bucketName,
+        "/test/a1/a2", HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, false, true);
+
+    // create bucket with quota limit 1
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setQuotaInNamespace(1));
+    
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omFileCreateResponse =
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertTrue(omFileCreateResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithRecursiveAndOverWrite()
           throws Exception {
     String key = "c/d/e/f";
     // Should be able to create file even if parent directories does not exist
     testNonRecursivePath(key, false, true, false);
     Assert.assertEquals("Invalid metrics value", 3, omMetrics.getNumKeys());
+    Assert.assertEquals(omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getUsedNamespace(), omMetrics.getNumKeys());
 
     // Add the key to key table
     OmDirectoryInfo omDirInfo = getDirInfo("c/d/e");

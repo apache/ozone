@@ -155,7 +155,7 @@ public class TestS3MultipartUploadCompleteRequest
         .getCacheValue(new CacheKey<>(
             omMetadataManager.getBucketKey(volumeName, bucketName)))
         .getCacheValue();
-    Assert.assertEquals(1L, omBucketInfo.getUsedNamespace());
+    Assert.assertEquals(getNamespaceCount(), omBucketInfo.getUsedNamespace());
   }
 
   protected void addVolumeAndBucket(String volumeName, String bucketName)
@@ -330,6 +330,10 @@ public class TestS3MultipartUploadCompleteRequest
 
   protected String getKeyName() {
     return UUID.randomUUID().toString();
+  }
+
+  protected long getNamespaceCount() {
+    return 1L;
   }
 }
 

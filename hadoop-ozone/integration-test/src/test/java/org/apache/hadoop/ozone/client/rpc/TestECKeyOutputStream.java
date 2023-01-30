@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -60,7 +59,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -98,7 +96,6 @@ public class TestECKeyOutputStream {
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     // If SCM detects dead node too quickly, then container would be moved to
     // closed state and all in progress writes will get exception. To avoid
     // that, we are just keeping higher timeout and none of the tests depending
@@ -171,7 +168,7 @@ public class TestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -263,6 +260,11 @@ public class TestECKeyOutputStream {
   }
 
   @Test
+  public void testChunksInSingleWriteOpWithOffset() throws IOException {
+    testMultipleChunksInSingleWriteOp(11, 25, 19);
+  }
+
+  @Test
   public void test15ChunksInSingleWriteOp() throws IOException {
     testMultipleChunksInSingleWriteOp(15);
   }
@@ -277,18 +279,28 @@ public class TestECKeyOutputStream {
     testMultipleChunksInSingleWriteOp(21);
   }
 
-  public void testMultipleChunksInSingleWriteOp(int numChunks)
-      throws IOException {
-    byte[] inputData = getInputBytes(numChunks);
+  private void testMultipleChunksInSingleWriteOp(int offset,
+                                                int bufferChunks, int numChunks)
+          throws IOException {
+    byte[] inputData = getInputBytes(offset, bufferChunks, numChunks);
     final OzoneBucket bucket = getOzoneBucket();
-    String keyName = "testMultipleChunksInSingleWriteOp" + numChunks;
+    String keyName =
+            String.format("testMultipleChunksInSingleWriteOpOffset" +
+                    "%dBufferChunks%dNumChunks", offset, bufferChunks,
+                    numChunks);
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
         new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
-      out.write(inputData);
+      out.write(inputData, offset, numChunks * chunkSize);
     }
 
-    validateContent(inputData, bucket, bucket.getKey(keyName));
+    validateContent(offset, numChunks * chunkSize, inputData, bucket,
+            bucket.getKey(keyName));
+  }
+
+  private void testMultipleChunksInSingleWriteOp(int numChunks)
+      throws IOException {
+    testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
   }
 
   @Test
@@ -332,11 +344,18 @@ public class TestECKeyOutputStream {
   }
 
   private void validateContent(byte[] inputData, OzoneBucket bucket,
+                               OzoneKey key) throws IOException {
+    validateContent(0, inputData.length, inputData, bucket, key);
+  }
+
+  private void validateContent(int offset, int length, byte[] inputData,
+                               OzoneBucket bucket,
       OzoneKey key) throws IOException {
     try (OzoneInputStream is = bucket.readKey(key.getName())) {
-      byte[] fileContent = new byte[inputData.length];
-      Assert.assertEquals(inputData.length, is.read(fileContent));
-      Assert.assertEquals(new String(inputData, UTF_8),
+      byte[] fileContent = new byte[length];
+      Assert.assertEquals(length, is.read(fileContent));
+      Assert.assertEquals(new String(Arrays.copyOfRange(inputData, offset,
+                      offset + length), UTF_8),
           new String(fileContent, UTF_8));
     }
   }
@@ -346,7 +365,7 @@ public class TestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -379,19 +398,25 @@ public class TestECKeyOutputStream {
       try (OzoneOutputStream out = bucket.createKey(keyName, 1024,
           new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
               chunkSize), new HashMap<>())) {
+        ECKeyOutputStream ecOut = (ECKeyOutputStream) out.getOutputStream();
         out.write(inputData);
         // Kill a node from first pipeline
-        nodeToKill =
-            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
-                .get(0).getPipeline().getFirstNode();
+        nodeToKill = ecOut.getStreamEntries()
+            .get(0).getPipeline().getFirstNode();
         cluster.shutdownHddsDatanode(nodeToKill);
 
         out.write(inputData);
-        // Check the second blockGroup pipeline to make sure that the failed not
-        // is not selected.
-        Assert.assertFalse(
-            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
-                .get(1).getPipeline().getNodes().contains(nodeToKill));
+
+        // Wait for flushing thread to finish its work.
+        final long checkpoint = System.currentTimeMillis();
+        ecOut.insertFlushCheckpoint(checkpoint);
+        GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
+            100, 10000);
+
+        // Check the second blockGroup pipeline to make sure that the failed
+        // node is not selected.
+        Assert.assertFalse(ecOut.getStreamEntries()
+            .get(1).getPipeline().getNodes().contains(nodeToKill));
       }
 
       try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -410,9 +435,13 @@ public class TestECKeyOutputStream {
   }
 
   private byte[] getInputBytes(int numChunks) {
-    byte[] inputData = new byte[numChunks * chunkSize];
+    return getInputBytes(0, numChunks, numChunks);
+  }
+
+  private byte[] getInputBytes(int offset, int bufferChunks, int numChunks) {
+    byte[] inputData = new byte[offset + bufferChunks * chunkSize];
     for (int i = 0; i < numChunks; i++) {
-      int start = (i * chunkSize);
+      int start = offset + (i * chunkSize);
       Arrays.fill(inputData, start, start + chunkSize - 1,
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }

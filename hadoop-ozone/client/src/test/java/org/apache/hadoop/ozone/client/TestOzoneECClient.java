@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,6 +44,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Assert;
@@ -216,7 +216,7 @@ public class TestOzoneECClient {
   public void testCreateBucketWithDefaultReplicationConfig()
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
 
@@ -262,33 +262,52 @@ public class TestOzoneECClient {
   }
 
   @Test
+  public void testChunksInSingleWriteOpWithOffset() throws IOException {
+    testMultipleChunksInSingleWriteOp(100, 12, 11);
+  }
+
+  @Test
   public void test12ChunksInSingleWriteOp() throws IOException {
     testMultipleChunksInSingleWriteOp(12);
   }
 
-  public void testMultipleChunksInSingleWriteOp(int numChunks)
+  private void testMultipleChunksInSingleWriteOp(int numChunks)
+          throws IOException {
+    testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
+  }
+  private void testMultipleChunksInSingleWriteOp(int offset, int bufferChunks,
+                                                 int numChunks)
       throws IOException {
-    byte[] inputData = new byte[numChunks * chunkSize];
+    byte[] inputData = new byte[offset + bufferChunks * chunkSize];
     for (int i = 0; i < numChunks; i++) {
-      int start = (i * chunkSize);
+      int start = offset + (i * chunkSize);
       Arrays.fill(inputData, start, start + chunkSize - 1,
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
-    final OzoneBucket bucket = writeIntoECKey(inputData, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig(dataBlocks, parityBlocks,
-                ECReplicationConfig.EcCodec.RS, chunkSize)));
+    final OzoneBucket bucket = writeIntoECKey(offset, numChunks * chunkSize,
+            inputData, keyName, new DefaultReplicationConfig(
+                    new ECReplicationConfig(dataBlocks, parityBlocks,
+                            ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneKey key = bucket.getKey(keyName);
-    validateContent(inputData, bucket, key);
+    validateContent(offset, numChunks * chunkSize, inputData, bucket, key);
   }
 
-  private void validateContent(byte[] inputData, OzoneBucket bucket,
+  private void validateContent(byte[] inputData,
+                               OzoneBucket bucket,
+                               OzoneKey key) throws IOException {
+    validateContent(0, inputData.length, inputData, bucket, key);
+  }
+
+  private void validateContent(int offset, int length, byte[] inputData,
+                               OzoneBucket bucket,
       OzoneKey key) throws IOException {
     Assert.assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[inputData.length];
-      Assert.assertEquals(inputData.length, is.read(fileContent));
-      Assert.assertEquals(new String(inputData, UTF_8),
+      byte[] fileContent = new byte[length];
+      Assert.assertEquals(length, is.read(fileContent));
+      Assert.assertEquals(new String(Arrays.copyOfRange(inputData, offset,
+                      offset + length),
+                      UTF_8),
           new String(fileContent, UTF_8));
     }
   }
@@ -300,7 +319,7 @@ public class TestOzoneECClient {
         Byte.parseByte("1"));
 
     writeIntoECKey(firstSmallChunk, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneManagerProtocolProtos.KeyLocationList blockList =
@@ -427,7 +446,7 @@ public class TestOzoneECClient {
     Arrays.fill(inputData, (numFullChunks * chunkSize),
         ((numFullChunks * chunkSize)) + partialChunkLen - 1, (byte) 1);
     final OzoneBucket bucket = writeIntoECKey(inputData, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
     OzoneKey key = bucket.getKey(keyName);
@@ -438,7 +457,7 @@ public class TestOzoneECClient {
   public void testCommitKeyInfo()
       throws IOException {
     final OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(dataBlocks, parityBlocks,
                 ECReplicationConfig.EcCodec.RS, chunkSize)));
 
@@ -591,29 +610,29 @@ public class TestOzoneECClient {
 
   @Test
   public void testWriteShouldFailIfMoreThanParityNodesFail()
-      throws IOException {
+      throws Exception {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2}, 3, 2);
   }
 
   @Test
   public void testWriteShouldSuccessIfLessThanParityNodesFail()
-      throws IOException {
+      throws Exception {
     testNodeFailuresWhileWriting(new int[] {0}, 2, 2);
   }
 
   @Test
-  public void testWriteShouldSuccessIf4NodesFailed() throws IOException {
+  public void testWriteShouldSuccessIf4NodesFailed() throws Exception {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2, 3}, 1, 2);
   }
 
   @Test
   public void testWriteShouldSuccessWithAdditional1BlockGroupAfterFailure()
-      throws IOException {
+      throws Exception {
     testNodeFailuresWhileWriting(new int[] {0, 1, 2, 3}, 10, 3);
   }
 
   @Test
-  public void testStripeWriteRetriesOn2Failures() throws IOException {
+  public void testStripeWriteRetriesOn2Failures() throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
     // Cluster has 15 nodes. So, first we will create 3 block groups with
@@ -636,7 +655,7 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testStripeWriteRetriesOn3Failures() throws IOException {
+  public void testStripeWriteRetriesOn3Failures() throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
 
@@ -658,9 +677,9 @@ public class TestOzoneECClient {
   }
 
   // The mocked impl throws IllegalStateException when there are not enough
-  // nodes in allocateBlock request. But write() converts it to IOException.
-  @Test(expected = IOException.class)
-  public void testStripeWriteRetriesOnAllNodeFailures() throws IOException {
+  // nodes in allocateBlock request.
+  @Test(expected = IllegalStateException.class)
+  public void testStripeWriteRetriesOnAllNodeFailures() throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
 
@@ -678,7 +697,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testStripeWriteRetriesOn4FailuresWith3RetriesAllowed()
-      throws IOException {
+      throws Exception {
     OzoneConfiguration con = new OzoneConfiguration();
     con.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2, StorageUnit.KB);
     con.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES, 3);
@@ -707,7 +726,7 @@ public class TestOzoneECClient {
   }
 
   public void testStripeWriteRetriesOnFailures(OzoneConfiguration con,
-      int clusterSize, int[] nodesIndexesToMarkFailure) throws IOException {
+      int clusterSize, int[] nodesIndexesToMarkFailure) throws Exception {
     close();
     MultiNodePipelineBlockAllocator blkAllocator =
         new MultiNodePipelineBlockAllocator(con, dataBlocks + parityBlocks,
@@ -725,6 +744,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
       Assert.assertTrue(
           ((MockXceiverClientFactory) factoryStub).getStorages().size() == 5);
       List<DatanodeDetails> failedDNs = new ArrayList<>();
@@ -768,7 +788,7 @@ public class TestOzoneECClient {
 
   public void testNodeFailuresWhileWriting(int[] nodesIndexesToMarkFailure,
       int numChunksToWriteAfterFailure, int numExpectedBlockGrps)
-      throws IOException {
+      throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -781,6 +801,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
@@ -822,22 +843,22 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testExcludeOnDNFailure() throws IOException {
+  public void testExcludeOnDNFailure() throws Exception {
     testExcludeFailedDN(IntStream.range(0, 5), IntStream.empty());
   }
 
   @Test
-  public void testExcludeOnDNClosed() throws IOException {
+  public void testExcludeOnDNClosed() throws Exception {
     testExcludeFailedDN(IntStream.empty(), IntStream.range(0, 5));
   }
 
   @Test
-  public void testExcludeOnDNMixed() throws IOException {
+  public void testExcludeOnDNMixed() throws Exception {
     testExcludeFailedDN(IntStream.range(0, 3), IntStream.range(3, 5));
   }
 
   private void testExcludeFailedDN(IntStream failedDNIndex,
-      IntStream closedDNIndex) throws IOException {
+      IntStream closedDNIndex) throws Exception {
     close();
     OzoneConfiguration con = new OzoneConfiguration();
     MultiNodePipelineBlockAllocator blkAllocator =
@@ -863,6 +884,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i % dataBlocks]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Then let's mark datanodes with closed container
       List<DatanodeDetails> closedDNs = closedDNIndex
@@ -880,6 +902,7 @@ public class TestOzoneECClient {
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i % dataBlocks]);
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Assert excludeList only includes failedDNs
       Assert.assertArrayEquals(failedDNs.toArray(new DatanodeDetails[0]),
@@ -890,7 +913,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testLargeWriteOfMultipleStripesWithStripeFailure()
-      throws IOException {
+      throws Exception {
     close();
     OzoneConfiguration con = new OzoneConfiguration();
     // block size of 3KB could hold 3 full stripes
@@ -924,6 +947,7 @@ public class TestOzoneECClient {
           out.write(inputChunks[i]);
         }
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
@@ -1036,7 +1060,7 @@ public class TestOzoneECClient {
 
   @Test
   public void testDiscardPreAllocatedBlocksPreventRetryExceeds()
-      throws IOException {
+      throws Exception {
     close();
     OzoneConfiguration con = new OzoneConfiguration();
     int maxRetries = 3;
@@ -1095,6 +1119,7 @@ public class TestOzoneECClient {
           out.write(inputChunks[i]);
         }
       }
+      waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Make the writes fail to trigger retry
       List<DatanodeDetails> failedDNs = new ArrayList<>();
@@ -1139,10 +1164,28 @@ public class TestOzoneECClient {
 
   private OzoneBucket writeIntoECKey(byte[] data, String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
-    return writeIntoECKey(new byte[][] {data}, key, defaultReplicationConfig);
+    return writeIntoECKey(0, data.length, data, key, defaultReplicationConfig);
+  }
+  private OzoneBucket writeIntoECKey(int offset, int length, byte[] data,
+      String key, DefaultReplicationConfig defaultReplicationConfig)
+      throws IOException {
+    return writeIntoECKey(new int[]{offset}, new int[]{length},
+            new byte[][] {data}, key, defaultReplicationConfig);
   }
 
   private OzoneBucket writeIntoECKey(byte[][] chunks, String key,
+      DefaultReplicationConfig defaultReplicationConfig) throws IOException {
+    int[] offsets = new int[chunks.length];
+    Arrays.fill(offsets, 0);
+    int[] lengths = Arrays.stream(chunks)
+            .mapToInt(chunk -> chunk.length).toArray();
+    return writeIntoECKey(offsets, lengths, chunks,
+            key, defaultReplicationConfig);
+  }
+
+  private OzoneBucket writeIntoECKey(int[] offsets, int[] lengths,
+                                     byte[][] chunks,
+                                     String key,
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
@@ -1160,7 +1203,7 @@ public class TestOzoneECClient {
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS, chunkSize), new HashMap<>())) {
       for (int i = 0; i < chunks.length; i++) {
-        out.write(chunks[i]);
+        out.write(chunks[i], offsets[i], lengths[i]);
       }
     }
     return bucket;
@@ -1183,5 +1226,13 @@ public class TestOzoneECClient {
       locationInfoList.add(info);
     }
     return locationInfoList;
+  }
+
+  private static void waitForFlushingThreadToFinish(
+      ECKeyOutputStream ecOut) throws Exception {
+    final long checkpoint = System.currentTimeMillis();
+    ecOut.insertFlushCheckpoint(checkpoint);
+    GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
+        100, 10000);
   }
 }

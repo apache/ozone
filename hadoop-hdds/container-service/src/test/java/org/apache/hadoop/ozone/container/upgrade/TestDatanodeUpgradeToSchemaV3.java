@@ -105,6 +105,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         this.schemaV3Enabled);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        true);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
   }
 
   @Before
@@ -665,7 +669,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
       long containerID, Pipeline pipeline) throws Exception {
     return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100, null);
+            ContainerTestHelper.getTestBlockID(containerID), 100);
   }
 
   public Pipeline getPipeline() {

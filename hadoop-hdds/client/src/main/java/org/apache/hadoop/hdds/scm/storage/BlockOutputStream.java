@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -120,6 +121,8 @@ public class BlockOutputStream extends OutputStream {
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
   private int replicationIndex;
+  private Pipeline pipeline;
+  private final ContainerClientMetrics clientMetrics;
 
   /**
    * Creates a new BlockOutputStream.
@@ -135,7 +138,8 @@ public class BlockOutputStream extends OutputStream {
       Pipeline pipeline,
       BufferPool bufferPool,
       OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -177,6 +181,8 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    this.clientMetrics = clientMetrics;
+    this.pipeline = pipeline;
   }
 
   void refreshCurrentBuffer() {
@@ -224,8 +230,12 @@ public class BlockOutputStream extends OutputStream {
     return this.xceiverClient;
   }
 
-  BlockData.Builder getContainerBlockData() {
+  public BlockData.Builder getContainerBlockData() {
     return this.containerBlockData;
+  }
+
+  public Pipeline getPipeline() {
+    return this.pipeline;
   }
 
   Token<? extends TokenIdentifier> getToken() {
@@ -362,6 +372,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
+    waitForFlushAndCommit(true);
+  }
+
+  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
     try {
       checkOpen();
       waitOnFlushFutures();
@@ -371,7 +385,7 @@ public class BlockOutputStream extends OutputStream {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, true);
     }
-    watchForCommit(true);
+    watchForCommit(bufferFull);
   }
 
   void releaseBuffersOnException() {
@@ -694,7 +708,6 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
-
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
           blockID.get(), data, token, replicationIndex);
@@ -717,6 +730,7 @@ public class BlockOutputStream extends OutputStream {
             throw ce;
           });
       containerBlockData.addChunks(chunkInfo);
+      clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
       return validateFuture;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -760,5 +774,13 @@ public class BlockOutputStream extends OutputStream {
     setIoException(ex);
     adjustBuffersOnException();
     throw getIoException();
+  }
+
+  /**
+   * Get the Replication Index.
+   * @return replicationIndex
+   */
+  public int getReplicationIndex() {
+    return replicationIndex;
   }
 }

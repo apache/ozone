@@ -67,7 +67,7 @@ import org.apache.hadoop.ozone.om.multitenant.InMemoryMultiTenantAccessControlle
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
-import org.apache.hadoop.ozone.om.multitenant.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
@@ -875,17 +875,34 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     return conf;
   }
 
-  public void loadTenantCacheFromDB() {
-    final Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
-        omMetadataManager.getTenantAccessIdTable();
-    final TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
-        accessIdTableIter = tenantAccessIdTable.iterator();
-    int userCount = 0;
-
+  private void loadTenantCacheFromDB() {
+    // First load each tenant as a key into the cache.
     final Table<String, OmDBTenantState> tenantStateTable =
         omMetadataManager.getTenantStateTable();
+    try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
+        tenantStateTableIter = tenantStateTable.iterator()) {
+      while (tenantStateTableIter.hasNext()) {
+        final KeyValue<String, OmDBTenantState> next =
+            tenantStateTableIter.next();
 
-    try {
+        final String tenantId = next.getKey();
+        final OmDBTenantState tenantState = next.getValue();
+
+        tenantCache.put(tenantId, new CachedTenantState(tenantId,
+            tenantState.getUserRoleName(), tenantState.getAdminRoleName()));
+      }
+    } catch (IOException ex) {
+      // Do not allow an inconsistent OM to start up.
+      throw new RuntimeException(
+          "Error while building tenant state cache from DB.", ex);
+    }
+
+    // Next use the access ID table to fill in membership info for each tenant.
+    int userCount = 0;
+    final Table<String, OmDBAccessIdInfo> tenantAccessIdTable =
+        omMetadataManager.getTenantAccessIdTable();
+    try (TableIterator<String, ? extends KeyValue<String, OmDBAccessIdInfo>>
+          accessIdTableIter = tenantAccessIdTable.iterator()) {
       while (accessIdTableIter.hasNext()) {
         final KeyValue<String, OmDBAccessIdInfo> next =
             accessIdTableIter.next();
@@ -897,19 +914,11 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         final String userPrincipal = value.getUserPrincipal();
         final boolean isAdmin = value.getIsAdmin();
 
-        final OmDBTenantState tenantState = tenantStateTable.get(tenantId);
         // If the TenantState doesn't exist, it means the accessId entry is
         //  orphaned or incorrect, likely metadata inconsistency
-        Preconditions.checkNotNull(tenantState,
+        CachedTenantState cachedTenantState = tenantCache.get(tenantId);
+        Preconditions.checkNotNull(cachedTenantState,
             "OmDBTenantState should have existed for " + tenantId);
-
-        final String tenantUserRoleName = tenantState.getUserRoleName();
-        final String tenantAdminRoleName = tenantState.getAdminRoleName();
-
-        // Enter tenant cache entry when it is the first hit for this tenant
-        final CachedTenantState cachedTenantState = tenantCache.computeIfAbsent(
-            tenantId, k -> new CachedTenantState(
-                tenantId, tenantUserRoleName, tenantAdminRoleName));
 
         cachedTenantState.getAccessIdInfoMap().put(accessId,
             new CachedAccessIdInfo(userPrincipal, isAdmin));
@@ -918,7 +927,9 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       LOG.info("Loaded {} tenants and {} tenant users from the database",
           tenantCache.size(), userCount);
     } catch (IOException ex) {
-      LOG.error("Error while loading user list", ex);
+      // Do not allow an inconsistent OM to start up.
+      throw new RuntimeException(
+          "Error while building tenant user cache from DB.", ex);
     }
   }
 

@@ -19,9 +19,9 @@
 package org.apache.hadoop.hdds.security.token;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequest;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getReadChunkRequest;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
@@ -105,8 +105,8 @@ public class TestOzoneBlockTokenSecretManager {
         .generateCertificate("CN=OzoneMaster", keyPair, 30, ALGORITHM);
     omCertSerialId = x509Certificate.getSerialNumber().toString();
     secretManager = new OzoneBlockTokenSecretManager(securityConfig,
-        TimeUnit.HOURS.toMillis(1), omCertSerialId);
-    client = Mockito.mock(OMCertificateClient.class);
+        TimeUnit.HOURS.toMillis(1));
+    client = Mockito.mock(DefaultCertificateClient.class);
     when(client.getCertificate()).thenReturn(x509Certificate);
     when(client.getCertificate(anyString())).
         thenReturn(x509Certificate);
@@ -175,10 +175,14 @@ public class TestOzoneBlockTokenSecretManager {
         secretManager.generateToken("testUser", blockID,
             EnumSet.allOf(AccessModeProto.class), 100);
     String encodedToken = token.encodeToUrlString();
-    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-        pipeline, blockID, 100, encodedToken);
-    ContainerCommandRequestProto putBlockCommand = getPutBlockRequest(
-        pipeline, encodedToken, writeChunkRequest.getWriteChunk());
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, blockID, 100)
+        .setEncodedToken(encodedToken)
+        .build();
+    ContainerCommandRequestProto putBlockCommand = newPutBlockRequestBuilder(
+        pipeline, writeChunkRequest.getWriteChunk())
+        .setEncodedToken(encodedToken)
+        .build();
 
     // THEN
     tokenVerifier.verify("testUser", token, putBlockCommand);
@@ -195,8 +199,9 @@ public class TestOzoneBlockTokenSecretManager {
         secretManager.generateToken("testUser", blockID,
             EnumSet.allOf(AccessModeProto.class), 100);
     String encodedToken = token.encodeToUrlString();
-    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-        pipeline, otherBlockID, 100, encodedToken);
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, otherBlockID, 100)
+            .setEncodedToken(encodedToken).build();
 
     // THEN
     BlockTokenException e = assertThrows(BlockTokenException.class,
@@ -269,10 +274,14 @@ public class TestOzoneBlockTokenSecretManager {
         secretManager.generateToken(testUser1, blockID,
             EnumSet.of(AccessModeProto.READ), 100);
     String encodedToken = token.encodeToUrlString();
-    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-        pipeline, blockID, 100, encodedToken);
-    ContainerCommandRequestProto putBlockCommand = getPutBlockRequest(
-        pipeline, encodedToken, writeChunkRequest.getWriteChunk());
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, blockID, 100)
+        .setEncodedToken(encodedToken)
+        .build();
+    ContainerCommandRequestProto putBlockCommand = newPutBlockRequestBuilder(
+        pipeline, writeChunkRequest.getWriteChunk())
+        .setEncodedToken(encodedToken)
+        .build();
     ContainerCommandRequestProto getBlockCommand = getBlockRequest(
         pipeline, putBlockCommand.getPutBlock());
 
@@ -292,8 +301,10 @@ public class TestOzoneBlockTokenSecretManager {
         secretManager.generateToken(testUser2, blockID,
             EnumSet.of(AccessModeProto.WRITE), 100);
     String encodedToken = token.encodeToUrlString();
-    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-        pipeline, blockID, 100, encodedToken);
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, blockID, 100)
+        .setEncodedToken(encodedToken)
+        .build();
     ContainerCommandRequestProto readChunkRequest =
         getReadChunkRequest(pipeline, writeChunkRequest.getWriteChunk());
 
@@ -312,8 +323,10 @@ public class TestOzoneBlockTokenSecretManager {
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken(user, blockID,
             EnumSet.allOf(AccessModeProto.class), 100);
-    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-        pipeline, blockID, 100, token.encodeToUrlString());
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, blockID, 100)
+        .setEncodedToken(token.encodeToUrlString())
+        .build();
 
     tokenVerifier.verify("testUser", token, writeChunkRequest);
 
@@ -336,8 +349,10 @@ public class TestOzoneBlockTokenSecretManager {
     Token<OzoneBlockTokenIdentifier> token =
         secretManager.generateToken(user, blockID,
             EnumSet.allOf(AccessModeProto.class), 100);
-    ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-        pipeline, blockID, 100, token.encodeToUrlString());
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, blockID, 100)
+        .setEncodedToken(token.encodeToUrlString())
+        .build();
 
     tokenVerifier.verify(user, token, writeChunkRequest);
 

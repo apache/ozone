@@ -20,11 +20,14 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Tests the server side replication config preference logic.
@@ -50,7 +53,7 @@ public class TestOzoneConfigUtil {
         .resolveReplicationConfigPreference(noneType, zeroFactor,
             clientECReplicationConfig, bucketECConfig, ratis3ReplicationConfig);
     // Client has no preference, so we should bucket defaults as we passed.
-    Assert.assertEquals(bucketECConfig.getEcReplicationConfig(),
+    Assert.assertEquals(bucketECConfig.getReplicationConfig(),
         replicationConfig);
   }
 
@@ -87,19 +90,54 @@ public class TestOzoneConfigUtil {
    */
   @Test
   public void testResolveClientSideRepConfigWhenBucketHasEC3() {
+    ReplicationConfig ratisReplicationConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
     DefaultReplicationConfig ratisBucketDefaults =
-        new DefaultReplicationConfig(ReplicationType.RATIS,
-            ReplicationFactor.THREE);
+        new DefaultReplicationConfig(ratisReplicationConfig);
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(noneType, zeroFactor,
             clientECReplicationConfig, ratisBucketDefaults,
             ratis3ReplicationConfig);
     // Client has no preference of type and bucket has ratis defaults, so it
     // should return ratis.
-    Assert.assertEquals(ratisBucketDefaults.getType().name(),
-        replicationConfig.getReplicationType().name());
-    Assert.assertEquals(ratisBucketDefaults.getFactor(),
-        ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()));
+    Assert.assertEquals(ratisReplicationConfig, replicationConfig);
   }
 
+  @Test
+  public void testS3AdminExtraction() throws IOException {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice,bob");
+
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
+        .containsAll(Arrays.asList("alice", "bob")));
+  }
+
+  @Test
+  public void testS3AdminExtractionWithFallback() throws IOException {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice,bob");
+
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
+        .containsAll(Arrays.asList("alice", "bob")));
+  }
+
+  @Test
+  public void testS3AdminGroupExtraction() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS,
+        "test1, test2");
+
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration)
+        .containsAll(Arrays.asList("test1", "test2")));
+  }
+
+  @Test
+  public void testS3AdminGroupExtractionWithFallback() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
+        "test1, test2");
+
+    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration)
+        .containsAll(Arrays.asList("test1", "test2")));
+  }
 }

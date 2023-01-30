@@ -33,14 +33,15 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.TransactionLogIterator;
-import org.rocksdb.WriteOptions;
+import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,23 +58,26 @@ public class RDBStore implements DBStore {
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
   private final RDBMetrics rdbMetrics;
+  private final String dbJmxBeanName;
 
   @VisibleForTesting
-  public RDBStore(File dbFile, DBOptions options,
+  public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
-    this(dbFile, options, new WriteOptions(), families, new CodecRegistry(),
-        false);
+    this(dbFile, options, new ManagedWriteOptions(), families,
+        new CodecRegistry(), false, null);
   }
 
-  public RDBStore(File dbFile, DBOptions dbOptions,
-      WriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly)
-      throws IOException {
+  public RDBStore(File dbFile, ManagedDBOptions dbOptions,
+                  ManagedWriteOptions writeOptions, Set<TableConfig> families,
+                  CodecRegistry registry, boolean readOnly,
+                  String dbJmxBeanNameName) throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
     codecRegistry = registry;
     dbLocation = dbFile;
+    dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
+        dbJmxBeanNameName;
 
     try {
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
@@ -81,14 +85,16 @@ public class RDBStore implements DBStore {
 
       if (dbOptions.statistics() != null) {
         Map<String, String> jmxProperties = new HashMap<>();
-        jmxProperties.put("dbName", dbFile.getName());
+        jmxProperties.put("dbName", dbJmxBeanName);
         statMBeanName = HddsUtils.registerWithJmxProperties(
             "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(),
-                dbFile.getName()));
+            RocksDBStoreMBean.create(dbOptions.statistics(), dbJmxBeanName));
         if (statMBeanName == null) {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
-              dbFile.getAbsolutePath());
+              dbJmxBeanName);
+        } else {
+          LOG.debug("jmx registration succeed during RocksDB init, db path :{}",
+              dbJmxBeanName);
         }
       }
 
@@ -131,13 +137,14 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     if (statMBeanName != null) {
       MBeans.unregister(statMBeanName);
       statMBeanName = null;
     }
 
     RDBMetrics.unRegister();
+    checkPointManager.close();
     db.close();
   }
 
@@ -262,7 +269,7 @@ public class RDBStore implements DBStore {
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {
-    return db.getColumnFamilies();
+    return db.getExtraColumnFamilies();
   }
 
   @Override
@@ -283,8 +290,18 @@ public class RDBStore implements DBStore {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
-    try (TransactionLogIterator transactionLogIterator =
+    try (ManagedTransactionLogIterator logIterator =
         db.getUpdatesSince(sequenceNumber)) {
+
+      // If Recon's sequence number is out-of-date and the iterator is invalid,
+      // throw SNNFE and let Recon fall back to full snapshot.
+      // This could happen after OM restart.
+      if (db.getLatestSequenceNumber() != sequenceNumber &&
+          !logIterator.get().isValid()) {
+        throw new SequenceNumberNotFoundException(
+            "Invalid transaction log iterator when getting updates since "
+                + "sequence number " + sequenceNumber);
+      }
 
       // Only the first record needs to be checked if its seq number <
       // ( 1 + passed_in_sequence_number). For example, if seqNumber passed
@@ -294,22 +311,21 @@ public class RDBStore implements DBStore {
 
       boolean checkValidStartingSeqNumber = true;
 
-      while (transactionLogIterator.isValid()) {
-        TransactionLogIterator.BatchResult result =
-            transactionLogIterator.getBatch();
+      while (logIterator.get().isValid()) {
+        BatchResult result = logIterator.get().getBatch();
         try {
           long currSequenceNumber = result.sequenceNumber();
           if (checkValidStartingSeqNumber &&
               currSequenceNumber > 1 + sequenceNumber) {
             throw new SequenceNumberNotFoundException("Unable to read data from"
                 + " RocksDB wal to get delta updates. It may have already been"
-                + "flushed to SSTs.");
+                + " flushed to SSTs.");
           }
           // If the above condition was not satisfied, then it is OK to reset
           // the flag.
           checkValidStartingSeqNumber = false;
           if (currSequenceNumber <= sequenceNumber) {
-            transactionLogIterator.next();
+            logIterator.get().next();
             continue;
           }
           dbUpdatesWrapper.addWriteBatch(result.writeBatch().data(),
@@ -320,10 +336,18 @@ public class RDBStore implements DBStore {
         } finally {
           result.writeBatch().close();
         }
-        transactionLogIterator.next();
+        logIterator.get().next();
       }
+    } catch (SequenceNumberNotFoundException e) {
+      LOG.warn("Unable to get delta updates since sequenceNumber {}. "
+              + "This exception will be thrown to the client",
+          sequenceNumber, e);
+      // Throw the exception back to Recon. Expect Recon to fall back to
+      // full snapshot.
+      throw e;
     } catch (RocksDBException | IOException e) {
-      LOG.error("Unable to get delta updates since sequenceNumber {} ",
+      LOG.error("Unable to get delta updates since sequenceNumber {}. "
+              + "This exception will not be thrown to the client ",
           sequenceNumber, e);
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());

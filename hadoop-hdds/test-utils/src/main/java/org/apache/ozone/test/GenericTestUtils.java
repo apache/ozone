@@ -25,6 +25,8 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
@@ -32,8 +34,7 @@ import com.google.common.base.Supplier;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.impl.Log4JLogger;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -42,6 +43,10 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
+import org.mockito.Mockito;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertTrue;
@@ -244,6 +249,50 @@ public abstract class GenericTestUtils {
     setLogLevel(LogManager.getRootLogger(), Level.toLevel(level.toString()));
   }
 
+  public static <T> T mockFieldReflection(Object object, String fieldName)
+          throws NoSuchFieldException, IllegalAccessException {
+    Field field = object.getClass().getDeclaredField(fieldName);
+    boolean isAccessible = field.isAccessible();
+
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    boolean modifierFieldAccessible = modifiersField.isAccessible();
+    modifiersField.setAccessible(true);
+    int modifierVal = modifiersField.getInt(field);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    T value = (T) field.get(object);
+    value = Mockito.spy(value);
+    field.set(object, value);
+    modifiersField.setInt(field, modifierVal);
+    modifiersField.setAccessible(modifierFieldAccessible);
+    field.setAccessible(isAccessible);
+    return value;
+  }
+
+  public static <T> T getFieldReflection(Object object, String fieldName)
+          throws NoSuchFieldException, IllegalAccessException {
+    Field field = object.getClass().getDeclaredField(fieldName);
+    boolean isAccessible = field.isAccessible();
+
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    boolean modifierFieldAccessible = modifiersField.isAccessible();
+    modifiersField.setAccessible(true);
+    int modifierVal = modifiersField.getInt(field);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    T value = (T) field.get(object);
+    modifiersField.setInt(field, modifierVal);
+    modifiersField.setAccessible(modifierFieldAccessible);
+    field.setAccessible(isAccessible);
+    return value;
+  }
+
+  public static <K, V> Map<V, K> getReverseMap(Map<K, List<V>> map) {
+    return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
+            .map(v -> Pair.of(v, entry.getKey())))
+            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+  }
+
   /**
    * Class to capture logs for doing assertions.
    */
@@ -251,11 +300,6 @@ public abstract class GenericTestUtils {
     private StringWriter sw = new StringWriter();
     private WriterAppender appender;
     private Logger logger;
-
-    public static LogCapturer captureLogs(Log l) {
-      Logger logger = ((Log4JLogger) l).getLogger();
-      return new LogCapturer(logger, getDefaultLayout());
-    }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
       return new LogCapturer(toLog4j(logger), getDefaultLayout());
@@ -341,6 +385,48 @@ public abstract class GenericTestUtils {
     public void close() throws Exception {
       IOUtils.closeQuietly(bytesPrintStream);
       System.setErr(oldErr);
+    }
+  }
+
+  /**
+   * Capture output printed to {@link System#out}.
+   * <p>
+   * Usage:
+   * <pre>
+   *   try (SystemOutCapturer capture = new SystemOutCapturer()) {
+   *     ...
+   *     // Call capture.getOutput() to get the output string
+   *   }
+   * </pre>
+   * <p>
+   * TODO: Add lambda support once Java 8 is common.
+   * <pre>
+   *   SystemOutCapturer.withCapture(capture -> {
+   *     ...
+   *   })
+   * </pre>
+   */
+  public static class SystemOutCapturer implements AutoCloseable {
+    private final ByteArrayOutputStream bytes;
+    private final PrintStream bytesPrintStream;
+    private final PrintStream oldOut;
+
+    public SystemOutCapturer() throws
+        UnsupportedEncodingException {
+      bytes = new ByteArrayOutputStream();
+      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+      oldOut = System.out;
+      System.setOut(new TeePrintStream(oldOut, bytesPrintStream));
+    }
+
+    public String getOutput() throws UnsupportedEncodingException {
+      return bytes.toString(UTF_8.name());
+    }
+
+    @Override
+    public void close() throws Exception {
+      IOUtils.closeQuietly(bytesPrintStream);
+      System.setOut(oldOut);
     }
   }
 
