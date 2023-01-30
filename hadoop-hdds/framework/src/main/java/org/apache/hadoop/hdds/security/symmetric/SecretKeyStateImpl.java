@@ -56,6 +56,7 @@ public final class SecretKeyStateImpl implements SecretKeyState {
    * Get the current active key, which is used for signing tokens. This is
    * also the latest key managed by this state.
    */
+  @Override
   public ManagedSecretKey getCurrentKey() {
     lock.readLock().lock();
     try {
@@ -70,6 +71,7 @@ public final class SecretKeyStateImpl implements SecretKeyState {
    * The returned keys are sorted by creation time, in the order of latest
    * to oldest.
    */
+  @Override
   public List<ManagedSecretKey> getSortedKeys() {
     lock.readLock().lock();
     try {
@@ -83,14 +85,8 @@ public final class SecretKeyStateImpl implements SecretKeyState {
    * Update the SecretKeys.
    * This method replicates SecretKeys across all SCM instances.
    */
+  @Override
   public void updateKeys(List<ManagedSecretKey> newKeys) {
-    updateKeysInternal(newKeys);
-  }
-
-  /**
-   * Update the SecretKeys on this instance only.
-   */
-  public void updateKeysInternal(List<ManagedSecretKey> newKeys) {
     LOG.info("Updating keys with {}", newKeys);
     lock.writeLock().lock();
     try {
@@ -108,4 +104,5 @@ public final class SecretKeyStateImpl implements SecretKeyState {
       lock.writeLock().unlock();
     }
   }
+
 }

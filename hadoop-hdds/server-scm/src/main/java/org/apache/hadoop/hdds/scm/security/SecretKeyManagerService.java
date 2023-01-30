@@ -97,13 +97,12 @@ public class SecretKeyManagerService implements SCMService, Runnable {
     serviceLock.lock();
     try {
       if (scmContext.isLeaderReady()) {
-
-        // Initialize SecretKeys if for first time leader.
-        if (secretKeyManager.initialize()) {
+        // Asynchronously initialize SecretKeys for first time leader.
+        if (secretKeyManager.isInitialized()) {
           // replicate the initialized SecretKeys to followers.
           scheduler.schedule(() -> {
             try {
-              secretKeyManager.flushInitializedState();
+              secretKeyManager.checkAndInitialize();
             } catch (TimeoutException e) {
               throw new RuntimeException(
                   "Timeout replicating initialized state.", e);

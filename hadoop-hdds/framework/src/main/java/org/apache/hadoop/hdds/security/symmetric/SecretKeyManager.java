@@ -43,7 +43,6 @@ public class SecretKeyManager {
       LoggerFactory.getLogger(SecretKeyManager.class);
 
   private final SecretKeyState state;
-  private boolean pendingInititializedState = false;
   private final Duration rotationDuration;
   private final Duration validityDuration;
   private final SecretKeyStore keyStore;
@@ -70,13 +69,16 @@ public class SecretKeyManager {
   }
 
   /**
-   * Initialize the state from by loading SecretKeys from local file, or
-   * generate new keys if the file doesn't exist.
+   * If the SecretKey state is not initialized, initialize it from by loading
+   * SecretKeys from local file, or generate new keys if the file doesn't
+   * exist.
    */
-  public synchronized boolean initialize() {
-    if (state.getCurrentKey() != null) {
-      return false;
+  public synchronized void checkAndInitialize() throws TimeoutException {
+    if (isInitialized()) {
+      return;
     }
+
+    LOG.info("Initializing SecretKeys.");
 
     // Load and filter expired keys.
     List<ManagedSecretKey> allKeys = keyStore.load()
@@ -90,26 +92,17 @@ public class SecretKeyManager {
       // a significant time.
       ManagedSecretKey newKey = generateSecretKey();
       allKeys.add(newKey);
-      LOG.info("No valid keys has been loaded, " +
-          "a new key is generated: {}", newKey);
+      LOG.info("No valid key has been loaded. " +
+          "A new key is generated: {}", newKey);
     } else {
       LOG.info("Keys reloaded: {}", allKeys);
     }
 
-    // First, update the SecretKey state to make it visible immediately on the
-    // current instance.
-    state.updateKeysInternal(allKeys);
-    // Then, remember to replicate SecretKey states to all instances.
-    pendingInititializedState = true;
-    return true;
+    state.updateKeys(allKeys);
   }
 
-  public synchronized void flushInitializedState() throws TimeoutException {
-    if (pendingInititializedState) {
-      LOG.info("Replicating initialized state.");
-      state.updateKeys(state.getSortedKeys());
-      pendingInititializedState = false;
-    }
+  public boolean isInitialized() {
+    return state.getCurrentKey() != null;
   }
 
   /**
@@ -118,7 +111,8 @@ public class SecretKeyManager {
    * @return true if rotation actually happens, false if it doesn't.
    */
   public synchronized boolean checkAndRotate() throws TimeoutException {
-    flushInitializedState();
+    // Initialize the state if it's not initialized already.
+    checkAndInitialize();
 
     ManagedSecretKey currentKey = state.getCurrentKey();
     if (shouldRotate(currentKey)) {

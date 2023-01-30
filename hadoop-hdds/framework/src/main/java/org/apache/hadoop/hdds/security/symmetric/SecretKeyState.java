@@ -13,6 +13,8 @@ public interface SecretKeyState {
   /**
    * Get the current active key, which is used for signing tokens. This is
    * also the latest key managed by this state.
+   *
+   * @return the current active key, or null if the state is not initialized.
    */
   ManagedSecretKey getCurrentKey();
 
@@ -29,9 +31,4 @@ public interface SecretKeyState {
    */
   @Replicate
   void updateKeys(List<ManagedSecretKey> newKeys) throws TimeoutException;
-
-  /**
-   * Update the SecretKeys on this instance only.
-   */
-  void updateKeysInternal(List<ManagedSecretKey> newKeys);
 }

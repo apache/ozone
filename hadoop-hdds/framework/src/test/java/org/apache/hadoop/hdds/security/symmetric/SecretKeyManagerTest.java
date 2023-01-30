@@ -95,14 +95,15 @@ public class SecretKeyManagerTest {
   @MethodSource("loadSecretKeysTestCases")
   public void testLoadSecretKeys(List<ManagedSecretKey> savedSecretKey,
                                  ManagedSecretKey expectedCurrentKey,
-                                 List<ManagedSecretKey> expectedLoadedKeys) {
+                                 List<ManagedSecretKey> expectedLoadedKeys)
+      throws Exception {
     SecretKeyState state = new SecretKeyStateImpl(mockedKeyStore);
     SecretKeyManager lifeCycleManager =
         new SecretKeyManager(state, mockedKeyStore,
             ROTATION_DURATION, VALIDITY_DURATION, ALGORITHM);
 
     when(mockedKeyStore.load()).thenReturn(savedSecretKey);
-    lifeCycleManager.initialize();
+    lifeCycleManager.checkAndInitialize();
 
     if (expectedCurrentKey != null) {
       assertEquals(state.getCurrentKey(), expectedCurrentKey);
@@ -161,7 +162,7 @@ public class SecretKeyManagerTest {
             ROTATION_DURATION, VALIDITY_DURATION, ALGORITHM);
 
     // Set the initial state.
-    state.updateKeysInternal(initialKeys);
+    state.updateKeys(initialKeys);
     ManagedSecretKey initialCurrentKey = state.getCurrentKey();
     Mockito.reset(mockedKeyStore);
 
