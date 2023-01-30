@@ -105,18 +105,52 @@ public interface ConfigurationSource {
     return valueString.trim().split("\\s*[,\n]\\s*");
   }
 
-  default Map<String, String> getPropsWithPrefix(String confPrefix) {
+  /**
+   * Gets the configuration entries where the key contains the prefix. This
+   * method will strip the prefix from the key in the return Map.
+   * Example: somePrefix.key->value will be key->value in the returned map.
+   * @param keyPrefix Prefix to search.
+   * @return Map containing keys that match and their values.
+   */
+  default Map<String, String> getPropsMatchPrefixAndTrimPrefix(
+      String keyPrefix) {
     Map<String, String> configMap = new HashMap<>();
     for (String name : getConfigKeys()) {
-      if (name.startsWith(confPrefix)) {
+      if (name.startsWith(keyPrefix)) {
         String value = get(name);
-        String keyName = name.substring(confPrefix.length());
+        String keyName = name.substring(keyPrefix.length());
         configMap.put(keyName, value);
       }
     }
     return configMap;
   }
 
+  /**
+   * Gets the configuration entries where the key contains the prefix.
+   * This method will return the entire key including the predix in the returned
+   * map.
+   * @param keyPrefix Prefix to search.
+   * @return Map containing keys that match and their values.
+   */
+  default Map<String, String> getPropsMatchPrefix(String keyPrefix) {
+    Map<String, String> configMap = new HashMap<>();
+    for (String name : getConfigKeys()) {
+      if (name.startsWith(keyPrefix)) {
+        String value = get(name);
+        configMap.put(name, value);
+      }
+    }
+    return configMap;
+  }
+
+  /**
+   * Checks if the property <value> is set.
+   * @param key The property name.
+   * @return true if the value is set else false.
+   */
+  default boolean isConfigured(String key) {
+    return get(key) != null;
+  }
   /**
    * Create a Configuration object and inject the required configuration values.
    *

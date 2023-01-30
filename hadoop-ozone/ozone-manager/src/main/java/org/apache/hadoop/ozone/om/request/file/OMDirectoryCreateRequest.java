@@ -28,19 +28,29 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -74,6 +84,7 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.NONE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+
 /**
  * Handle create directory request.
  */
@@ -99,12 +110,13 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     FAILURE // The request failed and exception was thrown
   }
 
-  public OMDirectoryCreateRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMDirectoryCreateRequest(OMRequest omRequest,
+                                  BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) {
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateDirectoryRequest createDirectoryRequest =
         getOmRequest().getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
@@ -184,7 +196,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Unable to create directory: " +keyName
+        throw new OMException("Unable to create directory: " + keyName
             + " in volume/bucket: " + volumeName + "/" + bucketName,
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
@@ -193,20 +205,27 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
-        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName,
-            keyArgs, baseObjId,
-            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex);
+        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
+            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex,
+            ozoneManager.getDefaultReplicationConfig());
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             missingParents, inheritAcls, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
+        checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
+        omBucketInfo.incrUsedNamespace(numMissingParents + 1L);
+
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
+        
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, result);
+            dirKeyInfo, missingParentInfos, result, getBucketLayout(),
+            omBucketInfo.copyObject());
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;
@@ -275,12 +294,14 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       LOG.debug("missing parent {} getting added to KeyTable", missingKey);
       // what about keyArgs for parent directories? TODO
-      OmKeyInfo parentKeyInfo = createDirectoryKeyInfoWithACL(
-          missingKey, keyArgs, nextObjId, inheritAcls, trxnLogIndex);
+      OmKeyInfo parentKeyInfo =
+          createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
+              inheritAcls, trxnLogIndex,
+              ozoneManager.getDefaultReplicationConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable().addCacheEntry(
+      omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
               bucketName, parentKeyInfo.getKeyName())),
           new CacheValue<>(Optional.of(parentKeyInfo),
@@ -333,32 +354,104 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param keyArgs
    * @param objectId
    * @param transactionIndex
+   * @param serverDefaultReplConfig
    * @return the OmKeyInfo structure
    */
-  public static OmKeyInfo createDirectoryKeyInfoWithACL(
-      String keyName, KeyArgs keyArgs, long objectId,
-      List<OzoneAcl> inheritAcls, long transactionIndex) {
-    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId)
-        .setAcls(inheritAcls).setUpdateID(transactionIndex).build();
+  public static OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
+      KeyArgs keyArgs, long objectId, List<OzoneAcl> inheritAcls,
+      long transactionIndex, ReplicationConfig serverDefaultReplConfig) {
+    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
+        serverDefaultReplConfig).setAcls(inheritAcls)
+        .setUpdateID(transactionIndex).build();
   }
 
   private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName,
-      KeyArgs keyArgs, long objectId) {
+      KeyArgs keyArgs, long objectId,
+      ReplicationConfig serverDefaultReplConfig) {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(dirName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setDataSize(0)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-        .setObjectID(objectId)
-        .setUpdateID(objectId);
+    OmKeyInfo.Builder keyInfoBuilder =
+        new OmKeyInfo.Builder()
+            .setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(dirName)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime())
+            .setDataSize(0);
+    if (keyArgs.getFactor() != null && keyArgs
+        .getFactor() != HddsProtos.ReplicationFactor.ZERO && keyArgs
+        .getType() != HddsProtos.ReplicationType.EC) {
+      // Factor available and not an EC replication config.
+      keyInfoBuilder.setReplicationConfig(ReplicationConfig
+          .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
+    } else if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
+      // Found EC type
+      keyInfoBuilder.setReplicationConfig(
+          new ECReplicationConfig(keyArgs.getEcReplicationConfig()));
+    } else {
+      // default type
+      keyInfoBuilder.setReplicationConfig(serverDefaultReplConfig);
+    }
+
+    keyInfoBuilder.setObjectID(objectId);
+    return keyInfoBuilder;
   }
 
+  static long getMaxNumOfRecursiveDirs() {
+    return MAX_NUM_OF_RECURSIVE_DIRS;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateDirectory
+  )
+  public static OMRequest disallowCreateDirectoryWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager().
+        isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCreateDirectoryRequest().getKeyArgs()
+          .hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates directory create requests.
+   * Handles the cases where an older client attempts to create a directory
+   * inside a bucket with a non LEGACY bucket layout.
+   * We do not want an older client modifying a bucket that it cannot
+   * understand.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateDirectory
+  )
+  public static OMRequest blockCreateDirectoryWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCreateDirectoryRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCreateDirectoryRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
+  }
 }

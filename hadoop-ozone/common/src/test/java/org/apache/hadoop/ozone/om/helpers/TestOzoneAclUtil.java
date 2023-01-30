@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -32,6 +33,7 @@ import java.util.List;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.junit.Assert.assertEquals;
@@ -187,5 +189,42 @@ public class TestOzoneAclUtil {
     userGroups.stream().forEach((group) -> OzoneAclUtil.addAcl(ozoneAcls,
         new OzoneAcl(GROUP, group, groupRights, ACCESS)));
     return ozoneAcls;
+  }
+
+  // Ported from tests added with HDDS-4606 for OmOzoneAclMap
+  @Test
+  public void testAddDefaultAcl() {
+    List<OzoneAcl> ozoneAcls = new ArrayList<>();
+    OzoneAclUtil.addAcl(ozoneAcls,
+        OzoneAcl.parseAcl("user:masstter:rx[DEFAULT]"));
+    OzoneAclUtil.addAcl(ozoneAcls,
+        OzoneAcl.parseAcl("user:masstter:rw[DEFAULT]"));
+
+    //[user:masstter:rwx[DEFAULT]]
+    Assert.assertEquals(1, ozoneAcls.size());
+    Assert.assertEquals(DEFAULT, ozoneAcls.get(0).getAclScope());
+
+    ozoneAcls = new ArrayList<>();
+    OzoneAclUtil.addAcl(ozoneAcls,
+        OzoneAcl.parseAcl("user:masstter:rx"));
+    OzoneAclUtil.addAcl(ozoneAcls,
+        OzoneAcl.parseAcl("user:masstter:rw[ACCESS]"));
+
+    //[user:masstter:rwx[ACCESS]]
+    Assert.assertEquals(1, ozoneAcls.size());
+    Assert.assertEquals(ACCESS, ozoneAcls.get(0).getAclScope());
+
+    ozoneAcls = new ArrayList<>();
+    OzoneAclUtil.addAcl(ozoneAcls,
+        OzoneAcl.parseAcl("user:masstter:rwx[DEFAULT]"));
+    OzoneAclUtil.addAcl(ozoneAcls,
+        OzoneAcl.parseAcl("user:masstter:rwx[ACCESS]"));
+
+    //[user:masstter:rwx[ACCESS], user:masstter:rwx[DEFAULT]]
+    Assert.assertEquals(2, ozoneAcls.size());
+    Assert.assertNotEquals(ozoneAcls.get(0).getAclScope(),
+        ozoneAcls.get(1).getAclScope());
+    Assert.assertEquals(ozoneAcls.get(0).getAclBitSet(),
+        ozoneAcls.get(1).getAclBitSet());
   }
 }

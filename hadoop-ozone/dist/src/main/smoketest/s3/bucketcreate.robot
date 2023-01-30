@@ -21,6 +21,7 @@ Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
+Default Tags        no-bucket-type
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -32,8 +33,20 @@ Create new bucket
     Create bucket
 
 Create bucket which already exists
-    Create bucket with name     ${BUCKET}
+    ${bucket} =                 Create bucket
+    Create bucket with name     ${bucket}
 
 Create bucket with invalid bucket name
-    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
+    ${randStr} =        Generate Ozone String
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
                         Should contain              ${result}         InvalidBucketName
+Create new bucket and check no group ACL
+    ${bucket} =         Create bucket
+    ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
+    ${group} =          Get Regexp Matches   ${acl}     "GROUP"
+    IF      '${group}' is not '[]'
+        ${json} =           Evaluate    json.loads('''${acl}''')    json
+        # make sure this check is for group acl
+        Should contain      ${json}[1][type]       GROUP
+        Should contain      ${json}[1][aclList]    NONE
+    END

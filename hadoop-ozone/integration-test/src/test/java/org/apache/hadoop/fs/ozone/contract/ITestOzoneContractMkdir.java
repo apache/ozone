@@ -19,22 +19,35 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractMkdirTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Test dir operations on Ozone.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractMkdir extends AbstractContractMkdirTest {
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+  private static boolean fsOptimizedServer;
+
+  public ITestOzoneContractMkdir(boolean fsoServer)
+      throws IOException {
+    if (fsOptimizedServer != fsoServer) {
+      setFsOptimizedServer(fsoServer);
+      ITestOzoneContractUtils.restartCluster(
+          fsOptimizedServer);
+    }
+  }
+
+  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
+    ITestOzoneContractMkdir.fsOptimizedServer = fsOptimizedServer;
   }
 
   @AfterClass
@@ -45,5 +58,10 @@ public class ITestOzoneContractMkdir extends AbstractContractMkdirTest {
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new OzoneContract(conf);
+  }
+
+  @Parameterized.Parameters
+  public static Collection data() {
+    return ITestOzoneContractUtils.getFsoCombinations();
   }
 }

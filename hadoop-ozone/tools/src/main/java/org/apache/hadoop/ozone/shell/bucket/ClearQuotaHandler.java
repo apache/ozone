@@ -31,7 +31,8 @@ import java.io.IOException;
  * clean quota of the bucket.
  */
 @Command(name = "clrquota",
-    description = "clear quota of the bucket")
+    description = "clear quota of the bucket. At least one of the " +
+        "quota clear flag is mandatory.")
 public class ClearQuotaHandler extends BucketHandler {
 
   @CommandLine.Mixin
@@ -44,12 +45,19 @@ public class ClearQuotaHandler extends BucketHandler {
     String bucketName = address.getBucketName();
     OzoneBucket bucket = client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName);
-
+    boolean isOptionPresent = false;
     if (clrSpaceQuota.getClrSpaceQuota()) {
       bucket.clearSpaceQuota();
+      isOptionPresent = true;
     }
     if (clrSpaceQuota.getClrNamespaceQuota()) {
       bucket.clearNamespaceQuota();
+      isOptionPresent = true;
+    }
+
+    if (!isOptionPresent) {
+      throw new IOException(
+          "At least one of the quota clear flag is required.");
     }
   }
 }

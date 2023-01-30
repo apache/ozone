@@ -62,4 +62,6 @@ public final class S3Consts {
   public static final String S3_XML_NAMESPACE = "http://s3.amazonaws" +
       ".com/doc/2006-03-01/";
 
+  public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+
 }

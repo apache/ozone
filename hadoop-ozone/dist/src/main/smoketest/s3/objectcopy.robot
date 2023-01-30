@@ -37,28 +37,28 @@ Create Dest Bucket
 Copy Object Happy Scenario
     Run Keyword if    '${DESTBUCKET}' == 'generated1'    Create Dest Bucket
                         Execute                    date > /tmp/copyfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/f1 --body /tmp/copyfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/copyobject/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/key=value/f1 --body /tmp/copyfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
 
-    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/f1
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/
+    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
     #copying again will not throw error
-    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/f1
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/
+    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/key=value/
                         Should contain             ${result}         f1
 
 Copy Object Where Bucket is not available
-    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket dfdfdfdfdfnonexistent --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/f1      255
+    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket dfdfdfdfdfnonexistent --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/key=value/f1      255
                         Should contain             ${result}        NoSuchBucket
-    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source dfdfdfdfdfnonexistent/${PREFIX}/copyobject/f1  255
+    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source dfdfdfdfdfnonexistent/${PREFIX}/copyobject/key=value/f1  255
                         Should contain             ${result}        NoSuchBucket
 
 Copy Object Where both source and dest are same with change to storageclass
-     ${result} =         Execute AWSS3APICli        copy-object --storage-class REDUCED_REDUNDANCY --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${DESTBUCKET}/${PREFIX}/copyobject/f1
+     ${result} =         Execute AWSS3APICli        copy-object --storage-class REDUCED_REDUNDANCY --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${DESTBUCKET}/${PREFIX}/copyobject/key=value/f1
                          Should contain             ${result}        ETag
 
 Copy Object Where Key not available
-    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
+    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/key=value/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
                         Should contain             ${result}        NoSuchKey

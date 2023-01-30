@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -34,8 +33,10 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -109,11 +110,6 @@ public class BlockOutputStream extends OutputStream {
   // which got written between successive putBlock calls.
   private List<ChunkBuffer> bufferList;
 
-  // This object will maintain the commitIndexes and byteBufferList in order
-  // Also, corresponding to the logIndex, the corresponding list of buffers will
-  // be released from the buffer pool.
-  private final CommitWatcher commitWatcher;
-
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
 
@@ -124,6 +120,9 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
+  private int replicationIndex;
+  private Pipeline pipeline;
+  private final ContainerClientMetrics clientMetrics;
 
   /**
    * Creates a new BlockOutputStream.
@@ -139,22 +138,32 @@ public class BlockOutputStream extends OutputStream {
       Pipeline pipeline,
       BufferPool bufferPool,
       OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
+    replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-    this.containerBlockData =
-        BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
-            .addMetadata(keyValue);
+
+    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
+        ContainerProtos.DatanodeBlockID.newBuilder()
+            .setContainerID(blockID.getContainerID())
+            .setLocalID(blockID.getLocalID())
+            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+    if (replicationIndex > 0) {
+      blkIDBuilder.setReplicaIndex(replicationIndex);
+    }
+    this.containerBlockData = BlockData.newBuilder().setBlockID(
+        blkIDBuilder.build()).addMetadata(keyValue);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
 
     //number of buffers used before doing a flush
-    refreshCurrentBuffer(bufferPool);
+    refreshCurrentBuffer();
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
 
@@ -165,7 +174,6 @@ public class BlockOutputStream extends OutputStream {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new CommitWatcher(bufferPool, xceiverClient);
     bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
@@ -173,10 +181,12 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
+    this.clientMetrics = clientMetrics;
+    this.pipeline = pipeline;
   }
 
-  private void refreshCurrentBuffer(BufferPool pool) {
-    currentBuffer = pool.getCurrentBuffer();
+  void refreshCurrentBuffer() {
+    currentBuffer = bufferPool.getCurrentBuffer();
     currentBufferRemaining =
         currentBuffer != null ? currentBuffer.remaining() : 0;
   }
@@ -186,7 +196,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   public long getTotalAckDataLength() {
-    return commitWatcher.getTotalAckDataLength();
+    return 0;
   }
 
   public long getWrittenDataLength() {
@@ -216,9 +226,24 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
-  @VisibleForTesting
-  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitWatcher.getCommitIndex2flushedDataMap();
+  XceiverClientSpi getXceiverClientSpi() {
+    return this.xceiverClient;
+  }
+
+  public BlockData.Builder getContainerBlockData() {
+    return this.containerBlockData;
+  }
+
+  public Pipeline getPipeline() {
+    return this.pipeline;
+  }
+
+  Token<? extends TokenIdentifier> getToken() {
+    return this.token;
+  }
+
+  ExecutorService getResponseExecutor() {
+    return this.responseExecutor;
   }
 
   @Override
@@ -260,9 +285,13 @@ public class BlockOutputStream extends OutputStream {
       writeChunkIfNeeded();
       off += writeLen;
       len -= writeLen;
-      writtenDataLength += writeLen;
+      updateWrittenDataLength(writeLen);
       doFlushOrWatchIfNeeded();
     }
+  }
+
+  public void updateWrittenDataLength(int writeLen) {
+    writtenDataLength += writeLen;
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {
@@ -343,27 +372,36 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
+    waitForFlushAndCommit(true);
+  }
+
+  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
     try {
       checkOpen();
-      if (!commitWatcher.getFutureMap().isEmpty()) {
-        waitOnFlushFutures();
-      }
+      waitOnFlushFutures();
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, true);
     }
-    watchForCommit(true);
+    watchForCommit(bufferFull);
   }
 
+  void releaseBuffersOnException() {
+  }
 
   // It may happen that once the exception is encountered , we still might
   // have successfully flushed up to a certain index. Make sure the buffers
   // only contain data which have not been sufficiently replicated
   private void adjustBuffersOnException() {
-    commitWatcher.releaseBuffersOnException();
-    refreshCurrentBuffer(bufferPool);
+    releaseBuffersOnException();
+    refreshCurrentBuffer();
+  }
+
+  XceiverClientReply sendWatchForCommit(boolean bufferFull)
+      throws IOException {
+    return null;
   }
 
   /**
@@ -371,14 +409,12 @@ public class BlockOutputStream extends OutputStream {
    * it is a no op.
    * @param bufferFull flag indicating whether bufferFull condition is hit or
    *              its called as part flush/close
-   * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
   private void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
     try {
-      XceiverClientReply reply = bufferFull ?
-          commitWatcher.watchOnFirstIndex() : commitWatcher.watchOnLastIndex();
+      final XceiverClientReply reply = sendWatchForCommit(bufferFull);
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -393,8 +429,10 @@ public class BlockOutputStream extends OutputStream {
       setIoException(ioe);
       throw getIoException();
     }
-    refreshCurrentBuffer(bufferPool);
+    refreshCurrentBuffer();
+  }
 
+  void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
   }
 
   /**
@@ -402,7 +440,7 @@ public class BlockOutputStream extends OutputStream {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  private CompletableFuture<ContainerProtos.
+  CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
@@ -441,16 +479,14 @@ public class BlockOutputStream extends OutputStream {
           blockID.set(responseBlockID);
           if (LOG.isDebugEnabled()) {
             LOG.debug(
-                "Adding index " + asyncReply.getLogIndex() + " commitMap size "
-                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                "Adding index " + asyncReply.getLogIndex() + " flushLength "
                     + flushPos + " numBuffers " + byteBufferList.size()
                     + " blockID " + blockID + " bufferPool size" + bufferPool
                     .getSize() + " currentBufferIndex " + bufferPool
                     .getCurrentBufferIndex());
           }
           // for standalone protocol, logIndex will always be 0.
-          commitWatcher
-              .updateCommitInfoMap(asyncReply.getLogIndex(), byteBufferList);
+          updateCommitInfo(asyncReply, byteBufferList);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -468,8 +504,12 @@ public class BlockOutputStream extends OutputStream {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    commitWatcher.getFutureMap().put(flushPos, flushFuture);
+    putFlushFuture(flushPos, flushFuture);
     return flushFuture;
+  }
+
+  void putFlushFuture(long flushPos,
+      CompletableFuture<ContainerCommandResponseProto> flushFuture) {
   }
 
   @Override
@@ -488,6 +528,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw e;
       }
     }
   }
@@ -514,7 +558,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      refreshCurrentBuffer(bufferPool);
+      refreshCurrentBuffer();
       Preconditions.checkArgument(currentBuffer.position() > 0);
       if (currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);
@@ -550,6 +594,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
+      } catch (Throwable e) {
+        String msg = "Failed to flush. error: " + e.getMessage();
+        LOG.error(msg, e);
+        throw e;
       } finally {
         cleanup(false);
       }
@@ -561,16 +609,10 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void waitOnFlushFutures()
-      throws InterruptedException, ExecutionException {
-    CompletableFuture<Void> combinedFuture = CompletableFuture.allOf(
-        commitWatcher.getFutureMap().values().toArray(
-            new CompletableFuture[commitWatcher.getFutureMap().size()]));
-    // wait for all the transactions to complete
-    combinedFuture.get();
+  void waitOnFlushFutures() throws InterruptedException, ExecutionException {
   }
 
-  private void validateResponse(
+  void validateResponse(
       ContainerProtos.ContainerCommandResponseProto responseProto)
       throws IOException {
     try {
@@ -589,16 +631,20 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  private void setIoException(Exception e) {
+  public void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
       ioException.compareAndSet(null, exception);
+      LOG.debug("Exception: for block ID: " + blockID,  e);
     } else {
-      LOG.debug("Previous request had already failed with " + ioe.toString()
-          + " so subsequent request also encounters"
-          + " Storage Container Exception ", e);
+      LOG.debug("Previous request had already failed with {} " +
+              "so subsequent request also encounters " +
+              "Storage Container Exception {}", ioe, e);
     }
+  }
+
+  void cleanup() {
   }
 
   public void cleanup(boolean invalidateClient) {
@@ -607,7 +653,8 @@ public class BlockOutputStream extends OutputStream {
     }
     xceiverClientFactory = null;
     xceiverClient = null;
-    commitWatcher.cleanup();
+    cleanup();
+
     if (bufferList !=  null) {
       bufferList.clear();
     }
@@ -621,7 +668,7 @@ public class BlockOutputStream extends OutputStream {
    *
    * @throws IOException if stream is closed
    */
-  private void checkOpen() throws IOException {
+  void checkOpen() throws IOException {
     if (isClosed()) {
       throw new IOException("BlockOutputStream has been closed.");
     } else if (getIoException() != null) {
@@ -641,8 +688,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException if there is an I/O error while performing the call
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
+   * @return
    */
-  private void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
+  CompletableFuture<ContainerCommandResponseProto> writeChunkToContainer(
+      ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
@@ -659,34 +708,37 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
-
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, token);
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          asyncReply.getResponse();
-      future.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          future.completeExceptionally(sce);
-        }
-        return e;
-      }, responseExecutor).exceptionally(e -> {
-        LOG.error("writing chunk failed " + chunkInfo.getChunkName() +
-                " blockID " + blockID + " with exception "
-                + e.getLocalizedMessage());
-        CompletionException ce = new CompletionException(e);
-        setIoException(ce);
-        throw ce;
-      });
+          blockID.get(), data, token, replicationIndex);
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          respFuture = asyncReply.getResponse();
+      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+          validateFuture = respFuture.thenApplyAsync(e -> {
+            try {
+              validateResponse(e);
+            } catch (IOException sce) {
+              respFuture.completeExceptionally(sce);
+            }
+            return e;
+          }, responseExecutor).exceptionally(e -> {
+            String msg = "Failed to write chunk " + chunkInfo.getChunkName() +
+                " into block " + blockID;
+            LOG.debug("{}, exception: {}", msg, e.getLocalizedMessage());
+            CompletionException ce = new CompletionException(msg, e);
+            setIoException(ce);
+            throw ce;
+          });
+      containerBlockData.addChunks(chunkInfo);
+      clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
+      return validateFuture;
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
     }
-    containerBlockData.addChunks(chunkInfo);
+    return null;
   }
 
   @VisibleForTesting
@@ -702,11 +754,11 @@ public class BlockOutputStream extends OutputStream {
    * handle ExecutionException else skip it.
    * @throws IOException
    */
-  private void handleInterruptedException(Exception ex,
+  void handleInterruptedException(Exception ex,
       boolean processExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");
-    if(processExecutionException) {
+    if (processExecutionException) {
       handleExecutionException(ex);
     } else {
       throw new IOException(EXCEPTION_MSG + ex.toString(), ex);
@@ -722,5 +774,13 @@ public class BlockOutputStream extends OutputStream {
     setIoException(ex);
     adjustBuffersOnException();
     throw getIoException();
+  }
+
+  /**
+   * Get the Replication Index.
+   * @return replicationIndex
+   */
+  public int getReplicationIndex() {
+    return replicationIndex;
   }
 }

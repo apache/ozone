@@ -28,21 +28,22 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
+import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,8 +58,10 @@ import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
@@ -73,16 +76,37 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final boolean doSyncWrite;
   private final OpenFiles files = new OpenFiles();
   private final long defaultReadBufferCapacity;
+  private final VolumeSet volumeSet;
 
-  public FilePerBlockStrategy(boolean sync, BlockManager manager) {
+  public FilePerBlockStrategy(boolean sync, BlockManager manager,
+                              VolumeSet volSet) {
     doSyncWrite = sync;
     this.defaultReadBufferCapacity = manager == null ? 0 :
         manager.getDefaultReadBufferCapacity();
+    this.volumeSet = volSet;
   }
 
   private static void checkLayoutVersion(Container container) {
     Preconditions.checkArgument(
-        container.getContainerData().getLayOutVersion() == FILE_PER_BLOCK);
+        container.getContainerData().getLayoutVersion() == FILE_PER_BLOCK);
+  }
+
+  @Override
+  public String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
+    checkLayoutVersion(container);
+    File chunkFile = getChunkFile(container, blockID, null);
+    return chunkFile.getAbsolutePath();
+  }
+
+  @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+          Container container, BlockID blockID, ContainerMetrics metrics)
+          throws StorageContainerException {
+    checkLayoutVersion(container);
+    File chunkFile = getChunkFile(container, blockID, null);
+    return new KeyValueStreamDataChannel(chunkFile,
+        container.getContainerData(), metrics);
   }
 
   @Override
@@ -122,11 +146,22 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
 
     HddsVolume volume = containerData.getVolume();
-    VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-    FileChannel channel = files.getChannel(chunkFile, doSyncWrite);
-    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len,
-        volumeIOStats);
+    FileChannel channel = null;
+    try {
+      channel = files.getChannel(chunkFile, doSyncWrite);
+    } catch (IOException e) {
+      onFailure(volume);
+      throw e;
+    }
+
+    // check whether offset matches block file length if its an overwrite
+    if (!overwrite) {
+      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
+    }
+
+    ChunkUtils
+        .writeData(channel, chunkFile.getName(), data, offset, len, volume);
 
     containerData.updateWriteStats(len, overwrite);
   }
@@ -143,45 +178,24 @@ public class FilePerBlockStrategy implements ChunkManager {
       return ChunkBuffer.wrap(ByteBuffer.wrap(new byte[0]));
     }
 
+    limitReadSize(info.getLen());
+
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
     HddsVolume volume = containerData.getVolume();
-    VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
     File chunkFile = getChunkFile(container, blockID, info);
 
-    long len = info.getLen();
+    int len = (int) info.getLen();
     long offset = info.getOffset();
-
-    long bufferCapacity = 0;
-    if (info.isReadDataIntoSingleBuffer()) {
-      // Older client - read all chunk data into one single buffer.
-      bufferCapacity = len;
-    } else {
-      // Set buffer capacity to checksum boundary size so that each buffer
-      // corresponds to one checksum. If checksum is NONE, then set buffer
-      // capacity to default (OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY = 64KB).
-      ChecksumData checksumData = info.getChecksumData();
-
-      if (checksumData != null) {
-        if (checksumData.getChecksumType() ==
-            ContainerProtos.ChecksumType.NONE) {
-          bufferCapacity = defaultReadBufferCapacity;
-        } else {
-          bufferCapacity = checksumData.getBytesPerChecksum();
-        }
-      }
-    }
-    // If the buffer capacity is 0, set all the data into one ByteBuffer
-    if (bufferCapacity == 0) {
-      bufferCapacity = len;
-    }
+    long bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
+        defaultReadBufferCapacity);
 
     ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,
         bufferCapacity);
 
-    ChunkUtils.readData(chunkFile, dataBuffers, offset, len, volumeIOStats);
+    ChunkUtils.readData(chunkFile, dataBuffers, offset, len, volume);
 
     return ChunkBuffer.wrap(Lists.newArrayList(dataBuffers));
   }
@@ -202,8 +216,13 @@ public class FilePerBlockStrategy implements ChunkManager {
   public void finishWriteChunks(KeyValueContainer container,
       BlockData blockData) throws IOException {
     File chunkFile = getChunkFile(container, blockData.getBlockID(), null);
-    files.close(chunkFile);
-    verifyChunkFileExists(chunkFile);
+    try {
+      files.close(chunkFile);
+      verifyChunkFileExists(chunkFile);
+    } catch (IOException e) {
+      onFailure(container.getContainerData().getVolume());
+      throw e;
+    }
   }
 
   private void deleteChunk(Container container, BlockID blockID,

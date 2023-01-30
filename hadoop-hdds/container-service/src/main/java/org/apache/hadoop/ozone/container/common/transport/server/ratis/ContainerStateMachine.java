@@ -23,18 +23,23 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -56,6 +61,8 @@ import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 
@@ -75,6 +82,7 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
@@ -83,6 +91,9 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.util.TaskQueue;
+import org.apache.ratis.util.function.CheckedSupplier;
+import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,13 +148,15 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
-  private final ExecutorService[] executors;
+  private final ConcurrentMap<Long, TaskQueue> containerTaskQueues;
+  private final ExecutorService executor;
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
+  private final boolean waitOnBothFollowers;
   /**
    * CSM metrics.
    */
@@ -164,13 +177,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     int numPendingRequests = conf
         .getObject(DatanodeRatisServerConfig.class)
         .getLeaderNumPendingRequests();
-    int pendingRequestsByteLimit = (int) conf.getStorageSize(
+    long pendingRequestsBytesLimit = (long)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
+    int pendingRequestsMegaBytesLimit =
+        HddsUtils.roundupMb(pendingRequestsBytesLimit);
     stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] {1, data.size()}, numPendingRequests,
-        pendingRequestsByteLimit);
+        (index, data) -> new int[] {1, HddsUtils.roundupMb(data.size())},
+        numPendingRequests, pendingRequestsMegaBytesLimit);
 
     this.chunkExecutors = chunkExecutors;
 
@@ -186,15 +201,16 @@ public class ContainerStateMachine extends BaseStateMachine {
             DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT);
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
-    this.executors = new ExecutorService[numContainerOpExecutors];
-    for (int i = 0; i < numContainerOpExecutors; i++) {
-      final int index = i;
-      this.executors[index] = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r);
-        t.setName("RatisApplyTransactionExecutor " + index);
-        return t;
-      });
-    }
+
+    this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
+        new ThreadFactoryBuilder()
+            .setNameFormat("ContainerOp-" + gid.getUuid() + "-%d")
+            .build());
+
+    this.containerTaskQueues = new ConcurrentHashMap<>();
+    this.waitOnBothFollowers = conf.getObject(
+        DatanodeConfiguration.class).waitOnAllFollowers();
+
   }
 
   @Override
@@ -347,6 +363,8 @@ public class ContainerStateMachine extends BaseStateMachine {
               .setWriteChunk(commitWriteChunkProto)
               .setTraceID(proto.getTraceID())
               .build();
+      Preconditions.checkArgument(write.hasData());
+      Preconditions.checkArgument(!write.getData().isEmpty());
 
       return TransactionContext.newBuilder()
           .setClientRequest(request)
@@ -409,19 +427,28 @@ public class ContainerStateMachine extends BaseStateMachine {
     return dispatchCommand(requestProto, context);
   }
 
-  private ExecutorService getCommandExecutor(
-      ContainerCommandRequestProto requestProto) {
-    int executorId = (int)(requestProto.getContainerID() % executors.length);
-    return executors[executorId];
+  private CompletableFuture<ContainerCommandResponseProto> runCommandAsync(
+      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
+    return CompletableFuture.supplyAsync(() -> {
+      final DispatcherContext context = new DispatcherContext.Builder()
+          .setTerm(entry.getTerm())
+          .setLogIndex(entry.getIndex())
+          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+          .setContainer2BCSIDMap(container2BCSIDMap)
+          .build();
+
+      return runCommand(requestProto, context);
+    }, executor);
   }
 
   private CompletableFuture<Message> handleWriteChunk(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
+    RaftServer server = ratisServer.getServer();
+    Preconditions.checkArgument(!write.getData().isEmpty());
     try {
-      RaftServer.Division division = ratisServer.getServerDivision();
-      if (division.getInfo().isLeader()) {
+      if (server.getDivision(gid).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (InterruptedException ioe) {
@@ -501,12 +528,66 @@ public class ContainerStateMachine extends BaseStateMachine {
     return raftFuture;
   }
 
-  private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
-    int hash = Objects.hashCode(req.getBlockID());
-    if (hash == Integer.MIN_VALUE) {
-      hash = Integer.MAX_VALUE;
+  private StateMachine.DataChannel getStreamDataChannel(
+          ContainerCommandRequestProto requestProto,
+          DispatcherContext context) throws StorageContainerException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("{}: getStreamDataChannel {} containerID={} pipelineID={} " +
+                      "traceID={}", gid, requestProto.getCmdType(),
+              requestProto.getContainerID(), requestProto.getPipelineID(),
+              requestProto.getTraceID());
     }
-    int i = Math.abs(hash) % chunkExecutors.size();
+    runCommand(requestProto, context);  // stream init
+    return dispatcher.getStreamDataChannel(requestProto);
+  }
+
+  @Override
+  public CompletableFuture<DataStream> stream(RaftClientRequest request) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        ContainerCommandRequestProto requestProto =
+            message2ContainerCommandRequestProto(request.getMessage());
+        DispatcherContext context =
+            new DispatcherContext.Builder()
+                .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
+                .setContainer2BCSIDMap(container2BCSIDMap)
+                .build();
+        DataChannel channel = getStreamDataChannel(requestProto, context);
+        final ExecutorService chunkExecutor = requestProto.hasWriteChunk() ?
+            getChunkExecutor(requestProto.getWriteChunk()) : null;
+        return new LocalStream(channel, chunkExecutor);
+      } catch (IOException e) {
+        throw new CompletionException("Failed to create data stream", e);
+      }
+    }, executor);
+  }
+
+  @Override
+  public CompletableFuture<?> link(DataStream stream, LogEntryProto entry) {
+    if (stream == null) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "DataStream is null"));
+    }
+    final DataChannel dataChannel = stream.getDataChannel();
+    if (dataChannel.isOpen()) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "DataStream: " + stream + " is not closed properly"));
+    }
+
+    final ContainerCommandRequestProto request;
+    if (dataChannel instanceof KeyValueStreamDataChannel) {
+      request = ((KeyValueStreamDataChannel) dataChannel).getPutBlockRequest();
+    } else {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "Unexpected DataChannel " + dataChannel.getClass()));
+    }
+    return runCommandAsync(request, entry).whenComplete(
+        (res, e) -> LOG.debug("link {}, entry: {}, request: {}",
+            res.getResult(), entry, request));
+  }
+
+  private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
+    int i = (int)(req.getBlockID().getLocalID() % chunkExecutors.size());
     return chunkExecutors.get(i);
   }
 
@@ -656,10 +737,13 @@ public class ContainerStateMachine extends BaseStateMachine {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
         ByteString data = stateMachineDataCache.get(entry.getIndex());
         if (data != null) {
+          Preconditions.checkArgument(!data.isEmpty());
           future.complete(data);
+          metrics.incNumDataCacheHit();
           return future;
         }
 
+        metrics.incNumDataCacheMiss();
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
@@ -686,7 +770,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private synchronized void updateLastApplied() {
     Long appliedTerm = null;
     long appliedIndex = -1;
-    for(long i = getLastAppliedTermIndex().getIndex() + 1;; i++) {
+    for (long i = getLastAppliedTermIndex().getIndex() + 1;; i++) {
       final Long removed = applyTransactionCompletionMap.remove(i);
       if (removed == null) {
         break;
@@ -715,6 +799,49 @@ public class ContainerStateMachine extends BaseStateMachine {
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     updateLastApplied();
+    removeStateMachineDataIfNeeded(index);
+  }
+
+  private CompletableFuture<ContainerCommandResponseProto> submitTask(
+      ContainerCommandRequestProto request, DispatcherContext.Builder context,
+      Consumer<Exception> exceptionHandler) {
+    final long containerId = request.getContainerID();
+    final TaskQueue queue = containerTaskQueues.computeIfAbsent(
+        containerId, id -> new TaskQueue("container" + id));
+    final CheckedSupplier<ContainerCommandResponseProto, Exception> task
+        = () -> {
+          try {
+            return runCommand(request, context.build());
+          } catch (Exception e) {
+            exceptionHandler.accept(e);
+            throw e;
+          }
+        };
+    final CompletableFuture<ContainerCommandResponseProto> f
+        = queue.submit(task, executor);
+    // after the task is completed, remove the queue if the queue is empty.
+    f.thenAccept(dummy -> containerTaskQueues.computeIfPresent(containerId,
+        (id, q) -> q.isEmpty() ? null : q));
+    return f;
+  }
+
+  // Removes the stateMachine data from cache once both followers catch up
+  // to the particular index.
+  private void removeStateMachineDataIfNeeded(long index) {
+    if (waitOnBothFollowers) {
+      try {
+        RaftServer.Division division = ratisServer.getServer().getDivision(gid);
+        if (division.getInfo().isLeader()) {
+          long minIndex = Arrays.stream(division.getInfo()
+              .getFollowerNextIndices()).min().getAsLong();
+          LOG.debug("Removing data corresponding to log index {} min index {} "
+                  + "from cache", index, minIndex);
+          stateMachineDataCache.removeIf(k -> k >= (Math.min(minIndex, index)));
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   /*
@@ -723,17 +850,22 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     long index = trx.getLogEntry().getIndex();
-    // Since leader and one of the followers has written the data, it can
-    // be removed from the stateMachineDataMap.
-    stateMachineDataCache.remove(index);
-
-    DispatcherContext.Builder builder =
-        new DispatcherContext.Builder()
-            .setTerm(trx.getLogEntry().getTerm())
-            .setLogIndex(index);
-
-    long applyTxnStartTime = Time.monotonicNowNanos();
     try {
+      // Remove the stateMachine data once both followers have caught up. If any
+      // one of the follower is behind, the pending queue will max out as
+      // configurable limit on pending request size and count and then will
+      // block and client will backoff as a result of that.
+      removeStateMachineDataIfNeeded(index);
+      // if waitOnBothFollower is false, remove the entry from the cache
+      // as soon as its applied and such entry exists in the cache.
+      if (!waitOnBothFollowers) {
+        stateMachineDataCache.removeIf(k -> k >= index);
+      }
+      DispatcherContext.Builder builder =
+          new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
+              .setLogIndex(index);
+
+      long applyTxnStartTime = Time.monotonicNowNanos();
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
       ContainerCommandRequestProto requestProto =
@@ -744,31 +876,27 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (cmdType == Type.WriteChunk) {
         Preconditions
             .checkArgument(requestProto.getWriteChunk().getData().isEmpty());
-        builder
-            .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA);
+        builder.setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA);
       }
       if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile
-          || cmdType == Type.PutBlock || cmdType == Type.CreateContainer) {
+          || cmdType == Type.PutBlock || cmdType == Type.CreateContainer
+          || cmdType == Type.StreamInit) {
         builder.setContainer2BCSIDMap(container2BCSIDMap);
       }
       CompletableFuture<Message> applyTransactionFuture =
           new CompletableFuture<>();
+      final Consumer<Exception> exceptionHandler = e -> {
+        LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
+            + "{} exception {}", gid, requestProto.getCmdType(), index, e);
+        stateMachineHealthy.compareAndSet(true, false);
+        metrics.incNumApplyTransactionsFails();
+        applyTransactionFuture.completeExceptionally(e);
+      };
+
       // Ensure the command gets executed in a separate thread than
       // stateMachineUpdater thread which is calling applyTransaction here.
-      CompletableFuture<ContainerCommandResponseProto> future =
-          CompletableFuture.supplyAsync(() -> {
-            try {
-              return runCommand(requestProto, builder.build());
-            } catch (Exception e) {
-              LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
-                      + "{} exception {}", gid, requestProto.getCmdType(),
-                  index, e);
-              stateMachineHealthy.compareAndSet(true, false);
-              metrics.incNumApplyTransactionsFails();
-              applyTransactionFuture.completeExceptionally(e);
-              throw e;
-            }
-          }, getCommandExecutor(requestProto));
+      final CompletableFuture<ContainerCommandResponseProto> future =
+          submitTask(requestProto, builder, exceptionHandler);
       future.thenApply(r -> {
         if (trx.getServerRole() == RaftPeerRole.LEADER
             && trx.getStateMachineContext() != null) {
@@ -802,11 +930,11 @@ public class ContainerStateMachine extends BaseStateMachine {
                     + "{} Container Result: {}", gid, r.getCmdType(), index,
                 r.getMessage(), r.getResult());
           }
-          applyTransactionFuture.complete(r::toByteString);
           if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile) {
             metrics.incNumBytesCommittedCount(
                 requestProto.getWriteChunk().getChunkData().getLen());
           }
+          applyTransactionFuture.complete(r::toByteString);
           // add the entry to the applyTransactionCompletionMap only if the
           // stateMachine is healthy i.e, there has been no applyTransaction
           // failures before.
@@ -818,12 +946,11 @@ public class ContainerStateMachine extends BaseStateMachine {
           }
         }
         return applyTransactionFuture;
-      }).whenComplete((r, t) ->  {
+      }).whenComplete((r, t) -> {
         if (t != null) {
           stateMachineHealthy.set(false);
           LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
-                  + "{} exception {}", gid, requestProto.getCmdType(),
-              index, t);
+              + "{} exception {}", gid, requestProto.getCmdType(), index, t);
         }
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletion(
@@ -844,6 +971,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
     return future;
+  }
+
+  @Override
+  public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
+    // once the leader steps down , clear the cache
+    evictStateMachineCache();
   }
 
   @Override
@@ -899,11 +1032,9 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     evictStateMachineCache();
-    for (ExecutorService executor : executors) {
-      executor.shutdown();
-    }
+    executor.shutdown();
     metrics.unRegister();
   }
 

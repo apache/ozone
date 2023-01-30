@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.security;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -55,5 +56,10 @@ public class S3GetSecretResponse extends OMClientResponse {
       omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
           s3SecretValue.getKerberosID(), s3SecretValue);
     }
+  }
+
+  @VisibleForTesting
+  public S3SecretValue getS3SecretValue() {
+    return s3SecretValue;
   }
 }

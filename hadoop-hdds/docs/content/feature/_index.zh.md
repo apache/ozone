@@ -1,6 +1,6 @@
 ---
-title: 特点
-name: 特点
+title: 特性
+name: 特性
 menu: main
 weight: 4
 ---
@@ -21,13 +21,7 @@ weight: 4
     limitations under the License.
     -->
 
-{{<jumbotron title="GDPR 在 Ozone 中的应用">}}
-          通用数据保护条例（GDPR）是关于如何处理个人数据的规范，它属于欧盟的法律，但是由于软件常常跨越地理位置传播和使用，Ozone 支持 GDPR 中的删除权（被遗忘权）。
+{{<jumbotron title="Ozone 特性">}}
+        以下页面介绍 Ozone 的相关特性，比如高可用性、拓扑感知和指标工具等。
 {{</jumbotron>}}
-
-<div class="alert alert-warning" role="alert">
-如果你想详细了解 Ozone 的 GDPR 框架，请参考 <a href="https://issues.apache.org/jira/secure/attachment/12978992/Ozone%20GDPR%20Framework.pdf">Ozone GDPR 框架</a>。
-</div>
-
-当你创建了一个符合 GDPR 规范的桶，在这个桶中创建的键都将自动符合 GDPR 规范。
 

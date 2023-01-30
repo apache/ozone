@@ -19,14 +19,18 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
 import com.google.common.base.Preconditions;
 
@@ -51,7 +55,7 @@ public final class MockPipeline {
   public static Pipeline createPipeline(int numNodes) throws IOException {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
-    for(int i = 0; i < numNodes; i++) {
+    for (int i = 0; i < numNodes; i++) {
       ids.add(MockDatanodeDetails.randomLocalDatanodeDetails());
     }
     return createPipeline(ids);
@@ -65,8 +69,8 @@ public final class MockPipeline {
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setNodes(dns)
         .build();
   }
@@ -81,9 +85,37 @@ public final class MockPipeline {
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes)
+        .setLeaderId(UUID.randomUUID())
+        .build();
+  }
+
+  public static Pipeline createEcPipeline() {
+    return createEcPipeline(new ECReplicationConfig(3, 2));
+  }
+
+  public static Pipeline createEcPipeline(ECReplicationConfig repConfig) {
+
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    for (int i = 0; i < repConfig.getRequiredNodes(); i++) {
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
+    Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();
+
+    int index = nodes.size() - 1;
+    for (DatanodeDetails dn : nodes) {
+      nodeIndexes.put(dn, index);
+      index--;
+    }
+
+    return Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(repConfig)
+        .setNodes(nodes)
+        .setReplicaIndexes(nodeIndexes)
         .build();
   }
 

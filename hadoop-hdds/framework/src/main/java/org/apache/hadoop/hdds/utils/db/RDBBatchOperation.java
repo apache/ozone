@@ -18,35 +18,34 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
+import java.io.IOException;
 
 /**
  * Batch operation implementation for rocks db.
  */
 public class RDBBatchOperation implements BatchOperation {
 
-  private final WriteBatch writeBatch;
+  private final ManagedWriteBatch writeBatch;
 
   public RDBBatchOperation() {
-    writeBatch = new WriteBatch();
+    writeBatch = new ManagedWriteBatch();
   }
 
-  public RDBBatchOperation(WriteBatch writeBatch) {
+  public RDBBatchOperation(ManagedWriteBatch writeBatch) {
     this.writeBatch = writeBatch;
   }
 
-  public void commit(RocksDB db, WriteOptions writeOptions) throws IOException {
-    try {
-      db.write(writeOptions, writeBatch);
-    } catch (RocksDBException e) {
-      throw new IOException("Unable to write the batch.", e);
-    }
+  public void commit(RocksDatabase db) throws IOException {
+    db.batchWrite(writeBatch);
+  }
+
+  public void commit(RocksDatabase db, ManagedWriteOptions writeOptions)
+      throws IOException {
+    db.batchWrite(writeBatch, writeOptions);
   }
 
   @Override
@@ -54,20 +53,12 @@ public class RDBBatchOperation implements BatchOperation {
     writeBatch.close();
   }
 
-  public void delete(ColumnFamilyHandle handle, byte[] key) throws IOException {
-    try {
-      writeBatch.delete(handle, key);
-    } catch (RocksDBException e) {
-      throw new IOException("Can't record batch delete operation.", e);
-    }
+  public void delete(ColumnFamily family, byte[] key) throws IOException {
+    family.batchDelete(writeBatch, key);
   }
 
-  public void put(ColumnFamilyHandle handle, byte[] key, byte[] value)
+  public void put(ColumnFamily family, byte[] key, byte[] value)
       throws IOException {
-    try {
-      writeBatch.put(handle, key, value);
-    } catch (RocksDBException e) {
-      throw new IOException("Can't record batch put operation.", e);
-    }
+    family.batchPut(writeBatch, key, value);
   }
 }

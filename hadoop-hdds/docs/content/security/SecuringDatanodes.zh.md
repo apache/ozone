@@ -30,7 +30,7 @@ Hadoop 中 datanode 的安全机制是通过给每个节点创建 Keytab 文件�
 参数名|描述
 --------|--------------
 dfs.datanode.kerberos.principal| datanode 的服务主体名 <br/> 比如：dn/_HOST@REALM.COM
-dfs.datanode.keytab.file| datanode 进程所使用的 keytab 文件
+dfs.datanode.kerberos.keytab.file| datanode 进程所使用的 keytab 文件
 hdds.datanode.http.auth.kerberos.principal| datanode http 服务器的服务主体名
 hdds.datanode.http.auth.kerberos.keytab| datanode http 服务器的服务主体登录所使用的 keytab 文件
 

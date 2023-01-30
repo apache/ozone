@@ -22,12 +22,12 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.After;
 import org.junit.Assert;
@@ -48,11 +48,11 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.apache.hadoop.test.GenericTestUtils.*;
+import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import static org.apache.ozone.test.GenericTestUtils.getTempPath;
 
 /**
  * Test secure Ozone Manager operation in distributed handler scenario.
@@ -83,7 +83,6 @@ public class TestSecureOzoneManager {
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
     conf.set(OZONE_SCM_NAMES, "localhost");
@@ -116,15 +115,14 @@ public class TestSecureOzoneManager {
         LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     omLogs.clearOutput();
 
     // Case 1: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail when SCM is not running.
     SecurityConfig securityConfig = new SecurityConfig(conf);
-    CertificateClient client = new OMCertificateClient(securityConfig,
-        omStorage.getOmCertSerialId());
+    CertificateClient client =
+        new OMCertificateClient(securityConfig, omStorage, scmId);
     Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     privateKey = client.getPrivateKey();
     publicKey = client.getPublicKey();
@@ -133,8 +131,7 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getCertificate());
 
     // Case 2: If key pair already exist than response should be RECOVER.
-    client = new OMCertificateClient(securityConfig,
-        omStorage.getOmCertSerialId());
+    client = new OMCertificateClient(securityConfig, omStorage, scmId);
     Assert.assertEquals(CertificateClient.InitResponse.RECOVER, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
@@ -166,21 +163,19 @@ public class TestSecureOzoneManager {
     CertificateCodec certCodec =
         new CertificateCodec(securityConfig, COMPONENT);
     X509Certificate x509Certificate = KeyStoreTestUtil.generateCertificate(
-        "CN=Test", new KeyPair(publicKey, privateKey), 10,
+        "CN=Test", new KeyPair(publicKey, privateKey), 365,
         securityConfig.getSignatureAlgo());
     certCodec.writeCertificate(new X509CertificateHolder(
         x509Certificate.getEncoded()));
-    client = new OMCertificateClient(securityConfig,
-        x509Certificate.getSerialNumber().toString());
     omStorage.setOmCertSerialId(x509Certificate.getSerialNumber().toString());
+    client = new OMCertificateClient(securityConfig, omStorage, scmId);
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
     Assert.assertNull(client.getPrivateKey());
     Assert.assertNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
 
     // Case 6: When private key and certificate is present.
-    client = new OMCertificateClient(securityConfig,
-        x509Certificate.getSerialNumber().toString());
+    client = new OMCertificateClient(securityConfig, omStorage, scmId);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     keyCodec.writePrivateKey(privateKey);
@@ -190,8 +185,7 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getCertificate());
 
     // Case 7 When keypair and certificate is present.
-    client = new OMCertificateClient(securityConfig,
-        x509Certificate.getSerialNumber().toString());
+    client = new OMCertificateClient(securityConfig, omStorage, scmId);
     Assert.assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
@@ -206,12 +200,11 @@ public class TestSecureOzoneManager {
     OzoneConfiguration config = new OzoneConfiguration(conf);
     OMStorage omStorage = new OMStorage(config);
     omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
     omStorage.setOmId(omId);
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
     LambdaTestUtils.intercept(RuntimeException.class, "Can't get SCM signed" +
             " certificate",
-        () -> OzoneManager.initializeSecurity(config, omStorage));
+        () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
   }
 
 }

@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 
 import org.junit.After;
@@ -69,7 +69,7 @@ public class TestOzoneManagerSnapshotProvider {
     omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
@@ -114,7 +114,7 @@ public class TestOzoneManagerSnapshotProvider {
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Download latest checkpoint from leader OM to follower OM
@@ -134,7 +134,7 @@ public class TestOzoneManagerSnapshotProvider {
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
       throws Exception {
 
-    OMTransactionInfo trxnInfoFromCheckpoint =
+    TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
             dbCheckpoint.getCheckpointLocation());
 

@@ -21,21 +21,28 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
@@ -46,19 +53,23 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,10 +89,15 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private ObjectStore objectStore;
   private OzoneVolume volume;
   private OzoneBucket bucket;
-  private ReplicationType replicationType;
-  private ReplicationFactor replicationFactor;
+  private ReplicationConfig bucketReplicationConfig;
+  // Client side configured replication config.
+  private ReplicationConfig clientConfiguredReplicationConfig;
   private boolean securityEnabled;
   private int configuredDnPort;
+  private OzoneConfiguration config;
+  private long nextReplicationConfigRefreshTime;
+  private long bucketRepConfigRefreshPeriodMS;
+  private java.time.Clock clock = Clock.system(ZoneOffset.UTC);
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -106,6 +122,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
 
     OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
+    bucketRepConfigRefreshPeriodMS = conf.getLong(
+        OzoneConfigKeys
+            .OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS,
+        OzoneConfigKeys
+            .OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS);
     if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
       // When the host name or service id isn't given
       // but ozone.om.service.ids is defined, declare failure.
@@ -135,12 +156,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.securityEnabled = true;
     }
 
-    String replicationTypeConf =
-        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT);
-
-    int replicationCountConf = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION,
-        OzoneConfigKeys.OZONE_REPLICATION_DEFAULT);
+    clientConfiguredReplicationConfig =
+        OzoneClientUtils.getClientConfiguredReplicationConfig(conf);
 
     if (OmUtils.isOmHAServiceId(conf, omHost)) {
       // omHost is listed as one of the service ids in the config,
@@ -157,16 +174,37 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
-    this.replicationType = ReplicationType.valueOf(replicationTypeConf);
-    this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
+    bucketReplicationConfig = this.bucket.getReplicationConfig();
+    nextReplicationConfigRefreshTime =
+        clock.millis() + bucketRepConfigRefreshPeriodMS;
+
+    // resolve the bucket layout in case of Link Bucket
+    BucketLayout resolvedBucketLayout =
+        OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+            new HashSet<>());
+
+    OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
+
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
+    this.config = conf;
   }
 
+  /**
+   * This API returns the value what is configured at client side only. It could
+   * differ from the server side default values. If no replication config
+   * configured at client, it will return 3.
+   */
   @Override
   public short getDefaultReplication() {
-    return (short) replicationFactor.getValue();
+    if (clientConfiguredReplicationConfig == null) {
+      // to provide backward compatibility, we are just retuning 3;
+      // However we need to handle with the correct behavior.
+      // TODO: Please see HDDS-5646
+      return (short) ReplicationFactor.THREE.getValue();
+    }
+    return (short) clientConfiguredReplicationConfig.getRequiredNodes();
   }
 
   @Override
@@ -181,6 +219,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
+          || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
         throw new FileNotFoundException(
             ex.getResult().name() + ": " + ex.getMessage());
@@ -199,18 +238,46 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      OzoneOutputStream ozoneOutputStream = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-        ReplicationFactor clientReplication = ReplicationFactor
-            .valueOf(replication);
-        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            clientReplication, overWrite, recursive);
+      OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
+          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
+              this.clientConfiguredReplicationConfig,
+              getReplicationConfigWithRefreshCheck(), config), overWrite,
+          recursive);
+      return new OzoneFSOutputStream(ozoneOutputStream);
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
+          || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+        throw new FileAlreadyExistsException(
+            ex.getResult().name() + ": " + ex.getMessage());
       } else {
-        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            replicationFactor, overWrite, recursive);
+        throw ex;
       }
-      return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
+    }
+  }
+
+  private ReplicationConfig getReplicationConfigWithRefreshCheck()
+      throws IOException {
+    if (clock.millis() > nextReplicationConfigRefreshTime) {
+      this.bucketReplicationConfig =
+          volume.getBucket(bucket.getName()).getReplicationConfig();
+      nextReplicationConfigRefreshTime =
+          clock.millis() + bucketRepConfigRefreshPeriodMS;
+    }
+    return this.bucketReplicationConfig;
+  }
+
+  @Override
+  public OzoneFSDataStreamOutput createStreamFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException {
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
+    try {
+      final ReplicationConfig replicationConfig
+          = OzoneClientUtils.resolveClientSideReplicationConfig(
+          replication, clientConfiguredReplicationConfig,
+          getReplicationConfigWithRefreshCheck(), config);
+      final OzoneDataStreamOutput out = bucket.createStreamFile(
+          key, 0, replicationConfig, overWrite, recursive);
+      return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
           || ex.getResult() == OMException.ResultCodes.NOT_A_FILE) {
@@ -254,6 +321,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return true;
   }
 
+
   /**
    * Helper method to delete an object specified by key name in bucket.
    *
@@ -261,12 +329,32 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
    * @return true if the key is deleted, false otherwise
    */
   @Override
-  public boolean deleteObject(String keyName) {
+  public boolean deleteObject(String keyName) throws IOException {
+    return deleteObject(keyName, false);
+  }
+
+  /**
+   * Helper method to delete an object specified by key name in bucket.
+   *
+   * @param keyName key name to be deleted
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
+   * @return true if the key is deleted, false otherwise
+   */
+  @Override
+  public boolean deleteObject(String keyName, boolean recursive)
+      throws IOException {
     LOG.trace("issuing delete for key {}", keyName);
     try {
       incrementCounter(Statistic.OBJECTS_DELETED, 1);
-      bucket.deleteKey(keyName);
+      bucket.deleteDirectory(keyName, recursive);
       return true;
+    } catch (OMException ome) {
+      LOG.error("delete key failed {}", ome.getMessage());
+      if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
+        throw new PathIsNotEmptyDirectoryException(ome.getMessage());
+      }
+      return false;
     } catch (IOException ioe) {
       LOG.error("delete key failed {}", ioe.getMessage());
       return false;
@@ -311,7 +399,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
 
   @Override
-  public Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException{
+  public Iterator<BasicKeyInfo> listKeys(String pathKey) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     return new IteratorAdapter(bucket.listKeys(pathKey));
   }
@@ -364,6 +452,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public String getCanonicalServiceName() {
     return objectStore.getCanonicalServiceName();
+  }
+
+  @VisibleForTesting
+  void setClock(Clock monotonicClock) {
+    this.clock = monotonicClock;
   }
 
   /**
@@ -450,9 +543,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
       String owner, URI defaultUri, Path workingDir) {
     OmKeyInfo keyInfo = status.getKeyInfo();
-    short replication = (short) keyInfo.getFactor().getNumber();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
             .makeQualified(defaultUri, workingDir),
         status.isDirectory(),
@@ -464,7 +559,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         owner,
         owner,
         null,
-        getBlockLocations(status)
+        getBlockLocations(status),
+        OzoneClientUtils.isKeyEncrypted(keyInfo),
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
 
@@ -523,4 +620,20 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return blockLocations;
   }
 
+  @Override
+  public boolean isFSOptimizedBucket() {
+    return bucket.getBucketLayout().isFileSystemOptimized();
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(String keyName, long length)
+      throws IOException {
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+
+    return OzoneClientUtils.getFileChecksumWithCombineMode(
+        volume, bucket, keyName,
+        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
+
+  }
 }

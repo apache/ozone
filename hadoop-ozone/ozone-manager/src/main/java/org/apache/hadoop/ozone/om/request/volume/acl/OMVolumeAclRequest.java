@@ -102,7 +102,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
         if (getOmRequest().getAddAclRequest().hasObj()) {
           modificationTime = getOmRequest().getAddAclRequest()
               .getModificationTime();
-        } else if (getOmRequest().getSetAclRequest().hasObj()){
+        } else if (getOmRequest().getSetAclRequest().hasObj()) {
           modificationTime = getOmRequest().getSetAclRequest()
               .getModificationTime();
         } else if (getOmRequest().getRemoveAclRequest().hasObj()) {

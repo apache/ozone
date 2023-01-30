@@ -25,12 +25,13 @@ import java.util.Collections;
 import java.util.StringJoiner;
 
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.Before;
 
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -47,7 +48,7 @@ public class TestOMFailoverProxyProvider {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
   private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
-  private OMFailoverProxyProvider provider;
+  private HadoopRpcOMFailoverProxyProvider provider;
   private long waitBetweenRetries;
   private int numNodes = 3;
   private OzoneConfiguration config;
@@ -61,14 +62,15 @@ public class TestOMFailoverProxyProvider {
     StringJoiner allNodeIds = new StringJoiner(",");
     for (int i = 1; i <= numNodes; i++) {
       String nodeId = NODE_ID_BASE_STR + i;
-      config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+      config.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
           nodeId), DUMMY_NODE_ADDR);
       allNodeIds.add(nodeId);
     }
-    config.set(OmUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
+    config.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    provider = new OMFailoverProxyProvider(config,
-        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID);
+    provider = new HadoopRpcOMFailoverProxyProvider(config,
+        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
+        OzoneManagerProtocolPB.class);
   }
 
   /**
@@ -116,12 +118,12 @@ public class TestOMFailoverProxyProvider {
    */
   @Test
   public void testWaitTimeWithSuggestedNewNode() {
-    Collection<String> allNodeIds = config.getTrimmedStringCollection(OmUtils.
+    Collection<String> allNodeIds = config.getTrimmedStringCollection(ConfUtils.
         addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID));
     allNodeIds.remove(provider.getCurrentProxyOMNodeId());
     Assert.assertTrue("This test needs at least 2 OMs",
         allNodeIds.size() > 0);
-    provider.performFailoverIfRequired(allNodeIds.iterator().next());
+    provider.setNextOmProxy(allNodeIds.iterator().next());
     Assert.assertEquals(0, provider.getWaitTime());
   }
 
@@ -147,8 +149,9 @@ public class TestOMFailoverProxyProvider {
   private void failoverToNextNode(int numNextNodeFailoverTimes,
       long waitTimeAfter) {
     for (int attempt = 0; attempt < numNextNodeFailoverTimes; attempt++) {
-      provider.performFailoverToNextProxy();
+      provider.selectNextOmProxy();
       Assert.assertEquals(waitTimeAfter, provider.getWaitTime());
+      provider.performFailover(null);
     }
   }
 
@@ -156,8 +159,9 @@ public class TestOMFailoverProxyProvider {
    * Failover to same node and wait time will be attempt*waitBetweenRetries.
    */
   private void failoverToSameNode(int numSameNodeFailoverTimes) {
+    provider.performFailover(null);
     for (int attempt = 1; attempt <= numSameNodeFailoverTimes; attempt++) {
-      provider.performFailoverIfRequired(provider.getCurrentProxyOMNodeId());
+      provider.setNextOmProxy(provider.getCurrentProxyOMNodeId());
       Assert.assertEquals(attempt * waitBetweenRetries,
           provider.getWaitTime());
     }
@@ -176,14 +180,18 @@ public class TestOMFailoverProxyProvider {
     StringJoiner allNodeIds = new StringJoiner(",");
     for (int i = 1; i <= numNodes; i++) {
       String nodeId = NODE_ID_BASE_STR + i;
-      ozoneConf.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId), nodeAddrs.get(i-1));
+      ozoneConf.set(
+          ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+          nodeId), nodeAddrs.get(i - 1));
       allNodeIds.add(nodeId);
     }
-    ozoneConf.set(OmUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
+    ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    OMFailoverProxyProvider prov = new OMFailoverProxyProvider(ozoneConf,
-        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID);
+    HadoopRpcOMFailoverProxyProvider prov =
+            new HadoopRpcOMFailoverProxyProvider(ozoneConf,
+                    UserGroupInformation.getCurrentUser(),
+                    OM_SERVICE_ID,
+                    OzoneManagerProtocolPB.class);
 
     Text dtService = prov.getCurrentProxyDelegationToken();
 

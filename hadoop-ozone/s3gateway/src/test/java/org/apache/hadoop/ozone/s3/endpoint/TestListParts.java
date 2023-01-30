@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -60,6 +61,7 @@ public class TestListParts {
 
     REST.setHeaders(headers);
     REST.setClient(client);
+    REST.setOzoneConfiguration(new OzoneConfiguration());
 
     Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         OzoneConsts.KEY);

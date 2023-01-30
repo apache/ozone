@@ -19,9 +19,16 @@
 package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,21 +36,25 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 
 /**
  * Utility methods for creating OM related metadata managers and objects.
@@ -138,13 +149,12 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", key);
 
-    omMetadataManager.getKeyTable().put(omKey,
+    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .build());
   }
 
@@ -163,15 +173,165 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzoneKey(volume,
         bucket, key);
 
-    omMetadataManager.getKeyTable().put(omKey,
+    omMetadataManager.getKeyTable(getBucketLayout()).put(omKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
+  }
+
+  /**
+   * Write a key on OM instance.
+   * @throw IOException while writing.
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeKeyToOm(OMMetadataManager omMetadataManager,
+                                    String key,
+                                    String bucket,
+                                    String volume,
+                                    String fileName,
+                                    long objectID,
+                                    long parentObjectId,
+                                    long bucketObjectId,
+                                    long volumeObjectId,
+                                    long dataSize,
+                                    BucketLayout bucketLayout)
+          throws IOException {
+    // DB key in FileTable => "volumeId/bucketId/parentId/fileName"
+    // DB key in KeyTable => "/volume/bucket/key"
+    String omKey;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+             bucketObjectId, parentObjectId, fileName);
+    } else {
+      omKey = omMetadataManager.getOzoneKey(volume, bucket, key);
+    }
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
+            new OmKeyInfo.Builder()
+                    .setBucketName(bucket)
+                    .setVolumeName(volume)
+                    .setKeyName(key)
+                    .setReplicationConfig(
+                        StandaloneReplicationConfig.getInstance(ONE))
+                    .setObjectID(objectID)
+                    .setParentObjectID(parentObjectId)
+                    .setDataSize(dataSize)
+                    .build());
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeKeyToOm(OMMetadataManager omMetadataManager,
+                                  String keyName,
+                                  String bucketName,
+                                  String volName,
+                                  String fileName,
+                                  long objectId,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  List<OmKeyLocationInfoGroup> locationVersions,
+                                  BucketLayout bucketLayout,
+                                  long dataSize)
+          throws IOException {
+
+    String omKey;
+    if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+              bucketObjectId, parentObjectId, fileName);
+    } else {
+      omKey = omMetadataManager.getOzoneKey(volName, bucketName, keyName);
+    }
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
+            new OmKeyInfo.Builder()
+                    .setBucketName(bucketName)
+                    .setVolumeName(volName)
+                    .setKeyName(keyName)
+                    .setDataSize(dataSize)
+                    .setOmKeyLocationInfos(locationVersions)
+                    .setReplicationConfig(
+                        StandaloneReplicationConfig.getInstance(ONE))
+                    .setObjectID(objectId)
+                    .setParentObjectID(parentObjectId)
+                    .build());
+  }
+
+  /**
+   * Write a directory as key on OM instance.
+   * We don't need to set size.
+   * @throws IOException
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeDirToOm(OMMetadataManager omMetadataManager,
+                                  String key,
+                                  String bucket,
+                                  String volume,
+                                  String fileName,
+                                  long objectID,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  BucketLayout bucketLayout)
+      throws IOException {
+    writeKeyToOm(omMetadataManager, key, bucket, volume,
+        fileName, objectID, parentObjectId, bucketObjectId,
+        volumeObjectId, 0, bucketLayout);
+  }
+
+  public static void writeDirToOm(OMMetadataManager omMetadataManager,
+                                  long objectId,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  String dirName) throws IOException {
+    // DB key in DirectoryTable => "parentId/dirName"
+    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+            bucketObjectId, parentObjectId, dirName);
+    omMetadataManager.getDirectoryTable().put(omKey,
+            new OmDirectoryInfo.Builder()
+                    .setName(dirName)
+                    .setObjectID(objectId)
+                    .setParentObjectID(parentObjectId)
+                    .build());
+  }
+
+  public static OzoneManagerServiceProviderImpl
+      getMockOzoneManagerServiceProvider() throws IOException {
+    OzoneManagerServiceProviderImpl omServiceProviderMock =
+            mock(OzoneManagerServiceProviderImpl.class);
+    OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
+    Table tableMock = mock(Table.class);
+    when(tableMock.getName()).thenReturn("keyTable");
+    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+        .thenReturn(tableMock);
+    when(omServiceProviderMock.getOMMetadataManagerInstance())
+            .thenReturn(omMetadataManagerMock);
+    return omServiceProviderMock;
+  }
+
+  public static OzoneManagerServiceProviderImpl
+      getMockOzoneManagerServiceProviderWithFSO() throws IOException {
+    OzoneManagerServiceProviderImpl omServiceProviderMock =
+            mock(OzoneManagerServiceProviderImpl.class);
+    OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
+    Table keyTableMock = mock(Table.class);
+    Table dirTableMock = mock(Table.class);
+    Table volTableMock = mock(Table.class);
+    Table bucketTableMock = mock(Table.class);
+    when(keyTableMock.getName()).thenReturn(FILE_TABLE);
+    when(omMetadataManagerMock.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
+        .thenReturn(keyTableMock);
+    when(dirTableMock.getName()).thenReturn(DIRECTORY_TABLE);
+    when(omMetadataManagerMock.getDirectoryTable()).thenReturn(dirTableMock);
+    when(volTableMock.getName()).thenReturn(VOLUME_TABLE);
+    when(omMetadataManagerMock.getVolumeTable()).thenReturn(volTableMock);
+    when(bucketTableMock.getName()).thenReturn(BUCKET_TABLE);
+    when(omMetadataManagerMock.getBucketTable()).thenReturn(bucketTableMock);
+    when(omServiceProviderMock.getOMMetadataManagerInstance())
+            .thenReturn(omMetadataManagerMock);
+    return omServiceProviderMock;
   }
 
   /**
@@ -188,11 +348,10 @@ public final class OMMetadataManagerTestUtils {
    */
   public static Pipeline getRandomPipeline(DatanodeDetails datanodeDetails) {
     return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+       .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .setId(PipelineID.randomId())
         .setNodes(Collections.singletonList(datanodeDetails))
         .setState(Pipeline.PipelineState.OPEN)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .build();
   }
 
@@ -208,5 +367,9 @@ public final class OMMetadataManagerTestUtils {
         .setBlockID(blockID)
         .setPipeline(pipeline)
         .build();
+  }
+
+  public static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

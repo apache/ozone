@@ -30,18 +30,17 @@ import picocli.CommandLine.Command;
 @Command(name = "ozone s3",
     description = "Shell for S3 specific operations",
     subcommands = {
-        GetS3SecretHandler.class
+        GetS3SecretHandler.class,
+        SetS3SecretHandler.class,
+        RevokeS3SecretHandler.class
     })
 public class S3Shell extends Shell {
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    TracingUtil.executeInNewSpan("s3shell",
-        (Supplier<Void>) () -> {
-          super.execute(argv);
-          return null;
-        });
+    return TracingUtil.executeInNewSpan("s3shell",
+        (Supplier<Integer>) () -> super.execute(argv));
   }
 
   /**

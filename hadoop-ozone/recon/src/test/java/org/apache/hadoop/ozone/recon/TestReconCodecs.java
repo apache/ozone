@@ -24,8 +24,8 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.impl.ContainerKeyPrefixCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit Tests for Codecs used in Recon.
@@ -39,10 +39,10 @@ public class TestReconCodecs {
 
     Codec<ContainerKeyPrefix> codec = new ContainerKeyPrefixCodec();
     byte[] persistedFormat = codec.toPersistedFormat(containerKeyPrefix);
-    Assert.assertTrue(persistedFormat != null);
+    Assertions.assertTrue(persistedFormat != null);
     ContainerKeyPrefix fromPersistedFormat =
         codec.fromPersistedFormat(persistedFormat);
-    Assert.assertEquals(containerKeyPrefix, fromPersistedFormat);
+    Assertions.assertEquals(containerKeyPrefix, fromPersistedFormat);
   }
 
   @Test
@@ -50,9 +50,9 @@ public class TestReconCodecs {
     Integer i = 1000;
     Codec<Integer> codec = new IntegerCodec();
     byte[] persistedFormat = codec.toPersistedFormat(i);
-    Assert.assertTrue(persistedFormat != null);
+    Assertions.assertTrue(persistedFormat != null);
     Integer fromPersistedFormat =
         codec.fromPersistedFormat(persistedFormat);
-    Assert.assertEquals(i, fromPersistedFormat);
+    Assertions.assertEquals(i, fromPersistedFormat);
   }
 }

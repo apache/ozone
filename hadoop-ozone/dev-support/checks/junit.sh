@@ -27,8 +27,8 @@ if [[ ${ITERATIONS} -le 0 ]]; then
   ITERATIONS=1
 fi
 
-export MAVEN_OPTS="-Xmx4096m"
-MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx'
+export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
+MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx --no-transfer-progress'
 
 if [[ "${FAIL_FAST:-}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"

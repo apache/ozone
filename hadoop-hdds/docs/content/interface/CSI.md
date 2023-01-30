@@ -24,6 +24,11 @@ summary: Ozone supports Container Storage Interface(CSI) protocol. You can use O
   limitations under the License.
 -->
 
+<div class="alert alert-warning" role="alert">
+
+Ozone CSI support is still in alpha phase and buckets can be mounted only via 3rd party S3 compatible Fuse implementation (like Goofys). Fuse over S3 can provide only limited performance compared to a native Fuse file system. Long-term Ozone may support a custom solution to mount buckets which provides better user experience (with fuse or NFS or any other solution). Until that CSI is recommended to use only if you can live with this limitation and your use case is tested carefully.
+</div>
+
 `Container Storage Interface` (CSI) will enable storage vendors (SP) to develop a plugin once and have it work across a number of container orchestration (CO) systems like Kubernetes or Yarn.
 
 To get more information about CSI at [SCI spec](https://github.com/container-storage-interface/spec/blob/master/spec.md)
@@ -65,7 +70,7 @@ Attach the pod scm-0 and put a key into the /s3v/pvc* bucket.
 ```bash
 kubectl exec -it  scm-0  bash
 [hadoop@scm-0 ~]$ ozone sh bucket list s3v
-{
+[ {
   "metadata" : { },
   "volumeName" : "s3v",
   "name" : "pvc-861e2d8b-2232-4cd1-b43c-c0c26697ab6b",
@@ -73,7 +78,7 @@ kubectl exec -it  scm-0  bash
   "versioning" : false,
   "creationTime" : "2020-06-11T08:19:47.469Z",
   "encryptionKeyName" : null
-}
+} ]
 [hadoop@scm-0 ~]$ ozone sh key put /s3v/pvc-861e2d8b-2232-4cd1-b43c-c0c26697ab6b/A LICENSE.txt
 ```
 

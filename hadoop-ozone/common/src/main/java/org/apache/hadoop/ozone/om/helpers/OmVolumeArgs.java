@@ -17,7 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,7 +28,6 @@ import java.util.Objects;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 
@@ -46,7 +46,20 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long quotaInBytes;
   private long quotaInNamespace;
   private long usedNamespace;
-  private final OmOzoneAclMap aclMap;
+  private List<OzoneAcl> acls;
+  /**
+   * Reference count on this Ozone volume.
+   *
+   * When reference count is larger than zero, it indicates that at least one
+   * "lock" is held on the volume by some Ozone feature (e.g. multi-tenancy).
+   * Volume delete operation will be denied in this case, and user should be
+   * prompted to release the lock first via the interface provided by that
+   * feature.
+   *
+   * Volumes created using CLI, ObjectStore API or upgraded from older OM DB
+   * will have reference count set to zero by default.
+   */
+  private long refCount;
 
   /**
    * Private constructor, constructed via builder.
@@ -57,18 +70,18 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * @param quotaInNamespace - Volume Quota in counts.
    * @param usedNamespace - Volume Namespace Quota Usage in counts.
    * @param metadata - metadata map for custom key/value data.
-   * @param aclMap - User to access rights map.
+   * @param acls - list of volume acls.
    * @param creationTime - Volume creation time.
    * @param objectID - ID of this object.
    * @param updateID - A sequence number that denotes the last update on this
    * object. This is a monotonically increasing number.
    */
-  @SuppressWarnings({"checkstyle:ParameterNumber", "This is invoked from a " +
-      "builder."})
+  @SuppressWarnings({"checkstyle:ParameterNumber",
+      "This is invoked from a builder."})
   private OmVolumeArgs(String adminName, String ownerName, String volume,
       long quotaInBytes, long quotaInNamespace, long usedNamespace,
-      Map<String, String> metadata, OmOzoneAclMap aclMap, long creationTime,
-      long modificationTime, long objectID, long updateID) {
+      Map<String, String> metadata, List<OzoneAcl> acls, long creationTime,
+      long modificationTime, long objectID, long updateID, long refCount) {
     this.adminName = adminName;
     this.ownerName = ownerName;
     this.volume = volume;
@@ -76,13 +89,34 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     this.quotaInNamespace = quotaInNamespace;
     this.usedNamespace = usedNamespace;
     this.metadata = metadata;
-    this.aclMap = aclMap;
+    this.acls = acls;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.refCount = refCount;
   }
 
+  public long getRefCount() {
+    Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
+    return refCount;
+  }
+
+  /**
+   * Increase refCount by 1.
+   */
+  public void incRefCount() {
+    this.refCount++;
+  }
+
+  /**
+   * Decrease refCount by 1.
+   */
+  public void decRefCount() {
+    Preconditions.checkState(this.refCount > 0L,
+        "refCount should not become negative");
+    this.refCount--;
+  }
 
   public void setOwnerName(String newOwner) {
     this.ownerName = newOwner;
@@ -93,7 +127,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   }
 
   public void setQuotaInNamespace(long quotaInNamespace) {
-    this.quotaInNamespace= quotaInNamespace;
+    this.quotaInNamespace = quotaInNamespace;
   }
 
   public void setCreationTime(long time) {
@@ -104,16 +138,16 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     this.modificationTime = time;
   }
 
-  public void addAcl(OzoneAcl acl) throws OMException {
-    this.aclMap.addAcl(acl);
+  public boolean addAcl(OzoneAcl ozoneAcl) {
+    return OzoneAclUtil.addAcl(acls, ozoneAcl);
   }
 
-  public void setAcls(List<OzoneAcl> acls) throws OMException {
-    this.aclMap.setAcls(acls);
+  public boolean setAcls(List<OzoneAcl> ozoneAcls) {
+    return OzoneAclUtil.setAcl(acls, ozoneAcls);
   }
 
-  public void removeAcl(OzoneAcl acl) throws OMException {
-    this.aclMap.removeAcl(acl);
+  public boolean removeAcl(OzoneAcl ozoneAcl) {
+    return OzoneAclUtil.removeAcl(acls, ozoneAcl);
   }
 
   /**
@@ -172,8 +206,18 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     return quotaInNamespace;
   }
 
-  public OmOzoneAclMap getAclMap() {
-    return aclMap;
+  public List<OzoneAcl> getAcls() {
+    return acls;
+  }
+
+  public List<OzoneAcl> getDefaultAcls() {
+    List<OzoneAcl> defaultAcls = new ArrayList<>();
+    for (OzoneAcl acl : acls) {
+      if (acl.getAclScope() == OzoneAcl.AclScope.DEFAULT) {
+        defaultAcls.add(acl);
+      }
+    }
+    return defaultAcls;
   }
 
   /**
@@ -249,9 +293,10 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     private long quotaInNamespace;
     private long usedNamespace;
     private Map<String, String> metadata;
-    private OmOzoneAclMap aclMap;
+    private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private long refCount;
 
     /**
      * Sets the Object ID for this Object.
@@ -279,7 +324,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
      */
     public Builder() {
       metadata = new HashMap<>();
-      aclMap = new OmOzoneAclMap();
+      acls = new ArrayList();
       quotaInBytes = OzoneConsts.QUOTA_RESET;
       quotaInNamespace = OzoneConsts.QUOTA_RESET;
     }
@@ -336,9 +381,15 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder addOzoneAcls(OzoneAclInfo acl) throws IOException {
-      aclMap.addAcl(acl);
+    public Builder addOzoneAcls(OzoneAcl acl) {
+      OzoneAclUtil.addAcl(acls, acl);
       return this;
+    }
+
+    public void setRefCount(long refCount) {
+      Preconditions.checkState(refCount >= 0L,
+          "refCount should not be negative");
+      this.refCount = refCount;
     }
 
     /**
@@ -350,14 +401,14 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
       return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-          quotaInNamespace, usedNamespace, metadata, aclMap, creationTime,
-          modificationTime, objectID, updateID);
+          quotaInNamespace, usedNamespace, metadata, acls, creationTime,
+          modificationTime, objectID, updateID, refCount);
     }
 
   }
 
   public VolumeInfo getProtobuf() {
-    List<OzoneAclInfo> aclList = aclMap.ozoneAclGetProtobuf();
+    List<OzoneAclInfo> aclList = OzoneAclUtil.toProtobuf(acls);
     return VolumeInfo.newBuilder()
         .setAdminName(adminName)
         .setOwnerName(ownerName)
@@ -372,13 +423,13 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
+        .setRefCount(refCount)
         .build();
   }
 
-  public static OmVolumeArgs getFromProtobuf(VolumeInfo volInfo)
-      throws OMException {
-    OmOzoneAclMap aclMap =
-        OmOzoneAclMap.ozoneAclGetFromProtobuf(volInfo.getVolumeAclsList());
+  public static OmVolumeArgs getFromProtobuf(VolumeInfo volInfo) {
+    List<OzoneAcl> acls = OzoneAclUtil.fromProtobuf(
+        volInfo.getVolumeAclsList());
     return new OmVolumeArgs(
         volInfo.getAdminName(),
         volInfo.getOwnerName(),
@@ -387,11 +438,12 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         volInfo.getQuotaInNamespace(),
         volInfo.getUsedNamespace(),
         KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()),
-        aclMap,
+        acls,
         volInfo.getCreationTime(),
         volInfo.getModificationTime(),
         volInfo.getObjectID(),
-        volInfo.getUpdateID());
+        volInfo.getUpdateID(),
+        volInfo.getRefCount());
   }
 
   @Override
@@ -403,6 +455,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         ", creationTime='" + creationTime + '\'' +
         ", quotaInBytes='" + quotaInBytes + '\'' +
         ", usedNamespace='" + usedNamespace + '\'' +
+        ", refCount='" + refCount + '\'' +
         '}';
   }
 
@@ -415,10 +468,14 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       metadata.forEach((k, v) -> cloneMetadata.put(k, v));
     }
 
-    OmOzoneAclMap cloneAclMap = aclMap.copyObject();
+    List<OzoneAcl> cloneAcls = new ArrayList(acls.size());
+
+    acls.forEach(acl -> cloneAcls.add(new OzoneAcl(acl.getType(),
+        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
+        acl.getAclScope())));
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInNamespace, usedNamespace, cloneMetadata, cloneAclMap,
-        creationTime, modificationTime, objectID, updateID);
+        quotaInNamespace, usedNamespace, cloneMetadata, cloneAcls,
+        creationTime, modificationTime, objectID, updateID, refCount);
   }
 }

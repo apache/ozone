@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -75,7 +75,6 @@ public class TestDnRatisLogParser {
 
   @Test
   public void testRatisLogParsing() throws Exception {
-    cluster.stop();
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);

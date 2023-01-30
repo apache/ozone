@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -31,12 +30,12 @@ import java.io.OutputStream;
  * Adapter from {@code OutputStream} to gRPC {@code StreamObserver}.
  * Data is buffered in a limited buffer of the specified size.
  */
-class GrpcOutputStream extends OutputStream {
+abstract class GrpcOutputStream<T> extends OutputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOutputStream.class);
 
-  private final StreamObserver<CopyContainerResponseProto> responseObserver;
+  private final StreamObserver<T> streamObserver;
 
   private final ByteString.Output buffer;
 
@@ -46,10 +45,9 @@ class GrpcOutputStream extends OutputStream {
 
   private long writtenBytes;
 
-  GrpcOutputStream(
-      StreamObserver<CopyContainerResponseProto> responseObserver,
+  GrpcOutputStream(StreamObserver<T> streamObserver,
       long containerId, int bufferSize) {
-    this.responseObserver = responseObserver;
+    this.streamObserver = streamObserver;
     this.containerId = containerId;
     this.bufferSize = bufferSize;
     buffer = ByteString.newOutput(bufferSize);
@@ -63,7 +61,7 @@ class GrpcOutputStream extends OutputStream {
         flushBuffer(false);
       }
     } catch (Exception ex) {
-      responseObserver.onError(ex);
+      streamObserver.onError(ex);
     }
   }
 
@@ -94,7 +92,7 @@ class GrpcOutputStream extends OutputStream {
         len = Math.min(bufferSize, remaining);
       }
     } catch (Exception ex) {
-      responseObserver.onError(ex);
+      streamObserver.onError(ex);
     }
   }
 
@@ -103,8 +101,20 @@ class GrpcOutputStream extends OutputStream {
     flushBuffer(true);
     LOG.info("Sent {} bytes for container {}",
         writtenBytes, containerId);
-    responseObserver.onCompleted();
+    streamObserver.onCompleted();
     buffer.close();
+  }
+
+  protected long getContainerId() {
+    return containerId;
+  }
+
+  protected long getWrittenBytes() {
+    return writtenBytes;
+  }
+
+  protected StreamObserver<T> getStreamObserver() {
+    return streamObserver;
   }
 
   private void flushBuffer(boolean eof) {
@@ -113,17 +123,12 @@ class GrpcOutputStream extends OutputStream {
       ByteString data = buffer.toByteString();
       LOG.debug("Sending {} bytes (of type {}) for container {}",
           length, data.getClass().getSimpleName(), containerId);
-      CopyContainerResponseProto response =
-          CopyContainerResponseProto.newBuilder()
-              .setContainerID(containerId)
-              .setData(data)
-              .setEof(eof)
-              .setReadOffset(writtenBytes)
-              .setLen(length)
-              .build();
-      responseObserver.onNext(response);
+      sendPart(eof, length, data);
       writtenBytes += length;
       buffer.reset();
     }
   }
+
+  protected abstract void sendPart(boolean eof, int length, ByteString data);
+
 }

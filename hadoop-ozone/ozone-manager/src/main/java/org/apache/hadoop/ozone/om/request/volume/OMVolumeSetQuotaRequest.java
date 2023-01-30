@@ -24,6 +24,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -193,21 +194,37 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         || volumeQuotaInBytes == 0) {
       return false;
     }
+    
+    // if volume quota is for reset, no need further check
+    if (volumeQuotaInBytes == OzoneConsts.QUOTA_RESET) {
+      return true;
+    }
 
+    boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         volumeName, null, null, Integer.MAX_VALUE);
-    for(OmBucketInfo bucketInfo : bucketList) {
+    for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
+      } else {
+        isBucketQuotaSet = false;
+        break;
       }
     }
-    if(volumeQuotaInBytes < totalBucketQuota &&
+    
+    if (!isBucketQuotaSet) {
+      throw new OMException("Can not set volume space quota on volume " +
+          "as some of buckets in this volume have no quota set.",
+          OMException.ResultCodes.QUOTA_ERROR);
+    }
+    
+    if (volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           ":" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
   }
@@ -219,6 +236,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     }
     return true;
   }
+
 }
 
 

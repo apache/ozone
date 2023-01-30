@@ -33,7 +33,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test metrics that represent container states.
@@ -50,6 +50,7 @@ public class TestSCMContainerMetrics {
         put(HddsProtos.LifeCycleState.CLOSED.toString(), 5);
         put(HddsProtos.LifeCycleState.DELETING.toString(), 6);
         put(HddsProtos.LifeCycleState.DELETED.toString(), 7);
+        put(HddsProtos.LifeCycleState.RECOVERING.toString(), 8);
       }};
 
 
@@ -78,6 +79,6 @@ public class TestSCMContainerMetrics {
     verify(mb, times(1)).addGauge(Interns.info("DeletedContainers",
         "Number of containers in deleted state"), 7);
     verify(mb, times(1)).addGauge(Interns.info("TotalContainers",
-        "Number of all containers"), 27);
+        "Number of all containers"), 35);
   }
 }

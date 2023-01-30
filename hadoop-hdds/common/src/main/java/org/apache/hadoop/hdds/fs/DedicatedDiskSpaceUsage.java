@@ -45,8 +45,14 @@ public class DedicatedDiskSpaceUsage extends AbstractSpaceUsageSource {
     return time(this::calculateUsedSpace, LOG);
   }
 
+  /**
+   * Calculate used space, all free space are counted out.
+   * Some space may not be used by us, but reserved for system usage.
+   * See {@link File#getUsableSpace()} and {@link File#getFreeSpace()}.
+   * @return used space
+   */
   private long calculateUsedSpace() {
-    return getCapacity() - getAvailable();
+    return getCapacity() - getFile().getFreeSpace();
   }
 
 }

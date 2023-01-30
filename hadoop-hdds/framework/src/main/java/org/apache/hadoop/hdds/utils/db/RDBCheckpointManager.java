@@ -19,46 +19,39 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 
 import org.apache.commons.lang3.StringUtils;
-import org.rocksdb.Checkpoint;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.RocksCheckpoint;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * RocksDB Checkpoint Manager, used to create and cleanup checkpoints.
  */
-public class RDBCheckpointManager {
+public class RDBCheckpointManager implements Closeable {
 
-  private final Checkpoint checkpoint;
-  private final RocksDB db;
+  private final RocksCheckpoint checkpoint;
   public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointManager.class);
-  private String checkpointNamePrefix = "";
-
-  public RDBCheckpointManager(RocksDB rocksDB) {
-    this.db = rocksDB;
-    this.checkpoint = Checkpoint.create(rocksDB);
-  }
+  private final String checkpointNamePrefix;
 
   /**
    * Create a checkpoint manager with a prefix to be added to the
    * snapshots created.
    *
-   * @param rocksDB          DB instance
    * @param checkpointPrefix prefix string.
    */
-  public RDBCheckpointManager(RocksDB rocksDB, String checkpointPrefix) {
-    this.db = rocksDB;
+  public RDBCheckpointManager(RocksDatabase db, String checkpointPrefix) {
     this.checkpointNamePrefix = checkpointPrefix;
-    this.checkpoint = Checkpoint.create(rocksDB);
+    this.checkpoint = db.createCheckpoint();
   }
 
   /**
@@ -79,22 +72,28 @@ public class RDBCheckpointManager {
 
       Path checkpointPath = Paths.get(parentDir, checkpointDir);
       Instant start = Instant.now();
-      checkpoint.createCheckpoint(checkpointPath.toString());
+      checkpoint.createCheckpoint(checkpointPath);
+      //Best guesstimate here. Not accurate.
+      final long latest = checkpoint.getLatestSequenceNumber();
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Created checkpoint at {} in {} milliseconds",
-              checkpointPath.toString(), duration);
+              checkpointPath, duration);
 
       return new RocksDBCheckpoint(
           checkpointPath,
           currentTime,
-          db.getLatestSequenceNumber(), //Best guesstimate here. Not accurate.
+          latest,
           duration);
-
-    } catch (RocksDBException e) {
+    } catch (IOException e) {
       LOG.error("Unable to create RocksDB Snapshot.", e);
     }
     return null;
+  }
+
+  @Override
+  public void close() throws IOException {
+    checkpoint.close();
   }
 }

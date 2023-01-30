@@ -206,8 +206,8 @@ public final class HddsClientUtils {
     if (keyName == null) {
       throw new IllegalArgumentException("Key name is null");
     }
-    if(!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
-            .matcher(keyName).matches()){
+    if (!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
+            .matcher(keyName).matches()) {
       throw new IllegalArgumentException("Invalid key name: " + keyName);
     }
   }
@@ -235,11 +235,12 @@ public final class HddsClientUtils {
   }
 
   /**
-   * Returns the s3VolumeName configured in ConfigurationSource.
+   * Returns the default S3 Volume name configured in ConfigurationSource,
+   * which will be used for S3 buckets that are not part of a tenant.
    * @param conf Configuration object
    * @return s3 volume name
    */
-  public static String getS3VolumeName(ConfigurationSource conf) {
+  public static String getDefaultS3VolumeName(ConfigurationSource conf) {
     return conf.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
             OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
   }

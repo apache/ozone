@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,10 +27,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -38,22 +41,27 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.datastream.SupportedDataStreamType;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.RoutingTable;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +71,8 @@ import org.slf4j.LoggerFactory;
 public final class RatisHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
+
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
@@ -96,7 +106,18 @@ public final class RatisHelper {
   }
 
   private static String toRaftPeerAddress(DatanodeDetails id, Port.Name port) {
-    return id.getIpAddress() + ":" + id.getPort(port).getValue();
+    if (datanodeUseHostName()) {
+      final String address =
+              id.getHostName() + ":" + id.getPort(port).getValue();
+      LOG.debug("Datanode is using hostname for raft peer address: {}",
+              address);
+      return address;
+    } else {
+      final String address =
+              id.getIpAddress() + ":" + id.getPort(port).getValue();
+      LOG.debug("Datanode is using IP for raft peer address: {}", address);
+      return address;
+    }
   }
 
   public static RaftPeerId toRaftPeerId(DatanodeDetails id) {
@@ -118,7 +139,9 @@ public final class RatisHelper {
         .setId(toRaftPeerId(dn))
         .setAddress(toRaftPeerAddress(dn, Port.Name.RATIS_SERVER))
         .setAdminAddress(toRaftPeerAddress(dn, Port.Name.RATIS_ADMIN))
-        .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS));
+        .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS))
+        .setDataStreamAddress(
+            toRaftPeerAddress(dn, Port.Name.RATIS_DATASTREAM));
   }
 
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {
@@ -136,7 +159,7 @@ public final class RatisHelper {
   }
 
   private static RaftGroup newRaftGroup(Collection<RaftPeer> peers) {
-    return peers.isEmpty()? emptyRaftGroup()
+    return peers.isEmpty() ? emptyRaftGroup()
         : RaftGroup.valueOf(DUMMY_GROUP_ID, peers);
   }
 
@@ -172,6 +195,7 @@ public final class RatisHelper {
       ConfigurationSource ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
+        toRaftPeer(pipeline.getFirstNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
@@ -182,16 +206,16 @@ public final class RatisHelper {
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
-  public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
-    return newRaftClient(getRpcType(conf), leader,
+  public static BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient(
+      ConfigurationSource conf) {
+    return (leader, tlsConfig) -> newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource configuration) {
-    return newRaftClient(rpcType, leader.getId(),
+    return newRaftClient(rpcType, leader.getId(), leader,
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
         tlsConfig, configuration);
   }
@@ -199,39 +223,91 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy,
       ConfigurationSource ozoneConfiguration) {
-    return newRaftClient(rpcType, leader.getId(),
+    return newRaftClient(rpcType, leader.getId(), leader,
         newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
         ozoneConfiguration);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
-      RaftGroup group, RetryPolicy retryPolicy,
+      RaftPeer primary, RaftGroup group, RetryPolicy retryPolicy,
       GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
-    final RaftProperties properties = new RaftProperties();
-
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    final RaftProperties properties = newRaftProperties(rpcType);
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
 
-    RaftClient.Builder builder =  RaftClient.newBuilder()
+    return RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)
+        .setPrimaryDataStreamServer(primary)
         .setProperties(properties)
-        .setRetryPolicy(retryPolicy);
+        .setParameters(setClientTlsConf(rpcType, tlsConfig))
+        .setRetryPolicy(retryPolicy)
+        .build();
+  }
 
+  public static Parameters setClientTlsConf(RpcType rpcType,
+      GrpcTlsConfig tlsConfig) {
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     if (tlsConfig != null && rpcType == SupportedRpcType.GRPC) {
       Parameters parameters = new Parameters();
-      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
-      builder.setParameters(parameters);
+      setAdminTlsConf(parameters, tlsConfig);
+      setClientTlsConf(parameters, tlsConfig);
+      return parameters;
     }
-    return builder.build();
+    return null;
+  }
+
+  private static void setAdminTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Admin.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  private static void setClientTlsConf(Parameters parameters,
+      GrpcTlsConfig tlsConfig) {
+    if (tlsConfig != null) {
+      GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+      NettyConfigKeys.DataStream.Client.setTlsConf(parameters, tlsConfig);
+    }
+  }
+
+  public static Parameters setServerTlsConf(
+      GrpcTlsConfig serverConf, GrpcTlsConfig clientConf) {
+    final Parameters parameters = new Parameters();
+    if (serverConf != null) {
+      GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
+      GrpcConfigKeys.TLS.setConf(parameters, serverConf);
+      setAdminTlsConf(parameters, serverConf);
+
+      NettyConfigKeys.DataStream.Server.setTlsConf(parameters, serverConf);
+    }
+    setClientTlsConf(parameters, clientConf);
+    return parameters;
+  }
+
+  public static Parameters setServerTlsConf(GrpcTlsConfig tlsConf) {
+    return setServerTlsConf(tlsConf, tlsConf);
+  }
+
+  public static RaftProperties newRaftProperties(RpcType rpcType) {
+    final RaftProperties properties = new RaftProperties();
+    setRpcType(properties, rpcType);
+    return properties;
+  }
+
+  public static RaftProperties setRpcType(RaftProperties properties,
+      RpcType rpcType) {
+    RaftConfigKeys.Rpc.setType(properties, rpcType);
+    RaftConfigKeys.DataStream.setType(properties,
+        SupportedDataStreamType.NETTY);
+    return properties;
   }
 
   /**
@@ -248,7 +324,8 @@ public final class RatisHelper {
     Map<String, String> ratisClientConf =
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
-      if (isClientConfig(key) || isGrpcClientConfig(key)) {
+      if (isClientConfig(key) || isGrpcClientConfig(key)
+              || isNettyStreamConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -264,6 +341,15 @@ public final class RatisHelper {
         !key.startsWith(GrpcConfigKeys.Admin.PREFIX) &&
         !key.startsWith(GrpcConfigKeys.Server.PREFIX);
   }
+
+  private static boolean isNettyStreamConfig(String key) {
+    return key.startsWith(NettyConfigKeys.DataStream.PREFIX);
+  }
+
+  private static boolean isStreamClientConfig(String key) {
+    return key.startsWith(RaftClientConfigKeys.DataStream.PREFIX);
+  }
+
   /**
    * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
@@ -278,7 +364,8 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
       // Exclude ratis client configuration.
-      if (!isClientConfig(key)) {
+      if (isNettyStreamConfig(key) || isStreamClientConfig(key) ||
+          !isClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -287,18 +374,18 @@ public final class RatisHelper {
 
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsWithPrefix(
+    return configuration.getPropsMatchPrefixAndTrimPrefix(
         StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
   }
 
   // For External gRPC client to server with gRPC TLS.
   // No mTLS for external client as SCM CA does not issued certificates for them
   public static GrpcTlsConfig createTlsClientConfig(SecurityConfig conf,
-      X509Certificate caCert) {
+      List<X509Certificate> caCerts) {
     GrpcTlsConfig tlsConfig = null;
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       tlsConfig = new GrpcTlsConfig(null, null,
-          caCert, false);
+          caCerts, false);
     }
     return tlsConfig;
   }
@@ -322,6 +409,12 @@ public final class RatisHelper {
         .min(Long::compareTo).orElse(null);
   }
 
+  private static boolean datanodeUseHostName() {
+    return CONF.getBoolean(
+            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+  }
+
   private static <U> Class<? extends U> getClass(String name,
       Class<U> xface) {
     try {
@@ -334,5 +427,60 @@ public final class RatisHelper {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+  
+  public static RoutingTable getRoutingTable(Pipeline pipeline) {
+    RaftPeerId primaryId = null;
+    List<RaftPeerId> raftPeers = new ArrayList<>();
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
+      try {
+        if (dn == pipeline.getFirstNode()) {
+          primaryId = raftPeerId;
+        }
+      } catch (IOException e) {
+        LOG.error("Can not get FirstNode from the pipeline: {} with " +
+            "exception: {}", pipeline.toString(), e.getLocalizedMessage());
+        return null;
+      }
+      raftPeers.add(raftPeerId);
+    }
+
+    RoutingTable.Builder builder = RoutingTable.newBuilder();
+    RaftPeerId previousId = primaryId;
+    for (RaftPeerId peerId : raftPeers) {
+      if (peerId.equals(primaryId)) {
+        continue;
+      }
+      builder.addSuccessor(previousId, peerId);
+      previousId = peerId;
+    }
+
+    return builder.build();
+  }
+
+  public static void debug(ByteBuffer buffer, String name, Logger log) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    buffer = buffer.duplicate();
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 1; buffer.remaining() > 0; i++) {
+      builder.append(buffer.get()).append(i % 20 == 0 ? "\n  " : ", ");
+    }
+    log.debug("{}: {}\n  {}", name, buffer, builder);
+  }
+
+  public static void debug(ByteBuf buf, String name, Logger log) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    buf = buf.duplicate();
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 1; buf.readableBytes() > 0; i++) {
+      builder.append(buf.readByte()).append(i % 20 == 0 ? "\n  " : ", ");
+    }
+    log.debug("{}: {}\n  {}", name, buf, builder);
   }
 }

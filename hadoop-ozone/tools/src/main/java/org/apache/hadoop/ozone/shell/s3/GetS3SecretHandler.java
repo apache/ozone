@@ -30,9 +30,13 @@ import picocli.CommandLine.Option;
 /**
  * Executes getsecret calls.
  */
-@Command(name = "getsecret",
-    description = "Returns s3 secret for current user")
+@Command(name = "getsecret", aliases = "get-secret",
+    description = "Returns S3 secret for a user")
 public class GetS3SecretHandler extends S3Handler {
+
+  @Option(names = "-u",
+      description = "Specify the user (accessId). Requires admin privilege'")
+  private String username;
 
   @Option(names = "-e",
       description = "Print out variables together with 'export' prefix, to "
@@ -47,12 +51,16 @@ public class GetS3SecretHandler extends S3Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    String userName = UserGroupInformation.getCurrentUser().getUserName();
+    if (username == null || username.isEmpty()) {
+      username = UserGroupInformation.getCurrentUser().getUserName();
+    }
 
-    final S3SecretValue secret = client.getObjectStore().getS3Secret(userName);
+    final S3SecretValue secret = client.getObjectStore().getS3Secret(username);
     if (export) {
-      out().println("export AWS_ACCESS_KEY_ID=" + secret.getAwsAccessKey());
-      out().println("export AWS_SECRET_ACCESS_KEY=" + secret.getAwsSecret());
+      out().println("export AWS_ACCESS_KEY_ID='" +
+          secret.getAwsAccessKey() + "'");
+      out().println("export AWS_SECRET_ACCESS_KEY='" +
+          secret.getAwsSecret() + "'");
     } else {
       out().println(secret);
     }
