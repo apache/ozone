@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
@@ -94,8 +93,8 @@ public class TestTarContainerPacker {
   private final String schemaVersion;
   private OzoneConfiguration conf;
 
-  public TestTarContainerPacker(
-      ContainerTestVersionInfo versionInfo, String compression) {
+  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
@@ -110,10 +109,8 @@ public class TestTarContainerPacker {
         ContainerTestVersionInfo.getLayoutList();
     List<Object[]> parameterList = new ArrayList<>();
     for (ContainerTestVersionInfo containerTestVersionInfo : layoutList) {
-      for (Map.Entry<CopyContainerCompression, String> entry :
-          CopyContainerCompression.getCompressionMapping().entrySet()) {
-        parameterList.add(
-            new Object[]{containerTestVersionInfo, entry.getValue()});
+      for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+        parameterList.add(new Object[]{containerTestVersionInfo, compr});
       }
     }
     return parameterList;
@@ -170,7 +167,7 @@ public class TestTarContainerPacker {
   }
 
   @Test
-  public void pack() throws IOException, CompressorException {
+  public void pack() throws IOException {
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);

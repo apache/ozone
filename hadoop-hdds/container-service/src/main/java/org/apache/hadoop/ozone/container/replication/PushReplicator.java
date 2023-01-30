@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -25,8 +26,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
-
-import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Pushes the container to the target datanode.
@@ -38,11 +37,13 @@ public class PushReplicator implements ContainerReplicator {
 
   private final ContainerReplicationSource source;
   private final ContainerUploader uploader;
+  private final CopyContainerCompression compression;
 
-  public PushReplicator(ContainerReplicationSource source,
-      ContainerUploader uploader) {
+  public PushReplicator(ConfigurationSource conf,
+      ContainerReplicationSource source, ContainerUploader uploader) {
     this.source = source;
     this.uploader = uploader;
+    compression = CopyContainerCompression.getConf(conf);
   }
 
   @Override
@@ -55,8 +56,8 @@ public class PushReplicator implements ContainerReplicator {
 
     OutputStream output = null;
     try {
-      output = uploader.startUpload(containerID, target, fut);
-      source.copyData(containerID, output, NO_COMPRESSION.name());
+      output = uploader.startUpload(containerID, target, fut, compression);
+      source.copyData(containerID, output, compression);
       fut.get();
       task.setStatus(Status.DONE);
     } catch (Exception e) {

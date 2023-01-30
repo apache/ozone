@@ -278,7 +278,7 @@ public class TestReplicationSupervisor {
     Path res = Paths.get("file:/tmp/no-such-file");
     Mockito.when(
         moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList(),
-            Mockito.any(Path.class)))
+            Mockito.any(Path.class), Mockito.any()))
         .thenReturn(res);
 
     final String testDir = GenericTestUtils.getTempPath(
@@ -289,9 +289,9 @@ public class TestReplicationSupervisor {
         .thenReturn(Collections.singletonList(
             new HddsVolume.Builder(testDir).conf(conf).build()));
     ContainerImporter importer =
-        new ContainerImporter(conf, set, null, null, volumeSet);
+        new ContainerImporter(conf, set, null, volumeSet);
     ContainerReplicator replicator =
-        new DownloadAndImportReplicator(set, importer, moc);
+        new DownloadAndImportReplicator(conf, set, importer, moc);
 
     replicatorRef.set(replicator);
 
