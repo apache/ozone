@@ -72,7 +72,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
         SCM_CA_CERT_STORAGE_DIR);
     SecretKeyStore secretKeyStore = new LocalSecretKeyStore(
         secretKeyConfig.getLocalSecretKeyFile());
-    SecretKeyState secretKeyState = new ScmSecretKeyState.Builder()
+    SecretKeyState secretKeyState = new ScmSecretKeyStateBuilder()
         .setSecretKeyStore(secretKeyStore)
         .setRatisServer(ratisServer)
         .build();

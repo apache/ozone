@@ -72,36 +72,33 @@ public class SecretKeyManager {
   /**
    * Initialize the state from by loading SecretKeys from local file, or
    * generate new keys if the file doesn't exist.
-   *
-   * @throws TimeoutException can possibly occur when replicating the state.
    */
   public synchronized boolean initialize() {
     if (state.getCurrentKey() != null) {
       return false;
     }
 
-    List<ManagedSecretKey> sortedKeys = keyStore.load()
+    // Load and filter expired keys.
+    List<ManagedSecretKey> allKeys = keyStore.load()
         .stream()
         .filter(x -> !x.isExpired())
-        .sorted(comparing(ManagedSecretKey::getCreationTime))
         .collect(toList());
 
-    ManagedSecretKey currentKey;
-    if (sortedKeys.isEmpty()) {
-      // First start, generate new key as the current key.
-      currentKey = generateSecretKey();
-      sortedKeys.add(currentKey);
-      LOG.info("No keys is loaded, generated new key: {}", currentKey);
+    if (allKeys.isEmpty()) {
+      // if no valid key present , generate new key as the current key.
+      // This happens at first start or restart after being down for
+      // a significant time.
+      ManagedSecretKey newKey = generateSecretKey();
+      allKeys.add(newKey);
+      LOG.info("No valid keys has been loaded, " +
+          "a new key is generated: {}", newKey);
     } else {
-      // For restarts, reload allKeys and take the latest one as current.
-      currentKey = sortedKeys.get(sortedKeys.size() - 1);
-      LOG.info("Key reloaded, current key: {}, all keys: {}", currentKey,
-          sortedKeys);
+      LOG.info("Keys reloaded: {}", allKeys);
     }
 
     // First, update the SecretKey state to make it visible immediately on the
     // current instance.
-    state.updateKeysInternal(currentKey, sortedKeys);
+    state.updateKeysInternal(allKeys);
     // Then, remember to replicate SecretKey states to all instances.
     pendingInititializedState = true;
     return true;
@@ -110,7 +107,7 @@ public class SecretKeyManager {
   public synchronized void flushInitializedState() throws TimeoutException {
     if (pendingInititializedState) {
       LOG.info("Replicating initialized state.");
-      state.updateKeys(state.getCurrentKey(), state.getAllKeys());
+      state.updateKeys(state.getSortedKeys());
       pendingInititializedState = false;
     }
   }
@@ -126,14 +123,14 @@ public class SecretKeyManager {
     ManagedSecretKey currentKey = state.getCurrentKey();
     if (shouldRotate(currentKey)) {
       ManagedSecretKey newCurrentKey = generateSecretKey();
-      List<ManagedSecretKey> updatedKeys = state.getAllKeys()
+      List<ManagedSecretKey> updatedKeys = state.getSortedKeys()
           .stream().filter(x -> !x.isExpired())
           .collect(toList());
       updatedKeys.add(newCurrentKey);
 
       LOG.info("SecretKey rotation is happening, new key generated {}",
           newCurrentKey);
-      state.updateKeys(newCurrentKey, updatedKeys);
+      state.updateKeys(updatedKeys);
       return true;
     }
     return false;

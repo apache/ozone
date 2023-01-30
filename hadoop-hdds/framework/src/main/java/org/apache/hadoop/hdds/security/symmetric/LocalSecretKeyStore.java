@@ -95,9 +95,7 @@ public class LocalSecretKeyStore implements SecretKeyStore {
     try (SequenceWriter writer =
              mapper.writer().writeValues(secretKeysFile.toFile())) {
       writer.init(true);
-      for (ManagedSecretKeyDto dto : dtos) {
-        writer.write(dto);
-      }
+      writer.writeAll(dtos);
     } catch (IOException e) {
       throw new IllegalStateException("Error saving SecretKeys to file "
           + secretKeysFile, e);
@@ -121,6 +119,10 @@ public class LocalSecretKeyStore implements SecretKeyStore {
     }
   }
 
+  /**
+   * Just a simple DTO that allows serializing/deserializing the immutable
+   * {@link ManagedSecretKey} objects.
+   */
   private static class ManagedSecretKeyDto {
     private UUID id;
     private Instant creationTime;

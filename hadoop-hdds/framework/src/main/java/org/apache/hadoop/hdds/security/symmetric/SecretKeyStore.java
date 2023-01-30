@@ -25,6 +25,8 @@ import java.util.List;
  * Interface for SecretKey storage component, which is responsible for saving
  * the SecretKeys states persistently to ensure they're not lost during
  * restarts.
+ *
+ * This interface allows new persistent storage to be plugged in easily.
  */
 public interface SecretKeyStore {
   List<ManagedSecretKey> load();

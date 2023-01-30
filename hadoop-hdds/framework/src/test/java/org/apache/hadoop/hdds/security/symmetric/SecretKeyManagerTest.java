@@ -30,10 +30,8 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
@@ -41,8 +39,6 @@ import java.util.stream.Stream;
 import static com.google.common.collect.Lists.newArrayList;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.DAYS;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -99,9 +95,8 @@ public class SecretKeyManagerTest {
   @MethodSource("loadSecretKeysTestCases")
   public void testLoadSecretKeys(List<ManagedSecretKey> savedSecretKey,
                                  ManagedSecretKey expectedCurrentKey,
-                                 List<ManagedSecretKey> expectedLoadedKeys)
-      throws TimeoutException {
-    SecretKeyState state = new TestSecretKeyState(mockedKeyStore);
+                                 List<ManagedSecretKey> expectedLoadedKeys) {
+    SecretKeyState state = new SecretKeyStateImpl(mockedKeyStore);
     SecretKeyManager lifeCycleManager =
         new SecretKeyManager(state, mockedKeyStore,
             ROTATION_DURATION, VALIDITY_DURATION, ALGORITHM);
@@ -111,13 +106,13 @@ public class SecretKeyManagerTest {
 
     if (expectedCurrentKey != null) {
       assertEquals(state.getCurrentKey(), expectedCurrentKey);
-      List<ManagedSecretKey> allKeys = state.getAllKeys();
+      List<ManagedSecretKey> allKeys = state.getSortedKeys();
       assertSameKeys(expectedLoadedKeys, allKeys);
     } else {
       // expect the current key is newly generated.
       assertFalse(savedSecretKey.contains(state.getCurrentKey()));
-      assertEquals(1, state.getAllKeys().size());
-      assertTrue(state.getAllKeys().contains(
+      assertEquals(1, state.getSortedKeys().size());
+      assertTrue(state.getSortedKeys().contains(
           state.getCurrentKey()));
     }
   }
@@ -139,13 +134,13 @@ public class SecretKeyManagerTest {
     return Stream.of(
 
         // Currentkey is new, not rotate.
-        of(newArrayList(k0, k1, k2), k0, false, null),
+        of(newArrayList(k0, k1, k2), false, null),
 
         // Current key just exceeds the rotation period.
-        of(newArrayList(k1, k2, k3), k1, true, newArrayList(k1, k2)),
+        of(newArrayList(k1, k2, k3), true, newArrayList(k1, k2)),
 
         // Current key exceeds the rotation period for a significant time (2d).
-        of(newArrayList(k2, k3, k4), k2, true, newArrayList(k2))
+        of(newArrayList(k2, k3, k4), true, newArrayList(k2))
     );
   }
 
@@ -155,19 +150,19 @@ public class SecretKeyManagerTest {
   @ParameterizedTest
   @MethodSource("rotationTestCases")
   public void testRotate(List<ManagedSecretKey> initialKeys,
-                         ManagedSecretKey initialCurrentKey,
                          boolean expectRotate,
                          List<ManagedSecretKey> expectedRetainedKeys)
       throws TimeoutException {
 
-    SecretKeyState state = new TestSecretKeyState(mockedKeyStore);
+    SecretKeyState state = new SecretKeyStateImpl(mockedKeyStore);
 
     SecretKeyManager lifeCycleManager =
         new SecretKeyManager(state, mockedKeyStore,
             ROTATION_DURATION, VALIDITY_DURATION, ALGORITHM);
 
     // Set the initial state.
-    state.updateKeysInternal(initialCurrentKey, initialKeys);
+    state.updateKeysInternal(initialKeys);
+    ManagedSecretKey initialCurrentKey = state.getCurrentKey();
     Mockito.reset(mockedKeyStore);
 
     assertEquals(expectRotate, lifeCycleManager.checkAndRotate());
@@ -183,7 +178,7 @@ public class SecretKeyManagerTest {
       // 2. keys are correctly rotated, expired ones are excluded.
       List<ManagedSecretKey> expectedAllKeys = expectedRetainedKeys;
       expectedAllKeys.add(currentKey);
-      assertSameKeys(expectedAllKeys, state.getAllKeys());
+      assertSameKeys(expectedAllKeys, state.getSortedKeys());
 
       // 3. All keys are stored.
       ArgumentCaptor<Collection<ManagedSecretKey>> storedKeyCaptor =
@@ -201,7 +196,7 @@ public class SecretKeyManagerTest {
               expectedExpiryTime).toMinutes());
     } else {
       assertEquals(initialCurrentKey, state.getCurrentKey());
-      assertSameKeys(initialKeys, state.getAllKeys());
+      assertSameKeys(initialKeys, state.getSortedKeys());
     }
   }
 
@@ -216,45 +211,4 @@ public class SecretKeyManagerTest {
         secretKey
     );
   }
-
-  private static class TestSecretKeyState implements SecretKeyState {
-    private ManagedSecretKey currentKey;
-    private Map<UUID, ManagedSecretKey> allKeys;
-    private SecretKeyStore keyStore;
-
-    TestSecretKeyState(SecretKeyStore keyStore) {
-      this.keyStore = keyStore;
-    }
-
-    @Override
-    public ManagedSecretKey getCurrentKey() {
-      return currentKey;
-    }
-
-    @Override
-    public List<ManagedSecretKey> getAllKeys() {
-      return new ArrayList<>(allKeys.values());
-    }
-
-    @Override
-    public ManagedSecretKey getKeyById(UUID id) {
-      return allKeys.get(id);
-    }
-
-    @Override
-    public void updateKeys(ManagedSecretKey newCurrentKey,
-                           List<ManagedSecretKey> newAllKeys) {
-      this.currentKey = newCurrentKey;
-      this.allKeys = newAllKeys.stream().collect(
-          toMap(ManagedSecretKey::getId, identity()));
-      keyStore.save(newAllKeys);
-    }
-
-    @Override
-    public void updateKeysInternal(ManagedSecretKey newCurrentKey,
-                                   List<ManagedSecretKey> newAllKeys) {
-      updateKeys(newCurrentKey, newAllKeys);
-    }
-  }
-
 }
