@@ -1753,7 +1753,7 @@ public class TestOzoneFileSystem {
     // Create single replica 1024 byte key.
     int keySize = 1024;
     TestDataUtil.createKey(ozoneBucket, "key1", ReplicationFactor.ONE,
-        ReplicationType.RATIS, new String(new byte[keySize]));
+        ReplicationType.RATIS, new String(new byte[keySize], UTF_8));
     checkStatus(Long.MAX_VALUE, keySize);
 
 // Not possible to test after HDDS-7751.
