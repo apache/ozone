@@ -95,12 +95,11 @@ public class RatisOverReplicationHandler
     Set<ContainerReplica> healthyReplicas = replicas.stream()
         .filter(r -> ReplicationManager.getNodeStatus(
             r.getDatanodeDetails(), nodeManager).isHealthy()
-        )
-        .collect(Collectors.toSet());
+        ).collect(Collectors.toSet());
 
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(containerInfo, healthyReplicas,
-            pendingOps, minHealthyForMaintenance);
+            pendingOps, minHealthyForMaintenance, true);
 
     // verify that this container is actually over replicated
     if (!verifyOverReplication(replicaCount)) {
@@ -152,13 +151,15 @@ public class RatisOverReplicationHandler
    * @param replicaCount ContainerReplicaCount object for the container
    * @param pendingOps Pending adds and deletes
    * @return List of ContainerReplica sorted using
-   * {@link RatisOverReplicationHandler#sortReplicas(Collection)}
+   * {@link RatisOverReplicationHandler#sortReplicas(Collection, boolean)}
    */
   private List<ContainerReplica> getEligibleReplicas(
-      ContainerReplicaCount replicaCount, List<ContainerReplicaOp> pendingOps) {
+      RatisContainerReplicaCount replicaCount,
+      List<ContainerReplicaOp> pendingOps) {
     // sort replicas so that they can be selected in a deterministic way
     List<ContainerReplica> eligibleReplicas =
-        sortReplicas(replicaCount.getReplicas());
+        sortReplicas(replicaCount.getReplicas(),
+            replicaCount.getHealthyReplicaCount() == 0);
 
     // retain one replica per unique origin datanode if the container is not
     // closed
@@ -166,13 +167,8 @@ public class RatisOverReplicationHandler
         new LinkedHashMap<>();
     if (replicaCount.getContainer().getState() !=
         HddsProtos.LifeCycleState.CLOSED) {
-      eligibleReplicas.stream()
-          // get replicas with state that matches container state
-          .filter(r -> ReplicationManager.compareState(
-              replicaCount.getContainer().getState(),
-              r.getState()))
-          .forEach(r -> uniqueReplicas
-              .putIfAbsent(r.getOriginDatanodeId(), r));
+      eligibleReplicas.forEach(r -> uniqueReplicas
+          .putIfAbsent(r.getOriginDatanodeId(), r));
 
       // note that this preserves order of the List
       eligibleReplicas.removeAll(uniqueReplicas.values());
@@ -188,7 +184,6 @@ public class RatisOverReplicationHandler
 
     // replicas that are not on IN_SERVICE nodes or are already pending
     // delete are not eligible
-    // TODO what about nodes that are not healthy?
     eligibleReplicas.removeIf(
         replica -> replica.getDatanodeDetails().getPersistedOpState() !=
             HddsProtos.NodeOperationalState.IN_SERVICE ||
@@ -199,12 +194,21 @@ public class RatisOverReplicationHandler
 
   /**
    * Sorts replicas using {@link ContainerReplica#hashCode()} (ContainerID and
-   * DatanodeDetails).
+   * DatanodeDetails). If allUnhealthy is true, sorts using sequence ID.
    * @param replicas replicas to sort
+   * @param allUnhealthy should be true if all replicas are UNHEALTHY
    * @return sorted List
    */
   private List<ContainerReplica> sortReplicas(
-      Collection<ContainerReplica> replicas) {
+      Collection<ContainerReplica> replicas, boolean allUnhealthy) {
+    if (allUnhealthy) {
+      // prefer deleting replicas with lower sequence IDs
+      return replicas.stream()
+          .sorted(Comparator.comparingLong(ContainerReplica::getSequenceId)
+              .reversed())
+          .collect(Collectors.toList());
+    }
+
     return replicas.stream()
         .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
         .collect(Collectors.toList());
@@ -216,11 +220,11 @@ public class RatisOverReplicationHandler
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
 
     /*
-    Over replication means we have enough healthy replicas, so unhealthy
-    replicas can be deleted. This might make the container violate placement
-    policy.
+    Being in the over replication queue means we have enough replicas that
+    match the container's state, so unhealthy or mismatched replicas can be
+    deleted. This might make the container violate placement policy.
      */
-    List<ContainerReplica> unhealthyReplicas = new ArrayList<>();
+    List<ContainerReplica> replicasRemoved = new ArrayList<>();
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
         return commands;
@@ -229,11 +233,11 @@ public class RatisOverReplicationHandler
           containerInfo.getState(), replica.getState())) {
         commands.add(Pair.of(replica.getDatanodeDetails(),
             createDeleteCommand(containerInfo)));
-        unhealthyReplicas.add(replica);
+        replicasRemoved.add(replica);
         excess--;
       }
     }
-    replicas.removeAll(unhealthyReplicas);
+    replicas.removeAll(replicasRemoved);
 
     /*
     Remove excess replicas if that does not make the container mis replicated.

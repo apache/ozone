@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -434,8 +435,111 @@ class TestRatisContainerReplicaCount {
 
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replicas,
-            Collections.emptyList(), 2);
+            Collections.emptyList(), 2, false);
     assertTrue(rcnt.isSufficientlyReplicated());
+  }
+
+  @Test
+  void testReplicaCounts() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0);
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, CLOSING));
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, UNHEALTHY));
+
+    // First, test by not considering UNHEALTHY replicas.
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertFalse(rcnt.isOverReplicated());
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY = 1
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+
+    // Now, test by considering UNHEALTHY replicas
+    rcnt = new RatisContainerReplicaCount(container, replicas,
+        Collections.emptyList(), 2, true);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertTrue(rcnt.isOverReplicated());
+    assertEquals(1, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY = 1
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+  }
+
+  @Test
+  void testUnhealthyReplicaOnDecommissionedNodeWithPendingDelete() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0);
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, CLOSING));
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(ContainerID.valueOf(1L), 0,
+            DECOMMISSIONED, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    List<ContainerReplicaOp> pendingOps =
+        ImmutableList.of(ContainerReplicaOp.create(
+            ContainerReplicaOp.PendingOpType.DELETE,
+            unhealthyReplica.getDatanodeDetails(), 0));
+
+    // First, test by not considering UNHEALTHY replicas.
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replicas,
+            pendingOps, 2, false);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertFalse(rcnt.isOverReplicated());
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY = 1
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // should be 0 because we're not considering unhealthy replicas
+    assertEquals(0, rcnt.getDecommissionCount());
+
+    // Now, test by considering UNHEALTHY replicas
+    rcnt = new RatisContainerReplicaCount(container, replicas,
+        pendingOps, 2, true);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertFalse(rcnt.isOverReplicated());
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY = 1
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    assertEquals(1, rcnt.getDecommissionCount());
   }
 
   @Test
@@ -454,7 +558,7 @@ class TestRatisContainerReplicaCount {
     ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
         unhealthyReplica.getDatanodeDetails(), 0));
     RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(container, replicas, ops, 2);
+        new RatisContainerReplicaCount(container, replicas, ops, 2, false);
     assertTrue(replicaCount.isSufficientlyReplicated());
   }
 

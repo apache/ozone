@@ -26,11 +26,13 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -158,7 +160,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     int minReplicasForMaintenance = request.getMaintenanceRedundancy();
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
-            minReplicasForMaintenance);
+            minReplicasForMaintenance, false);
 
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
@@ -203,6 +205,24 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     }
     // No issues detected, just return healthy.
     return new ContainerHealthResult.HealthyResult(container);
+  }
+
+  private boolean hasSufficientMatchingReplicas(ContainerCheckRequest request) {
+    ContainerInfo container = request.getContainerInfo();
+    Set<ContainerReplica> replicas =
+        new HashSet<>(request.getContainerReplicas());
+
+    // keep only matching replicas
+    replicas.removeIf(
+        replica -> !ReplicationManager.compareState(container.getState(),
+            replica.getState()));
+
+    RatisContainerReplicaCount replicaCount =
+        new RatisContainerReplicaCount(container, replicas,
+            request.getPendingOps(),
+            request.getMaintenanceRedundancy(), false);
+
+    return replicaCount.isSufficientlyReplicated();
   }
 
   /**
