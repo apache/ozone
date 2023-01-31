@@ -62,9 +62,9 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private ObjectName mBean;
 
   protected void init(int version, T[] lfs) throws IOException {
+    validateLayoutFeatureVersions(lfs);
     lock.writeLock().lock();
     try {
-      validateLayoutFeatureVersions(lfs);
       metadataLayoutVersion = version;
       initializeFeatures(lfs);
       softwareLayoutVersion = features.lastKey();

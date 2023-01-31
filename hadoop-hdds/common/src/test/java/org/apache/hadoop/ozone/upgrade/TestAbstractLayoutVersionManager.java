@@ -94,13 +94,13 @@ public class TestAbstractLayoutVersionManager {
   @Test
   public void testInitFailsIfLayoutFeaturesVersionsAreNotStrictlyIncreasing() {
     assertThrowsExactly(IOException.class,
-      () -> versionManager.init(3, getDecreasingLayoutFeatures(3)),
-      "Cannot initialize VersionManager."
+        () -> versionManager.init(3, getDecreasingLayoutFeatures(3)),
+        "Cannot initialize VersionManager."
     );
 
     assertThrowsExactly(IOException.class,
-      () -> versionManager.init(3, getNonUniqueLayoutFeatures()),
-      "Cannot initialize VersionManager."
+        () -> versionManager.init(3, getNonUniqueLayoutFeatures()),
+        "Cannot initialize VersionManager."
     );
   }
 
