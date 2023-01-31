@@ -91,6 +91,8 @@ public class IncrementalContainerReportHandler extends
             if (!replicaProto.getState().equals(
                 ContainerReplicaProto.State.DELETED)) {
               nodeManager.addContainer(dd, id);
+            } else {
+              nodeManager.removeContainer(dd, id);
             }
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
