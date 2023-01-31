@@ -38,7 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 
 /**
  * The RocksDB specified snapshot provider.
- * Supports Incremental Snapshot(IC) and Full Snapshot.
+ * Supports Incremental Snapshot and Full Snapshot.
  *
  * The process is as the followings:
  * 1. Download the snapshot file from the leader
@@ -166,9 +166,9 @@ public abstract class RDBSnapshotProvider implements Closeable {
   /**
    * Untar the downloaded snapshot and convert to the {@link RocksDBCheckpoint}.
    *
-   * @param snapshot the downloaded snapshot file
+   * @param snapshot the downloaded snapshot tar file
    * @param untarDir the directory to place the untarred files
-   * @param deleteSnapshot whether to delete the downloaded snapshot file
+   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
    * @return {@link RocksDBCheckpoint}
    * @throws IOException
    */
