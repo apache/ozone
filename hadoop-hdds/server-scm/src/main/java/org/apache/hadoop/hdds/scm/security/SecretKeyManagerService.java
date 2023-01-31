@@ -98,7 +98,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
     try {
       if (scmContext.isLeaderReady()) {
         // Asynchronously initialize SecretKeys for first time leader.
-        if (secretKeyManager.isInitialized()) {
+        if (!secretKeyManager.isInitialized()) {
           scheduler.schedule(() -> {
             try {
               secretKeyManager.checkAndInitialize();
