@@ -160,7 +160,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
    */
   public String getSnapshotFileName(String leaderNodeID) {
     String snapshotTime = Long.toString(System.currentTimeMillis());
-    return dbName + "-" + leaderNodeID + "-" + snapshotTime + ".tar.gz";
+    return dbName + "-" + leaderNodeID + "-" + snapshotTime + ".tar";
   }
 
   /**
