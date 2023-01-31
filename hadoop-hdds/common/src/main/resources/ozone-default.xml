@@ -3606,7 +3606,7 @@
   <property>
     <name>ozone.om.snapshot.diff.db.dirs</name>
     <value/>
-    <tag>OZONE, OM </tag>
+    <tag>OZONE, OM</tag>
     <description>
       Directory where the OzoneManager stores the snapshot diff related data.
       This should be specified as a single directory. If the directory does not

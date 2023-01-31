@@ -556,7 +556,7 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_NAME = "snapshotName";
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
-  public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapshots.diff";
+  public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiffs";
 
   public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
 
