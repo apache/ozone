@@ -197,7 +197,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
             bucketName, snapshotName);
       }
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
     }

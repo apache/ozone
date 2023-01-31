@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.snapshot;
 
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -51,7 +50,6 @@ public class DeleteSnapshotHandler extends Handler {
 
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
-    OmUtils.validateSnapshotName(snapshotName);  // TODO: Not required in this case, can remove
 
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, snapshotName);
