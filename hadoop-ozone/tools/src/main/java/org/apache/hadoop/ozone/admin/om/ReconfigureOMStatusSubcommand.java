@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.admin.om;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -37,16 +37,16 @@ import java.util.concurrent.Callable;
     description = "Check reconfig status",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReconfigOMStatusSubcommand implements Callable<Void> {
+public class ReconfigureOMStatusSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private ReconfigOMCommands parent;
+  private ReconfigureOMCommands parent;
 
   @Override
   public Void call() throws Exception {
-    ReconfigProtocol reconfigProxy =
-        ReconfigOMSubCommandUtil.getSingleOMReconfigProxy(parent.getAddress());
-    ReconfigurationTaskStatus status = reconfigProxy.getReconfigStatus();
+    ReconfigureProtocol reconfigProxy = ReconfigureOMSubCommandUtil
+        .getSingleOMReconfigureProxy(parent.getAddress());
+    ReconfigurationTaskStatus status = reconfigProxy.getReconfigureStatus();
     System.out.printf("Reconfiguring status for node [%s]: ",
         parent.getAddress());
     printReconfigurationStatus(status);

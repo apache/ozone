@@ -21,14 +21,14 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
-import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.GetConfigurationChangeProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.GetReconfigStatusRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.GetReconfigStatusResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ListReconfigPropertiesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ListReconfigPropertiesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.StartReconfigRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.StartReconfigResponseProto;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListReconfigurePropertiesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListReconfigurePropertiesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.StartReconfigureRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.StartReconfigureResponseProto;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,30 +37,30 @@ import java.util.Optional;
 
 /**
  * This class is used on the server side. Calls come across the wire for the
- * for protocol {@link ReconfigProtocolPB}.
+ * for protocol {@link ReconfigureProtocolPB}.
  * This class translates the PB data types
  * to the native data types used inside the NN/DN as specified in the generic
- * ReconfigProtocol.
+ * ReconfigureProtocol.
  */
-public class ReconfigProtocolServerSideTranslatorPB implements
-    ReconfigProtocolPB {
+public class ReconfigureProtocolServerSideTranslatorPB implements
+    ReconfigureProtocolPB {
 
-  private final ReconfigProtocol impl;
+  private final ReconfigureProtocol impl;
 
-  private static final StartReconfigResponseProto START_RECONFIG_RESP =
-      StartReconfigResponseProto.newBuilder().build();
+  private static final StartReconfigureResponseProto START_RECONFIG_RESP =
+      StartReconfigureResponseProto.newBuilder().build();
 
-  public ReconfigProtocolServerSideTranslatorPB(
-      ReconfigProtocol impl) {
+  public ReconfigureProtocolServerSideTranslatorPB(
+      ReconfigureProtocol impl) {
     this.impl = impl;
   }
 
   @Override
-  public StartReconfigResponseProto startReconfig(
-      RpcController controller, StartReconfigRequestProto request)
+  public StartReconfigureResponseProto startReconfigure(
+      RpcController controller, StartReconfigureRequestProto request)
       throws ServiceException {
     try {
-      impl.startReconfig();
+      impl.startReconfigure();
     } catch (IOException e) {
       throw new ServiceException(e);
     }
@@ -68,39 +68,39 @@ public class ReconfigProtocolServerSideTranslatorPB implements
   }
 
   @Override
-  public ListReconfigPropertiesResponseProto listReconfigProperties(
-      RpcController controller, ListReconfigPropertiesRequestProto request)
+  public ListReconfigurePropertiesResponseProto listReconfigureProperties(
+      RpcController controller, ListReconfigurePropertiesRequestProto request)
       throws ServiceException {
     try {
-      return listReconfigProperties(impl.listReconfigProperties());
+      return listReconfigureProperties(impl.listReconfigureProperties());
     } catch (IOException e) {
       throw new ServiceException(e);
     }
   }
 
-  private ListReconfigPropertiesResponseProto listReconfigProperties(
+  private ListReconfigurePropertiesResponseProto listReconfigureProperties(
       List<String> reconfigurableProperties) {
-    ListReconfigPropertiesResponseProto.Builder builder =
-        ListReconfigPropertiesResponseProto.newBuilder();
+    ListReconfigurePropertiesResponseProto.Builder builder =
+        ListReconfigurePropertiesResponseProto.newBuilder();
     builder.addAllName(reconfigurableProperties);
     return builder.build();
   }
 
   @Override
-  public GetReconfigStatusResponseProto getReconfigStatus(
-      RpcController unused, GetReconfigStatusRequestProto request)
+  public GetReconfigureStatusResponseProto getReconfigureStatus(
+      RpcController unused, GetReconfigureStatusRequestProto request)
       throws ServiceException {
     try {
-      return getReconfigStatus(impl.getReconfigStatus());
+      return getReconfigureStatus(impl.getReconfigureStatus());
     } catch (IOException e) {
       throw new ServiceException(e);
     }
   }
 
-  private GetReconfigStatusResponseProto getReconfigStatus(
+  private GetReconfigureStatusResponseProto getReconfigureStatus(
       ReconfigurationTaskStatus status) {
-    GetReconfigStatusResponseProto.Builder builder =
-        GetReconfigStatusResponseProto.newBuilder();
+    GetReconfigureStatusResponseProto.Builder builder =
+        GetReconfigureStatusResponseProto.newBuilder();
 
     builder.setStartTime(status.getStartTime());
     if (status.stopped()) {

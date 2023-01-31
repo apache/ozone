@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
-import org.apache.hadoop.hdds.protocolPB.ReconfigProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolClientSideTranslatorPB;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -27,16 +27,19 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 /**
- * Reconfig subcommand utils.
+ * Reconfigure subcommand utils.
  */
-public class ReconfigOMSubCommandUtil {
+public final class ReconfigureOMSubCommandUtil {
 
-  public static ReconfigProtocol getSingleOMReconfigProxy(String address)
+  private ReconfigureOMSubCommandUtil() {
+  }
+
+  public static ReconfigureProtocol getSingleOMReconfigureProxy(String address)
       throws IOException {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     InetSocketAddress nodeAddr = NetUtils.createSocketAddr(address);
-    return new ReconfigProtocolClientSideTranslatorPB(
+    return new ReconfigureProtocolClientSideTranslatorPB(
         nodeAddr, user, ozoneConf);
   }
 

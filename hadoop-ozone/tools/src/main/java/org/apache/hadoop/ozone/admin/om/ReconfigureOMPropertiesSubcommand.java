@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.admin.om;
 
-import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -25,23 +25,23 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * Handler of ozone admin om reconfig properties command.
+ * Handler of ozone admin om reconfigure properties command.
  */
 @Command(
     name = "properties",
     description = "List reconfigurable properties",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReconfigOMPropertiesSubcommand implements Callable<Void> {
+public class ReconfigureOMPropertiesSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private ReconfigOMCommands parent;
+  private ReconfigureOMCommands parent;
 
   @Override
   public Void call() throws Exception {
-    ReconfigProtocol reconfigProxy =
-        ReconfigOMSubCommandUtil.getSingleOMReconfigProxy(parent.getAddress());
-    List<String> properties = reconfigProxy.listReconfigProperties();
+    ReconfigureProtocol reconfigProxy = ReconfigureOMSubCommandUtil
+        .getSingleOMReconfigureProxy(parent.getAddress());
+    List<String> properties = reconfigProxy.listReconfigureProperties();
     System.out.printf("OM Node [%s] Reconfigurable properties:%n",
         parent.getAddress());
     for (String name : properties) {

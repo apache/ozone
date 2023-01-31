@@ -27,11 +27,11 @@ import java.io.IOException;
 import java.util.List;
 
 /**********************************************************************
- * ReconfigProtocol is used by ozone admin to reload configuration.
+ * ReconfigureProtocol is used by ozone admin to reload configuration.
  **********************************************************************/
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public interface ReconfigProtocol {
+public interface ReconfigureProtocol {
 
   long VERSIONID = 1L;
 
@@ -39,18 +39,18 @@ public interface ReconfigProtocol {
    * Asynchronously reload configuration on disk and apply changes.
    */
   @Idempotent
-  void startReconfig() throws IOException;
+  void startReconfigure() throws IOException;
 
   /**
    * Get the status of the previously issued reconfig task.
    * @see ReconfigurationTaskStatus
    */
   @Idempotent
-  ReconfigurationTaskStatus getReconfigStatus() throws IOException;
+  ReconfigurationTaskStatus getReconfigureStatus() throws IOException;
 
   /**
    * Get a list of allowed properties for reconfiguration.
    */
   @Idempotent
-  List<String> listReconfigProperties() throws IOException;
+  List<String> listReconfigureProperties() throws IOException;
 }

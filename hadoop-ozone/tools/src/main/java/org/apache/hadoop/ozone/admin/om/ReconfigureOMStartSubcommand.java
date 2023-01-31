@@ -17,58 +17,33 @@
  */
 package org.apache.hadoop.ozone.admin.om;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.kohsuke.MetaInfServices;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
-
 import java.util.concurrent.Callable;
 
 /**
- * Subcommand to group reconfig OM related operations.
+ * Handler of ozone admin om reconfig start command.
  */
 @Command(
-    name = "reconfig",
-    description = "Dynamically reconfigure OM without restarting server",
+    name = "start",
+    description = "Start reconfig asynchronously",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        ReconfigOMStartSubcommand.class, 
-        ReconfigOMStatusSubcommand.class,
-        ReconfigOMPropertiesSubcommand.class
-    })
-@MetaInfServices(SubcommandWithParent.class)
-public class ReconfigOMCommands implements Callable<Void>,
-    SubcommandWithParent {
+    versionProvider = HddsVersionProvider.class)
+public class ReconfigureOMStartSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @Spec
-  private CommandSpec spec;
-
-  @CommandLine.Option(names = {"-address"},
-      description = "om node address: <ip:port> or <hostname:port>",
-      required = true)
-  private String address;
+  private ReconfigureOMCommands parent;
 
   @Override
   public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
+    ReconfigureProtocol reconfigProxy = ReconfigureOMSubCommandUtil
+        .getSingleOMReconfigureProxy(parent.getAddress());
+    reconfigProxy.startReconfigure();
+    System.out.printf("Started OM reconfiguration task on node [%s].%n",
+        parent.getAddress());
     return null;
-  }
-
-  public String getAddress() {
-    return address;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OMAdmin.class;
   }
 
 }

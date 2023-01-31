@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.protocolPB;
 
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ReconfigProtocolService;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
@@ -27,10 +27,10 @@ import org.apache.hadoop.security.KerberosInfo;
  * reconfiguration on the fly.
  */
 @ProtocolInfo(
-    protocolName = "org.apache.hadoop.hdds.protocol.ReconfigProtocol",
+    protocolName = "org.apache.hadoop.hdds.protocol.ReconfigureProtocol",
     protocolVersion = 1)
 @KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings
     .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
-public interface ReconfigProtocolPB extends
-    ReconfigProtocolService.BlockingInterface {
+public interface ReconfigureProtocolPB extends
+    ReconfigureProtocolService.BlockingInterface {
 }

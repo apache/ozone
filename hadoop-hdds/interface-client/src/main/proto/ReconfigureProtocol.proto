@@ -27,20 +27,20 @@
 
 syntax="proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
-option java_outer_classname = "ReconfigProtocolProtos";
+option java_outer_classname = "ReconfigureProtocolProtos";
 option java_generic_services = true;
 option java_generate_equals_and_hash = true;
 package hadoop.hdds;
 
 /** Asks OM/SCM to reload configuration file. */
-message StartReconfigRequestProto {
+message StartReconfigureRequestProto {
 }
 
-message StartReconfigResponseProto {
+message StartReconfigureResponseProto {
 }
 
 /** Query the running status of reconfiguration process */
-message GetReconfigStatusRequestProto {
+message GetReconfigureStatusRequestProto {
 }
 
 message GetConfigurationChangeProto {
@@ -50,17 +50,17 @@ message GetConfigurationChangeProto {
   optional string errorMessage = 4;  // It is empty if success.
 }
 
-message GetReconfigStatusResponseProto {
+message GetReconfigureStatusResponseProto {
   required int64 startTime = 1;
   optional int64 endTime = 2;
   repeated GetConfigurationChangeProto changes = 3;
 }
 
 /** Query the reconfigurable properties on OM/SCM. */
-message ListReconfigPropertiesRequestProto {
+message ListReconfigurePropertiesRequestProto {
 }
 
-message ListReconfigPropertiesResponseProto {
+message ListReconfigurePropertiesResponseProto {
   repeated string name = 1;
 }
 
@@ -68,13 +68,13 @@ message ListReconfigPropertiesResponseProto {
  * Protocol used from client to the OM.
  * See the request and response for details of rpc call.
  */
-service ReconfigProtocolService {
-  rpc getReconfigStatus(GetReconfigStatusRequestProto)
-      returns(GetReconfigStatusResponseProto);
+service ReconfigureProtocolService {
+  rpc getReconfigureStatus(GetReconfigureStatusRequestProto)
+      returns(GetReconfigureStatusResponseProto);
 
-  rpc startReconfig(StartReconfigRequestProto)
-      returns(StartReconfigResponseProto);
+  rpc startReconfigure(StartReconfigureRequestProto)
+      returns(StartReconfigureResponseProto);
 
-  rpc listReconfigProperties(ListReconfigPropertiesRequestProto)
-      returns(ListReconfigPropertiesResponseProto);
+  rpc listReconfigureProperties(ListReconfigurePropertiesRequestProto)
+      returns(ListReconfigurePropertiesResponseProto);
 }

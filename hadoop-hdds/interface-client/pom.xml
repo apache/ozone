@@ -103,7 +103,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>hdds.proto</include>
-                <include>ReconfigProtocol.proto</include>
+                <include>ReconfigureProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
@@ -122,7 +122,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>hdds.proto</include>
-                <include>ReconfigProtocol.proto</include>
+                <include>ReconfigureProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/java/proto3</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>

@@ -26,13 +26,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.GetConfigurationChangeProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.GetReconfigStatusResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.GetReconfigStatusRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ListReconfigPropertiesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.ListReconfigPropertiesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.ReconfigProtocolProtos.StartReconfigRequestProto;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListReconfigurePropertiesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListReconfigurePropertiesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.StartReconfigureRequestProto;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -53,47 +53,47 @@ import java.util.Optional;
 
 /**
  * This class is the client side translator to translate the requests made on
- * {@link ReconfigProtocol} interfaces to the RPC server implementing
- * {@link ReconfigProtocolPB}.
+ * {@link ReconfigureProtocol} interfaces to the RPC server implementing
+ * {@link ReconfigureProtocolPB}.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
-public class ReconfigProtocolClientSideTranslatorPB implements
-    ProtocolMetaInterface, ReconfigProtocol, ProtocolTranslator, Closeable {
+public class ReconfigureProtocolClientSideTranslatorPB implements
+    ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator, Closeable {
   public static final Logger LOG = LoggerFactory
-      .getLogger(ReconfigProtocolClientSideTranslatorPB.class);
+      .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 
   private static final RpcController NULL_CONTROLLER = null;
-  private static final StartReconfigRequestProto VOID_START_RECONFIG =
-      StartReconfigRequestProto.newBuilder().build();
+  private static final StartReconfigureRequestProto VOID_START_RECONFIG =
+      StartReconfigureRequestProto.newBuilder().build();
 
-  private static final ListReconfigPropertiesRequestProto
+  private static final ListReconfigurePropertiesRequestProto
       VOID_LIST_RECONFIGURABLE_PROPERTIES =
-      ListReconfigPropertiesRequestProto.newBuilder().build();
+      ListReconfigurePropertiesRequestProto.newBuilder().build();
 
-  private static final GetReconfigStatusRequestProto
+  private static final GetReconfigureStatusRequestProto
       VOID_GET_RECONFIG_STATUS =
-      GetReconfigStatusRequestProto.newBuilder().build();
+      GetReconfigureStatusRequestProto.newBuilder().build();
 
-  private final ReconfigProtocolPB rpcProxy;
+  private final ReconfigureProtocolPB rpcProxy;
 
-  public ReconfigProtocolClientSideTranslatorPB(InetSocketAddress addr,
+  public ReconfigureProtocolClientSideTranslatorPB(InetSocketAddress addr,
       UserGroupInformation ugi, OzoneConfiguration conf)
       throws IOException {
-    rpcProxy = createReconfigurationProtocolProxy(addr, ugi, conf);
+    rpcProxy = createReconfigureProtocolProxy(addr, ugi, conf);
   }
 
-  static ReconfigProtocolPB createReconfigurationProtocolProxy(
+  static ReconfigureProtocolPB createReconfigureProtocolProxy(
       InetSocketAddress addr, UserGroupInformation ugi,
       OzoneConfiguration conf) throws IOException {
 
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
-        ReconfigProtocolPB.class, ProtobufRpcEngine.class);
+        ReconfigureProtocolPB.class, ProtobufRpcEngine.class);
     Configuration hadoopConf = LegacyHadoopConfigurationSource
         .asHadoopConfiguration(conf);
     return RPC.getProtocolProxy(
-            ReconfigProtocolPB.class,
-            RPC.getProtocolVersion(ReconfigProtocolPB.class),
+            ReconfigureProtocolPB.class,
+            RPC.getProtocolVersion(ReconfigureProtocolPB.class),
             addr, ugi, hadoopConf,
             NetUtils.getDefaultSocketFactory(hadoopConf))
         .getProxy();
@@ -110,28 +110,28 @@ public class ReconfigProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public void startReconfig() throws IOException {
+  public void startReconfigure() throws IOException {
     try {
-      rpcProxy.startReconfig(NULL_CONTROLLER, VOID_START_RECONFIG);
+      rpcProxy.startReconfigure(NULL_CONTROLLER, VOID_START_RECONFIG);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
   }
 
   @Override
-  public ReconfigurationTaskStatus getReconfigStatus()
+  public ReconfigurationTaskStatus getReconfigureStatus()
       throws IOException {
     try {
-      GetReconfigStatusResponseProto response = rpcProxy.getReconfigStatus(
-          NULL_CONTROLLER, VOID_GET_RECONFIG_STATUS);
-      return getReconfigStatus(response);
+      GetReconfigureStatusResponseProto response = rpcProxy
+          .getReconfigureStatus(NULL_CONTROLLER, VOID_GET_RECONFIG_STATUS);
+      return getReconfigureStatus(response);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
   }
 
-  private ReconfigurationTaskStatus getReconfigStatus(
-      GetReconfigStatusResponseProto response) {
+  private ReconfigurationTaskStatus getReconfigureStatus(
+      GetReconfigureStatusResponseProto response) {
     Map<PropertyChange, Optional<String>> statusMap = null;
     long startTime;
     long endTime = 0;
@@ -156,10 +156,10 @@ public class ReconfigProtocolClientSideTranslatorPB implements
   }
   
   @Override
-  public List<String> listReconfigProperties() throws IOException {
-    ListReconfigPropertiesResponseProto response;
+  public List<String> listReconfigureProperties() throws IOException {
+    ListReconfigurePropertiesResponseProto response;
     try {
-      response = rpcProxy.listReconfigProperties(NULL_CONTROLLER,
+      response = rpcProxy.listReconfigureProperties(NULL_CONTROLLER,
           VOID_LIST_RECONFIGURABLE_PROPERTIES);
       return response.getNameList();
     } catch (ServiceException e) {
@@ -170,9 +170,9 @@ public class ReconfigProtocolClientSideTranslatorPB implements
   @Override
   public boolean isMethodSupported(String methodName) throws IOException {
     return RpcClientUtil.isMethodSupported(rpcProxy,
-        ReconfigProtocolPB.class,
+        ReconfigureProtocolPB.class,
         RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-        RPC.getProtocolVersion(ReconfigProtocolPB.class),
+        RPC.getProtocolVersion(ReconfigureProtocolPB.class),
         methodName);
   }
 }

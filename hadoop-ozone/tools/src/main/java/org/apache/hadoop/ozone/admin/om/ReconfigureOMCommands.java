@@ -17,33 +17,58 @@
  */
 package org.apache.hadoop.ozone.admin.om;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.protocol.ReconfigProtocol;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
+
 import java.util.concurrent.Callable;
 
 /**
- * Handler of ozone admin om reconfig start command.
+ * Subcommand to group reconfigure OM related operations.
  */
 @Command(
-    name = "start",
-    description = "Start execute the reconfig operation asynchronously",
+    name = "reconfig",
+    description = "Dynamically reconfig OM without restarting server",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class ReconfigOMStartSubcommand implements Callable<Void> {
+    versionProvider = HddsVersionProvider.class,
+    subcommands = {
+        ReconfigureOMStartSubcommand.class, 
+        ReconfigureOMStatusSubcommand.class,
+        ReconfigureOMPropertiesSubcommand.class
+    })
+@MetaInfServices(SubcommandWithParent.class)
+public class ReconfigureOMCommands implements Callable<Void>,
+    SubcommandWithParent {
 
   @CommandLine.ParentCommand
-  private ReconfigOMCommands parent;
+  private OMAdmin parent;
+
+  @Spec
+  private CommandSpec spec;
+
+  @CommandLine.Option(names = {"-address"},
+      description = "om node address: <ip:port> or <hostname:port>",
+      required = true)
+  private String address;
 
   @Override
   public Void call() throws Exception {
-    ReconfigProtocol reconfigProxy =
-        ReconfigOMSubCommandUtil.getSingleOMReconfigProxy(parent.getAddress());
-    reconfigProxy.startReconfig();
-    System.out.printf("Started OM reconfiguration task on node [%s].%n",
-        parent.getAddress());
+    GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  public String getAddress() {
+    return address;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OMAdmin.class;
   }
 
 }
