@@ -166,7 +166,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>rocksdb-checkpoint-differ</artifactId>
       <version>${hdds.version}</version>
     </dependency>
-
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+    </dependency>
   </dependencies>
 
 

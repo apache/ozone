@@ -8,6 +8,7 @@ share/ozone/lib/aopalliance-repackaged.jar
 share/ozone/lib/asm.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
+share/ozone/lib/awaitility.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
 share/ozone/lib/aws-java-sdk-s3.jar
@@ -60,6 +61,7 @@ share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_7.jar
+share/ozone/lib/hamcrest.jar
 share/ozone/lib/hdds-annotation-processing.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
