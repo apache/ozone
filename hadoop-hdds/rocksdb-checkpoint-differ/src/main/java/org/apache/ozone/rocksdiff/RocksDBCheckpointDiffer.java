@@ -204,7 +204,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
           TimeUnit.MILLISECONDS);
 
       this.executor.scheduleWithFixedDelay(
-          this::pruneSttFiles,
+          this::pruneSstFiles,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS
@@ -1290,7 +1290,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * those are not needed to generate snapshot diff. These files are basically
    * non-leaf nodes of the DAG.
    */
-  public void pruneSttFiles() {
+  public void pruneSstFiles() {
     Set<String> nonLeafSstFiles;
 
     synchronized (compactionListenerWriteLock) {

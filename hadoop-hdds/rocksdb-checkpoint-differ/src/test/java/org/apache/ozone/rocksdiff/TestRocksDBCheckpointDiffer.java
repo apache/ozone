@@ -1192,7 +1192,7 @@ public class TestRocksDBCheckpointDiffer {
             MINUTES.toMillis(10));
 
     differ.loadAllCompactionLogs();
-    differ.pruneSttFiles();
+    differ.pruneSstFiles();
 
     Set<String> actualFileSetAfterPruning;
     try (Stream<Path> pathStream = Files.list(Paths.get(sstBackUpDirName))
