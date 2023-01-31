@@ -150,10 +150,11 @@ public class DBCheckpointServlet extends HttpServlet {
       String[] sstParam = request.getParameterValues(
           OZONE_DB_CHECKPOINT_REQUEST_SST);
       if (sstParam != null) {
-        receivedSstList = Arrays.stream(sstParam)
+        receivedSstList.addAll(
+            Arrays.stream(sstParam)
             .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
             .distinct()
-            .collect(Collectors.toList());
+            .collect(Collectors.toList()));
         LOG.info("Received excluding SST {}", receivedSstList);
       }
 
