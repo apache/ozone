@@ -105,7 +105,7 @@ public class TestOzoneBlockTokenSecretManager {
         .generateCertificate("CN=OzoneMaster", keyPair, 30, ALGORITHM);
     omCertSerialId = x509Certificate.getSerialNumber().toString();
     secretManager = new OzoneBlockTokenSecretManager(securityConfig,
-        TimeUnit.HOURS.toMillis(1), omCertSerialId);
+        TimeUnit.HOURS.toMillis(1));
     client = Mockito.mock(DefaultCertificateClient.class);
     when(client.getCertificate()).thenReturn(x509Certificate);
     when(client.getCertificate(anyString())).

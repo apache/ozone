@@ -641,7 +641,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public String createSnapshot(String pathStr, String snapshotName)
       throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     return objectStore.createSnapshot(ofsPath.getVolumeName(),
         ofsPath.getBucketName(),
         snapshotName);

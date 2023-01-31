@@ -215,46 +215,6 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithOtherBucketQuotaUsedCrossLimit()
-      throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String testBucketName = bucketName + "1";
-
-    OMRequestTestUtils.addVolumeToDB(
-        volumeName, omMetadataManager, 10 * GB);
-    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-    OMRequestTestUtils.addBucketToDB(volumeName, testBucketName,
-        omMetadataManager);
-    
-    // updated used size of one bucket
-    String bucketKey = omMetadataManager
-        .getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
-        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue();
-    omBucketInfo.incrUsedBytes(8 * GB);
-    omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
-
-    // create request to set bucket size where other bucket have used quota
-    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
-        testBucketName, true, 3 * GB);
-    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
-        new OMBucketSetPropertyRequest(omRequest);
-
-    OMClientResponse omClientResponse = omBucketSetPropertyRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
-        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-    Assert.assertTrue(omClientResponse.getOMResponse().getMessage().
-        contains("Total buckets quota in this volume " +
-            "should not be greater than volume quota"));
-  }
-
-  @Test
   public void rejectsSettingQuotaOnLink() throws Exception {
     // GIVEN
     String volumeName = UUID.randomUUID().toString();
@@ -301,7 +261,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     BucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setDefaultReplicationConfig(new DefaultReplicationConfig(
-            EC, new ECReplicationConfig(3, 2)))
+            new ECReplicationConfig(3, 2)))
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
         .setIsVersionEnabled(true)
@@ -349,7 +309,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     BucketArgs bucketArgs = OmBucketArgs.newBuilder()
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    EC, new ECReplicationConfig(3, 2)))
+                    new ECReplicationConfig(3, 2)))
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
             .setIsVersionEnabled(true)
@@ -533,7 +493,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             .setVolumeName(volumeName2)
             .setBucketName(bucketName2)
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    EC, new ECReplicationConfig(3, 2)));
+                    new ECReplicationConfig(3, 2)));
 
     OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
     OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketInfo);
@@ -562,11 +522,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(EC,
             dbBucketInfoAfter.getDefaultReplicationConfig().getType());
     Assert.assertEquals(
-            dbBucketInfoBefore.getDefaultReplicationConfig().getType(),
-            dbBucketInfoAfter.getDefaultReplicationConfig().getType());
-    Assert.assertEquals(
-            dbBucketInfoBefore.getDefaultReplicationConfig().getFactor(),
-            dbBucketInfoAfter.getDefaultReplicationConfig().getFactor());
+            dbBucketInfoBefore.getDefaultReplicationConfig(),
+            dbBucketInfoAfter.getDefaultReplicationConfig());
     Assert.assertEquals(20 * GB,
             dbBucketInfoAfter.getQuotaInBytes());
     Assert.assertEquals(1000L,

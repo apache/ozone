@@ -19,6 +19,12 @@ CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
+# TODO: HDDS-7495
+#   S3 security tests need object store layout from s3 gateway. Other tests on
+#   this cluster use `ozone fs`. The config to set an S3 gateway specific bucket
+#   layout will be added in HDDS-7495. Until then, the server side default must
+#   be changed for all tests on this cluster to work.
+OZONE-SITE.XML_ozone.default.bucket.layout=LEGACY
 OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
@@ -68,6 +74,7 @@ OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
 
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=5s
 OZONE-SITE.XML_hdds.scm.replication.event.timeout=10s
+OZONE-SITE.XML_hdds.scm.replication.push=true
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s

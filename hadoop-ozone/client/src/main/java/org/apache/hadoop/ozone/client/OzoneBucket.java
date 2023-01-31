@@ -247,12 +247,7 @@ public class OzoneBucket extends WithMetadata {
         quotaInNamespace, bucketLayout, owner);
     this.bucketLayout = bucketLayout;
     if (defaultReplicationConfig != null) {
-      this.defaultReplication =
-          defaultReplicationConfig.getType() == ReplicationType.EC ?
-              defaultReplicationConfig.getEcReplicationConfig() :
-              ReplicationConfig
-                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
-                      defaultReplicationConfig.getFactor());
+      defaultReplication = defaultReplicationConfig.getReplicationConfig();
     } else {
       // Bucket level replication is not configured by default.
       this.defaultReplication = null;

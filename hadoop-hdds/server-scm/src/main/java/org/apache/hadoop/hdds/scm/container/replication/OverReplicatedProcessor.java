@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * Class used to pick messages from the ReplicationManager over replicated
@@ -50,7 +51,7 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
     replicationManager.requeueOverReplicatedContainer(healthResult);
   }
   @Override
-  protected Map<DatanodeDetails, SCMCommand<?>> getDatanodeCommands(
+  protected Set<Pair<DatanodeDetails, SCMCommand<?>>> getDatanodeCommands(
       ReplicationManager replicationManager,
       ContainerHealthResult.OverReplicatedHealthResult healthResult)
       throws IOException {
