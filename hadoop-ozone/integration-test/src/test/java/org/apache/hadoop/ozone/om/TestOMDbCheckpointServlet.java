@@ -24,7 +24,6 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -283,8 +282,7 @@ public class TestOMDbCheckpointServlet {
 
     File outputFile =
         new File(Paths.get(testDirName, "output_file.tar").toString());
-    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-        Paths.get(testDirName));
+    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(checkpoint.toPath());
     writeDBCheckpointToStream(dbCheckpoint,
         new FileOutputStream(outputFile), new ArrayList<>());
     assertNotNull(outputFile);
@@ -294,7 +292,7 @@ public class TestOMDbCheckpointServlet {
   public void testWriteIncrementalCheckpointToOutputStream() throws Exception {
 
     File testRootDir = folder.newFolder();
-    File testDir = new File(testRootDir, "test");
+    File testDir = new File(testRootDir, "checkpoint");
     assertTrue(testDir.mkdir());
 
     File file1 = new File(testDir, "1.sst");
