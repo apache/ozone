@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
@@ -38,6 +39,7 @@ import static org.apache.commons.io.output.NullOutputStream.NULL_OUTPUT_STREAM;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -46,6 +48,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test for {@link PushReplicator}.
  */
+@Timeout(30)
 class TestPushReplicator {
 
   private OzoneConfiguration conf;
@@ -153,8 +156,7 @@ class TestPushReplicator {
       return null;
     })
         .when(source)
-        .copyData(eq(containerID), eq(outputStream),
-            compressionArgument.capture());
+        .copyData(eq(containerID), any(), compressionArgument.capture());
 
     return new PushReplicator(conf, source, uploader);
   }
