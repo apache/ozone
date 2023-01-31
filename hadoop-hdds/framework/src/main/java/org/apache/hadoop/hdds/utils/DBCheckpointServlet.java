@@ -46,7 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar.gz)
+ * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
  */
 public class DBCheckpointServlet extends HttpServlet {
 
@@ -171,9 +171,10 @@ public class DBCheckpointServlet extends HttpServlet {
       if (file == null) {
         return;
       }
-      response.setContentType("application/x-tgz");
+      response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition",
-          "attachment; filename=\"" + file + ".tgz\"");
+          "attachment; filename=\"" +
+               file + ".tar\"");
 
       Instant start = Instant.now();
       List<String> excluded = HddsServerUtil.writeDBCheckpointToStream(

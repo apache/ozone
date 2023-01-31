@@ -19,9 +19,12 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
@@ -37,27 +40,40 @@ public class GrpcReplicationService extends
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationService.class);
 
-  private static final int BUFFER_SIZE = 1024 * 1024;
+  static final int BUFFER_SIZE = 1024 * 1024;
 
   private final ContainerReplicationSource source;
+  private final ContainerImporter importer;
 
-  public GrpcReplicationService(ContainerReplicationSource source) {
+  public GrpcReplicationService(ContainerReplicationSource source,
+      ContainerImporter importer) {
     this.source = source;
+    this.importer = importer;
   }
 
   @Override
   public void download(CopyContainerRequestProto request,
       StreamObserver<CopyContainerResponseProto> responseObserver) {
     long containerID = request.getContainerID();
-    LOG.info("Streaming container data ({}) to other datanode", containerID);
+    String compression = request.hasCompression() ?
+        request.getCompression().toString() : CopyContainerCompression
+        .getDefaultCompression().toString();
+    LOG.info("Streaming container data ({}) to other datanode " +
+        "with compression {}", containerID, compression);
     try {
-      GrpcOutputStream outputStream =
-          new GrpcOutputStream(responseObserver, containerID, BUFFER_SIZE);
-      source.copyData(containerID, outputStream);
+      OutputStream outputStream = new CopyContainerResponseStream(
+          responseObserver, containerID, BUFFER_SIZE);
+      source.copyData(containerID, outputStream, compression);
     } catch (IOException e) {
       LOG.error("Error streaming container {}", containerID, e);
       responseObserver.onError(e);
     }
   }
 
+  @Override
+  public StreamObserver<SendContainerRequest> upload(
+      StreamObserver<SendContainerResponse> responseObserver) {
+
+    return new SendContainerRequestHandler(importer, responseObserver);
+  }
 }

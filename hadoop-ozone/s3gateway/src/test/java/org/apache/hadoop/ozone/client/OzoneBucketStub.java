@@ -118,7 +118,7 @@ public class OzoneBucketStub extends OzoneBucket {
             super.close();
           }
         };
-    return new OzoneOutputStream(byteArrayOutputStream);
+    return new OzoneOutputStream(byteArrayOutputStream, null);
   }
 
   @Override
@@ -150,7 +150,7 @@ public class OzoneBucketStub extends OzoneBucket {
             super.close();
           }
         };
-    return new OzoneOutputStream(byteArrayOutputStream);
+    return new OzoneOutputStream(byteArrayOutputStream, null);
   }
 
   @Override

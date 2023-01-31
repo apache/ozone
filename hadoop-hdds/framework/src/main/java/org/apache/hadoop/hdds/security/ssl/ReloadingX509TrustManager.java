@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.hdds.security.ssl;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,8 +136,8 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     ks.load(null, null);
     ks.setCertificateEntry(certId, cert);
 
-    TrustManagerFactory trustManagerFactory =
-        TrustManagerFactory.getInstance(SSLFactory.SSLCERTIFICATE);
+    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
+        TrustManagerFactory.getDefaultAlgorithm());
     trustManagerFactory.init(ks);
     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
     for (TrustManager trustManager1 : trustManagers) {

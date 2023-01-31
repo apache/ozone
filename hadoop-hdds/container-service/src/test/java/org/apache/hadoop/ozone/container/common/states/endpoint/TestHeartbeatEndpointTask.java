@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -107,6 +108,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
+    final long termInSCM = 42;
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         Mockito.mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
@@ -118,9 +120,15 @@ public class TestHeartbeatEndpointTask {
                 .setDatanodeUUID(
                     ((SCMHeartbeatRequestProto)invocation.getArgument(0))
                         .getDatanodeDetails().getUuid())
+                .setTerm(termInSCM)
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(scm);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        Mockito.mock(DatanodeStateMachine.class));
+    context.setTermOfLeaderSCM(1);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     Assertions.assertTrue(heartbeat.hasDatanodeDetails());
@@ -128,6 +136,9 @@ public class TestHeartbeatEndpointTask {
     Assertions.assertFalse(heartbeat.hasContainerReport());
     Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
     Assertions.assertFalse(heartbeat.hasContainerActions());
+    OptionalLong termInDatanode = context.getTermOfLeaderSCM();
+    Assertions.assertTrue(termInDatanode.isPresent());
+    Assertions.assertEquals(termInSCM, termInDatanode.getAsLong());
   }
 
   @Test
@@ -312,22 +323,6 @@ public class TestHeartbeatEndpointTask {
       Assertions.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
           queueCount.getCount(i));
     }
-  }
-
-  /**
-   * Creates HeartbeatEndpointTask for the given StorageContainerManager proxy.
-   *
-   * @param proxy StorageContainerDatanodeProtocolClientSideTranslatorPB
-   *
-   * @return HeartbeatEndpointTask
-   */
-  private HeartbeatEndpointTask getHeartbeatEndpointTask(
-      StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class));
-    return getHeartbeatEndpointTask(conf, context, proxy);
-
   }
 
   /**

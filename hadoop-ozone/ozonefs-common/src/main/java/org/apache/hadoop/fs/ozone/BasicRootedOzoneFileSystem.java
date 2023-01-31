@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -251,6 +252,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   private FSDataOutputStream createOutputStream(String key, short replication,
       boolean overwrite, boolean recursive) throws IOException {
+    boolean isRatisStreamingEnabled = getConf().getBoolean(
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
+    if (isRatisStreamingEnabled) {
+      return new FSDataOutputStream(adapter.createStreamFile(key,
+          replication, overwrite, recursive), statistics);
+    }
     return new FSDataOutputStream(adapter.createFile(key,
         replication, overwrite, recursive), statistics);
   }
@@ -275,7 +283,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.dstPath = pathToKey(dstPath);
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
       // Initialize bucket here to reduce number of RPC calls
-      OFSPath ofsPath = new OFSPath(srcPath);
+      OFSPath ofsPath = new OFSPath(srcPath,
+          OzoneConfiguration.of(getConfSource()));
       // TODO: Refactor later.
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
@@ -320,8 +329,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     // src and dst should be in the same bucket
-    OFSPath ofsSrc = new OFSPath(src);
-    OFSPath ofsDst = new OFSPath(dst);
+    OFSPath ofsSrc = new OFSPath(src,
+        OzoneConfiguration.of(getConfSource()));
+    OFSPath ofsDst = new OFSPath(dst,
+        OzoneConfiguration.of(getConfSource()));
     if (!ofsSrc.isInSameBucketAs(ofsDst)) {
       throw new IOException("Cannot rename a key to a different bucket");
     }
@@ -468,7 +479,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         throw new PathIsNotEmptyDirectoryException(f.toString());
       }
       // Initialize bucket here to reduce number of RPC calls
-      OFSPath ofsPath = new OFSPath(f);
+      OFSPath ofsPath = new OFSPath(f,
+          OzoneConfiguration.of(getConfSource()));
       // TODO: Refactor later.
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
@@ -498,7 +510,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.f = f;
       this.recursive = recursive;
       // Initialize bucket here to reduce number of RPC calls
-      OFSPath ofsPath = new OFSPath(f);
+      OFSPath ofsPath = new OFSPath(f,
+          OzoneConfiguration.of(getConfSource()));
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
       LOG.debug("Deleting bucket with name {} is via DeleteIteratorWithFSO.",
@@ -529,7 +542,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     DeleteIteratorFactory(Path f, boolean recursive) {
       this.path = f;
       this.recursive = recursive;
-      this.ofsPath = new OFSPath(f);
+      this.ofsPath = new OFSPath(f,
+          OzoneConfiguration.of(getConfSource()));
     }
 
     OzoneListingIterator getDeleteIterator()
@@ -594,7 +608,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
-      OFSPath ofsPath = new OFSPath(key);
+
+      OFSPath ofsPath = new OFSPath(key,
+          OzoneConfiguration.of(getConfSource()));
 
       // Handle rm root
       if (ofsPath.isRoot()) {
@@ -770,9 +786,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     do {
       tmpStatusList =
           adapter.listStatus(pathToKey(f), false, startPath,
-              numEntries, uri, workingDir, getUsername())
-              .stream()
-              .collect(Collectors.toList());
+              numEntries, uri, workingDir, getUsername());
 
       if (!tmpStatusList.isEmpty()) {
         if (startPath.isEmpty() || !statuses.getLast().getPath().toString()
@@ -835,7 +849,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public Path getTrashRoot(Path path) {
-    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsPath = new OFSPath(path,
+        OzoneConfiguration.of(getConfSource()));
     return ofsPath.getTrashRoot();
   }
 
@@ -1242,7 +1257,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT);
       if (status.isDir()) {
         LOG.trace("Iterating directory: {}", pathKey);
-        OFSPath ofsPath = new OFSPath(pathKey);
+        OFSPath ofsPath = new OFSPath(pathKey,
+            OzoneConfiguration.of(getConfSource()));
         String ofsPathPrefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         if (isFSO) {
@@ -1250,7 +1266,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           fileStatuses = listStatusAdapter(path);
           for (FileStatusAdapter fileStatus : fileStatuses) {
             String keyName =
-                new OFSPath(fileStatus.getPath().toString()).getKeyName();
+                new OFSPath(fileStatus.getPath().toString(),
+                    OzoneConfiguration.of(getConfSource())).getKeyName();
             keyPathList.add(ofsPathPrefix + keyName);
           }
           if (keyPathList.size() >= batchSize) {
@@ -1323,28 +1340,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
-    Path symLink = null;
-    try {
-      fileStatusAdapter.getSymlink();
-    } catch (Exception ex) {
-      //NOOP: If not symlink symlink remains null.
-    }
-
-    FileStatus fileStatus = new FileStatus(
-        fileStatusAdapter.getLength(),
-        fileStatusAdapter.isDir(),
-        fileStatusAdapter.getBlockReplication(),
-        fileStatusAdapter.getBlocksize(),
-        fileStatusAdapter.getModificationTime(),
-        fileStatusAdapter.getAccessTime(),
-        new FsPermission(fileStatusAdapter.getPermission()),
-        fileStatusAdapter.getOwner(),
-        fileStatusAdapter.getGroup(),
-        symLink,
-        fileStatusAdapter.getPath()
+  protected FileStatus constructFileStatus(
+          FileStatusAdapter fileStatusAdapter) {
+    return new FileStatus(fileStatusAdapter.getLength(),
+            fileStatusAdapter.isDir(),
+            fileStatusAdapter.getBlockReplication(),
+            fileStatusAdapter.getBlocksize(),
+            fileStatusAdapter.getModificationTime(),
+            fileStatusAdapter.getAccessTime(),
+            new FsPermission(fileStatusAdapter.getPermission()),
+            fileStatusAdapter.getOwner(),
+            fileStatusAdapter.getGroup(),
+            fileStatusAdapter.getSymlink(),
+            fileStatusAdapter.getPath(),
+            false,
+            fileStatusAdapter.isEncrypted(),
+            fileStatusAdapter.isErasureCoded()
     );
+  }
 
+  FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
+    FileStatus fileStatus = constructFileStatus(fileStatusAdapter);
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
     if (blockLocations == null || blockLocations.length == 0) {
       return fileStatus;

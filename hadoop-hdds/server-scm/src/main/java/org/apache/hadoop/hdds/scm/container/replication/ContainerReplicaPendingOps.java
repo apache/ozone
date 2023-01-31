@@ -52,6 +52,8 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<PendingOpType, AtomicLong>
       pendingOpCount = new ConcurrentHashMap<>();
   private ReplicationManagerMetrics replicationMetrics = null;
+  private List<ContainerReplicaPendingOpsSubscriber> subscribers =
+      new ArrayList<>();
 
   public ContainerReplicaPendingOps(final ConfigurationSource conf,
       Clock clock) {
@@ -119,7 +121,7 @@ public class ContainerReplicaPendingOps {
     boolean completed = completeOp(ADD, containerID, target, replicaIndex);
     if (isMetricsNotNull() && completed) {
       if (replicaIndex > 0) {
-        replicationMetrics.incrEcReplicationCmdsCompletedTotal();
+        replicationMetrics.incrEcReplicasCreatedTotal();
       } else if (replicaIndex == 0) {
         replicationMetrics.incrNumReplicationCmdsCompleted();
       }
@@ -141,7 +143,7 @@ public class ContainerReplicaPendingOps {
     boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
     if (isMetricsNotNull() && completed) {
       if (replicaIndex > 0) {
-        replicationMetrics.incrEcDeletionCmdsCompletedTotal();
+        replicationMetrics.incrEcReplicasDeletedTotal();
       } else if (replicaIndex == 0) {
         replicationMetrics.incrNumDeletionCmdsCompleted();
       }
@@ -168,6 +170,9 @@ public class ContainerReplicaPendingOps {
    */
   public void removeExpiredEntries(long expiryMilliSeconds) {
     for (ContainerID containerID : pendingOps.keySet()) {
+      // List of expired ops that subscribers will be notified about
+      List<ContainerReplicaOp> expiredOps = new ArrayList<>();
+
       // Rather than use an entry set, we get the map entry again. This is
       // to protect against another thread modifying the value after this
       // iterator started. Once we lock on the ContainerID object, no other
@@ -187,6 +192,7 @@ public class ContainerReplicaPendingOps {
           if (op.getScheduledEpochMillis() + expiryMilliSeconds
               < clock.millis()) {
             iterator.remove();
+            expiredOps.add(op);
             pendingOpCount.get(op.getOpType()).decrementAndGet();
             updateTimeoutMetrics(op);
           }
@@ -197,19 +203,24 @@ public class ContainerReplicaPendingOps {
       } finally {
         lock.unlock();
       }
+
+      // notify if there are expired ops
+      if (!expiredOps.isEmpty()) {
+        notifySubscribers(expiredOps, containerID, true);
+      }
     }
   }
 
   private void updateTimeoutMetrics(ContainerReplicaOp op) {
     if (op.getOpType() == ADD && isMetricsNotNull()) {
       if (op.getReplicaIndex() > 0) {
-        replicationMetrics.incrEcReplicationCmdsTimeoutTotal();
+        replicationMetrics.incrEcReplicaCreateTimeoutTotal();
       } else if (op.getReplicaIndex() == 0) {
         replicationMetrics.incrNumReplicationCmdsTimeout();
       }
     } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
       if (op.getReplicaIndex() > 0) {
-        replicationMetrics.incrEcDeletionCmdsTimeoutTotal();
+        replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
       } else if (op.getReplicaIndex() == 0) {
         replicationMetrics.incrNumDeletionCmdsTimeout();
       }
@@ -234,6 +245,8 @@ public class ContainerReplicaPendingOps {
   private boolean completeOp(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex) {
     boolean found = false;
+    // List of completed ops that subscribers will be notified about
+    List<ContainerReplicaOp> completedOps = new ArrayList<>();
     Lock lock = writeLock(containerID);
     lock.lock();
     try {
@@ -246,6 +259,7 @@ public class ContainerReplicaPendingOps {
               && op.getTarget().equals(target)
               && op.getReplicaIndex() == replicaIndex) {
             found = true;
+            completedOps.add(op);
             iterator.remove();
             pendingOpCount.get(op.getOpType()).decrementAndGet();
           }
@@ -257,7 +271,38 @@ public class ContainerReplicaPendingOps {
     } finally {
       lock.unlock();
     }
+
+    if (found) {
+      notifySubscribers(completedOps, containerID, false);
+    }
     return found;
+  }
+
+  /**
+   * Notifies subscribers about the specified ops by calling
+   * ContainerReplicaPendingOpsSubscriber#opCompleted.
+   *
+   * @param ops the ops to send notifications for
+   * @param containerID the container that ops belong to
+   * @param timedOut true if the ops (each one) expired, false if they completed
+   */
+  private void notifySubscribers(List<ContainerReplicaOp> ops,
+      ContainerID containerID, boolean timedOut) {
+    for (ContainerReplicaOp op : ops) {
+      for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
+        subscriber.opCompleted(op, containerID, timedOut);
+      }
+    }
+  }
+
+  /**
+   * Registers a subscriber that will be notified about completed ops.
+   *
+   * @param subscriber object that wants to subscribe
+   */
+  public void registerSubscriber(
+      ContainerReplicaPendingOpsSubscriber subscriber) {
+    subscribers.add(subscriber);
   }
 
   private Lock writeLock(ContainerID containerID) {

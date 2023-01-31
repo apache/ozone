@@ -29,7 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 
@@ -50,12 +50,12 @@ public class SCMDBSnapshotProvider extends RDBSnapshotProvider {
 
   private Map<String, SCMNodeDetails> peerNodesMap;
 
-  private final SCMCertificateClient scmCertificateClient;
+  private final CertificateClient scmCertificateClient;
 
   public SCMDBSnapshotProvider(ConfigurationSource conf,
       File scmRatisSnapshotDir,
       List<SCMNodeDetails> peerNodes,
-      SCMCertificateClient scmCertificateClient) {
+      CertificateClient scmCertificateClient) {
     super(scmRatisSnapshotDir, OzoneConsts.SCM_DB_NAME);
     LOG.info("Initializing SCM Snapshot Provider");
 

@@ -28,12 +28,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -415,16 +411,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   }
 
   public void setDefaultReplicationConfig(ReplicationConfig replicationConfig) {
-    this.defaultReplicationConfig = new DefaultReplicationConfig(
-        ReplicationType.fromProto(replicationConfig.getReplicationType()),
-        replicationConfig
-            .getReplicationType() == HddsProtos.ReplicationType.EC ?
-            null :
-            ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()),
-        replicationConfig
-            .getReplicationType() == HddsProtos.ReplicationType.EC ?
-            ((ECReplicationConfig) replicationConfig) :
-            null);
+    defaultReplicationConfig = new DefaultReplicationConfig(replicationConfig);
   }
 
   /**
@@ -681,7 +668,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (bucketInfo.hasDefaultReplicationConfig()) {
       obib.setDefaultReplicationConfig(
-          OMPBHelper.convert(bucketInfo.getDefaultReplicationConfig()));
+          DefaultReplicationConfig.fromProto(
+              bucketInfo.getDefaultReplicationConfig()));
     }
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());

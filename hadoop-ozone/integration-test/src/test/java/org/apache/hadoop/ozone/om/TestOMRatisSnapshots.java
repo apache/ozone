@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -86,6 +87,10 @@ public class TestOMRatisSnapshots {
 
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
+  // This test depends on direct RocksDB checks that are easier done with OBS
+  // buckets.
+  private static final BucketLayout TEST_BUCKET_LAYOUT =
+      BucketLayout.OBJECT_STORE;
 
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
@@ -130,7 +135,8 @@ public class TestOMRatisSnapshots {
     objectStore.createVolume(volumeName, createVolumeArgs);
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
 
-    retVolumeinfo.createBucket(bucketName);
+    retVolumeinfo.createBucket(bucketName,
+        BucketArgs.newBuilder().setBucketLayout(TEST_BUCKET_LAYOUT).build());
     ozoneBucket = retVolumeinfo.getBucket(bucketName);
   }
 
@@ -207,7 +213,7 @@ public class TestOMRatisSnapshots {
     assertNotNull(followerOMMetaMngr.getBucketTable().get(
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(getDefaultBucketLayout())
+      assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
@@ -222,9 +228,12 @@ public class TestOMRatisSnapshots {
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
+    // TODO: Enable this part after RATIS-1481 used
+    /*
     assertNotNull(followerOMMetaMngr.getKeyTable(
-        getDefaultBucketLayout()).get(followerOMMetaMngr.getOzoneKey(
+        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
         volumeName, bucketName, newKeys.get(0))));
+     */
   }
 
   @Test
@@ -296,11 +305,11 @@ public class TestOMRatisSnapshots {
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
 
     for (String key : firstKeys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(getDefaultBucketLayout())
+      assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
     for (String key : secondKeys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(getDefaultBucketLayout())
+      assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
@@ -319,7 +328,7 @@ public class TestOMRatisSnapshots {
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
     assertNotNull(followerOMMetaMngr.getKeyTable(
-        getDefaultBucketLayout()).get(followerOMMetaMngr.getOzoneKey(
+        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
         volumeName, bucketName, newKeys.get(0))));
 
     // Verify follower candidate directory get cleaned
@@ -422,11 +431,11 @@ public class TestOMRatisSnapshots {
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
     for (String key : firstKeys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(getDefaultBucketLayout())
+      assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
     for (String key : secondKeys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(getDefaultBucketLayout())
+      assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
@@ -446,7 +455,7 @@ public class TestOMRatisSnapshots {
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
     assertNotNull(followerOMMetaMngr.getKeyTable(
-        getDefaultBucketLayout()).get(followerOMMetaMngr.getOzoneKey(
+        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
         volumeName, bucketName, newKeys.get(0))));
 
     // Verify follower candidate directory get cleaned
@@ -537,20 +546,20 @@ public class TestOMRatisSnapshots {
         followerOMMetaMgr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
       assertNotNull(followerOMMetaMgr.getKeyTable(
-          getDefaultBucketLayout())
+          TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
     OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
     for (String key : newKeys) {
       assertNotNull(leaderOmMetaMgr.getKeyTable(
-          getDefaultBucketLayout())
+          TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
     Thread.sleep(5000);
     followerOMMetaMgr = followerOM.getMetadataManager();
     for (String key : newKeys) {
       assertNotNull(followerOMMetaMgr.getKeyTable(
-          getDefaultBucketLayout())
+          TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
     // Read newly created keys
@@ -635,7 +644,8 @@ public class TestOMRatisSnapshots {
     assertNotNull(followerOMMetaMngr.getBucketTable().get(
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(getDefaultBucketLayout())
+      assertNotNull(followerOMMetaMngr.getKeyTable(
+          TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
@@ -804,10 +814,6 @@ public class TestOMRatisSnapshots {
       inputStream.read(data, 0, 100);
       inputStream.close();
     }
-  }
-
-  private static BucketLayout getDefaultBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 
   private static class DummyExitManager extends ExitManager {

@@ -352,18 +352,18 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
+    OmKeyInfo value = null;
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
-
-    BucketLayout bucketLayout =
-        getBucketLayout(metadataManager, args.getVolumeName(),
-            args.getBucketName());
-    keyName = OMClientRequest
-        .validateAndNormalizeKey(enableFileSystemPaths, keyName,
-            bucketLayout);
-
-    OmKeyInfo value = null;
     try {
+      BucketLayout bucketLayout =
+          getBucketLayout(metadataManager, args.getVolumeName(),
+              args.getBucketName());
+      keyName = OMClientRequest
+          .validateAndNormalizeKey(enableFileSystemPaths, keyName,
+              bucketLayout);
+
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
@@ -1318,17 +1318,20 @@ public class KeyManagerImpl implements KeyManager {
     OmKeyInfo fakeDirKeyInfo = null;
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
-    Table.KeyValue<String, OmKeyInfo> keyValue =
-            metadataManager.getKeyTable(layout).iterator()
-                .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
+      Table.KeyValue<String, OmKeyInfo> keyValue =
+          keyTblItr
+              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
 
-    if (keyValue != null) {
-      Path fullPath = Paths.get(keyValue.getValue().getKeyName());
-      Path subPath = Paths.get(dirKey);
-      OmKeyInfo omKeyInfo = keyValue.getValue();
-      if (fullPath.startsWith(subPath)) {
-        // create fake directory
-        fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+      if (keyValue != null) {
+        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+        Path subPath = Paths.get(dirKey);
+        OmKeyInfo omKeyInfo = keyValue.getValue();
+        if (fullPath.startsWith(subPath)) {
+          // create fake directory
+          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+        }
       }
     }
 
@@ -1591,16 +1594,27 @@ public class KeyManagerImpl implements KeyManager {
     String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
+    Table<String, OmKeyInfo> keyTable;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
-    Table<String, OmKeyInfo> keyTable = metadataManager
-        .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = getIteratorForKeyInTableCache(recursive, startKey,
-        volumeName, bucketName, cacheKeyMap, keyArgs, keyTable)) {
+    try {
+      keyTable = metadataManager
+          .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
+      iterator = getIteratorForKeyInTableCache(recursive, startKey,
+          volumeName, bucketName, cacheKeyMap, keyArgs, keyTable);
+    } finally {
+      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+          bucketName);
+    }
+
+    try {
       findKeyInDbWithIterator(recursive, startKey, numEntries, volumeName,
           bucketName, keyName, cacheKeyMap, keyArgs, keyTable, iterator);
+    } finally {
+      iterator.close();
     }
+
     int countEntries;
 
     countEntries = 0;
@@ -1636,21 +1650,16 @@ public class KeyManagerImpl implements KeyManager {
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable) throws IOException {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
-    try {
-      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
-          cacheIter = keyTable.cacheIterator();
-      String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-          OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-          ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
+        cacheIter = keyTable.cacheIterator();
+    String startCacheKey = OZONE_URI_DELIMITER + volumeName +
+        OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
+        ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
 
-      // First, find key in TableCache
-      listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
-          recursive, cacheKeyMap);
-      iterator = keyTable.iterator();
-    } finally {
-      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
-    }
+    // First, find key in TableCache
+    listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
+        recursive, cacheKeyMap);
+    iterator = keyTable.iterator();
     return iterator;
   }
 

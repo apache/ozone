@@ -320,12 +320,13 @@ public class TestOzoneContainer {
           chunkList.add(info.getProtoBufMessage());
         }
         blockData.setChunks(chunkList);
-        blockDataTable.put(cData.blockKey(blockID.getLocalID()), blockData);
+        blockDataTable.put(cData.getBlockKey(blockID.getLocalID()),
+            blockData);
       }
 
       // Set Block count and used bytes.
-      metadataTable.put(cData.blockCountKey(), (long) blocks);
-      metadataTable.put(cData.bytesUsedKey(), usedBytes);
+      metadataTable.put(cData.getBlockCountKey(), (long) blocks);
+      metadataTable.put(cData.getBytesUsedKey(), usedBytes);
     }
     // remaining available capacity of the container
     return (freeBytes - usedBytes);

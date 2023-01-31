@@ -27,9 +27,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -49,6 +49,8 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -65,9 +67,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
-import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * The default CertificateServer used by SCM. This has no dependencies on any
@@ -252,7 +254,6 @@ public class DefaultCAServer implements CertificateServer {
           LOG.error("Certificate storage failed, retrying one more time.", e);
           xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
-
         xcertHolder.complete(xcert);
         break;
       default:
@@ -474,19 +475,7 @@ public class DefaultCAServer implements CertificateServer {
       break;
     case INITIALIZE:
       if (type == CAType.SELF_SIGNED_CA) {
-        consumer = (arg) -> {
-          try {
-            generateSelfSignedCA(arg);
-          } catch (NoSuchProviderException | NoSuchAlgorithmException
-              | IOException e) {
-            LOG.error("Unable to initialize CertificateServer.", e);
-          }
-          VerificationStatus newStatus = verifySelfSignedCA(arg);
-          if (newStatus != VerificationStatus.SUCCESS) {
-            LOG.error("Unable to initialize CertificateServer, failed in " +
-                "verification.");
-          }
-        };
+        consumer = this::initRootCa;
       } else if (type == CAType.INTERMEDIARY_CA) {
         // For sub CA certificates are generated during bootstrap/init. If
         // both keys/certs are missing, init/bootstrap is missed to be
@@ -504,6 +493,29 @@ public class DefaultCAServer implements CertificateServer {
       break;
     }
     return consumer;
+  }
+
+  private void initRootCa(SecurityConfig securityConfig) {
+    if (isExternalCaSpecified(securityConfig)) {
+      initWithExternalRootCa(securityConfig);
+    } else {
+      try {
+        generateSelfSignedCA(securityConfig);
+      } catch (NoSuchProviderException | NoSuchAlgorithmException
+               | IOException e) {
+        LOG.error("Unable to initialize CertificateServer.", e);
+      }
+    }
+    VerificationStatus newStatus = verifySelfSignedCA(securityConfig);
+    if (newStatus != VerificationStatus.SUCCESS) {
+      LOG.error("Unable to initialize CertificateServer, failed in " +
+          "verification.");
+    }
+  }
+
+  private boolean isExternalCaSpecified(SecurityConfig conf) {
+    return !conf.getExternalRootCaCert().isEmpty() &&
+        !conf.getExternalRootCaPrivateKeyPath().isEmpty();
   }
 
   /**
@@ -529,12 +541,13 @@ public class DefaultCAServer implements CertificateServer {
    * Generates a self-signed Root Certificate for CA.
    *
    * @param securityConfig - SecurityConfig
-   * @param key - KeyPair.
+   * @param key            - KeyPair.
    * @throws IOException          - on Error.
    * @throws SCMSecurityException - on Error.
    */
-  private void generateRootCertificate(SecurityConfig securityConfig,
-      KeyPair key) throws IOException, SCMSecurityException {
+  private void generateRootCertificate(
+      SecurityConfig securityConfig, KeyPair key)
+      throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
     LocalDateTime beginDate =
         LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
@@ -562,8 +575,8 @@ public class DefaultCAServer implements CertificateServer {
           });
     } catch (IOException e) {
       throw new org.apache.hadoop.hdds.security.x509
-          .exceptions.CertificateException(
-              "Error while adding ip to CA self signed certificate", e,
+          .exception.CertificateException(
+          "Error while adding ip to CA self signed certificate", e,
           CSR_ERROR);
     }
     X509CertificateHolder selfSignedCertificate = builder.build();
@@ -571,6 +584,65 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certCodec =
         new CertificateCodec(config, componentName);
     certCodec.writeCertificate(selfSignedCertificate);
+  }
+
+  private void initWithExternalRootCa(SecurityConfig conf) {
+    String externalRootCaLocation = conf.getExternalRootCaCert();
+    Path extCertPath = Paths.get(externalRootCaLocation);
+    Path extPrivateKeyPath = Paths.get(conf.getExternalRootCaPrivateKeyPath());
+    String externalPublicKeyLocation = conf.getExternalRootCaPublicKeyPath();
+
+    KeyCodec keyCodec = new KeyCodec(config, componentName);
+    CertificateCodec certificateCodec =
+        new CertificateCodec(config, componentName);
+    try {
+      Path extCertParent = extCertPath.getParent();
+      Path extCertName = extCertPath.getFileName();
+      if (extCertParent == null || extCertName == null) {
+        throw new IOException("External cert path is not correct: " +
+            extCertPath);
+      }
+      X509CertificateHolder certHolder = certificateCodec.readCertificate(
+          extCertParent, extCertName.toString());
+      Path extPrivateKeyParent = extPrivateKeyPath.getParent();
+      Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
+      if (extPrivateKeyParent == null || extPrivateKeyFileName == null) {
+        throw new IOException("External private key path is not correct: " +
+            extPrivateKeyPath);
+      }
+      PrivateKey privateKey = keyCodec.readPrivateKey(extPrivateKeyParent,
+          extPrivateKeyFileName.toString());
+      PublicKey publicKey;
+      publicKey = readPublicKeyWithExternalData(
+          externalPublicKeyLocation, keyCodec, certHolder);
+      keyCodec.writeKey(new KeyPair(publicKey, privateKey));
+      certificateCodec.writeCertificate(certHolder);
+    } catch (IOException | CertificateException | NoSuchAlgorithmException |
+             InvalidKeySpecException e) {
+      LOG.error("External root CA certificate initialization failed", e);
+    }
+  }
+
+  private PublicKey readPublicKeyWithExternalData(
+      String externalPublicKeyLocation, KeyCodec keyCodec,
+      X509CertificateHolder certHolder)
+      throws CertificateException, NoSuchAlgorithmException,
+      InvalidKeySpecException, IOException {
+    PublicKey publicKey;
+    if (externalPublicKeyLocation.isEmpty()) {
+      publicKey = CertificateCodec.getX509Certificate(certHolder)
+          .getPublicKey();
+    } else {
+      Path publicKeyPath = Paths.get(externalPublicKeyLocation);
+      Path publicKeyPathFileName = publicKeyPath.getFileName();
+      Path publicKeyParent = publicKeyPath.getParent();
+      if (publicKeyPathFileName == null || publicKeyParent == null) {
+        throw new IOException("Public key path incorrect: " + publicKeyParent);
+      }
+      publicKey = keyCodec.readPublicKey(
+          publicKeyParent, publicKeyPathFileName.toString());
+    }
+    return publicKey;
   }
 
   /**

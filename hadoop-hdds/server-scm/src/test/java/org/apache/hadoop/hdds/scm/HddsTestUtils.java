@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -84,7 +85,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -691,11 +691,20 @@ public final class HddsTestUtils {
   }
 
   public static Set<ContainerReplica> getReplicas(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long sequenceId,
+          final DatanodeDetails... datanodeDetails) {
+    return Sets.newHashSet(getReplicas(containerId, state, sequenceId,
+            Arrays.asList(datanodeDetails)));
+  }
+
+  public static List<ContainerReplica> getReplicas(
       final ContainerID containerId,
       final ContainerReplicaProto.State state,
       final long sequenceId,
-      final DatanodeDetails... datanodeDetails) {
-    Set<ContainerReplica> replicas = new HashSet<>();
+      final Iterable<DatanodeDetails> datanodeDetails) {
+    List<ContainerReplica> replicas = new ArrayList<>();
     for (DatanodeDetails datanode : datanodeDetails) {
       replicas.add(getReplicas(containerId, state,
           sequenceId, datanode.getUuid(), datanode));
@@ -744,14 +753,14 @@ public final class HddsTestUtils {
     return builder.build();
   }
 
-  public static Set<ContainerReplica> getReplicasWithReplicaIndex(
+  public static List<ContainerReplica> getReplicasWithReplicaIndex(
           final ContainerID containerId,
           final ContainerReplicaProto.State state,
           final long usedBytes,
           final long keyCount,
           final long sequenceId,
-          final DatanodeDetails... datanodeDetails) {
-    Set<ContainerReplica> replicas = new HashSet<>();
+          final Iterable<DatanodeDetails> datanodeDetails) {
+    List<ContainerReplica> replicas = new ArrayList<>();
     int replicaIndex = 1;
     for (DatanodeDetails datanode : datanodeDetails) {
       replicas.add(getReplicaBuilder(containerId, state,
@@ -760,6 +769,17 @@ public final class HddsTestUtils {
       replicaIndex += 1;
     }
     return replicas;
+  }
+
+  public static Set<ContainerReplica> getReplicasWithReplicaIndex(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final long usedBytes,
+          final long keyCount,
+          final long sequenceId,
+          final DatanodeDetails... datanodeDetails) {
+    return Sets.newHashSet(getReplicasWithReplicaIndex(containerId, state,
+            usedBytes, keyCount, sequenceId, Arrays.asList(datanodeDetails)));
   }
 
 
