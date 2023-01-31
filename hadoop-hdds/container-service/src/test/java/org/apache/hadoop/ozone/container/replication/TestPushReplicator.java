@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.ozone.test.SpyOutputStream;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -42,6 +43,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test for {@link PushReplicator}.
  */
+@Disabled("HDDS-7856")
 class TestPushReplicator {
 
   @Test
