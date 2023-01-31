@@ -220,8 +220,9 @@ public class TestOzoneSnapshotRestore {
     Assertions.assertEquals(0, delKeyCount);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
-            + OM_KEY_PREFIX + snapshotKeyPrefix;
-    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
+        + OM_KEY_PREFIX + snapshotKeyPrefix;
+    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
+        + OM_KEY_PREFIX;
 
     for (int i = 0; i < 5; i++) {
       keyCopy(sourcePath + keyPrefix + i, destPath);
@@ -259,8 +260,9 @@ public class TestOzoneSnapshotRestore {
     Assertions.assertEquals(5, volBucketKeyCount);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
-            + OM_KEY_PREFIX + snapshotKeyPrefix;
-    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket2;
+        + OM_KEY_PREFIX + snapshotKeyPrefix;
+    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket2
+        + OM_KEY_PREFIX;
 
     for (int i = 0; i < 5; i++) {
       keyCopy(sourcePath + keyPrefix + i, destPath);
@@ -302,8 +304,9 @@ public class TestOzoneSnapshotRestore {
     Assertions.assertEquals(5, volBucketKeyCount);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
-            + OM_KEY_PREFIX + snapshotKeyPrefix;
-    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket2;
+        + OM_KEY_PREFIX + snapshotKeyPrefix;
+    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket2
+        + OM_KEY_PREFIX;
 
     for (int i = 0; i < 5; i++) {
       keyCopy(sourcePath + keyPrefix + i, destPath);
