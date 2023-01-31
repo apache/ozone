@@ -79,7 +79,7 @@ public class CleanExpired implements Callable<Void>, SubcommandWithParent {
     try {
       DBStore dbStore = HAUtils.loadDB(
           configuration, db.getParentFile(),
-          db.getName(), new SCMDBDefinition());
+          db.getName(), new SCMDBDefinition(), false);
       removeExpiredCertificates(dbStore);
     } catch (Exception e) {
       LOG.error("Error trying to open file: " + dbFilePath +
