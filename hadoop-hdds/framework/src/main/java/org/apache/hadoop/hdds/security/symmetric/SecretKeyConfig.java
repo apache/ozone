@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME_DEFAULT;
@@ -54,13 +55,13 @@ public class SecretKeyConfig {
         HDDS_SECRET_KEY_FILE_DEFAULT);
     localSecretKeyFile = Paths.get(metadataDir, component, keyDir, fileName);
 
-    String rotateDurationStr = conf.get(HDDS_SECRET_KEY_ROTATE_DURATION,
-        HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT);
-    this.rotateDuration = Duration.parse(rotateDurationStr);
+    long rotateDurationInMs = conf.getTimeDuration(HDDS_SECRET_KEY_ROTATE_DURATION,
+        HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
+    this.rotateDuration = Duration.ofMillis(rotateDurationInMs);
 
-    String expiryDurationStr = conf.get(HDDS_SECRET_KEY_EXPIRY_DURATION,
-        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT);
-    this.expiryDuration = Duration.parse(expiryDurationStr);
+    long expiryDurationInMs = conf.getTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION,
+        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
+    this.expiryDuration = Duration.ofMillis(expiryDurationInMs);
 
     this.algorithm = conf.get(HDDS_SECRET_KEY_ALGORITHM,
         HDDS_SECRET_KEY_ALGORITHM_DEFAULT);

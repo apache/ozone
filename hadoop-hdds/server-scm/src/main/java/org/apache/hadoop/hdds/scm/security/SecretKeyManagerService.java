@@ -84,10 +84,10 @@ public class SecretKeyManagerService implements SCMService, Runnable {
             .setNameFormat(getServiceName())
             .build());
 
-    String rotationCheckDurationStr = conf.get(
+    long rotationCheckInMs = conf.getTimeDuration(
         HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
-        HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT);
-    rotationCheckDuration = Duration.parse(rotationCheckDurationStr);
+        HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
+    rotationCheckDuration = Duration.ofMillis(rotationCheckInMs);
 
     start();
   }

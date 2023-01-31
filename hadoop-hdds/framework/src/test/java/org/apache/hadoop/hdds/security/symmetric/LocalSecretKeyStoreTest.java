@@ -30,10 +30,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Duration;
@@ -127,7 +125,7 @@ public class LocalSecretKeyStoreTest {
   @Test
   public void testLoadExistingFile() throws Exception {
     // copy test file content to the backing file.
-    String test_json = "[\n" +
+    String testJson = "[\n" +
         "  {\n" +
         "    \"id\":\"78864cfb-793b-4157-8ad6-714c9f950a16\",\n" +
         "    \"creationTime\":\"2007-12-03T10:15:30Z\",\n" +
@@ -136,7 +134,7 @@ public class LocalSecretKeyStoreTest {
         "    \"encoded\":\"YSeCdJRB4RclxoeE69ENmTe2Cv8ybyKhHP3mq4M1r8o=\"\n" +
         "  }\n" +
         "]";
-    Files.write(testSecretFile, Collections.singletonList(test_json),
+    Files.write(testSecretFile, Collections.singletonList(testJson),
         StandardOpenOption.WRITE);
 
     Instant date = Instant.parse("2007-12-03T10:15:30.00Z");

@@ -3612,30 +3612,27 @@
   </property>
   <property>
     <name>hdds.secret.key.expiry.duration</name>
-    <value>P7D</value>
+    <value>7d</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
-      The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
     </description>
   </property>
   <property>
     <name>hdds.secret.key.rotate.duration</name>
-    <value>P1D</value>
+    <value>1d</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration that SCM periodically generate a new symmetric secret keys.
-      The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
     </description>
   </property>
   <property>
     <name>hdds.secret.key.rotate.check.duration</name>
-    <value>PT10M</value>
+    <value>10m</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration that SCM periodically checks if it's time to generate new symmetric secret keys.
       This must be smaller than hdds.secret.key.rotate.duration.
-      The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
     </description>
   </property>
   <property>

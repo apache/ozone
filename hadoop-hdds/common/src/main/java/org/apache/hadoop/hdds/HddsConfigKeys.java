@@ -222,11 +222,11 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
       "hdds.secret.key.expiry.duration";
-  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "P7D";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
 
   public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
       "hdds.secret.key.rotate.duration";
-  public static final String HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT = "P1D";
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT = "1d";
 
   public static final String HDDS_SECRET_KEY_ALGORITHM =
       "hdds.secret.key.algorithm";
@@ -236,7 +236,7 @@ public final class HddsConfigKeys {
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION =
       "hdds.secret.key.rotate.check.duration";
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
-      = "PT10M";
+      = "10m";
 
   /**
    * Do not instantiate.

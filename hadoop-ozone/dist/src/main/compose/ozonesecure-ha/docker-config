@@ -138,7 +138,3 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
-
-OZONE-SITE.XML_hdds.secret.key.rotate.duration=PT5M
-OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=PT1M
-OZONE-SITE.XML_hdds.secret.key.expiry.duration=PT1H

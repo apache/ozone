@@ -43,6 +43,7 @@ import java.util.UUID;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -50,7 +51,7 @@ import static java.util.stream.Collectors.toList;
  * JSON file on local file system.
  */
 public class LocalSecretKeyStore implements SecretKeyStore {
-  public static final Set<PosixFilePermission> SECRET_KEYS_PERMISSIONS =
+  private static final Set<PosixFilePermission> SECRET_KEYS_PERMISSIONS =
       newHashSet(OWNER_READ, OWNER_WRITE);
   private static final Logger LOG =
       LoggerFactory.getLogger(LocalSecretKeyStore.class);
@@ -59,7 +60,7 @@ public class LocalSecretKeyStore implements SecretKeyStore {
   private final ObjectMapper mapper;
 
   public LocalSecretKeyStore(Path secretKeysFile) {
-    this.secretKeysFile = secretKeysFile;
+    this.secretKeysFile = requireNonNull(secretKeysFile);
     this.mapper = new ObjectMapper()
         .registerModule(new JavaTimeModule())
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
@@ -108,7 +109,8 @@ public class LocalSecretKeyStore implements SecretKeyStore {
   private void createSecretKeyFiles() {
     try {
       if (!Files.exists(secretKeysFile)) {
-        if (!Files.exists(secretKeysFile.getParent())) {
+        if (secretKeysFile.getParent() != null
+            && !Files.exists(secretKeysFile.getParent())) {
           Files.createDirectories(secretKeysFile.getParent());
         }
         Files.createFile(secretKeysFile);
