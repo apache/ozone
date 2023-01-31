@@ -30,4 +30,4 @@
  * An excellent example of a profile would be ozone profile if you would
  * like to see a reference to create your own profiles.
  */
-package org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles;
+package org.apache.hadoop.hdds.security.x509.certificate.authority.profile;

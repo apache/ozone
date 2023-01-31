@@ -20,4 +20,4 @@
 /**
  * Exceptions thrown by X.509 security classes.
  */
-package org.apache.hadoop.hdds.security.x509.exceptions;
+package org.apache.hadoop.hdds.security.x509.exception;

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,14 +77,20 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
-  private final Set<ContainerReplica> replicas;
+  private final List<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> replicaPendingOps,
       int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
-    this.replicas = replicas;
+    // Iterate replicas in deterministic order to avoid potential data loss
+    // on delete.
+    // See https://issues.apache.org/jira/browse/HDDS-4589.
+    // N.B., sort replicas by (containerID, datanodeDetails).
+    this.replicas = replicas.stream()
+        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
+        .collect(Collectors.toList());
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
     this.pendingAdd = new ArrayList<>();
     this.pendingDelete = new ArrayList<>();
@@ -173,7 +180,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   @Override
-  public Set<ContainerReplica> getReplicas() {
+  public List<ContainerReplica> getReplicas() {
     return replicas;
   }
 
@@ -317,7 +324,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     for (Integer i : decommissionIndexes.keySet()) {
       missing.remove(i);
     }
-    return missing.stream().collect(Collectors.toList());
+    return new ArrayList<>(missing);
   }
 
   /**

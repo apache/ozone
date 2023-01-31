@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.OzoneSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -264,19 +264,8 @@ public class OzoneDelegationTokenSecretManager
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
-    identifier.setOmCertSerialId(getOmCertificateSerialId());
+    identifier.setOmCertSerialId(getCertSerialId());
     identifier.setOmServiceId(getOmServiceId());
-  }
-
-  /**
-   * Get OM certificate serial id.
-   * */
-  private String getOmCertificateSerialId() {
-    if (omCertificateSerialId == null) {
-      omCertificateSerialId =
-          getCertClient().getCertificate().getSerialNumber().toString();
-    }
-    return omCertificateSerialId;
   }
 
   private String getOmServiceId() {
@@ -480,6 +469,7 @@ public class OzoneDelegationTokenSecretManager
     try {
       signerCert.checkValidity();
     } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+      LOG.error("signerCert {} is invalid", signerCert, e);
       return false;
     }
 
@@ -487,6 +477,7 @@ public class OzoneDelegationTokenSecretManager
       return getCertClient().verifySignature(identifier.getBytes(), password,
           signerCert);
     } catch (CertificateException e) {
+      LOG.error("verifySignature with signerCert {} failed", signerCert, e);
       return false;
     }
   }

@@ -17,7 +17,7 @@
  *
  */
 
-package org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles;
+package org.apache.hadoop.hdds.security.x509.certificate.authority.profile;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.BasicConstraints;

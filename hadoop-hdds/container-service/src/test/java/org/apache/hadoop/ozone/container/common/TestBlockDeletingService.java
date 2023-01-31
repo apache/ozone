@@ -224,7 +224,8 @@ public class TestBlockDeletingService {
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
       for (int j = 0; j < numOfBlocksPerContainer; j++) {
         blockID = ContainerTestHelper.getTestBlockID(containerID);
-        String deleteStateName = data.deletingBlockKey(blockID.getLocalID());
+        String deleteStateName = data.getDeletingBlockKey(
+            blockID.getLocalID());
         BlockData kd = new BlockData(blockID);
         List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
         putChunksInBlock(numOfChunksPerBlock, j, chunks, buffer, chunkManager,
@@ -256,7 +257,7 @@ public class TestBlockDeletingService {
           container, blockID);
       kd.setChunks(chunks);
       try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-        String blockKey = data.blockKey(blockID.getLocalID());
+        String blockKey = data.getBlockKey(blockID.getLocalID());
         metadata.getStore().getBlockDataTable().put(blockKey, kd);
       } catch (IOException exception) {
         LOG.info("Exception = " + exception);
@@ -291,7 +292,7 @@ public class TestBlockDeletingService {
           DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
               (DatanodeStoreSchemaThreeImpl) ds;
           dnStoreThreeImpl.getDeleteTransactionTable()
-              .putWithBatch(batch, data.deleteTxnKey(txnID), dtx);
+              .putWithBatch(batch, data.getDeleteTxnKey(txnID), dtx);
         } else {
           DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
               (DatanodeStoreSchemaTwoImpl) ds;
@@ -344,12 +345,12 @@ public class TestBlockDeletingService {
       container.getContainerData().setBlockCount(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
-          .put(data.blockCountKey(), (long) numOfBlocksPerContainer);
+          .put(data.getBlockCountKey(), (long) numOfBlocksPerContainer);
       metadata.getStore().getMetadataTable()
-          .put(data.bytesUsedKey(),
+          .put(data.getBytesUsedKey(),
               chunkLength * numOfChunksPerBlock * numOfBlocksPerContainer);
       metadata.getStore().getMetadataTable()
-          .put(data.pendingDeleteBlockCountKey(),
+          .put(data.getPendingDeleteBlockCountKey(),
               (long) numOfBlocksPerContainer);
     } catch (IOException exception) {
       LOG.warn("Meta Data update was not successful for container: "
@@ -465,7 +466,7 @@ public class TestBlockDeletingService {
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta, data));
       Assert.assertEquals(3, meta.getStore().getMetadataTable()
-          .get(data.pendingDeleteBlockCountKey()).longValue());
+          .get(data.getPendingDeleteBlockCountKey()).longValue());
 
       // Container contains 3 blocks. So, space used by the container
       // should be greater than zero.
@@ -495,9 +496,9 @@ public class TestBlockDeletingService {
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
       Assert.assertEquals(0, meta.getStore().getMetadataTable()
-          .get(data.pendingDeleteBlockCountKey()).longValue());
+          .get(data.getPendingDeleteBlockCountKey()).longValue());
       Assert.assertEquals(0,
-          meta.getStore().getMetadataTable().get(data.blockCountKey())
+          meta.getStore().getMetadataTable().get(data.getBlockCountKey())
               .longValue());
       Assert.assertEquals(3,
           deletingServiceMetrics.getSuccessCount()

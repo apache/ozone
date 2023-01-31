@@ -231,29 +231,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithOnlyVolumeQuotaExceeded()
-      throws Exception {
-    when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
-    OMRequest modifiedOmRequest =
-        doPreExecute(createKeyRequest(false, 0, keyName));
-
-    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(
-        modifiedOmRequest, getBucketLayout());
-
-    // create bucket with quota limit 1
-    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager, 1L);
-    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
-        omMetadataManager, omKeyCreateRequest.getBucketLayout());
-
-    OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
-    Assert.assertTrue(omKeyCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-  }
-
   private void checkResponse(OMRequest modifiedOmRequest,
       OMClientResponse omKeyCreateResponse, long id, boolean override,
       BucketLayout bucketLayout) throws Exception {

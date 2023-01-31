@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
-import java.util.Set;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
@@ -33,7 +33,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 public interface ContainerReplicaCount {
   ContainerInfo getContainer();
 
-  Set<ContainerReplica> getReplicas();
+  List<ContainerReplica> getReplicas();
 
   boolean isSufficientlyReplicated();
 
