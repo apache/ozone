@@ -55,11 +55,13 @@ public class SecretKeyConfig {
         HDDS_SECRET_KEY_FILE_DEFAULT);
     localSecretKeyFile = Paths.get(metadataDir, component, keyDir, fileName);
 
-    long rotateDurationInMs = conf.getTimeDuration(HDDS_SECRET_KEY_ROTATE_DURATION,
+    long rotateDurationInMs = conf.getTimeDuration(
+        HDDS_SECRET_KEY_ROTATE_DURATION,
         HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
     this.rotateDuration = Duration.ofMillis(rotateDurationInMs);
 
-    long expiryDurationInMs = conf.getTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION,
+    long expiryDurationInMs = conf.getTimeDuration(
+        HDDS_SECRET_KEY_EXPIRY_DURATION,
         HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
     this.expiryDuration = Duration.ofMillis(expiryDurationInMs);
 
