@@ -41,6 +41,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.google.common.collect.Sets.newHashSet;
+import static java.nio.file.Files.createDirectories;
+import static java.nio.file.Files.createFile;
+import static java.nio.file.Files.exists;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
 import static java.util.Objects.requireNonNull;
@@ -108,12 +111,12 @@ public class LocalSecretKeyStore implements SecretKeyStore {
 
   private void createSecretKeyFiles() {
     try {
-      if (!Files.exists(secretKeysFile)) {
-        if (secretKeysFile.getParent() != null
-            && !Files.exists(secretKeysFile.getParent())) {
-          Files.createDirectories(secretKeysFile.getParent());
+      if (!exists(secretKeysFile)) {
+        Path parent = secretKeysFile.getParent();
+        if (parent != null && !exists(parent)) {
+          createDirectories(parent);
         }
-        Files.createFile(secretKeysFile);
+        createFile(secretKeysFile);
       }
       Files.setPosixFilePermissions(secretKeysFile, SECRET_KEYS_PERMISSIONS);
     } catch (IOException e) {
