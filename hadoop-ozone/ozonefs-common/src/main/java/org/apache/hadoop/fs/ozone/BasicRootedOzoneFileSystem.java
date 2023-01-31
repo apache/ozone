@@ -88,7 +88,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
  * This is a basic version which doesn't extend
  * KeyProviderTokenIssuer and doesn't include statistics. It can be used
  * from older hadoop version. For newer hadoop version use the full featured
- * BasicRootedOzoneFileSystem.
+ * RootedOzoneFileSystem.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -659,22 +659,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
 
+      // handling posix symlink delete behaviours
+      // i.) rm [-r] <symlink path>, delete symlink not target bucket contents
+      // ii.) rm -r <symlink path>/, delete target bucket contents not symlink
+      boolean handleTrailingSlash = false;
       boolean isBucketLink = false;
       // check for bucket link
       if (ofsPath.isBucket()) {
         isBucketLink = adapterImpl.getBucket(ofsPath, false)
             .isLink();
+        handleTrailingSlash = f.toString().endsWith(OZONE_URI_DELIMITER);
       }
 
       // if link, don't delete contents
-      if (isBucketLink) {
+      if (isBucketLink && !handleTrailingSlash) {
         result = true;
       } else {
         result = innerDelete(f, recursive);
       }
 
       // Handle delete bucket
-      if (ofsPath.isBucket()) {
+      if (ofsPath.isBucket() && !handleTrailingSlash) {
         OzoneVolume volume =
             adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
         try {
@@ -1399,6 +1404,24 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return new ContentSummary.Builder().length(summary[0]).
         fileCount(summary[2]).directoryCount(summary[3]).
         spaceConsumed(summary[1]).build();
+  }
+
+  @Override
+  public boolean supportsSymlinks() {
+    return true;
+  }
+
+  @Override
+  public Path getLinkTarget(Path f) throws IOException {
+    OFSPath ofsPath = new OFSPath(f,
+        OzoneConfiguration.of(getConfSource()));
+    OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+    if (bucket.isLink()) {
+      return new Path(OZONE_URI_DELIMITER +
+          bucket.getSourceVolume() + OZONE_URI_DELIMITER +
+          bucket.getSourceBucket());
+    }
+    return f;
   }
 
 }
