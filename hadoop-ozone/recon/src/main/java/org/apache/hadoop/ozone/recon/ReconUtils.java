@@ -303,9 +303,9 @@ public class ReconUtils {
       return Long.MAX_VALUE;
     }
     // The smallest container size being tracked for count
-    // is 128 MB i.e. 134217728 = 2 ^ 27.
+    // is 1GB i.e. 1073741824 = 2 ^ 30.
     int binIndex = getContainerSizeBinIndex(containerSize);
-    return (long) Math.pow(2, (10 + binIndex));
+    return (long) Math.pow(2, (30 + binIndex));
   }
 
 
@@ -330,7 +330,7 @@ public class ReconUtils {
     int index = nextClosestPowerIndexOfTwo(containerSize);
     // if the container size is smaller than our track scope,
     // we map it to the first bin
-    return index < 10 ? 0 : index - 10;
+    return index < 30 ? 0 : index - 30;
   }
 
   private static int nextClosestPowerIndexOfTwo(long dataSize) {

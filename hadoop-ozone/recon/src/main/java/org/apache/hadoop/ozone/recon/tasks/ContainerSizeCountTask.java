@@ -334,7 +334,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
     return new ContainerSizeCountKey(
         // Using the FileSize UpperBound Calculator for now, we can replace it
         // with a new UpperBound Calculator for containers only
-        ReconUtils.getFileSizeUpperBound(containerSize));
+        ReconUtils.getContainerSizeUpperBound(containerSize));
   }
 
 
