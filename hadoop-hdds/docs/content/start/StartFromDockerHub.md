@@ -104,9 +104,3 @@ our bucket.
 ```bash
 aws s3 --endpoint http://localhost:9878 ls s3://bucket1/testfile
 ```
-
-<div class="alert alert-info" role="alert"> You can also check the internal
-bucket browser supported by Ozone S3 interface by clicking on the below link.
-<br>
-</div>
-http://localhost:9878/bucket1?browser

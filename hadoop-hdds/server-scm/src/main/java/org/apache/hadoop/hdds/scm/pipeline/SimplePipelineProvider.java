@@ -18,20 +18,23 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Implements Api for creating stand alone pipelines.
  */
-public class SimplePipelineProvider extends PipelineProvider {
+public class SimplePipelineProvider
+    extends PipelineProvider<StandaloneReplicationConfig> {
 
   public SimplePipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager) {
@@ -39,13 +42,21 @@ public class SimplePipelineProvider extends PipelineProvider {
   }
 
   @Override
-  public Pipeline create(ReplicationFactor factor) throws IOException {
-    List<DatanodeDetails> dns = pickNodesNeverUsed(ReplicationType.STAND_ALONE,
-        factor);
-    if (dns.size() < factor.getNumber()) {
+  public Pipeline create(StandaloneReplicationConfig replicationConfig)
+      throws IOException {
+    return create(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public Pipeline create(StandaloneReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
+    List<DatanodeDetails> dns = pickNodesNotUsed(replicationConfig);
+    if (dns.size() < replicationConfig.getRequiredNodes()) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes.",
-              factor.getNumber(), dns.size());
+              replicationConfig.getRequiredNodes(), dns.size());
       throw new InsufficientDatanodesException(e);
     }
 
@@ -53,22 +64,30 @@ public class SimplePipelineProvider extends PipelineProvider {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
-        .setType(ReplicationType.STAND_ALONE)
-        .setFactor(factor)
-        .setNodes(dns.subList(0, factor.getNumber()))
+        .setReplicationConfig(replicationConfig)
+        .setNodes(dns.subList(0,
+            replicationConfig.getReplicationFactor().getNumber()))
         .build();
   }
 
   @Override
-  public Pipeline create(ReplicationFactor factor,
+  public Pipeline create(StandaloneReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
-        .setType(ReplicationType.STAND_ALONE)
-        .setFactor(factor)
+        .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .build();
+  }
+
+  @Override
+  public Pipeline createForRead(StandaloneReplicationConfig replicationConfig,
+      Set<ContainerReplica> replicas) {
+    return create(replicationConfig, replicas
+        .stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList()));
   }
 
   @Override

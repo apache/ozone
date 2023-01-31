@@ -34,8 +34,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,8 +46,8 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -71,7 +71,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
     dslContext = getDslContext();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     // The following setup runs only once
     if (!isSetupDone) {
@@ -83,7 +83,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocess() {
+  public void testReprocess() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     // Mock 5 rows in each table and test the count
     for (String tableName: tableCountTask.getTaskTables()) {
@@ -116,7 +116,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
     ArrayList<OMDBUpdateEvent> events = new ArrayList<>();
     // Create 5 put, 1 delete and 1 update event for each table
     for (String tableName: tableCountTask.getTaskTables()) {
-      for (int i=0; i<5; i++) {
+      for (int i = 0; i < 5; i++) {
         events.add(getOMUpdateEvent("item" + i, null, tableName, PUT));
       }
       // for delete event, if value is set to null, the counter will not be

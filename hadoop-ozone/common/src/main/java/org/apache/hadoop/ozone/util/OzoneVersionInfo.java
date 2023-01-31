@@ -44,7 +44,7 @@ public final class OzoneVersionInfo {
   public static final RatisVersionInfo RATIS_VERSION_INFO =
       new RatisVersionInfo();
 
-  private OzoneVersionInfo() {}
+  private OzoneVersionInfo() { }
 
   public static void main(String[] args) {
     System.out.println(
@@ -72,7 +72,9 @@ public final class OzoneVersionInfo {
     System.out.println("Compiled by " + OZONE_VERSION_INFO.getUser() + " on "
         + OZONE_VERSION_INFO.getDate());
     System.out.println(
-        "Compiled with protoc " + OZONE_VERSION_INFO.getProtocVersion());
+        "Compiled with protoc " + OZONE_VERSION_INFO.getHadoopProtoc2Version() +
+            ", " + OZONE_VERSION_INFO.getGrpcProtocVersion() +
+            " and " + OZONE_VERSION_INFO.getHadoopProtoc3Version());
     System.out.println(
         "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum());
     System.out.println(

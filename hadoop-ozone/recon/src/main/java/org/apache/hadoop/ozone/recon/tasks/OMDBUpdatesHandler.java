@@ -24,23 +24,24 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class used to listen on OM RocksDB updates.
  */
-public class OMDBUpdatesHandler extends WriteBatch.Handler {
+public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
@@ -49,6 +50,8 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
+  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
+      = new HashMap<>();
   private OMDBDefinition omdbDefinition;
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
@@ -90,6 +93,15 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
+    // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
+    // and assuming to typecast as String while de-serializing will throw error.
+    // omdbLatestUpdateEvents defines map key as String type to store in its map
+    // and to change to Object as key will have larger impact considering all
+    // ReconOmTasks. Currently, this table is not needed to sync in Recon OM DB
+    // snapshot as this table data not being used currently in Recon.
+    // When this table data will be needed, all events for this table will be
+    // saved using Object as key and new task will also retrieve using Object
+    // as key.
     Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
     Optional<Class> valueType = omdbDefinition.getValueType(tableName);
     if (keyType.isPresent() && valueType.isPresent()) {
@@ -97,7 +109,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
       builder.setAction(action);
-      String key = (String) codecRegistry.asObject(keyBytes, keyType.get());
+      Object key = codecRegistry.asObject(keyBytes, keyType.get());
       builder.setKey(key);
 
       // Put new
@@ -105,9 +117,17 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       // Delete existing
       // Delete non-existing
       Table table = omMetadataManager.getTable(tableName);
-      // Recon does not add entries to cache and it is safer to always use
-      // getSkipCache in Recon.
-      Object oldValue = table.getSkipCache(key);
+
+      OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
+      Object oldValue;
+      if (latestEvent != null) {
+        oldValue = latestEvent.getValue();
+      } else {
+        // Recon does not add entries to cache, and it is safer to always use
+        // getSkipCache in Recon.
+        oldValue = table.getSkipCache(key);
+      }
+
       if (action == PUT) {
         Object value = codecRegistry.asObject(valueBytes, valueType.get());
         builder.setValue(value);
@@ -115,7 +135,9 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
         // as an "UPDATE" event.
         if (oldValue != null) {
           builder.setOldValue(oldValue);
-          builder.setAction(UPDATE);
+          if (latestEvent == null || latestEvent.getAction() != DELETE) {
+            builder.setAction(UPDATE);
+          }
         }
       } else if (action.equals(DELETE)) {
         // When you delete a Key, we add the old value to the event so that
@@ -126,15 +148,10 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       OMDBUpdateEvent event = builder.build();
       if (LOG.isDebugEnabled()) {
         LOG.debug(String.format("Generated OM update Event for table : %s, " +
-            "action = %s", tableName, action));
-      }
-      if (omdbUpdateEvents.contains(event)) {
-        // If the same event is part of this batch, the last one only holds.
-        // For example, if there are 2 PUT key1 events, then the first one
-        // can be discarded.
-        omdbUpdateEvents.remove(event);
+                "action = %s", tableName, action));
       }
       omdbUpdateEvents.add(event);
+      omdbLatestUpdateEvents.put(key, event);
     } else {
       // key type or value type cannot be determined for this table.
       // log a warn message and ignore the update.
@@ -266,6 +283,15 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
      * There are no use cases yet for this method in Recon. These will be
      * implemented as and when need arises.
      */
+  }
+
+  public void markCommitWithTimestamp(final byte[] xid, final byte[] ts)
+      throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
+
   }
 
   /**

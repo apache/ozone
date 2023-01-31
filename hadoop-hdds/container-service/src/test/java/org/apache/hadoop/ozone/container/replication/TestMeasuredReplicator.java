@@ -17,14 +17,17 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.util.ArrayList;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.forTest;
 
 /**
  * Test replicator metric measurement.
@@ -32,11 +35,11 @@ import org.junit.Test;
 public class TestMeasuredReplicator {
 
   private MeasuredReplicator measuredReplicator;
+  private ContainerReplicator replicator;
 
-  @Before
+  @BeforeEach
   public void initReplicator() {
-    measuredReplicator = new MeasuredReplicator(task -> {
-
+    replicator = task -> {
       task.setTransferredBytes(task.getContainerId() * 1024);
 
       //fail if container id is even
@@ -50,57 +53,87 @@ public class TestMeasuredReplicator {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-    });
+    };
+    measuredReplicator = new MeasuredReplicator(replicator, "test");
   }
 
-  @After
+  @AfterEach
   public void closeReplicator() throws Exception {
     measuredReplicator.close();
   }
 
   @Test
-  public void measureFailureSuccessAndBytes() throws Exception {
+  public void measureFailureSuccessAndBytes() {
     //WHEN
-    measuredReplicator.replicate(new ReplicationTask(1L, new ArrayList<>()));
-    measuredReplicator.replicate(new ReplicationTask(2L, new ArrayList<>()));
-    measuredReplicator.replicate(new ReplicationTask(3L, new ArrayList<>()));
+    measuredReplicator.replicate(new ReplicationTask(forTest(1), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(2), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(3), replicator));
 
     //THEN
     //even containers should be failed
-    Assert.assertEquals(2, measuredReplicator.getSuccess().value());
-    Assert.assertEquals(1, measuredReplicator.getFailure().value());
+    Assertions.assertEquals(2, measuredReplicator.getSuccess().value());
+    Assertions.assertEquals(1, measuredReplicator.getFailure().value());
 
     //sum of container ids (success) in kb
-    Assert.assertEquals(4 * 1024,
+    Assertions.assertEquals((1 + 3) * 1024,
         measuredReplicator.getTransferredBytes().value());
+    Assertions.assertEquals(2 * 1024,
+        measuredReplicator.getFailureBytes().value());
   }
 
   @Test
-  public void testSuccessTime() throws Exception {
+  public void testReplicationTime() throws Exception {
     //WHEN
     //will wait at least the 300ms
-    measuredReplicator.replicate(new ReplicationTask(101L, new ArrayList<>()));
-    measuredReplicator.replicate(new ReplicationTask(201L, new ArrayList<>()));
-    measuredReplicator.replicate(new ReplicationTask(300L, new ArrayList<>()));
+    measuredReplicator.replicate(new ReplicationTask(forTest(101), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(201), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(300), replicator));
 
     //THEN
     //even containers should be failed
-    Assert.assertTrue(
-        "Measured time should be at least 300 ms but was "
-            + measuredReplicator.getSuccessTime().value(),
-        measuredReplicator.getSuccessTime().value() >= 300L);
+    long successTime = measuredReplicator.getSuccessTime().value();
+    long failureTime = measuredReplicator.getFailureTime().value();
+    Assertions.assertTrue(successTime >= 300L,
+        "Measured time should be at least 300 ms but was " + successTime);
+    Assertions.assertTrue(failureTime >= 300L,
+        "Measured time should be at least 300 ms but was " + failureTime);
   }
 
   @Test
-  public void testSuccessTimeFailureExcluded() throws Exception {
-
+  public void testFailureTimeSuccessExcluded() {
     //WHEN
-    //will wait at least the 300ms
-    measuredReplicator.replicate(new ReplicationTask(300L, new ArrayList<>()));
+    //will wait at least the 15ms
+    measuredReplicator.replicate(new ReplicationTask(forTest(15), replicator));
+
 
     //THEN
     //even containers should be failed, supposed to be zero
-    Assert.assertEquals(0, measuredReplicator.getSuccessTime().value());
+    Assertions.assertEquals(0, measuredReplicator.getFailureTime().value());
   }
 
+  @Test
+  public void testSuccessTimeFailureExcluded() {
+    //WHEN
+    //will wait at least the 10ms
+    measuredReplicator.replicate(new ReplicationTask(forTest(10), replicator));
+
+
+    //THEN
+    //even containers should be failed, supposed to be zero
+    Assertions.assertEquals(0, measuredReplicator.getSuccessTime().value());
+  }
+
+  @Test
+  public void testReplicationQueueTimeMetrics() {
+    final Instant queued = Instant.now().minus(1, ChronoUnit.SECONDS);
+    ReplicationTask task = new ReplicationTask(forTest(100), replicator) {
+      @Override
+      public Instant getQueued() {
+        return queued;
+      }
+    };
+    measuredReplicator.replicate(task);
+    // There might be some deviation, so we use >= 1000 here.
+    Assertions.assertTrue(measuredReplicator.getQueueTime().value() >= 1000);
+  }
 }

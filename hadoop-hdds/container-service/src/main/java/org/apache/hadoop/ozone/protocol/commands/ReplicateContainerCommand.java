@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -33,28 +34,52 @@ import org.apache.hadoop.hdds.protocol.proto
 
 import com.google.common.base.Preconditions;
 
+import static java.util.Collections.emptyList;
+
 /**
  * SCM command to request replication of a container.
  */
-public class ReplicateContainerCommand
+public final class ReplicateContainerCommand
     extends SCMCommand<ReplicateContainerCommandProto> {
 
   private final long containerID;
   private final List<DatanodeDetails> sourceDatanodes;
+  private final DatanodeDetails targetDatanode;
+  private int replicaIndex = 0;
 
-  public ReplicateContainerCommand(long containerID,
+  public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
-    super();
+    return new ReplicateContainerCommand(containerID, sourceDatanodes, null);
+  }
+
+  public static ReplicateContainerCommand toTarget(long containerID,
+      DatanodeDetails target) {
+    return new ReplicateContainerCommand(containerID, emptyList(), target);
+  }
+
+  public static ReplicateContainerCommand forTest(long containerID) {
+    return new ReplicateContainerCommand(containerID, emptyList(), null);
+  }
+
+  private ReplicateContainerCommand(long containerID,
+      List<DatanodeDetails> sourceDatanodes, DatanodeDetails target) {
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
+    this.targetDatanode = target;
   }
 
   // Should be called only for protobuf conversion
-  public ReplicateContainerCommand(long containerID,
-      List<DatanodeDetails> sourceDatanodes, long id) {
+  private ReplicateContainerCommand(long containerID,
+      List<DatanodeDetails> sourceDatanodes, long id,
+      DatanodeDetails targetDatanode) {
     super(id);
     this.containerID = containerID;
     this.sourceDatanodes = sourceDatanodes;
+    this.targetDatanode = targetDatanode;
+  }
+
+  public void setReplicaIndex(int index) {
+    replicaIndex = index;
   }
 
   @Override
@@ -70,6 +95,10 @@ public class ReplicateContainerCommand
     for (DatanodeDetails dd : sourceDatanodes) {
       builder.addSources(dd.getProtoBufMessage());
     }
+    builder.setReplicaIndex(replicaIndex);
+    if (targetDatanode != null) {
+      builder.setTarget(targetDatanode.getProtoBufMessage());
+    }
     return builder.build();
   }
 
@@ -77,15 +106,23 @@ public class ReplicateContainerCommand
       ReplicateContainerCommandProto protoMessage) {
     Preconditions.checkNotNull(protoMessage);
 
-    List<DatanodeDetails> datanodeDetails =
-        protoMessage.getSourcesList()
-            .stream()
+    List<DatanodeDetailsProto> sources = protoMessage.getSourcesList();
+    List<DatanodeDetails> sourceNodes = !sources.isEmpty()
+        ? sources.stream()
             .map(DatanodeDetails::getFromProtoBuf)
-            .collect(Collectors.toList());
+            .collect(Collectors.toList())
+        : emptyList();
+    DatanodeDetails targetNode = protoMessage.hasTarget()
+        ? DatanodeDetails.getFromProtoBuf(protoMessage.getTarget())
+        : null;
 
-    return new ReplicateContainerCommand(protoMessage.getContainerID(),
-        datanodeDetails, protoMessage.getCmdId());
-
+    ReplicateContainerCommand cmd =
+        new ReplicateContainerCommand(protoMessage.getContainerID(),
+            sourceNodes, protoMessage.getCmdId(), targetNode);
+    if (protoMessage.hasReplicaIndex()) {
+      cmd.setReplicaIndex(protoMessage.getReplicaIndex());
+    }
+    return cmd;
   }
 
   public long getContainerID() {
@@ -94,5 +131,27 @@ public class ReplicateContainerCommand
 
   public List<DatanodeDetails> getSourceDatanodes() {
     return sourceDatanodes;
+  }
+
+  public DatanodeDetails getTargetDatanode() {
+    return targetDatanode;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType());
+    sb.append(": containerId: ").append(getContainerID());
+    sb.append(", replicaIndex: ").append(getReplicaIndex());
+    if (targetDatanode != null) {
+      sb.append(", targetNode: ").append(targetDatanode);
+    } else {
+      sb.append(", sourceNodes: ").append(sourceDatanodes);
+    }
+    return sb.toString();
   }
 }

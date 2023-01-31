@@ -29,7 +29,7 @@ The current configuration in the robot files (hostnames, ports) are adjusted for
 
 # Run tests in docker environment
 
-In the ./compose folder there are additional test scripts to make it easy to run all tests or run a specific test in a docker environment.
+In the [compose](../compose) folder there are additional test scripts to make it easy to run all tests or run a specific test in a docker environment.
 
 ## Test one environment
 

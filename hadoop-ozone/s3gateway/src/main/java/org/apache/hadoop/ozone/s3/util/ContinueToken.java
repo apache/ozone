@@ -57,13 +57,16 @@ public class ContinueToken {
   public String encodeToString() {
     if (this.lastKey != null) {
 
-      ByteBuffer buffer = ByteBuffer
-          .allocate(4 + lastKey.length()
-              + (lastDir == null ? 0 : lastDir.length()));
-      buffer.putInt(lastKey.length());
-      buffer.put(lastKey.getBytes(StandardCharsets.UTF_8));
+      byte[] rawLastKey = lastKey.getBytes(StandardCharsets.UTF_8);
+      byte[] rawLastDir = (lastDir == null ? new byte[0] :
+          lastDir.getBytes(StandardCharsets.UTF_8));
+
+      ByteBuffer buffer = ByteBuffer.allocate(
+          4 + rawLastKey.length + rawLastDir.length);
+      buffer.putInt(rawLastKey.length);
+      buffer.put(rawLastKey);
       if (lastDir != null) {
-        buffer.put(lastDir.getBytes(StandardCharsets.UTF_8));
+        buffer.put(rawLastDir);
       }
 
       String hex = Hex.encodeHexString(buffer.array());
@@ -108,7 +111,7 @@ public class ContinueToken {
 
       } catch (DecoderException ex) {
         OS3Exception os3Exception = S3ErrorTable.newError(S3ErrorTable
-            .INVALID_ARGUMENT, key);
+            .INVALID_ARGUMENT, key, ex);
         os3Exception.setErrorMessage("The continuation token provided is " +
             "incorrect");
         throw os3Exception;

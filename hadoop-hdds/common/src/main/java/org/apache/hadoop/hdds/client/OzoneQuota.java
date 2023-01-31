@@ -43,7 +43,7 @@ public final class OzoneQuota {
   public static final String OZONE_QUOTA_TB = "TB";
 
   /** Quota Units.*/
-  public enum Units {B, KB, MB, GB, TB}
+  public enum Units { B, KB, MB, GB, TB }
 
   // Quota to decide how many buckets can be created.
   private long quotaInNamespace;
@@ -130,15 +130,6 @@ public final class OzoneQuota {
   private OzoneQuota(RawQuotaInBytes rawQuotaInBytes) {
     this.rawQuotaInBytes = rawQuotaInBytes;
     this.quotaInBytes = rawQuotaInBytes.sizeInBytes();
-  }
-
-  /**
-   * Constructor for Ozone NameSpace Quota.
-   *
-   * @param quotaInNamespace long value
-   */
-  private OzoneQuota(long quotaInNamespace) {
-    this.quotaInNamespace = quotaInNamespace;
   }
 
   /**

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
@@ -78,6 +79,14 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
+      KEY prefix) {
+    throw new UnsupportedOperationException("Iterating tables directly is not" +
+        " supported for datanode containers due to differing schema " +
+        "version.");
+  }
+
+  @Override
   public String getName() throws IOException {
     return table.getName();
   }
@@ -109,18 +118,35 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<? extends KeyValue<KEY, VALUE>> getRangeKVs(
-          KEY startKey, int count,
+          KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
-    return table.getRangeKVs(startKey, count, filters);
+    return table.getRangeKVs(startKey, count, prefix, filters);
   }
 
   @Override
   public List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(
-          KEY startKey, int count,
+          KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
-    return table.getSequentialRangeKVs(startKey, count, filters);
+    return table.getSequentialRangeKVs(startKey, count, prefix, filters);
+  }
+
+  @Override
+  public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
+      throws IOException {
+    table.deleteBatchWithPrefix(batch, prefix);
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, KEY prefix)
+      throws IOException {
+    table.dumpToFileWithPrefix(externalFile, prefix);
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    table.loadFromFile(externalFile);
   }
 
   @Override

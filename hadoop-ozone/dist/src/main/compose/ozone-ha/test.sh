@@ -15,11 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:HA
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
 export OZONE_REPLICATION_FACTOR=3
+export SCM=scm1
 export OM_SERVICE_ID=omservice
 
 # shellcheck source=/dev/null
@@ -27,10 +30,10 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm basic/ozone-shell-single.robot
-execute_robot_test scm basic/links.robot
-execute_robot_test scm s3
-execute_robot_test scm freon
+execute_robot_test ${SCM} basic/ozone-shell-single.robot
+execute_robot_test ${SCM} basic/links.robot
+execute_robot_test ${SCM} s3
+execute_robot_test ${SCM} freon
 
 stop_docker_env
 

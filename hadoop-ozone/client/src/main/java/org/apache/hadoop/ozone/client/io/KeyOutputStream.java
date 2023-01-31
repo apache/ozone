@@ -27,13 +27,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -42,7 +41,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -65,7 +63,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyOutputStream extends OutputStream {
+public class KeyOutputStream extends OutputStream implements Syncable {
 
   private OzoneClientConfig config;
 
@@ -73,14 +71,13 @@ public class KeyOutputStream extends OutputStream {
    * Defines stream action while calling handleFlushOrClose.
    */
   enum StreamAction {
-    FLUSH, CLOSE, FULL
+    FLUSH, HSYNC, CLOSE, FULL
   }
 
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
   private boolean closed;
-  private FileEncryptionInfo feInfo;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   // how much of data is actually written yet to underlying stream
@@ -92,11 +89,9 @@ public class KeyOutputStream extends OutputStream {
   private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
-  /**
-   * A constructor for testing purpose only.
-   */
-  @VisibleForTesting
-  public KeyOutputStream() {
+  private long clientID;
+
+  public KeyOutputStream(ContainerClientMetrics clientMetrics) {
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -104,7 +99,7 @@ public class KeyOutputStream extends OutputStream {
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool();
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics);
   }
 
   @VisibleForTesting
@@ -127,37 +122,40 @@ public class KeyOutputStream extends OutputStream {
     return retryCount;
   }
 
+  @VisibleForTesting
+  public long getClientID() {
+    return clientID;
+  }
+
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyOutputStream(
       OzoneClientConfig config,
       OpenKeySession handler,
       XceiverClientFactory xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
-      String requestId, ReplicationFactor factor, ReplicationType type,
+      String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
+      boolean unsafeByteBufferConversion,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
-    OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(
             config,
             omClient,
-            requestId, factor, type,
+            requestId, replicationConfig,
             uploadID, partNumber,
-            isMultipart, info,
+            isMultipart, handler.getKeyInfo(),
             unsafeByteBufferConversion,
             xceiverClientManager,
-            handler.getId());
-
-    // Retrieve the file encryption key info, null if file is not in
-    // encrypted bucket.
-    this.feInfo = info.getFileEncryptionInfo();
+            handler.getId(),
+            clientMetrics);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
+    this.clientID = handler.getId();
   }
 
   /**
@@ -300,8 +298,7 @@ public class KeyOutputStream extends OutputStream {
     Pipeline pipeline = streamEntry.getPipeline();
     PipelineID pipelineId = pipeline.getId();
     long totalSuccessfulFlushedData = streamEntry.getTotalAckDataLength();
-    //set the correct length for the current stream
-    streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
+    streamEntry.resetToAckedPosition();
     long bufferedDataLen = blockOutputStreamEntryPool.computeBufferData();
     if (containerExclusionException) {
       LOG.debug(
@@ -330,7 +327,7 @@ public class KeyOutputStream extends OutputStream {
     // if the container needs to be excluded , add the container to the
     // exclusion list , otherwise add the pipeline to the exclusion list
     if (containerExclusionException) {
-      excludeList.addConatinerId(ContainerID.valueof(containerId));
+      excludeList.addConatinerId(ContainerID.valueOf(containerId));
     } else {
       excludeList.addPipeline(pipelineId);
     }
@@ -434,7 +431,7 @@ public class KeyOutputStream extends OutputStream {
 
   // Every container specific exception from datatnode will be seen as
   // StorageContainerException
-  private boolean checkIfContainerToExclude(Throwable t) {
+  protected boolean checkIfContainerToExclude(Throwable t) {
     return t instanceof StorageContainerException;
   }
 
@@ -442,6 +439,22 @@ public class KeyOutputStream extends OutputStream {
   public void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
+  }
+
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    checkNotClosed();
+    handleFlushOrClose(StreamAction.HSYNC);
+    //TODO HDDS-7593: send hsyncKey to update length;
+    //     where the hsyncKey op is similar to
+    //     blockOutputStreamEntryPool.commitKey(offset)
+    //     except that hsyncKey only updates the key length
+    //     instead of committing it.
   }
 
   /**
@@ -504,6 +517,9 @@ public class KeyOutputStream extends OutputStream {
     case FLUSH:
       entry.flush();
       break;
+    case HSYNC:
+      entry.hsync();
+      break;
     default:
       throw new IOException("Invalid Operation");
     }
@@ -535,10 +551,6 @@ public class KeyOutputStream extends OutputStream {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
 
-  public FileEncryptionInfo getFileEncryptionInfo() {
-    return feInfo;
-  }
-
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockOutputStreamEntryPool.getExcludeList();
@@ -549,21 +561,29 @@ public class KeyOutputStream extends OutputStream {
    */
   public static class Builder {
     private OpenKeySession openHandler;
-    private XceiverClientManager xceiverManager;
+    private XceiverClientFactory xceiverManager;
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
-    private ReplicationType type;
-    private ReplicationFactor factor;
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
+    private ReplicationConfig replicationConfig;
+    private ContainerClientMetrics clientMetrics;
+
+    public String getMultipartUploadID() {
+      return multipartUploadID;
+    }
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
       return this;
+    }
+
+    public int getMultipartNumber() {
+      return multipartNumber;
     }
 
     public Builder setMultipartNumber(int partNumber) {
@@ -571,14 +591,26 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public OpenKeySession getOpenHandler() {
+      return openHandler;
+    }
+
     public Builder setHandler(OpenKeySession handler) {
       this.openHandler = handler;
       return this;
     }
 
-    public Builder setXceiverClientManager(XceiverClientManager manager) {
+    public XceiverClientFactory getXceiverManager() {
+      return xceiverManager;
+    }
+
+    public Builder setXceiverClientManager(XceiverClientFactory manager) {
       this.xceiverManager = manager;
       return this;
+    }
+
+    public OzoneManagerProtocol getOmClient() {
+      return omClient;
     }
 
     public Builder setOmClient(OzoneManagerProtocol client) {
@@ -586,9 +618,17 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public int getChunkSize() {
+      return chunkSize;
+    }
+
     public Builder setChunkSize(int size) {
       this.chunkSize = size;
       return this;
+    }
+
+    public String getRequestID() {
+      return requestID;
     }
 
     public Builder setRequestID(String id) {
@@ -596,14 +636,8 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
-      return this;
+    public boolean isMultipartKey() {
+      return isMultipartKey;
     }
 
     public Builder setIsMultipartKey(boolean isMultipart) {
@@ -611,14 +645,40 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public OzoneClientConfig getClientConfig() {
+      return clientConfig;
+    }
+
     public Builder setConfig(OzoneClientConfig config) {
       this.clientConfig = config;
       return this;
     }
 
+    public boolean isUnsafeByteBufferConversionEnabled() {
+      return unsafeByteBufferConversion;
+    }
+
     public Builder enableUnsafeByteBufferConversion(boolean enabled) {
       this.unsafeByteBufferConversion = enabled;
       return this;
+    }
+
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
+    }
+
+    public Builder setReplicationConfig(ReplicationConfig replConfig) {
+      this.replicationConfig = replConfig;
+      return this;
+    }
+
+    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
+      this.clientMetrics = clientMetrics;
+      return this;
+    }
+
+    public ContainerClientMetrics getClientMetrics() {
+      return clientMetrics;
     }
 
     public KeyOutputStream build() {
@@ -629,13 +689,14 @@ public class KeyOutputStream extends OutputStream {
           omClient,
           chunkSize,
           requestID,
-          factor,
-          type,
+          replicationConfig,
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion);
+          unsafeByteBufferConversion,
+          clientMetrics);
     }
+
   }
 
   /**

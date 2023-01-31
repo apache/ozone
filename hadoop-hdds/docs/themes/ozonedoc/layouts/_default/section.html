@@ -36,7 +36,8 @@
                 {{ .Content }}
                 {{.Params.card}}
                 {{ if not (eq .Params.cards "false")}}
-                {{ range $page_index, $page_val := .Pages }}
+                {{ $pagesToShow := where .Pages "Params.hideFromSectionPage" "!=" "true" }}
+                {{ range $page_index, $page_val := $pagesToShow }}
 
                 {{ $page_count := len .Pages }}
                 {{if (eq (mod $page_index 2) 0)}}

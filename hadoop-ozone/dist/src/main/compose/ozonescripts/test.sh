@@ -37,6 +37,7 @@ start_docker_env 1
 ${COMPOSE_DIR}/start.sh
 ${COMPOSE_DIR}/ps.sh
 
+execute_robot_test scm basic/single_node.robot
 execute_robot_test scm admincli/pipeline.robot
 
 ${COMPOSE_DIR}/stop.sh

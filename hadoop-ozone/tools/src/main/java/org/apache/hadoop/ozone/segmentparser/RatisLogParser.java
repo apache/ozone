@@ -34,18 +34,13 @@ import picocli.CommandLine;
     subcommands = {
         DatanodeRatisLogParser.class,
         GenericRatisLogParser.class,
-        OMRatisLogParser.class
-        //TODO: After SCM HA implementation, we can add log parser for SCM.
+        OMRatisLogParser.class,
+        SCMRatisLogParser.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 @MetaInfServices(SubcommandWithParent.class)
 public class RatisLogParser extends GenericCli implements SubcommandWithParent {
-
-  @Override
-  public void execute(String[] argv) {
-    super.execute(argv);
-  }
 
   public static void main(String[] args) {
     new RatisLogParser().run(args);

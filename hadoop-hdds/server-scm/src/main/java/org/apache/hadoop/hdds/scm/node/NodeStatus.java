@@ -35,7 +35,7 @@ public class NodeStatus {
   private long opStateExpiryEpochSeconds;
 
   public NodeStatus(HddsProtos.NodeOperationalState operationalState,
-             HddsProtos.NodeState health) {
+                    HddsProtos.NodeState health) {
     this.operationalState = operationalState;
     this.health = health;
     this.opStateExpiryEpochSeconds = 0;
@@ -54,6 +54,11 @@ public class NodeStatus {
         HddsProtos.NodeState.HEALTHY);
   }
 
+  public static NodeStatus inServiceHealthyReadOnly() {
+    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+        HddsProtos.NodeState.HEALTHY_READONLY);
+  }
+
   public static NodeStatus inServiceStale() {
     return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
         HddsProtos.NodeState.STALE);
@@ -62,6 +67,11 @@ public class NodeStatus {
   public static NodeStatus inServiceDead() {
     return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
         HddsProtos.NodeState.DEAD);
+  }
+
+  public boolean isNodeWritable() {
+    return health == HddsProtos.NodeState.HEALTHY &&
+        operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
   }
 
   public HddsProtos.NodeState getHealth() {
@@ -143,13 +153,14 @@ public class NodeStatus {
   }
 
   /**
-   * Returns true if the nodeStatus is healthy (ie not stale or dead) and false
-   * otherwise.
+   * Returns true if the nodeStatus is healthy or healthy_readonly (ie not stale
+   * or dead) and false otherwise.
    *
-   * @return True if the node is Healthy, false otherwise
+   * @return True if the node is healthy or healthy_readonly, false otherwise.
    */
   public boolean isHealthy() {
-    return health == HddsProtos.NodeState.HEALTHY;
+    return health == HddsProtos.NodeState.HEALTHY
+        || health == HddsProtos.NodeState.HEALTHY_READONLY;
   }
 
   /**
@@ -199,8 +210,8 @@ public class NodeStatus {
 
   @Override
   public String toString() {
-    return "OperationalState: "+operationalState+" Health: "+health+
-        " OperastionStateExpiry: "+opStateExpiryEpochSeconds;
+    return "OperationalState: " + operationalState + " Health: " + health +
+        " OperationStateExpiry: " + opStateExpiryEpochSeconds;
   }
 
 }

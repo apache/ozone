@@ -24,18 +24,23 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Interface for creating pipelines.
  */
-public abstract class PipelineProvider {
-
+public abstract class PipelineProvider<REPLICATION_CONFIG
+    extends ReplicationConfig> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(PipelineProvider.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
 
@@ -58,20 +63,62 @@ public abstract class PipelineProvider {
     return stateManager;
   }
 
-  protected abstract Pipeline create(ReplicationFactor factor)
+  protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig)
       throws IOException;
 
-  protected abstract Pipeline create(ReplicationFactor factor,
-      List<DatanodeDetails> nodes);
+  protected abstract Pipeline create(REPLICATION_CONFIG replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException;
+
+  protected abstract Pipeline create(
+      REPLICATION_CONFIG replicationConfig,
+      List<DatanodeDetails> nodes
+  );
+
+  protected abstract Pipeline createForRead(
+      REPLICATION_CONFIG replicationConfig,
+      Set<ContainerReplica> replicas
+  );
 
   protected abstract void close(Pipeline pipeline) throws IOException;
 
   protected abstract void shutdown();
 
-  List<DatanodeDetails> pickNodesNeverUsed(ReplicationType type,
-      ReplicationFactor factor) throws SCMException {
+  List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
+      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+    int nodesRequired = replicationConfig.getRequiredNodes();
+    List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
+    List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
+        .filter(dn -> SCMCommonPlacementPolicy
+            .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
+        .limit(nodesRequired)
+        .collect(Collectors.toList());
+
+    if (healthyDNsWithSpace.size() < nodesRequired) {
+      String msg = String.format("Unable to find enough nodes that meet the " +
+              "space requirement of %d bytes for metadata and %d bytes for " +
+              "data in healthy node set. Nodes required: %d Found: %d",
+          metadataSizeRequired, dataSizeRequired, nodesRequired,
+          healthyDNsWithSpace.size());
+      LOG.error(msg);
+      throw new SCMException(msg,
+          SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
+    }
+
+    return healthyDNsWithSpace;
+  }
+
+  List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig)
+      throws SCMException {
+    return pickAllNodesNotUsed(replicationConfig).stream()
+        .limit(replicationConfig.getRequiredNodes())
+        .collect(Collectors.toList());
+  }
+
+  List<DatanodeDetails> pickAllNodesNotUsed(
+      REPLICATION_CONFIG replicationConfig) throws SCMException {
     Set<DatanodeDetails> dnsUsed = new HashSet<>();
-    stateManager.getPipelines(type, factor).stream().filter(
+    stateManager.getPipelines(replicationConfig).stream().filter(
         p -> p.getPipelineState().equals(Pipeline.PipelineState.OPEN) ||
             p.getPipelineState().equals(Pipeline.PipelineState.DORMANT) ||
             p.getPipelineState().equals(Pipeline.PipelineState.ALLOCATED))
@@ -82,12 +129,12 @@ public abstract class PipelineProvider {
         .getNodes(NodeStatus.inServiceHealthy())
         .parallelStream()
         .filter(dn -> !dnsUsed.contains(dn))
-        .limit(factor.getNumber())
         .collect(Collectors.toList());
-    if (dns.size() < factor.getNumber()) {
+    if (dns.size() < replicationConfig.getRequiredNodes()) {
       String e = String
-          .format("Cannot create pipeline of factor %d using %d nodes." +
-                  " Used %d nodes. Healthy nodes %d", factor.getNumber(),
+          .format("Cannot create pipeline %s using %d nodes." +
+                  " Used %d nodes. Healthy nodes %d",
+              replicationConfig.toString(),
               dns.size(), dnsUsed.size(),
               nodeManager.getNodes(NodeStatus.inServiceHealthy()).size());
       throw new SCMException(e,

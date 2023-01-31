@@ -22,16 +22,18 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DEFAULT_NODEGROUP;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DEFAULT_RACK;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Test the node schema loader. */
+@Timeout(30)
 public class TestNodeSchemaManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestNodeSchemaManager.class);
@@ -49,17 +51,16 @@ public class TestNodeSchemaManager {
     manager.init(conf);
   }
 
-  @Rule
-  public Timeout testTimeout = Timeout.seconds(30);
-
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testFailure1() {
-    manager.getCost(0);
+    assertThrows(IllegalArgumentException.class,
+        () -> manager.getCost(0));
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testFailure2() {
-    manager.getCost(manager.getMaxLevel() + 1);
+    assertThrows(IllegalArgumentException.class,
+        () -> manager.getCost(manager.getMaxLevel() + 1));
   }
 
   @Test
@@ -75,13 +76,10 @@ public class TestNodeSchemaManager {
     String filePath = classLoader.getResource(
         "./networkTopologyTestFiles/good.xml").getPath() + ".backup";
     conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
-    try {
-      manager.init(conf);
-      fail("should fail");
-    } catch (Throwable e) {
-      assertTrue(e.getMessage().contains("Failed to load schema file:" +
-          filePath));
-    }
+    Throwable e = assertThrows(RuntimeException.class,
+        () -> manager.init(conf));
+    assertTrue(e.getMessage().contains("Failed to load schema file:" +
+        filePath));
   }
 
   @Test
@@ -96,6 +94,6 @@ public class TestNodeSchemaManager {
         manager.complete("/nodegroup" + path));
 
     // failed complete action
-    assertEquals(null, manager.complete("/dc" + path));
+    assertNull(manager.complete("/dc" + path));
   }
 }

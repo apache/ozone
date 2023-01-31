@@ -88,7 +88,7 @@ public class TestOzoneManagerRestInterface {
 
     ObjectMapper objectMapper = new ObjectMapper();
     TypeReference<List<ServiceInfo>> serviceInfoReference =
-        new TypeReference<List<ServiceInfo>>() {};
+        new TypeReference<List<ServiceInfo>>() { };
     List<ServiceInfo> serviceInfos = objectMapper.readValue(
         serviceListJson, serviceInfoReference);
     Map<HddsProtos.NodeType, ServiceInfo> serviceMap = new HashMap<>();
@@ -106,8 +106,9 @@ public class TestOzoneManagerRestInterface {
     Assert.assertEquals(server.getHttpAddress().getPort(),
         omInfo.getPort(ServicePort.Type.HTTP));
 
+    Assert.assertTrue(getScmAddressForClients(conf).iterator().hasNext());
     InetSocketAddress scmAddress =
-        getScmAddressForClients(conf);
+        getScmAddressForClients(conf).iterator().next();
     ServiceInfo scmInfo = serviceMap.get(HddsProtos.NodeType.SCM);
 
     Assert.assertEquals(scmAddress.getHostName(), scmInfo.getHostname());

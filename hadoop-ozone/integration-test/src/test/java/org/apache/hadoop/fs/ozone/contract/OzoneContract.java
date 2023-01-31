@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.Assert;
 
 /**
@@ -45,6 +46,8 @@ class OzoneContract extends AbstractFSContract {
 
   private static MiniOzoneCluster cluster;
   private static final String CONTRACT_XML = "contract/ozone.xml";
+
+  private static boolean fsOptimizedServer;
 
   OzoneContract(Configuration conf) {
     super(conf);
@@ -63,6 +66,16 @@ class OzoneContract extends AbstractFSContract {
     return path;
   }
 
+  public static void initOzoneConfiguration(boolean fsoServer) {
+    fsOptimizedServer = fsoServer;
+  }
+
+  public static void createCluster(boolean fsoServer) throws IOException {
+    // Set the flag to enable/disable FSO on server.
+    initOzoneConfiguration(fsoServer);
+    createCluster();
+  }
+
   public static void createCluster() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
@@ -78,6 +91,17 @@ class OzoneContract extends AbstractFSContract {
     conf.setFromObject(raftClientConfig);
 
     conf.addResource(CONTRACT_XML);
+
+    if (fsOptimizedServer) {
+      // Default bucket layout is set to FSO in case of FSO server.
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    } else {
+      // Default bucket layout is set to LEGACY to support Hadoop compatible
+      // FS operations that are incompatible with OBS (default config value).
+      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.LEGACY.name());
+    }
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {

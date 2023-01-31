@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.fsck;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -34,7 +36,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 
@@ -49,7 +50,7 @@ public class ContainerMapper {
       throws IOException {
     OmMetadataManagerImpl metadataManager =
         new OmMetadataManagerImpl(configuration);
-    return metadataManager.getKeyTable();
+    return metadataManager.getKeyTable(getBucketLayout());
   }
 
   public static void main(String[] args) throws IOException {
@@ -94,7 +95,8 @@ public class ContainerMapper {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
-            byte[] value = omKeyInfo.getProtobuf(true, CURRENT_VERSION)
+            byte[] value = omKeyInfo
+                .getProtobuf(true, ClientVersion.CURRENT_VERSION)
                 .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
@@ -130,6 +132,10 @@ public class ContainerMapper {
       return dataMap;
 
     }
+  }
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }
 

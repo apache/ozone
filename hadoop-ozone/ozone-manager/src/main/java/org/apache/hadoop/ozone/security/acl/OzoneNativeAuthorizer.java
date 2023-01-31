@@ -16,8 +16,10 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -28,11 +30,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 /**
@@ -49,7 +48,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManager prefixManager;
-  private Collection<String> ozAdmins;
+  private OzoneAdmins ozAdmins;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
@@ -57,7 +56,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
   public OzoneNativeAuthorizer(VolumeManager volumeManager,
       BucketManager bucketManager, KeyManager keyManager,
-      PrefixManager prefixManager, Collection<String> ozoneAdmins) {
+      PrefixManager prefixManager, OzoneAdmins ozoneAdmins) {
     this.volumeManager = volumeManager;
     this.bucketManager = bucketManager;
     this.keyManager = keyManager;
@@ -80,7 +79,6 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     OzoneObjInfo objInfo;
     RequestContext parentContext;
     boolean isACLTypeCreate = (context.getAclRights() == ACLType.CREATE);
-    boolean isACLTypeDelete = (context.getAclRights() == ACLType.DELETE);
 
     if (ozObject instanceof OzoneObjInfo) {
       objInfo = (OzoneObjInfo) ozObject;
@@ -102,20 +100,32 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    // For CREATE and DELETE acl requests, the parents need to be checked
-    // for WRITE acl. If Key create request is received, then we need to
-    // check if user has WRITE acl set on Bucket and Volume. In all other cases
-    // the parents also need to be checked for the same acl type.
-    if (isACLTypeCreate || isACLTypeDelete) {
-      parentContext = RequestContext.newBuilder()
+    // Refined the parent context
+    // OP         |CHILD     |PARENT
+
+    // CREATE      NONE         WRITE
+    // DELETE      DELETE       WRITE
+    // WRITE       WRITE        WRITE
+    // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
+
+    // READ        READ         READ
+    // LIST        LIST         READ      (V1 LIST=>READ)
+    // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
+
+    ACLType aclRight = context.getAclRights();
+    ACLType parentAclRight = aclRight;
+
+    if (aclRight == ACLType.CREATE || aclRight == ACLType.DELETE ||
+        aclRight == ACLType.WRITE_ACL) {
+      parentAclRight = ACLType.WRITE;
+    } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST) {
+      parentAclRight = ACLType.READ;
+    }
+    parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
         .setAclType(context.getAclType())
-        .setAclRights(ACLType.WRITE)
-        .build();
-    } else {
-      parentContext = context;
-    }
+        .setAclRights(parentAclRight).build();
 
     switch (objInfo.getResourceType()) {
     case VOLUME:
@@ -188,12 +198,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.prefixManager = prefixManager;
   }
 
-  public void setOzoneAdmins(Collection<String> ozoneAdmins) {
+  public void setOzoneAdmins(OzoneAdmins ozoneAdmins) {
     this.ozAdmins = ozoneAdmins;
   }
 
-  public Collection<String> getOzoneAdmins() {
-    return Collections.unmodifiableCollection(this.ozAdmins);
+  public OzoneAdmins getOzoneAdmins() {
+    return ozAdmins;
   }
 
   public void setAllowListAllVolumes(boolean allowListAllVolumes) {
@@ -216,16 +226,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   }
 
   private boolean isAdmin(UserGroupInformation callerUgi) {
+    Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
+
     if (ozAdmins == null) {
       return false;
     }
 
-    if (ozAdmins.contains(callerUgi.getShortUserName()) ||
-        ozAdmins.contains(callerUgi.getUserName()) ||
-        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      return true;
-    }
-
-    return false;
+    return ozAdmins.isAdmin(callerUgi);
   }
 }

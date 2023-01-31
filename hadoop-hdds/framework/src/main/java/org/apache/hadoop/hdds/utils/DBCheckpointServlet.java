@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,38 +21,27 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar.gz)
+ * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
  */
 public class DBCheckpointServlet extends HttpServlet {
 
@@ -64,10 +53,14 @@ public class DBCheckpointServlet extends HttpServlet {
   private transient DBCheckpointMetrics dbMetrics;
 
   private boolean aclEnabled;
-  private Collection<String> ozAdmins;
+  private boolean isSpnegoEnabled;
+  private transient OzoneAdmins admins;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
-      boolean omAclEnabled, Collection<String> ozoneAdmins)
+                         boolean omAclEnabled,
+                         Collection<String> allowedAdminUsers,
+                         Collection<String> allowedAdminGroups,
+                         boolean isSpnegoAuthEnabled)
       throws ServletException {
 
     dbStore = store;
@@ -78,15 +71,15 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     this.aclEnabled = omAclEnabled;
-    this.ozAdmins = ozoneAdmins;
+    this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
+    this.isSpnegoEnabled = isSpnegoAuthEnabled;
   }
 
-  private boolean hasPermission(String username) {
-    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
-    if (aclEnabled) {
-      // Only Ozone admins are allowed
-      return ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)
-          || ozAdmins.contains(username);
+  private boolean hasPermission(UserGroupInformation user) {
+    // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
+    // enabled
+    if (aclEnabled && isSpnegoEnabled) {
+      return admins.isAdmin(user);
     } else {
       return true;
     }
@@ -109,7 +102,7 @@ public class DBCheckpointServlet extends HttpServlet {
       return;
     }
 
-    // Check ACL for dbCheckpoint only when global Ozone ACL is enable
+    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
     if (aclEnabled) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
@@ -121,7 +114,9 @@ public class DBCheckpointServlet extends HttpServlet {
         return;
       } else {
         final String userPrincipalName = userPrincipal.getName();
-        if (!hasPermission(userPrincipalName)) {
+        UserGroupInformation ugi =
+            UserGroupInformation.createRemoteUser(userPrincipalName);
+        if (!hasPermission(ugi)) {
           LOG.error("Permission denied: User principal '{}' does not have"
                   + " access to /dbCheckpoint.\nThis can happen when Ozone"
                   + " Manager is started with a different user.\n"
@@ -161,10 +156,10 @@ public class DBCheckpointServlet extends HttpServlet {
       if (file == null) {
         return;
       }
-      response.setContentType("application/x-tgz");
+      response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition",
           "attachment; filename=\"" +
-               file.toString() + ".tgz\"");
+               file + ".tar\"");
 
       Instant start = Instant.now();
       writeDBCheckpointToStream(checkpoint,
@@ -193,53 +188,4 @@ public class DBCheckpointServlet extends HttpServlet {
     }
   }
 
-  /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
-   *
-   * @param checkpoint  checkpoint file
-   * @param destination desination output stream.
-   * @throws IOException
-   */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
-      throws IOException {
-
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
-            }
-          }
-        }
-      }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
-    }
-  }
-
-  private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
-    }
-    archiveOutputStream.closeArchiveEntry();
-  }
 }

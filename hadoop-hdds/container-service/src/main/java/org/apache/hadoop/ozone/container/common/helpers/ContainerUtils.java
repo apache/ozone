@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
@@ -32,9 +33,13 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -44,7 +49,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -58,9 +63,6 @@ public final class ContainerUtils {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerUtils.class);
-
-  private static final ByteString REDACTED =
-      ByteString.copyFromUtf8("<redacted>");
 
   private ContainerUtils() {
     //never constructed.
@@ -185,21 +187,29 @@ public final class ContainerUtils {
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
    */
-  public static void verifyChecksum(ContainerData containerData)
-      throws IOException {
-    String storedChecksum = containerData.getChecksum();
+  public static void verifyChecksum(ContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    boolean enabled = conf.getBoolean(
+            HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
+            HddsConfigKeys.
+                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
+    if (enabled) {
+      String storedChecksum = containerData.getChecksum();
 
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-        containerData.getContainerType());
-    containerData.computeAndSetChecksum(yaml);
-    String computedChecksum = containerData.getChecksum();
+      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+          containerData.getContainerType(),
+          containerData instanceof KeyValueContainerData &&
+              ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
+      containerData.computeAndSetChecksum(yaml);
+      String computedChecksum = containerData.getChecksum();
 
-    if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
-      throw new StorageContainerException("Container checksum error for " +
-          "ContainerID: " + containerData.getContainerID() + ". " +
-          "\nStored Checksum: " + storedChecksum +
-          "\nExpected Checksum: " + computedChecksum,
-          CONTAINER_CHECKSUM_ERROR);
+      if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
+        throw new StorageContainerException("Container checksum error for " +
+                "ContainerID: " + containerData.getContainerID() + ". " +
+                "\nStored Checksum: " + storedChecksum +
+                "\nExpected Checksum: " + computedChecksum,
+                CONTAINER_CHECKSUM_ERROR);
+      }
     }
   }
 
@@ -236,71 +246,56 @@ public final class ContainerUtils {
   }
 
   /**
+   * Get the chunk directory from the containerData.
+   *
+   * @param containerData {@link ContainerData}
+   * @return the file of chunk directory
+   * @throws StorageContainerException
+   */
+  public static File getChunkDir(ContainerData containerData)
+      throws StorageContainerException {
+    Preconditions.checkNotNull(containerData, "Container data can't be null");
+
+    String chunksPath = containerData.getChunksPath();
+    if (chunksPath == null) {
+      LOG.error("Chunks path is null in the container data");
+      throw new StorageContainerException("Unable to get Chunks directory.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+
+    File chunksDir = new File(chunksPath);
+    if (!chunksDir.exists()) {
+      LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
+      throw new StorageContainerException("Chunks directory " +
+          chunksDir.getAbsolutePath() + " does not exist.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    return chunksDir;
+  }
+
+  /**
    * ContainerID can be decoded from the container base directory name.
    */
   public static long getContainerID(File containerBaseDir) {
     return Long.parseLong(containerBaseDir.getName());
   }
 
-  /**
-   * Remove binary data from request {@code msg}.  (May be incomplete, feel
-   * free to add any missing cleanups.)
-   */
-  public static ContainerCommandRequestProto processForDebug(
-      ContainerCommandRequestProto msg) {
-
-    if (msg == null) {
-      return null;
-    }
-
-    if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
-      ContainerCommandRequestProto.Builder builder = msg.toBuilder();
-      if (msg.hasWriteChunk()) {
-        builder.getWriteChunkBuilder().setData(REDACTED);
-      }
-      if (msg.hasPutSmallFile()) {
-        builder.getPutSmallFileBuilder().setData(REDACTED);
-      }
-      return builder.build();
-    }
-
-    return msg;
+  public static String getContainerTarName(long containerId) {
+    return "container-" + containerId + ".tar";
   }
 
-  /**
-   * Remove binary data from response {@code msg}.  (May be incomplete, feel
-   * free to add any missing cleanups.)
-   */
-  public static ContainerCommandResponseProto processForDebug(
-      ContainerCommandResponseProto msg) {
+  public static long retrieveContainerIdFromTarName(String tarName)
+      throws IOException {
+    assert tarName != null;
+    Pattern pattern = Pattern.compile("container-(\\d+).tar");
+    // Now create matcher object.
+    Matcher m = pattern.matcher(tarName);
 
-    if (msg == null) {
-      return null;
+    if (m.find()) {
+      return Long.parseLong(m.group(1));
+    } else {
+      throw new IOException("Illegal container tar gz file " +
+          tarName);
     }
-
-    if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
-      ContainerCommandResponseProto.Builder builder = msg.toBuilder();
-      if (msg.hasReadChunk()) {
-        if (msg.getReadChunk().hasData()) {
-          builder.getReadChunkBuilder().setData(REDACTED);
-        }
-        if (msg.getReadChunk().hasDataBuffers()) {
-          builder.getReadChunkBuilder().getDataBuffersBuilder()
-              .addBuffers(REDACTED);
-        }
-      }
-      if (msg.hasGetSmallFile()) {
-        if (msg.getGetSmallFile().getData().hasData()) {
-          builder.getGetSmallFileBuilder().getDataBuilder().setData(REDACTED);
-        }
-        if (msg.getGetSmallFile().getData().hasDataBuffers()) {
-          builder.getGetSmallFileBuilder().getDataBuilder()
-              .getDataBuffersBuilder().addBuffers(REDACTED);
-        }
-      }
-      return builder.build();
-    }
-
-    return msg;
   }
 }

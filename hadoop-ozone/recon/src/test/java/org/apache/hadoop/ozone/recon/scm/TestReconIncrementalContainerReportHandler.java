@@ -20,8 +20,9 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -50,19 +53,22 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Test;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Test Recon ICR handler.
  */
 public class TestReconIncrementalContainerReportHandler
     extends AbstractReconContainerManagerTest {
+  private HDDSLayoutVersionManager versionManager;
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
 
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
         mock(IncrementalContainerReportFromDatanode.class);
@@ -81,25 +87,34 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+
+    NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+
     nodeManager.register(datanodeDetails, null, null);
 
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager);
+            containerManager, SCMContext.emptyContext());
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
 
     reconIcr.onMessage(reportMock, eventPublisherMock);
     nodeManager.addContainer(datanodeDetails, containerID);
-    assertTrue(containerManager.exists(containerID));
+    assertTrue(containerManager.containerExist(containerID));
     assertEquals(1, containerManager.getContainerReplicas(containerID).size());
     assertEquals(OPEN, containerManager.getContainer(containerID).getState());
   }
 
   @Test
-  public void testProcessICRStateMismatch() throws IOException {
+  public void testProcessICRStateMismatch()
+      throws IOException, TimeoutException {
 
     // Recon container state is "OPEN".
     // Replica state could be any Non OPEN state.
@@ -112,8 +127,7 @@ public class TestReconIncrementalContainerReportHandler
           containerWithPipeline.getContainerInfo().containerID();
 
       ReconContainerManager containerManager = getContainerManager();
-      containerManager.addNewContainer(containerID.getId(),
-          containerWithPipeline);
+      containerManager.addNewContainer(containerWithPipeline);
 
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();
@@ -130,18 +144,18 @@ public class TestReconIncrementalContainerReportHandler
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
-              containerManager);
+              containerManager, SCMContext.emptyContext());
 
       reconIcr.onMessage(reportMock, mock(EventPublisher.class));
-      assertTrue(containerManager.exists(containerID));
+      assertTrue(containerManager.containerExist(containerID));
       assertEquals(1,
           containerManager.getContainerReplicas(containerID).size());
       LifeCycleState expectedState = getContainerStateFromReplicaState(state);
       LifeCycleState actualState =
           containerManager.getContainer(containerID).getState();
-      assertEquals(String.format("Expecting %s in " +
-              "container state for replica state %s", expectedState,
-          state), expectedState, actualState);
+      assertEquals(expectedState, actualState,
+          String.format("Expecting %s in container state for replica state %s",
+              expectedState, state));
     }
   }
 

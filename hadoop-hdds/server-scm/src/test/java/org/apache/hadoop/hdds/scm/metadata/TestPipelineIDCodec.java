@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
@@ -57,7 +57,7 @@ public class TestPipelineIDCodec {
 
   @Test
   public void testPersistingARandomUUID() throws Exception {
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
       UUID uuid = UUID.randomUUID();
 
       long mask = 0x0000_0000_0000_00FFL;

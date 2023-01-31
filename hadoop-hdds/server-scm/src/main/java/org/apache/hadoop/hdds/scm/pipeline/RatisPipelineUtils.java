@@ -21,12 +21,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftGroup;
@@ -91,7 +91,7 @@ public final class RatisPipelineUtils {
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
     final RaftPeer p = RatisHelper.toRaftPeer(dn);
-    try(RaftClient client = RatisHelper
+    try (RaftClient client = RatisHelper
         .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType), p,
             retryPolicy, grpcTlsConfig, ozoneConf)) {
       client.getGroupManagementApi(p.getId())
@@ -103,15 +103,15 @@ public final class RatisPipelineUtils {
    * Return the list of pipelines who share the same set of datanodes
    * with the input pipeline.
    *
-   * @param stateManager PipelineStateManager
+   * @param stateManager PipelineStateManagerImpl
    * @param pipeline input pipeline
    * @return list of matched pipeline
    */
   static List<Pipeline> checkPipelineContainSameDatanodes(
       PipelineStateManager stateManager, Pipeline pipeline) {
-    return stateManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE)
+    return stateManager
+        .getPipelines(RatisReplicationConfig
+            .getInstance(ReplicationFactor.THREE))
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
             (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
                 p.sameDatanodes(pipeline)))
