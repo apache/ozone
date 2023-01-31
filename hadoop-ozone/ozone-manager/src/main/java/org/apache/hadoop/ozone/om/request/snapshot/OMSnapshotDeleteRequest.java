@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 /**
@@ -63,7 +64,6 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
   }
 
   @Override
-//  @DisallowedUntilLayoutVersion(OZONE_SNAPSHOT_SCHEMA)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
@@ -110,7 +110,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotDeletes();
 
-//    boolean acquiredBucketLock = false;
+    boolean acquiredBucketLock = false;
     boolean acquiredSnapshotLock = false;
     IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -133,10 +133,10 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     SnapshotInfo snapshotInfo = null;
 
     try {
-      // TODO: Do we need a bucket lock here? Probably not?
-//      acquiredBucketLock =
-//          omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
-//              volumeName, bucketName);
+      // Acquire bucket lock
+      acquiredBucketLock =
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName);
 
       acquiredSnapshotLock =
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
@@ -186,10 +186,10 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
         omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
             bucketName, snapshotName);
       }
-//      if (acquiredBucketLock) {
-//        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-//            bucketName);
-//      }
+      if (acquiredBucketLock) {
+        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
     }
 
     if (snapshotInfo == null) {
