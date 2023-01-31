@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test for {@link PushReplicator}.
  */
+@Timeout(30)
 class TestPushReplicator {
 
   @Test
