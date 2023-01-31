@@ -17,7 +17,13 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 
 /**
  * Abstract class to capture common variables and methods for different types
@@ -41,17 +47,26 @@ public abstract class AbstractReplicationTask {
 
   private final long containerId;
 
-  private final Instant queued = Instant.now();
+  private final Instant queued;
 
   private final long deadlineMsSinceEpoch;
 
   private final long term;
 
+  private ReplicationCommandPriority priority = NORMAL;
+
   protected AbstractReplicationTask(long containerID,
       long deadlineMsSinceEpoch, long term) {
+    this(containerID, deadlineMsSinceEpoch, term,
+        Clock.system(ZoneId.systemDefault()));
+  }
+
+  protected AbstractReplicationTask(long containerID,
+      long deadlineMsSinceEpoch, long term, Clock clock) {
     this.containerId = containerID;
     this.deadlineMsSinceEpoch = deadlineMsSinceEpoch;
     this.term = term;
+    queued = Instant.now(clock);
   }
 
   public long getContainerId() {
@@ -87,4 +102,22 @@ public abstract class AbstractReplicationTask {
    */
   public abstract void runTask();
 
+  /**
+   * Set the relative priority of a task. Internally Tasks use the integer value
+   * associated with the ENUM parameter. An ENUM with a lower integer value
+   * will be sorted earlier in the queue than a larger value.
+   * @param priority ENUM representing an integer indicating the priority of
+   *                 this task.
+   */
+  public void setPriority(ReplicationCommandPriority priority) {
+    this.priority = priority;
+  }
+
+  /**
+   * Returns the priority of the task. A lower number indicates a higher
+   * priority.
+   */
+  public ReplicationCommandPriority getPriority() {
+    return priority;
+  }
 }
