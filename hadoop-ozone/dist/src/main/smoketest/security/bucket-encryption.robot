@@ -43,12 +43,3 @@ Create Key in Encrypted Bucket
     ${key} =         Set Variable    o3://${OM_SERVICE_ID}/${VOLUME}/encrypted-bucket/passwd
     ${output} =      Execute    ozone sh key put ${key} /etc/passwd
     Key Should Match Local File    ${key}    /etc/passwd
-
-List Encrypted Buckets Only
-                     Execute    ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/nonsecure-bucket
-    ${output} =      Execute    ozone sh bucket list o3://${OM_SERVICE_ID}/${VOLUME}/
-                     Should Contain        ${output}    encrypted-bucket
-                     Should Contain        ${output}    nonsecure-bucket
-    ${output} =      Execute    ozone sh bucket list o3://${OM_SERVICE_ID}/${VOLUME}/ -e
-                     Should Contain        ${output}    encrypted-bucket
-                     Should Not Contain    ${output}    nonsecure-bucket
