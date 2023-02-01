@@ -18,47 +18,40 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Collections.emptyMap;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static java.util.Collections.singleton;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.createContainer;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests ozone containers replication.
@@ -66,78 +59,89 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(300)
 class TestContainerReplication {
 
-  private static final int DATANODE_COUNT = 3;
-  private static final String VOLUME = "vol1";
-  private static final String BUCKET = "bucket1";
+  private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
   private static MiniOzoneCluster cluster;
-  private static OzoneClient client;
-  private static OzoneBucket bucket;
+
+  private static XceiverClientFactory clientFactory;
 
   @BeforeAll
   static void setup() throws Exception {
     OzoneConfiguration conf = createConfiguration();
+    CopyContainerCompression[] compressions = CopyContainerCompression.values();
+    final int count = compressions.length;
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(DATANODE_COUNT)
+        .setNumDatanodes(count)
+        .setStartDataNodes(false)
         .build();
+    List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
+    for (int i = 0; i < count; ++i) {
+      compressions[i].setOn(datanodes.get(i).getConf());
+    }
+    cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
 
-    client = OzoneClientFactory.getRpcClient(conf);
-
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(VOLUME);
-    OzoneVolume volume = objectStore.getVolume(VOLUME);
-    volume.createBucket(BUCKET);
-    bucket = volume.getBucket(BUCKET);
+    clientFactory = new XceiverClientManager(conf);
   }
 
   @AfterAll
   static void tearDown() throws IOException {
-    if (client != null) {
-      client.close();
+    if (clientFactory != null) {
+      clientFactory.close();
     }
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Test
-  void testPush() throws Exception {
-    OmKeyLocationInfo location = createNewClosedContainer("push");
-    final long containerID = location.getContainerID();
-    DatanodeDetails source = location.getPipeline().getFirstNode();
+  @ParameterizedTest
+  @EnumSource
+  void testPush(CopyContainerCompression compression) throws Exception {
+    final int index = compression.ordinal();
+    DatanodeDetails source = cluster.getHddsDatanodes().get(index)
+        .getDatanodeDetails();
+    long containerID = createNewClosedContainer(source);
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
-    addDatanodeCommand(source, cmd);
-    waitForReplicaCount(containerID, 2, cluster);
+    queueAndWaitForSuccess(cmd, source);
   }
 
-  @Test
-  void testPull() throws Exception {
-    OmKeyLocationInfo location = createNewClosedContainer("pull");
-    final long containerID = location.getContainerID();
-    DatanodeDetails source = location.getPipeline().getFirstNode();
-    DatanodeDetails target = selectOtherNode(source);
+  @ParameterizedTest
+  @EnumSource
+  void testPull(CopyContainerCompression compression) throws Exception {
+    final int index = compression.ordinal();
+    DatanodeDetails target = cluster.getHddsDatanodes().get(index)
+        .getDatanodeDetails();
+    DatanodeDetails source = selectOtherNode(target);
+    long containerID = createNewClosedContainer(source);
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.fromSources(containerID,
             ImmutableList.of(source));
-    addDatanodeCommand(target, cmd);
-    waitForReplicaCount(containerID, 2, cluster);
+    queueAndWaitForSuccess(cmd, target);
   }
 
-  private static void addDatanodeCommand(DatanodeDetails dn, SCMCommand<?> cmd)
-      throws IOException {
-    StateContext context = cluster.getHddsDatanode(dn).getDatanodeStateMachine()
-        .getContext();
+  private void queueAndWaitForSuccess(ReplicateContainerCommand cmd,
+      DatanodeDetails dn)
+      throws IOException, InterruptedException, TimeoutException {
+
+    DatanodeStateMachine datanodeStateMachine =
+        cluster.getHddsDatanode(dn).getDatanodeStateMachine();
+    final ReplicationSupervisor supervisor =
+       datanodeStateMachine.getSupervisor();
+    final long replicationCount = supervisor.getReplicationSuccessCount();
+    StateContext context = datanodeStateMachine.getContext();
     context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
     context.addCommand(cmd);
+    waitFor(
+        () -> supervisor.getReplicationSuccessCount() == replicationCount + 1,
+        100, 30000);
   }
 
   private DatanodeDetails selectOtherNode(DatanodeDetails source)
       throws IOException {
     int sourceIndex = cluster.getHddsDatanodeIndex(source);
-    int targetIndex = IntStream.range(0, DATANODE_COUNT)
+    int targetIndex = IntStream.range(0, cluster.getHddsDatanodes().size())
         .filter(index -> index != sourceIndex)
         .findAny()
         .orElseThrow(() -> new AssertionError("no target datanode found"));
@@ -156,25 +160,14 @@ class TestContainerReplication {
     return conf;
   }
 
-  private static OmKeyLocationInfo createNewClosedContainer(String key)
+  private static long createNewClosedContainer(DatanodeDetails dn)
       throws Exception {
-    ReplicationConfig one = RatisReplicationConfig.getInstance(ONE);
-    try (OutputStream out = bucket.createKey(key, 0, one, emptyMap())) {
-      out.write("Hello".getBytes(UTF_8));
+    long containerID = CONTAINER_ID.incrementAndGet();
+    try (XceiverClientSpi client = clientFactory.acquireClient(
+        createPipeline(singleton(dn)))) {
+      createContainer(client, containerID, null, CLOSED, 0);
+      return containerID;
     }
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(VOLUME)
-        .setBucketName(BUCKET)
-        .setKeyName(key)
-        .build();
-    OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-    assertNotNull(locations);
-    List<OmKeyLocationInfo> locationList = locations.getLocationList();
-    assertEquals(1, locationList.size());
-    OmKeyLocationInfo location = locationList.iterator().next();
-    waitForContainerClose(cluster, location.getContainerID());
-    return location;
   }
 
 }

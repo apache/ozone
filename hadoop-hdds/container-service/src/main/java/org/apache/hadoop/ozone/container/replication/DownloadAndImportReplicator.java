@@ -42,19 +42,19 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   public static final Logger LOG =
       LoggerFactory.getLogger(DownloadAndImportReplicator.class);
 
+  private final ConfigurationSource conf;
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
-  private final CopyContainerCompression compression;
 
   public DownloadAndImportReplicator(
       ConfigurationSource conf, ContainerSet containerSet,
       ContainerImporter containerImporter,
       ContainerDownloader downloader) {
+    this.conf = conf;
     this.containerSet = containerSet;
     this.downloader = downloader;
     this.containerImporter = containerImporter;
-    compression = CopyContainerCompression.getConf(conf);
   }
 
   @Override
@@ -67,9 +67,11 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     }
 
     List<DatanodeDetails> sourceDatanodes = task.getSources();
+    CopyContainerCompression compression =
+        CopyContainerCompression.getConf(conf);
 
-    LOG.info("Starting replication of container {} from {}", containerID,
-        sourceDatanodes);
+    LOG.info("Starting replication of container {} from {} using {}",
+        containerID, sourceDatanodes, compression);
 
     try {
       HddsVolume targetVolume = containerImporter.chooseNextVolume();
