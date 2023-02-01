@@ -213,7 +213,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(
+  public Future<List<X509CertificateHolder>> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
@@ -231,16 +231,21 @@ public class DefaultCAServer implements CertificateServer {
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
+    CompletableFuture<List<X509CertificateHolder>> xCertHolders
+        = new CompletableFuture<>();
+
     if (xcertHolder.isCompletedExceptionally()) {
       // This means that approver told us there are things which it disagrees
       // with in this Certificate Request. Since the first set of sanity
       // checks failed, we just return the future object right here.
-      return xcertHolder;
+      xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
+          "verify the CSR."));
     }
+    List<X509CertificateHolder> allCerts;
     try {
       switch (approverType) {
       case MANUAL:
-        xcertHolder.completeExceptionally(new SCMSecurityException("Manual " +
+        xCertHolders.completeExceptionally(new SCMSecurityException("Manual " +
             "approval is not yet implemented."));
         break;
       case KERBEROS_TRUSTED:
@@ -254,7 +259,11 @@ public class DefaultCAServer implements CertificateServer {
           LOG.error("Certificate storage failed, retrying one more time.", e);
           xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
-        xcertHolder.complete(xcert);
+        CertificateCodec codec = new CertificateCodec(config, componentName);
+        allCerts = codec.getCertList();
+        allCerts.add(0, xcert);
+
+        xCertHolders.complete(allCerts);
         break;
       default:
         return null; // cannot happen, keeping checkstyle happy.
@@ -262,10 +271,10 @@ public class DefaultCAServer implements CertificateServer {
     } catch (CertificateException | IOException | OperatorCreationException |
              TimeoutException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xcertHolder.completeExceptionally(
+      xCertHolders.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
-    return xcertHolder;
+    return xCertHolders;
   }
 
   private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
@@ -292,7 +301,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(String csr,
+  public Future<List<X509CertificateHolder>> requestCertificate(String csr,
       CertificateApprover.ApprovalType type, NodeType nodeType)
       throws IOException {
     PKCS10CertificationRequest request =

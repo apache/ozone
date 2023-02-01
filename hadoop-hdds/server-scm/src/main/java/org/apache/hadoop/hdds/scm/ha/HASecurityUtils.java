@@ -54,6 +54,7 @@ import java.net.InetSocketAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -153,15 +154,14 @@ public final class HASecurityUtils {
       // Store SCM sub CA and root CA certificate.
       if (response.hasX509CACertificate()) {
         String pemEncodedRootCert = response.getX509CACertificate();
-        client.storeCertificate(pemEncodedRootCert, true, true);
-        client.storeCertificate(pemEncodedCert, true);
+        client.storeCertificate(pemEncodedRootCert, true);
+        client.storeCertificate(pemEncodedCert);
+        //note: this does exactly the same as store certificate
+        persistSubCACertificate(config, client,
+            pemEncodedCert);
 
         X509Certificate certificate =
             CertificateCodec.getX509Certificate(pemEncodedCert);
-
-        persistSubCACertificate(config, client,
-            CertificateCodec.getCertificateHolder(certificate));
-
         // Persist scm cert serial ID.
         scmStorageConfig.setScmCertSerialId(certificate.getSerialNumber()
             .toString());
@@ -192,24 +192,25 @@ public final class HASecurityUtils {
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
           config, scmAddress);
 
-      X509CertificateHolder subSCMCertHolder = rootCAServer.
+      List<X509CertificateHolder> subSCMCertHolderList = rootCAServer.
           requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
 
       X509CertificateHolder rootCACertificateHolder =
           rootCAServer.getCACertificate();
 
       String pemEncodedCert =
-          CertificateCodec.getPEMEncodedString(subSCMCertHolder);
+          CertificateCodec.getPEMEncodedString(subSCMCertHolderList);
+
 
       String pemEncodedRootCert =
           CertificateCodec.getPEMEncodedString(rootCACertificateHolder);
 
 
-      client.storeCertificate(pemEncodedRootCert, true, true);
-      client.storeCertificate(pemEncodedCert, true);
-
-
-      persistSubCACertificate(config, client, subSCMCertHolder);
+      client.storeCertificate(pemEncodedRootCert, true);
+      client.storeCertificate(pemEncodedCert);
+      //note: this does exactly the same as store certificate
+      persistSubCACertificate(config, client, pemEncodedCert);
+      X509CertificateHolder subSCMCertHolder = subSCMCertHolderList.get(0);
 
       // Persist scm cert serial ID.
       scmStorageConfig.setScmCertSerialId(subSCMCertHolder.getSerialNumber()
@@ -283,6 +284,7 @@ public final class HASecurityUtils {
   /**
    * Persists the sub SCM signed certificate to the location which can be
    * read by sub CA Certificate server.
+   *
    * @param config
    * @param certificateClient
    * @param certificateHolder
@@ -290,12 +292,15 @@ public final class HASecurityUtils {
    */
   private static void persistSubCACertificate(OzoneConfiguration config,
       CertificateClient certificateClient,
-      X509CertificateHolder certificateHolder) throws IOException {
+      String certificateHolder) throws IOException {
+    SecurityConfig securityConfig = new SecurityConfig(config);
     CertificateCodec certCodec =
-        new CertificateCodec(new SecurityConfig(config),
+        new CertificateCodec(securityConfig,
             certificateClient.getComponentName());
 
-    certCodec.writeCertificate(certificateHolder);
+    certCodec.writeCertificate(certCodec.getLocation().toAbsolutePath(),
+        securityConfig.getCertificateFileName(),
+        certificateHolder);
   }
 
   /**

@@ -24,10 +24,13 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.cert.CertPath;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -135,13 +138,15 @@ public class TestOzoneDelegationTokenSecretManager {
    * */
   private CertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    X509Certificate cert = KeyStoreTestUtil
+    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+    X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    CertPath certPath = fact.generateCertPath(ImmutableList.of(singleCert));
 
     return new OMCertificateClient(securityConfig) {
       @Override
-      public X509Certificate getCertificate() {
-        return cert;
+      public CertPath getCertPath() {
+        return certPath;
       }
 
       @Override
@@ -156,7 +161,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public X509Certificate getCertificate(String serialId) {
-        return cert;
+        return (X509Certificate) certPath.getCertificates().get(0);
       }
     };
   }

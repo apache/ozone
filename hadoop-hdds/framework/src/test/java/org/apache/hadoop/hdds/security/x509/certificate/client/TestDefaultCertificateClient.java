@@ -307,11 +307,11 @@ public class TestDefaultCertificateClient {
         () -> dnCertClient.getCertificate(cert3.getSerialNumber()
             .toString()));
     codec.writeCertificate(certPath, "1.crt",
-        getPEMEncodedString(cert1), true);
+        getPEMEncodedString(cert1));
     codec.writeCertificate(certPath, "2.crt",
-        getPEMEncodedString(cert2), true);
+        getPEMEncodedString(cert2));
     codec.writeCertificate(certPath, "3.crt",
-        getPEMEncodedString(cert3), true);
+        getPEMEncodedString(cert3));
 
     // Re instantiate DN client which will load certificates from filesystem.
     dnCertClient = new DNCertificateClient(dnSecurityConfig, null,
@@ -333,9 +333,9 @@ public class TestDefaultCertificateClient {
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
 
-    dnCertClient.storeCertificate(getPEMEncodedString(cert1), true);
-    dnCertClient.storeCertificate(getPEMEncodedString(cert2), true);
-    dnCertClient.storeCertificate(getPEMEncodedString(cert3), true);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1));
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2));
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3));
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
         .toString()));
@@ -506,6 +506,7 @@ public class TestDefaultCertificateClient {
             .newBuilder().setResponseCode(SCMSecurityProtocolProtos
                 .SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
+            .setX509Certificate(pemCert)
             .setX509CACertificate(pemCert)
             .build();
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
@@ -551,7 +552,8 @@ public class TestDefaultCertificateClient {
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
     certCodec = new CertificateCodec(dnSecurityConfig,
         newCertDir.toPath());
-    dnCertClient.storeCertificate(getPEMEncodedString(cert), true, false, false,
+    dnCertClient.storeCertificate(getPEMEncodedString(cert),
+        CertificateClient.CertType.INTERMEDIATE,
         certCodec, false);
     // a success renew after auto cleanup new key and cert dir
     dnCertClient.renewAndStoreKeyAndCertificate(true);

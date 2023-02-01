@@ -19,29 +19,43 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.LineIterator;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.security.cert.CertPath;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -58,6 +72,7 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 public class CertificateCodec {
   public static final String BEGIN_CERT = "-----BEGIN CERTIFICATE-----";
   public static final String END_CERT = "-----END CERTIFICATE-----";
+  public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CertificateCodec.class);
@@ -94,6 +109,15 @@ public class CertificateCodec {
   public static X509Certificate getX509Certificate(X509CertificateHolder holder)
       throws CertificateException {
     return CERTIFICATE_CONVERTER.getCertificate(holder);
+  }
+
+  public static String getPEMEncodedString(List<X509CertificateHolder> certs)
+      throws SCMSecurityException {
+    ArrayList<String> pemEncodedList = new ArrayList<>(certs.size());
+    for (X509CertificateHolder cert : certs) {
+      pemEncodedList.add(getPEMEncodedString(cert));
+    }
+    return StringUtils.join(pemEncodedList, "\n");
   }
 
   /**
@@ -145,9 +169,9 @@ public class CertificateCodec {
    */
   public static X509Certificate getX509Certificate(String pemEncodedString)
       throws CertificateException, IOException {
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+    CertificateFactory fact = new CertificateFactory();
     try (InputStream input = IOUtils.toInputStream(pemEncodedString, UTF_8)) {
-      return (X509Certificate) fact.generateCertificate(input);
+      return (X509Certificate) fact.engineGenerateCertificate(input);
     }
   }
 
@@ -161,33 +185,17 @@ public class CertificateCodec {
   }
 
   /**
-   * Gets the X.509 Certificate from PEM encoded String.
-   *
-   * @param pemEncodedString - PEM encoded String.
-   * @return X509Certificate  - Certificate.
-   * @throws CertificateException - Thrown on Failure.
-   * @throws IOException          - Thrown on Failure.
-   */
-  public static X509Certificate getX509Cert(String pemEncodedString)
-      throws CertificateException, IOException {
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
-    try (InputStream input = IOUtils.toInputStream(pemEncodedString, UTF_8)) {
-      return (X509Certificate) fact.generateCertificate(input);
-    }
-  }
-
-  /**
    * Write the Certificate pointed to the location by the configs.
    *
    * @param xCertificate - Certificate to write.
    * @throws SCMSecurityException - on Error.
-   * @throws IOException - on Error.
+   * @throws IOException          - on Error.
    */
   public void writeCertificate(X509CertificateHolder xCertificate)
       throws SCMSecurityException, IOException {
     String pem = getPEMEncodedString(xCertificate);
     writeCertificate(location.toAbsolutePath(),
-        this.securityConfig.getCertificateFileName(), pem, false);
+        this.securityConfig.getCertificateFileName(), pem);
   }
 
   /**
@@ -195,48 +203,52 @@ public class CertificateCodec {
    *
    * @param xCertificate - Certificate to write.
    * @param fileName - file name to write to.
-   * @param overwrite - boolean value, true means overwrite an existing
-   * certificate.
    * @throws SCMSecurityException - On Error.
    * @throws IOException          - On Error.
    */
   public void writeCertificate(X509CertificateHolder xCertificate,
-      String fileName, boolean overwrite)
+      String fileName)
       throws SCMSecurityException, IOException {
     String pem = getPEMEncodedString(xCertificate);
-    writeCertificate(location.toAbsolutePath(), fileName, pem, overwrite);
+    writeCertificate(location.toAbsolutePath(), fileName, pem);
+  }
+
+  public void writeCertificate(String fileName, String pemEncodedCert)
+      throws IOException {
+    writeCertificate(location.toAbsolutePath(), fileName, pemEncodedCert);
   }
 
   /**
    * Helper function that writes data to the file.
    *
-   * @param basePath - Base Path where the file needs to written to.
-   * @param fileName - Certificate file name.
+   * @param basePath              - Base Path where the file needs to written
+   *                              to.
+   * @param fileName              - Certificate file name.
    * @param pemEncodedCertificate - pemEncoded Certificate file.
-   * @param force - Overwrite if the file exists.
    * @throws IOException - on Error.
    */
   public synchronized void writeCertificate(Path basePath, String fileName,
-      String pemEncodedCertificate, boolean force)
+      String pemEncodedCertificate)
       throws IOException {
+    checkBasePathDirectory(basePath);
     File certificateFile =
         Paths.get(basePath.toString(), fileName).toFile();
-    if (certificateFile.exists() && !force) {
-      throw new SCMSecurityException("Specified certificate file already " +
-          "exists.Please use force option if you want to overwrite it.");
-    }
-    if (!basePath.toFile().exists()) {
-      if (!basePath.toFile().mkdirs()) {
-        LOG.error("Unable to create file path. Path: {}", basePath);
-        throw new IOException("Creation of the directories failed."
-            + basePath.toString());
-      }
-    }
+
     try (FileOutputStream file = new FileOutputStream(certificateFile)) {
       IOUtils.write(pemEncodedCertificate, file, UTF_8);
     }
 
     Files.setPosixFilePermissions(certificateFile.toPath(), permissionSet);
+  }
+
+  private void checkBasePathDirectory(Path basePath) throws IOException {
+    if (!basePath.toFile().exists()) {
+      if (!basePath.toFile().mkdirs()) {
+        LOG.error("Unable to create file path. Path: {}", basePath);
+        throw new IOException("Creation of the directories failed."
+            + basePath);
+      }
+    }
   }
 
   /**
@@ -247,6 +259,7 @@ public class CertificateCodec {
    * @throws CertificateException - on Error.
    * @throws IOException          - on Error.
    */
+  //BUG HERE
   public X509CertificateHolder readCertificate() throws
       CertificateException, IOException {
     return readCertificate(this.location.toAbsolutePath(),
@@ -269,6 +282,7 @@ public class CertificateCodec {
     return getX509CertificateHolder(certificateFile);
   }
 
+
   /**
    * Helper function to read certificate.
    *
@@ -283,10 +297,50 @@ public class CertificateCodec {
       throw new IOException("Unable to find the requested certificate. Path: "
           + certificateFile.toString());
     }
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+
+    CertificateFactory fact = new CertificateFactory();
     try (FileInputStream is = new FileInputStream(certificateFile)) {
       return getCertificateHolder(
-          (X509Certificate) fact.generateCertificate(is));
+          (X509Certificate) fact.engineGenerateCertificate(is));
+    }
+  }
+
+  public List<X509CertificateHolder> getCertList()
+      throws IOException, CertificateException {
+    CertPath certPath =
+        getCertPath(this.securityConfig.getCertificateFileName());
+    ArrayList<X509CertificateHolder> certList = new ArrayList<>();
+    for (Certificate cert : certPath.getCertificates()) {
+      certList.add(getCertificateHolder((X509Certificate) cert));
+    }
+    return certList;
+  }
+
+  public CertPath getCertPathFromPemEncodedString(
+      String pemString) throws CertificateException, IOException {
+    try (InputStream is =
+             new ByteArrayInputStream(pemString.getBytes(DEFAULT_CHARSET))) {
+      return generateCertPathFromInputStream(is);
+    }
+  }
+
+  private CertPath generateCertPathFromInputStream(InputStream inputStream)
+      throws CertificateException {
+    CertificateFactory fact = new CertificateFactory();
+    return fact.engineGenerateCertPath(inputStream, "PEM");
+  }
+
+  public CertPath getCertPath(String fileName)
+      throws IOException, CertificateException {
+    checkBasePathDirectory(location.toAbsolutePath());
+    File certFile =
+        Paths.get(location.toAbsolutePath().toString(), fileName).toFile();
+    if (!certFile.exists()) {
+      throw new IOException("Unable to find the requested certificate file. " +
+          "Path: " + certFile);
+    }
+    try (FileInputStream is = new FileInputStream(certFile)) {
+      return generateCertPathFromInputStream(is);
     }
   }
 

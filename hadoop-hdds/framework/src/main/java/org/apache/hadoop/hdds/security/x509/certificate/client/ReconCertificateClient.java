@@ -114,14 +114,15 @@ public class ReconCertificateClient  extends CommonCertificateClient {
         String pemEncodedCert = response.getX509Certificate();
         CertificateCodec certCodec = new CertificateCodec(
             getSecurityConfig(), certPath);
-        storeCertificate(pemEncodedCert, true, false, false, certCodec, false);
-        storeCertificate(response.getX509CACertificate(), true, true,
-            false, certCodec, false);
+        storeCertificate(pemEncodedCert, CertType.INTERMEDIATE, certCodec,
+            false);
+        storeCertificate(response.getX509CACertificate(), CertType.CA,
+            certCodec, false);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              true, false, true, certCodec, false);
+              CertType.ROOT_CA, certCodec, false);
         }
         return getX509Certificate(pemEncodedCert).getSerialNumber().toString();
       } else {

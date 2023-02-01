@@ -87,7 +87,7 @@ public interface CertificateServer {
    * approved.
    * @throws SCMSecurityException - on Error.
    */
-  Future<X509CertificateHolder> requestCertificate(
+  Future<List<X509CertificateHolder>> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType type, NodeType role)
       throws SCMSecurityException;
@@ -96,14 +96,15 @@ public interface CertificateServer {
   /**
    * Request a Certificate based on Certificate Signing Request.
    *
-   * @param csr - Certificate Signing Request as a PEM encoded String.
-   * @param type - An Enum which says what kind of approval process to follow.
+   * @param csr       - Certificate Signing Request as a PEM encoded String.
+   * @param type      - An Enum which says what kind of approval process to
+   *                  follow.
    * @param nodeType: OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
    */
-  Future<X509CertificateHolder> requestCertificate(String csr,
+  Future<List<X509CertificateHolder>> requestCertificate(String csr,
       ApprovalType type, NodeType nodeType) throws IOException;
 
   /**

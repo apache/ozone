@@ -27,6 +27,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -196,8 +197,18 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public CertPath getCertPath() {
+    return null;
+  }
+
+  @Override
   public X509Certificate getCertificate() {
     return x509Certificate;
+  }
+
+  @Override
+  public CertPath getCACertPath() {
+    return null;
   }
 
   @Override
@@ -277,12 +288,12 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force)
+  public void storeCertificate(String cert)
       throws CertificateException {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force, boolean caCert)
+  public void storeCertificate(String cert, boolean caCert)
       throws CertificateException {
   }
 
@@ -329,7 +340,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert, boolean force) {
+  public void storeRootCACertificate(String pemEncodedCert) {
 
   }
 

@@ -42,6 +42,8 @@ import java.security.KeyPair;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.CertType.CA;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.CertType.INTERMEDIATE;
 
 /**
  * Certificate client for OzoneManager.
@@ -175,13 +177,13 @@ public class OMCertificateClient extends CommonCertificateClient {
       if (response.hasX509CACertificate()) {
         String pemEncodedRootCert = response.getX509CACertificate();
         storeCertificate(pemEncodedRootCert,
-            true, true, false, certCodec, false);
-        storeCertificate(pemEncodedCert, true, false, false, certCodec, false);
+            CA, certCodec, false);
+        storeCertificate(pemEncodedCert, INTERMEDIATE, certCodec, false);
 
         // Store Root CA certificate if available.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              true, false, true, certCodec, false);
+              CertType.ROOT_CA, certCodec, false);
         }
         return CertificateCodec.getX509Certificate(pemEncodedCert)
             .getSerialNumber().toString();

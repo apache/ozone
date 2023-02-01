@@ -197,11 +197,12 @@ public class TestDefaultCAServer {
     testCA.init(new SecurityConfig(conf),
         SELF_SIGNED_CA);
 
-    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
+    Future<List<X509CertificateHolder>> holder =
+        testCA.requestCertificate(csrString,
+            CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get());
+    assertNotNull(holder.get().get(0));
   }
 
   /**
@@ -241,8 +242,8 @@ public class TestDefaultCAServer {
     testCA.init(new SecurityConfig(conf),
         SELF_SIGNED_CA);
 
-    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+    Future<List<X509CertificateHolder>> holder = testCA.requestCertificate(
+        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     assertNotNull(holder.get());
@@ -275,11 +276,11 @@ public class TestDefaultCAServer {
     // Let us convert this to a string to mimic the common use case.
     String csrString = CertificateSignRequest.getEncodedString(csr);
 
-    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+    Future<List<X509CertificateHolder>> holder = testCA.requestCertificate(
+        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
 
     X509Certificate certificate =
-        new JcaX509CertificateConverter().getCertificate(holder.get());
+        new JcaX509CertificateConverter().getCertificate(holder.get().get(0));
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
@@ -329,7 +330,7 @@ public class TestDefaultCAServer {
     LambdaTestUtils.intercept(ExecutionException.class, "ScmId and " +
             "ClusterId in CSR subject are incorrect",
         () -> {
-          Future<X509CertificateHolder> holder =
+          Future<List<X509CertificateHolder>> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
           holder.get();
@@ -369,7 +370,7 @@ public class TestDefaultCAServer {
         scmCertificateClient.getComponentName());
 
     certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
-        CertificateCodec.getPEMEncodedString(externalCert), true);
+        CertificateCodec.getPEMEncodedString(externalCert));
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
@@ -432,11 +433,11 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    Future<X509CertificateHolder> holder = rootCA.requestCertificate(csr,
+    Future<List<X509CertificateHolder>> holder = rootCA.requestCertificate(csr,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     assertTrue(holder.isDone());
 
-    X509CertificateHolder certificateHolder = holder.get();
+    X509CertificateHolder certificateHolder = holder.get().get(0);
 
 
     assertNotNull(certificateHolder);
@@ -449,11 +450,11 @@ public class TestDefaultCAServer {
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 
     scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(rootCertHolder), true, true);
+        CertificateCodec.getPEMEncodedString(rootCertHolder), true);
 
     // Write to the location where Default CA Server reads from.
     scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(certificateHolder), true);
+        CertificateCodec.getPEMEncodedString(certificateHolder));
 
     CertificateCodec certCodec =
         new CertificateCodec(new SecurityConfig(conf),

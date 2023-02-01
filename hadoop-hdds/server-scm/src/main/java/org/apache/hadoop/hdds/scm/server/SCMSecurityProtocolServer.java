@@ -224,8 +224,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    */
   private String getEncodedCertToString(String certSignReq, NodeType nodeType)
       throws IOException {
-
-    Future<X509CertificateHolder> future;
+    Future<List<X509CertificateHolder>> future;
     if (nodeType == NodeType.SCM) {
       future = rootCertificateServer.requestCertificate(certSignReq,
               KERBEROS_TRUSTED, nodeType);

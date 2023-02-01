@@ -271,7 +271,7 @@ public class TestCRLCodec {
       assertTrue(basePath.mkdirs());
     }
     codec.writeCertificate(basePath.toPath(), TMP_CERT_FILE_NAME,
-                           pemString, false);
+        pemString);
   }
 
   private X509CertificateHolder readTempCert()

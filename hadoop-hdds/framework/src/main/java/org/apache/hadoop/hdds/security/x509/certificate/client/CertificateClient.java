@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
@@ -78,10 +79,15 @@ public interface CertificateClient extends Closeable {
    *
    * @return certificate or Null if there is no data.
    */
+  CertPath getCertPath();
+
   X509Certificate getCertificate();
+
+  CertPath getCACertPath();
 
   /**
    * Return the latest CA certificate known to the client.
+   *
    * @return latest ca certificate known to the client.
    */
   X509Certificate getCACertificate();
@@ -184,25 +190,21 @@ public interface CertificateClient extends Closeable {
    * Stores the Certificate  for this client. Don't use this api to add
    * trusted certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
+   * @param pemEncodedCert - pem encoded X509 Certificate
    * @throws CertificateException - on Error.
-   *
    */
-  void storeCertificate(String pemEncodedCert, boolean force)
+  void storeCertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**
    * Stores the Certificate  for this client. Don't use this api to add
    * trusted certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
-   * @param caCert                - Is CA certificate.
+   * @param pemEncodedCert - pem encoded X509 Certificate
+   * @param caCert         - Is CA certificate.
    * @throws CertificateException - on Error.
-   *
    */
-  void storeCertificate(String pemEncodedCert, boolean force, boolean caCert)
+  void storeCertificate(String pemEncodedCert, boolean caCert)
       throws CertificateException;
 
   /**
@@ -272,11 +274,11 @@ public interface CertificateClient extends Closeable {
 
   /**
    * Store RootCA certificate.
+   *
    * @param pemEncodedCert
-   * @param force
    * @throws CertificateException
    */
-  void storeRootCACertificate(String pemEncodedCert, boolean force)
+  void storeRootCACertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**
@@ -365,7 +367,14 @@ public interface CertificateClient extends Closeable {
 
   /**
    * Register a receiver that will be called after the certificate renewed.
+   *
    * @param receiver
    */
   void registerNotificationReceiver(CertificateNotification receiver);
+
+  enum CertType {
+    INTERMEDIATE,
+    CA,
+    ROOT_CA
+  }
 }

@@ -22,11 +22,14 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -45,15 +48,17 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 public class CertificateClientTest implements CertificateClient {
   private KeyPair keyPair;
-  private X509Certificate x509Certificate;
+  private CertPath certPath;
   private SecurityConfig secConfig;
 
   public CertificateClientTest(OzoneConfiguration conf)
       throws Exception {
     secConfig = new SecurityConfig(conf);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    x509Certificate = KeyStoreTestUtil.generateCertificate("CN=OzoneMaster",
-        keyPair, 30, "SHA256withRSA");
+    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+    X509Certificate singleCert = KeyStoreTestUtil
+        .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    certPath = fact.generateCertPath(ImmutableList.of(singleCert));
   }
 
   @Override
@@ -75,17 +80,27 @@ public class CertificateClientTest implements CertificateClient {
   @Override
   public X509Certificate getCertificate(String certSerialId)
       throws CertificateException {
-    return x509Certificate;
+    return (X509Certificate) certPath.getCertificates().get(0);
+  }
+
+  @Override
+  public CertPath getCertPath() {
+    return certPath;
   }
 
   @Override
   public X509Certificate getCertificate() {
-    return x509Certificate;
+    return (X509Certificate) certPath.getCertificates().get(0);
   }
 
   @Override
   public X509Certificate getCACertificate() {
-    return x509Certificate;
+    return (X509Certificate) certPath.getCertificates().get(0);
+  }
+
+  @Override
+  public CertPath getCACertPath() {
+    return certPath;
   }
 
   @Override
@@ -149,12 +164,12 @@ public class CertificateClientTest implements CertificateClient {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force)
+  public void storeCertificate(String cert)
       throws CertificateException {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force, boolean caCert)
+  public void storeCertificate(String cert, boolean caCert)
       throws CertificateException {
   }
 
@@ -196,11 +211,11 @@ public class CertificateClientTest implements CertificateClient {
 
   @Override
   public X509Certificate getRootCACertificate() {
-    return x509Certificate;
+    return (X509Certificate) certPath.getCertificates().get(0);
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert, boolean force) {
+  public void storeRootCACertificate(String pemEncodedCert) {
 
   }
 
@@ -264,7 +279,8 @@ public class CertificateClientTest implements CertificateClient {
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
 
     keyPair = newKeyPair;
-    x509Certificate = newCert;
+    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+    certPath = fact.generateCertPath(ImmutableList.of(newCert));
   }
 
   @Override

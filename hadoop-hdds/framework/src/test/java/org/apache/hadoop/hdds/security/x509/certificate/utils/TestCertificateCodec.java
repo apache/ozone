@@ -33,12 +33,18 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.cert.CertPath;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,17 +83,7 @@ public class TestCertificateCodec {
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
-        SelfSignedCertificate.newBuilder()
-            .setSubject(RandomStringUtils.randomAlphabetic(4))
-            .setClusterID(RandomStringUtils.randomAlphabetic(4))
-            .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(startDate)
-            .setEndDate(endDate)
-            .setConfiguration(keyGenerator.getSecurityConfig()
-                .getConfiguration())
-            .setKey(keyGenerator.generateKey())
-            .makeCA()
-            .build();
+        generateTestCert(keyGenerator, startDate, endDate);
     CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
     String pemString = codec.getPEMEncodedString(cert);
     assertTrue(pemString.startsWith(CertificateCodec.BEGIN_CERT));
@@ -122,21 +118,11 @@ public class TestCertificateCodec {
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
-        SelfSignedCertificate.newBuilder()
-            .setSubject(RandomStringUtils.randomAlphabetic(4))
-            .setClusterID(RandomStringUtils.randomAlphabetic(4))
-            .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(startDate)
-            .setEndDate(endDate)
-            .setConfiguration(keyGenerator.getSecurityConfig()
-                .getConfiguration())
-            .setKey(keyGenerator.generateKey())
-            .makeCA()
-            .build();
+        generateTestCert(keyGenerator, startDate, endDate);
     CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
     String pemString = codec.getPEMEncodedString(cert);
     codec.writeCertificate(basePath, "pemcertificate.crt",
-        pemString, false);
+        pemString);
     X509CertificateHolder certHolder =
         codec.readCertificate(basePath, "pemcertificate.crt");
     assertNotNull(certHolder);
@@ -162,17 +148,7 @@ public class TestCertificateCodec {
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
-        SelfSignedCertificate.newBuilder()
-            .setSubject(RandomStringUtils.randomAlphabetic(4))
-            .setClusterID(RandomStringUtils.randomAlphabetic(4))
-            .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(startDate)
-            .setEndDate(endDate)
-            .setConfiguration(keyGenerator.getSecurityConfig()
-                .getConfiguration())
-            .setKey(keyGenerator.generateKey())
-            .makeCA()
-            .build();
+        generateTestCert(keyGenerator, startDate, endDate);
     CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
     codec.writeCertificate(cert);
     X509CertificateHolder certHolder = codec.readCertificate();
@@ -197,25 +173,71 @@ public class TestCertificateCodec {
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
-        SelfSignedCertificate.newBuilder()
-            .setSubject(RandomStringUtils.randomAlphabetic(4))
-            .setClusterID(RandomStringUtils.randomAlphabetic(4))
-            .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(startDate)
-            .setEndDate(endDate)
-            .setConfiguration(keyGenerator.getSecurityConfig()
-                .getConfiguration())
-            .setKey(keyGenerator.generateKey())
-            .makeCA()
-            .build();
+        generateTestCert(keyGenerator, startDate, endDate);
     CertificateCodec codec =
         new CertificateCodec(keyGenerator.getSecurityConfig(), "ca");
-    codec.writeCertificate(cert, "newcert.crt", false);
+    codec.writeCertificate(cert, "newcert.crt");
     // Rewrite with force support
-    codec.writeCertificate(cert, "newcert.crt", true);
+    codec.writeCertificate(cert, "newcert.crt");
     X509CertificateHolder x509CertificateHolder =
         codec.readCertificate(codec.getLocation(), "newcert.crt");
     assertNotNull(x509CertificateHolder);
-
   }
+
+  @Test
+  public void testMultipleCertReadWrite() throws IOException,
+      NoSuchAlgorithmException, NoSuchProviderException, CertificateException {
+    //Given two certificates
+    HDDSKeyGenerator keyGenerator =
+        new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
+    X509CertificateHolder firstCert =
+        generateTestCert(keyGenerator, startDate, endDate);
+
+    X509CertificateHolder secondCert =
+        generateTestCert(keyGenerator, startDate, endDate);
+    assertNotEquals(firstCert, secondCert);
+
+    List<X509CertificateHolder> certificateList = new ArrayList<>();
+    certificateList.add(firstCert);
+    certificateList.add(secondCert);
+
+
+    //When prepending the second one before the first one
+    CertificateCodec codec =
+        new CertificateCodec(keyGenerator.getSecurityConfig(), "ca");
+    String certFileName = "newcert.crt";
+    String pemEncodedStrings =
+        CertificateCodec.getPEMEncodedString(certificateList);
+    codec.writeCertificate(certFileName, pemEncodedStrings);
+
+    CertPath certificates =
+        codec.getCertPath(certFileName);
+    Iterator<? extends Certificate> iterator =
+        certificates.getCertificates().iterator();
+    Certificate rereadPrependedCert = iterator.next();
+    Certificate rereadFirstCert = iterator.next();
+    assertEquals(CertificateCodec.getCertificateHolder((X509Certificate) rereadPrependedCert),
+        firstCert);
+    assertEquals(CertificateCodec.getCertificateHolder((X509Certificate) rereadFirstCert),
+        secondCert);
+  }
+
+  private X509CertificateHolder generateTestCert(HDDSKeyGenerator keyGenerator,
+      LocalDateTime startDate, LocalDateTime endDate)
+      throws IOException, NoSuchProviderException, NoSuchAlgorithmException {
+    return SelfSignedCertificate.newBuilder()
+        .setSubject(RandomStringUtils.randomAlphabetic(4))
+        .setClusterID(RandomStringUtils.randomAlphabetic(4))
+        .setScmID(RandomStringUtils.randomAlphabetic(4))
+        .setBeginDate(startDate)
+        .setEndDate(endDate)
+        .setConfiguration(keyGenerator.getSecurityConfig()
+            .getConfiguration())
+        .setKey(keyGenerator.generateKey())
+        .makeCA()
+        .build();
+  }
+
 }
