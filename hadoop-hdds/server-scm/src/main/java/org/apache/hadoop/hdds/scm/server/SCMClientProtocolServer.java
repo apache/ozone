@@ -1109,7 +1109,7 @@ public class SCMClientProtocolServer implements
 
     // return count number of DatanodeUsageInfoProto
     return datanodeUsageInfoList.stream()
-        .map(each -> each.toProto(clientVersion, each.getContainerCount()))
+        .map(each -> each.toProto(clientVersion))
         .limit(count)
         .collect(Collectors.toList());
   }

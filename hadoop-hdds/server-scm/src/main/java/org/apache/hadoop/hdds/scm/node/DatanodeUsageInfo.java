@@ -189,13 +189,11 @@ public class DatanodeUsageInfo {
    *
    * @return Protobuf HddsProtos.DatanodeUsageInfo
    */
-  public DatanodeUsageInfoProto toProto(int clientVersion,
-                                        long containerCount) {
-    return toProtoBuilder(clientVersion, containerCount).build();
+  public DatanodeUsageInfoProto toProto(int clientVersion) {
+    return toProtoBuilder(clientVersion).build();
   }
 
-  private DatanodeUsageInfoProto.Builder toProtoBuilder(int clientVersion,
-                                                        long containerCount) {
+  private DatanodeUsageInfoProto.Builder toProtoBuilder(int clientVersion) {
     DatanodeUsageInfoProto.Builder builder =
         DatanodeUsageInfoProto.newBuilder();
 
