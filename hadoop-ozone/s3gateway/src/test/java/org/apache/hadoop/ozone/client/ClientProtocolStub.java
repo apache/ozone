@@ -620,8 +620,16 @@ public class ClientProtocolStub implements ClientProtocol {
   public List<OzoneSnapshot> listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
-    return null;
+      return null;
   }
+  
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName)
+      throws IOException {
+
+  }
+
+
 
   public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
                                          String fromSnapshot, String toSnapshot)
