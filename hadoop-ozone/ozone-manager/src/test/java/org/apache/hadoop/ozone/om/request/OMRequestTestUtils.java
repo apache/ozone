@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -126,6 +127,18 @@ public final class OMRequestTestUtils {
             omMetadataManager.getBucketKey(volumeName, bucketName))) {
       addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
     }
+  }
+
+  public static void addVolumeAndBucketToDB(
+      String volumeName, OMMetadataManager omMetadataManager,
+      OmBucketInfo.Builder builder)
+      throws Exception {
+    if (!omMetadataManager.getVolumeTable().isExist(
+        omMetadataManager.getVolumeKey(volumeName))) {
+      addVolumeToDB(volumeName, omMetadataManager);
+    }
+
+    addBucketToDB(omMetadataManager, builder);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -583,6 +596,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCreateBucketRequest(req)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString()).build();
   }
@@ -605,6 +619,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCreateBucketRequest(req)
+            .setVersion(ClientVersion.CURRENT_VERSION)
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setClientId(UUID.randomUUID().toString()).build();
   }

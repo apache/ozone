@@ -24,6 +24,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -92,7 +93,9 @@ public class IncrementalContainerReportHandler extends
               nodeManager.addContainer(dd, id);
             }
           }
-          processContainerReplica(dd, container, replicaProto, publisher);
+          if (ContainerReportValidator.validate(container, dd, replicaProto)) {
+            processContainerReplica(dd, container, replicaProto, publisher);
+          }
         } catch (ContainerNotFoundException e) {
           success = false;
           LOG.warn("Container {} not found!", replicaProto.getContainerID());

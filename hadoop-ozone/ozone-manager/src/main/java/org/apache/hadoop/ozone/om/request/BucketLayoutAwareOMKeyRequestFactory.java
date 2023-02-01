@@ -244,7 +244,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     // supported.
     throw new OMException(
         "Request type " + requestType + " not supported with bucket layout " +
-            bucketLayout, OMException.ResultCodes.INTERNAL_ERROR);
+            bucketLayout, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
 
   }
 

@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CRLStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
@@ -58,6 +57,15 @@ public final class SCMEvents {
   public static final TypedEvent<CommandQueueReportFromDatanode>
       COMMAND_QUEUE_REPORT = new TypedEvent<>(
           CommandQueueReportFromDatanode.class, "Command_Queue_Report");
+
+  /**
+   * After node manager processes a COMMAND_QUEUE_REPORT it fires
+   * this event to allow any other processes which depend upon the counts to
+   * be notified they have been updated.
+   */
+  public static final TypedEvent<DatanodeDetails>
+      DATANODE_COMMAND_COUNT_UPDATED = new TypedEvent<>(
+          DatanodeDetails.class, "Datanode_Command_Queue_Updated");
 
   /**
    * Event generated on DataNode registration.
@@ -209,9 +217,6 @@ public final class SCMEvents {
       DELETE_BLOCK_STATUS =
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
-
-  public static final TypedEvent<SafeModeStatus> SAFE_MODE_STATUS =
-      new TypedEvent<>(SafeModeStatus.class, "Safe mode status");
 
   /**
    * A CRL status report will be sent by datanodes. This report is received

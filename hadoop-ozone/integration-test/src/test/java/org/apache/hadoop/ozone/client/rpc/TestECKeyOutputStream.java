@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -60,7 +59,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -98,7 +96,6 @@ public class TestECKeyOutputStream {
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     // If SCM detects dead node too quickly, then container would be moved to
     // closed state and all in progress writes will get exception. To avoid
     // that, we are just keeping higher timeout and none of the tests depending
@@ -171,7 +168,7 @@ public class TestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -368,7 +365,7 @@ public class TestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -401,19 +398,25 @@ public class TestECKeyOutputStream {
       try (OzoneOutputStream out = bucket.createKey(keyName, 1024,
           new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
               chunkSize), new HashMap<>())) {
+        ECKeyOutputStream ecOut = (ECKeyOutputStream) out.getOutputStream();
         out.write(inputData);
         // Kill a node from first pipeline
-        nodeToKill =
-            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
-                .get(0).getPipeline().getFirstNode();
+        nodeToKill = ecOut.getStreamEntries()
+            .get(0).getPipeline().getFirstNode();
         cluster.shutdownHddsDatanode(nodeToKill);
 
         out.write(inputData);
-        // Check the second blockGroup pipeline to make sure that the failed not
-        // is not selected.
-        Assert.assertFalse(
-            ((ECKeyOutputStream) out.getOutputStream()).getStreamEntries()
-                .get(1).getPipeline().getNodes().contains(nodeToKill));
+
+        // Wait for flushing thread to finish its work.
+        final long checkpoint = System.currentTimeMillis();
+        ecOut.insertFlushCheckpoint(checkpoint);
+        GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
+            100, 10000);
+
+        // Check the second blockGroup pipeline to make sure that the failed
+        // node is not selected.
+        Assert.assertFalse(ecOut.getStreamEntries()
+            .get(1).getPipeline().getNodes().contains(nodeToKill));
       }
 
       try (OzoneInputStream is = bucket.readKey(keyName)) {

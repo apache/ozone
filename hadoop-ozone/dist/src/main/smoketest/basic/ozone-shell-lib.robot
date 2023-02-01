@@ -33,7 +33,7 @@ Test ozone shell
     ${result} =     Execute and checkrc    ozone sh volume info ${protocol}${server}/${volume}      255
                     Should contain      ${result}       VOLUME_NOT_FOUND
     ${result} =     Execute             ozone sh volume create ${protocol}${server}/${volume} --space-quota 100TB --namespace-quota 100
-                    Should not contain  ${result}       Failed
+                    Should Be Empty     ${result}
     ${result} =     Execute             ozone sh volume list ${protocol}${server}/ | jq -r '.[] | select(.name=="${volume}")'
                     Should contain      ${result}       creationTime
     ${result} =     Execute             ozone sh volume list | jq -r '.[] | select(.name=="${volume}")'
@@ -44,7 +44,8 @@ Test ozone shell
 #                    Should Be Equal     ${result}       bill
     ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
                     Should Be Equal     ${result}       10995116277760
-                    Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
+    ${result} =     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
+                    Should Be Empty     ${result}
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .storageType'
                     Should Be Equal     ${result}       DISK
     ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'

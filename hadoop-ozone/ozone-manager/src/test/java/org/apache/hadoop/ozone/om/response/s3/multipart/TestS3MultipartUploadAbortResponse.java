@@ -100,7 +100,8 @@ public class TestS3MultipartUploadAbortResponse
   protected S3InitiateMultipartUploadResponse
         getS3InitiateMultipartUploadResponse(
       String volumeName, String bucketName, String keyName,
-      String multipartUploadID, long volumeId, long bucketId) {
+      String multipartUploadID, long volumeId, long bucketId)
+      throws IOException {
     return createS3InitiateMPUResponse(volumeName, bucketName, keyName,
         multipartUploadID);
   }

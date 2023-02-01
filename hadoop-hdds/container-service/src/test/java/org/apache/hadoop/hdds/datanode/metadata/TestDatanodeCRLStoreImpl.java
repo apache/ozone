@@ -31,17 +31,17 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test class for {@link DatanodeCRLStoreImpl}.
@@ -54,7 +54,7 @@ public class TestDatanodeCRLStoreImpl {
   private CRLApprover crlApprover;
   private SecurityConfig securityConfig;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
@@ -62,24 +62,16 @@ public class TestDatanodeCRLStoreImpl {
     dnCRLStore = new DatanodeCRLStoreImpl(conf);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     securityConfig = new SecurityConfig(conf);
-  }
-
-  @Before
-  public void initCRLApprover() {
     crlApprover = new DefaultCRLApprover(securityConfig,
         keyPair.getPrivate());
   }
 
-  @After
-  public void tearDown() {
-    FileUtil.fullyDelete(testDir);
-  }
-
-  @After
+  @AfterEach
   public void destroyDbStore() throws Exception {
     if (dnCRLStore.getStore() != null) {
       dnCRLStore.getStore().close();
     }
+    FileUtil.fullyDelete(testDir);
   }
   @Test
   public void testCRLStore() throws Exception {

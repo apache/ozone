@@ -154,6 +154,10 @@ public class StorageInfo {
     properties.setProperty(key, value);
   }
 
+  public void unsetProperty(String key) {
+    properties.remove(key);
+  }
+
   public void setClusterId(String clusterId) {
     properties.setProperty(CLUSTER_ID, clusterId);
   }

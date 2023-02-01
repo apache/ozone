@@ -124,10 +124,11 @@ enum Type {
   RangerBGSync = 109;
 
   EchoRPC = 110;
+  GetKeyInfo = 111;
 
-  CreateSnapshot = 111;
-  ListSnapshot = 112;
-  SnapshotDiff = 113;
+  CreateSnapshot = 112;
+  ListSnapshot = 113;
+  SnapshotDiff = 114;
 }
 
 message OMRequest {
@@ -234,10 +235,11 @@ message OMRequest {
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
 
   optional EchoRPCRequest                   EchoRPCRequest                 = 110;
+  optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
 
-  optional CreateSnapshotRequest            CreateSnapshotRequest          = 111;
-  optional ListSnapshotRequest              ListSnapshotRequest            = 112;
-  optional SnapshotDiffRequest              snapshotDiffRequest            = 113;
+  optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 113;
+  optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
 
 }
 
@@ -338,10 +340,11 @@ message OMResponse {
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
 
   optional EchoRPCResponse                   EchoRPCResponse               = 110;
+  optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
 
-  optional CreateSnapshotResponse            CreateSnapshotResponse        = 111;
-  optional ListSnapshotResponse              ListSnapshotResponse          = 112;
-  optional SnapshotDiffResponse              snapshotDiffResponse          = 113;
+  optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
+  optional ListSnapshotResponse              ListSnapshotResponse          = 113;
+  optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
 }
 
 enum Status {
@@ -454,6 +457,8 @@ enum Status {
     FEATURE_NOT_ENABLED = 86;
 
     INVALID_SNAPSHOT_ERROR = 87;
+
+    CONTAINS_SNAPSHOT = 88;
 }
 
 /**
@@ -913,6 +918,8 @@ message KeyArgs {
     // When it is a head operation which is to check whether key exist
     optional bool headOp = 18;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
+    // Force OM to update container cache location from SCL
+    optional bool forceUpdateContainerCacheFromSCM = 20;
 }
 
 message KeyLocation {
@@ -994,6 +1001,7 @@ message KeyInfo {
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
+    optional bool isFile = 19;
 }
 
 message DirectoryInfo {
@@ -1097,6 +1105,17 @@ message LookupKeyResponse {
     optional uint64 ID = 3;
     // TODO : allow specifying a particular version to read.
     optional uint64 openVersion = 4;
+}
+
+message GetKeyInfoRequest {
+  required KeyArgs keyArgs = 1;
+  optional bool assumeS3Context = 2;
+}
+
+message GetKeyInfoResponse {
+  optional KeyInfo keyInfo = 1;
+  optional VolumeInfo volumeInfo = 2;
+  optional string UserPrincipal = 3;
 }
 
 message RenameKeysRequest {
@@ -1643,25 +1662,25 @@ message SetRangerServiceVersionRequest {
 }
 
 message CreateSnapshotRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
   optional string snapshotName = 3;
   optional string snapshotId = 4;
 }
 
 message ListSnapshotRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
   optional string prefix = 3;
   optional string prevSnapshot = 4;
   optional uint32 maxListResult = 5;
 }
 
 message SnapshotDiffRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string fromSnapshot = 3;
-  required string toSnapshot = 4;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
 }
 
 message DeleteTenantRequest {
@@ -1702,7 +1721,7 @@ message SetRangerServiceVersionResponse {
 }
 
 message CreateSnapshotResponse {
-  required SnapshotInfo snapshotInfo = 1;
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message ListSnapshotResponse {
@@ -1711,14 +1730,14 @@ message ListSnapshotResponse {
 
 
 message SnapshotDiffResponse {
-  required SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional SnapshotDiffReportProto snapshotDiffReport = 1;
 }
 
 message SnapshotDiffReportProto {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string fromSnapshot = 3;
-  required string toSnapshot = 4;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   repeated DiffReportEntryProto diffList = 5;
 }
 
@@ -1729,8 +1748,8 @@ message DiffReportEntryProto {
     DELETE= 3;
     RENAME = 4;
   }
-  required DiffTypeProto diffType = 1;
-  required string sourcePath = 2;
+  optional DiffTypeProto diffType = 1;
+  optional string sourcePath = 2;
   optional string targetPath = 3;
 }
 

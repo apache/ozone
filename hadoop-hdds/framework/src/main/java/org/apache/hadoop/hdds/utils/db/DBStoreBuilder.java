@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -44,6 +45,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -98,6 +103,8 @@ public final class DBStoreBuilder {
   private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionLog;
+  private long maxTimeAllowedForSnapshotInDag;
+  private long pruneCompactionDagDaemonRunInterval;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -145,6 +152,16 @@ public final class DBStoreBuilder {
     defaultCfProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
           HDDS_DEFAULT_DB_PROFILE);
     LOG.debug("Default DB profile:{}", defaultCfProfile);
+
+    maxTimeAllowedForSnapshotInDag = configuration.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    pruneCompactionDagDaemonRunInterval = configuration.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   private void applyDBDefinition(DBDefinition definition) {
@@ -201,7 +218,8 @@ public final class DBStoreBuilder {
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
           registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionLog);
+          enableCompactionLog, maxTimeAllowedForSnapshotInDag,
+          pruneCompactionDagDaemonRunInterval);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }

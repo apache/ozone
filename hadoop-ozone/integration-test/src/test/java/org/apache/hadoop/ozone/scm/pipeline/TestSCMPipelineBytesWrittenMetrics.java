@@ -100,7 +100,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
     builder.setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(keyName).setRefreshPipeline(true);
+        .setKeyName(keyName);
 
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     Assertions.assertEquals(keyName, keyDetails.getName());
