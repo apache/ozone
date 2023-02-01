@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.snapshot;
 
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -27,17 +26,17 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * ozone sh snapshot create.
+ * ozone snapshot delete.
  */
-@CommandLine.Command(name = "create",
-    description = "Create a snapshot")
-public class CreateSnapshotHandler extends Handler {
+@CommandLine.Command(name = "delete",
+    description = "Delete a snapshot")
+public class DeleteSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
   private BucketUri snapshotPath;
 
-  @CommandLine.Parameters(description = "Snapshot name (Optional)",
-      index = "1", arity = "0..1")
+  @CommandLine.Parameters(description = "Snapshot name",
+      index = "1", arity = "1")
   private String snapshotName;
 
   @Override
@@ -51,12 +50,12 @@ public class CreateSnapshotHandler extends Handler {
 
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
-    OmUtils.validateSnapshotName(snapshotName);
-    String newName = client.getObjectStore()
-        .createSnapshot(volumeName, bucketName, snapshotName);
+
+    client.getObjectStore()
+        .deleteSnapshot(volumeName, bucketName, snapshotName);
     if (isVerbose()) {
-      out().format("Created snapshot '%s' under '%s/%s'.%n",
-          newName, volumeName, bucketName);
+      out().format("Deleted snapshot '%s' under '%s/%s'.%n",
+          snapshotName, volumeName, bucketName);
     }
   }
 }

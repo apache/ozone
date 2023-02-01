@@ -69,6 +69,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numInitiateMultipartUploads;
   private @Metric MutableCounterLong numCompleteMultipartUploads;
   private @Metric MutableCounterLong numSnapshotCreates;
+  private @Metric MutableCounterLong numSnapshotDeletes;
   private @Metric MutableCounterLong numSnapshotLists;
 
   private @Metric MutableCounterLong numGetFileStatus;
@@ -119,6 +120,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
   private @Metric MutableCounterLong numSnapshotCreateFails;
+  private @Metric MutableCounterLong numSnapshotDeleteFails;
   private @Metric MutableCounterLong numSnapshotListFails;
   private @Metric MutableCounterLong numSnapshotActive;
   private @Metric MutableCounterLong numSnapshotDeleted;
@@ -441,6 +443,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumSnapshotCreateFails() {
     numSnapshotCreateFails.incr();
+  }
+
+  public void incNumSnapshotDeletes() {
+    numSnapshotDeletes.incr();
+  }
+
+  public void incNumSnapshotDeleteFails() {
+    numSnapshotDeleteFails.incr();
   }
 
   public void incNumSnapshotLists() {

@@ -20,12 +20,12 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import java.util.UUID;
-
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
-
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -34,33 +34,34 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-
-
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
+
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests OMSnapshotCreateRequest class, which handles CreateSnapshot request.
+ * Tests OMSnapshotDeleteRequest class, which handles DeleteSnapshot request.
+ * Mostly mirrors TestOMSnapshotCreateRequest.
+ * testEntryNotExist() and testEntryExists() are unique.
  */
-public class TestOMSnapshotCreateRequest {
+public class TestOMSnapshotDeleteRequest {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
@@ -118,7 +119,7 @@ public class TestOMSnapshotCreateRequest {
     // set the owner
     when(ozoneManager.isOwner(any(), any())).thenReturn(true);
     OMRequest omRequest =
-        OMRequestTestUtils.createSnapshotRequest(
+        OMRequestTestUtils.deleteSnapshotRequest(
         volumeName, bucketName, snapshotName);
     // should not throw
     doPreExecute(omRequest);
@@ -128,11 +129,11 @@ public class TestOMSnapshotCreateRequest {
   public void testPreExecuteBadOwner() throws Exception {
     // owner not set
     OMRequest omRequest =
-        OMRequestTestUtils.createSnapshotRequest(
+        OMRequestTestUtils.deleteSnapshotRequest(
         volumeName, bucketName, snapshotName);
     // Check bad owner
     LambdaTestUtils.intercept(OMException.class,
-        "Only bucket owners and Ozone admins can create snapshots",
+        "Only bucket owners and Ozone admins can delete snapshots",
         () -> doPreExecute(omRequest));
   }
 
@@ -141,7 +142,7 @@ public class TestOMSnapshotCreateRequest {
     // check invalid snapshot name
     String badName = "a?b";
     OMRequest omRequest =
-        OMRequestTestUtils.createSnapshotRequest(
+        OMRequestTestUtils.deleteSnapshotRequest(
         volumeName, bucketName, badName);
     LambdaTestUtils.intercept(OMException.class,
         "Invalid snapshot name: " + badName,
@@ -152,12 +153,11 @@ public class TestOMSnapshotCreateRequest {
   public void testPreExecuteNameOnlyNumbers() throws Exception {
     // check invalid snapshot name containing only numbers
     String badNameON = "1234";
-    OMRequest omRequest =
-            OMRequestTestUtils.createSnapshotRequest(
-                    volumeName, bucketName, badNameON);
+    OMRequest omRequest = OMRequestTestUtils.deleteSnapshotRequest(
+        volumeName, bucketName, badNameON);
     LambdaTestUtils.intercept(OMException.class,
-            "Invalid snapshot name: " + badNameON,
-            () -> doPreExecute(omRequest));
+        "Invalid snapshot name: " + badNameON,
+        () -> doPreExecute(omRequest));
   }
 
   @Test
@@ -170,26 +170,26 @@ public class TestOMSnapshotCreateRequest {
 
     // name length = 63
     when(ozoneManager.isOwner(any(), any())).thenReturn(true);
-    OMRequest omRequest = OMRequestTestUtils.createSnapshotRequest(
-                    volumeName, bucketName, name63);
+    OMRequest omRequest = OMRequestTestUtils.deleteSnapshotRequest(
+        volumeName, bucketName, name63);
     // should not throw any error
     doPreExecute(omRequest);
 
     // name length = 64
-    OMRequest omRequest2 = OMRequestTestUtils.createSnapshotRequest(
-                    volumeName, bucketName, name64);
+    OMRequest omRequest2 = OMRequestTestUtils.deleteSnapshotRequest(
+        volumeName, bucketName, name64);
     LambdaTestUtils.intercept(OMException.class,
-            "Invalid snapshot name: " + name64,
-            () -> doPreExecute(omRequest2));
+        "Invalid snapshot name: " + name64,
+        () -> doPreExecute(omRequest2));
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     OMRequest omRequest =
-        OMRequestTestUtils.createSnapshotRequest(
+        OMRequestTestUtils.deleteSnapshotRequest(
         volumeName, bucketName, snapshotName);
-    OMSnapshotCreateRequest omSnapshotCreateRequest =
+    OMSnapshotDeleteRequest omSnapshotDeleteRequest =
         doPreExecute(omRequest);
     String key = SnapshotInfo.getTableKey(volumeName,
         bucketName, snapshotName);
@@ -199,79 +199,133 @@ public class TestOMSnapshotCreateRequest {
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
     // add key to cache
-    OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-    
-    // check cache
-    SnapshotInfo snapshotInfo =
-        omMetadataManager.getSnapshotInfoTable().get(key);
-    Assert.assertNotNull(snapshotInfo);
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(
+        volumeName, bucketName, snapshotName, null);
+    Assert.assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE,
+        snapshotInfo.getSnapshotStatus());
+    omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+        new CacheKey<>(key),
+        new CacheValue<>(Optional.of(snapshotInfo), 1L));
 
-    // verify table data with response data.
-    SnapshotInfo snapshotInfoFromProto = SnapshotInfo.getFromProtobuf(
-        omClientResponse.getOMResponse()
-        .getCreateSnapshotResponse().getSnapshotInfo());
-    Assert.assertEquals(snapshotInfoFromProto, snapshotInfo);
+    // Trigger validateAndUpdateCache
+    OMClientResponse omClientResponse =
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L,
+            ozoneManagerDoubleBufferHelper);
+
+    // check cache
+    snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(key);
+    Assert.assertNotNull(snapshotInfo);
+    Assert.assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED,
+        snapshotInfo.getSnapshotStatus());
 
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateSnapshotResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Type.CreateSnapshot,
-        omResponse.getCmdType());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omResponse.getStatus());
+
+    // check response success flag
+    Assert.assertTrue(omResponse.getSuccess());
+
+    Assert.assertNotNull(omResponse.getDeleteSnapshotResponse());
+    Assert.assertEquals(Type.DeleteSnapshot, omResponse.getCmdType());
+    Assert.assertEquals(Status.OK, omResponse.getStatus());
   }
 
+  /**
+   * Expect snapshot deletion failure when snapshot entry does not exist.
+   */
+  @Test
+  public void testEntryNotExist() throws Exception {
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
+    OMRequest omRequest = OMRequestTestUtils.deleteSnapshotRequest(
+        volumeName, bucketName, snapshotName);
+    OMSnapshotDeleteRequest omSnapshotDeleteRequest = doPreExecute(omRequest);
+    String key = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
+
+    // Entry does not exist
+    Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
+
+    // Trigger delete snapshot validateAndUpdateCache
+    OMClientResponse omClientResponse =
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 1L,
+            ozoneManagerDoubleBufferHelper);
+
+    OMResponse omResponse = omClientResponse.getOMResponse();
+    Assert.assertNotNull(omResponse.getDeleteSnapshotResponse());
+    Assert.assertEquals(Status.FILE_NOT_FOUND, omResponse.getStatus());
+  }
+
+  /**
+   * Expect successful snapshot deletion when snapshot entry exists.
+   * But a second deletion would result in an error.
+   */
   @Test
   public void testEntryExists() throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
-    OMRequest omRequest =
-        OMRequestTestUtils.createSnapshotRequest(
+    String key = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
+
+    OMRequest omRequest1 = OMRequestTestUtils.createSnapshotRequest(
         volumeName, bucketName, snapshotName);
-    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
-    String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+    OMSnapshotCreateRequest omSnapshotCreateRequest =
+        TestOMSnapshotCreateRequest.doPreExecute(omRequest1, ozoneManager);
 
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
-    //create entry
-    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+    // Create snapshot entry
+    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L,
         ozoneManagerDoubleBufferHelper);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
     Assert.assertNotNull(snapshotInfo);
+    Assert.assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE,
+        snapshotInfo.getSnapshotStatus());
 
-    // Now try to create again to verify error
-    omRequest =
-        OMRequestTestUtils.createSnapshotRequest(
+    OMRequest omRequest2 = OMRequestTestUtils.deleteSnapshotRequest(
         volumeName, bucketName, snapshotName);
-    omSnapshotCreateRequest = doPreExecute(omRequest);
+    OMSnapshotDeleteRequest omSnapshotDeleteRequest = doPreExecute(omRequest2);
+
+    // Delete snapshot entry
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2,
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L,
             ozoneManagerDoubleBufferHelper);
-    
+
+    snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(key);
+    // The snapshot entry should still exist in the table,
+    // but marked as DELETED.
+    Assert.assertNotNull(snapshotInfo);
+    Assert.assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED,
+        snapshotInfo.getSnapshotStatus());
+    Assert.assertTrue(snapshotInfo.getDeletionTime() > 0L);
+
+    // Response should be successful
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateSnapshotResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS,
-        omResponse.getStatus());
+    Assert.assertNotNull(omResponse.getDeleteSnapshotResponse());
+    Assert.assertEquals(Status.OK, omResponse.getStatus());
+
+    // Now delete snapshot entry again, expect error
+    omRequest2 = OMRequestTestUtils.deleteSnapshotRequest(
+        volumeName, bucketName, snapshotName);
+    omSnapshotDeleteRequest = doPreExecute(omRequest2);
+    omClientResponse =
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 3L,
+            ozoneManagerDoubleBufferHelper);
+
+    // Snapshot entry should still be there.
+    snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(key);
+    Assert.assertNotNull(snapshotInfo);
+    Assert.assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED,
+        snapshotInfo.getSnapshotStatus());
+
+    omResponse = omClientResponse.getOMResponse();
+    Assert.assertNotNull(omResponse.getDeleteSnapshotResponse());
+    Assert.assertEquals(Status.FILE_NOT_FOUND, omResponse.getStatus());
   }
 
-  private OMSnapshotCreateRequest doPreExecute(
+  private OMSnapshotDeleteRequest doPreExecute(
       OMRequest originalRequest) throws Exception {
-    return doPreExecute(originalRequest, ozoneManager);
-  }
-
-  /**
-   * Static helper method so this could be used in TestOMSnapshotDeleteRequest.
-   */
-  static OMSnapshotCreateRequest doPreExecute(
-      OMRequest originalRequest, OzoneManager ozoneManager) throws Exception {
-    OMSnapshotCreateRequest omSnapshotCreateRequest =
-        new OMSnapshotCreateRequest(originalRequest);
+    OMSnapshotDeleteRequest omSnapshotDeleteRequest =
+        new OMSnapshotDeleteRequest(originalRequest);
 
     OMRequest modifiedRequest =
-        omSnapshotCreateRequest.preExecute(ozoneManager);
-    return new OMSnapshotCreateRequest(modifiedRequest);
+        omSnapshotDeleteRequest.preExecute(ozoneManager);
+    return new OMSnapshotDeleteRequest(modifiedRequest);
   }
 
 }

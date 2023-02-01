@@ -28,11 +28,12 @@ import java.io.IOException;
 import java.util.List;
 
 /**
+ * ozone sh snapshot list.
  * a handler for Ozone shell CLI command 'list snapshot'.
  */
 @CommandLine.Command(name = "list",
     aliases = "ls",
-    description = "list snapshot for the buckets.")
+    description = "List snapshots for the buckets.")
 public class ListSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
