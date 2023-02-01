@@ -132,7 +132,7 @@ public class TestOMSnapshotCreateRequest {
         volumeName, bucketName, snapshotName);
     // Check bad owner
     LambdaTestUtils.intercept(OMException.class,
-        "Only bucket owners/admins can create snapshots",
+        "Only bucket owners and Ozone admins can create snapshots",
         () -> doPreExecute(omRequest));
   }
 
@@ -258,6 +258,14 @@ public class TestOMSnapshotCreateRequest {
 
   private OMSnapshotCreateRequest doPreExecute(
       OMRequest originalRequest) throws Exception {
+    return doPreExecute(originalRequest, ozoneManager);
+  }
+
+  /**
+   * Static helper method so this could be used in TestOMSnapshotDeleteRequest.
+   */
+  static OMSnapshotCreateRequest doPreExecute(
+      OMRequest originalRequest, OzoneManager ozoneManager) throws Exception {
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         new OMSnapshotCreateRequest(originalRequest);
 

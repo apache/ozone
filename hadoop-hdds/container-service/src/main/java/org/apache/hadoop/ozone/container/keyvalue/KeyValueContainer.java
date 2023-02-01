@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.Collections;
@@ -56,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -72,7 +75,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
-import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -336,9 +338,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } finally {
       writeUnlock();
     }
-    LOG.warn("Moving container {} to state {} from state:{} Trace:{}",
+    LOG.warn("Moving container {} to state {} from state:{}",
             containerData.getContainerPath(), containerData.getState(),
-            prevState, StringUtils.getStackTrace(Thread.currentThread()));
+            prevState);
   }
 
   @Override
@@ -507,21 +509,22 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void importContainerData(InputStream input,
-      ContainerPacker<KeyValueContainerData> packer) throws IOException {
+      ContainerPacker<KeyValueContainerData> packer)
+      throws IOException {
+    HddsVolume hddsVolume = containerData.getVolume();
+    String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+        hddsVolume, hddsVolume.getClusterID());
+    long containerId = containerData.getContainerID();
+    Path destContainerDir =
+        Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
+            hddsVolume.getHddsRootDir().toString(), idDir, containerId));
+    Path tmpDir = ContainerImporter.getUntarDirectory(hddsVolume);
     writeLock();
     try {
-      if (getContainerFile().exists()) {
-        String errorMessage = String.format(
-            "Can't import container (cid=%d) data to a specific location"
-                + " as the container descriptor (%s) has already been exist.",
-            getContainerData().getContainerID(),
-            getContainerFile().getAbsolutePath());
-        throw new StorageContainerException(errorMessage,
-            CONTAINER_ALREADY_EXISTS);
-      }
       //copy the values from the input stream to the final destination
       // directory.
-      byte[] descriptorContent = packer.unpackContainerData(this, input);
+      byte[] descriptorContent = packer.unpackContainerData(this, input, tmpDir,
+          destContainerDir);
 
       Preconditions.checkNotNull(descriptorContent,
           "Container descriptor is missing from the container archive: "
@@ -533,31 +536,28 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       KeyValueContainerData originalContainerData =
           (KeyValueContainerData) ContainerDataYaml
               .readContainer(descriptorContent);
-
-
-      containerData.setState(originalContainerData.getState());
-      containerData
-          .setContainerDBType(originalContainerData.getContainerDBType());
-      containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
-
-      //rewriting the yaml file with new checksum calculation.
-      update(originalContainerData.getMetadata(), true);
-
-      if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-        // load metadata from received dump files before we try to parse kv
-        BlockUtils.loadKVContainerDataFromFiles(containerData, config);
+      importContainerData(originalContainerData);
+    } catch (Exception ex) {
+      // clean data under tmp directory
+      try {
+        Path containerUntarDir = tmpDir.resolve(String.valueOf(containerId));
+        if (containerUntarDir.toFile().exists()) {
+          FileUtils.deleteDirectory(containerUntarDir.toFile());
+        }
+      } catch (Exception deleteex) {
+        LOG.error(
+            "Can not cleanup container directory under {} for container {}",
+            tmpDir, containerId, deleteex);
       }
 
-      //fill in memory stat counter (keycount, byte usage)
-      KeyValueContainerUtil.parseKVContainerData(containerData, config);
-
-    } catch (Exception ex) {
+      // Throw exception for existed containers
       if (ex instanceof StorageContainerException &&
           ((StorageContainerException) ex).getResult() ==
               CONTAINER_ALREADY_EXISTS) {
         throw ex;
       }
-      //delete all the temporary data in case of any exception.
+
+      // delete all other temporary data in case of any exception.
       try {
         if (containerData.getSchemaVersion() != null &&
             containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
@@ -570,13 +570,31 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       } catch (Exception deleteex) {
         LOG.error(
             "Can not cleanup destination directories after a container import"
-                + " error (cid" +
-                containerData.getContainerID() + ")", deleteex);
+                + " error (cid: {}", containerId, deleteex);
       }
       throw ex;
     } finally {
       writeUnlock();
     }
+  }
+
+  public void importContainerData(KeyValueContainerData originalContainerData)
+      throws IOException {
+    containerData.setState(originalContainerData.getState());
+    containerData
+        .setContainerDBType(originalContainerData.getContainerDBType());
+    containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
+
+    //rewriting the yaml file with new checksum calculation.
+    update(originalContainerData.getMetadata(), true);
+
+    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      // load metadata from received dump files before we try to parse kv
+      BlockUtils.loadKVContainerDataFromFiles(containerData, config);
+    }
+
+    //fill in memory stat counter (keycount, byte usage)
+    KeyValueContainerUtil.parseKVContainerData(containerData, config);
   }
 
   @Override

@@ -31,12 +31,11 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
- * Response for OMSnapshotCreateResponse.
+ * Response for OMSnapshotCreateRequest.
  */
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
-  @SuppressWarnings("checkstyle:parameternumber")
   public OMSnapshotCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull String volumeName, @Nonnull String bucketName,
                                   @Nonnull String snapshotName) {

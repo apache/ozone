@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,30 +26,22 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 /**
  * The task to download a container from the sources.
  */
-public class ReplicationTask {
+public class ReplicationTask extends AbstractReplicationTask {
 
-  private volatile Status status = Status.QUEUED;
-
-  private final long containerId;
-
-  private final List<DatanodeDetails> sources;
-
-  private final Instant queued = Instant.now();
-
-  private final long deadlineMsSinceEpoch;
-
-  private final long term;
+  private final ReplicateContainerCommand cmd;
+  private final ContainerReplicator replicator;
 
   /**
    * Counter for the transferred bytes.
    */
   private long transferredBytes;
 
-  public ReplicationTask(ReplicateContainerCommand cmd) {
-    this.containerId = cmd.getContainerID();
-    this.sources = cmd.getSourceDatanodes();
-    this.deadlineMsSinceEpoch = cmd.getDeadline();
-    this.term = cmd.getTerm();
+  public ReplicationTask(ReplicateContainerCommand cmd,
+                         ContainerReplicator replicator) {
+    super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
+    setPriority(cmd.getPriority());
+    this.cmd = cmd;
+    this.replicator = replicator;
   }
 
   /**
@@ -58,17 +49,11 @@ public class ReplicationTask {
    */
   protected ReplicationTask(
       long containerId,
-      List<DatanodeDetails> sources
+      List<DatanodeDetails> sources,
+      ContainerReplicator replicator
   ) {
-    this(new ReplicateContainerCommand(containerId, sources));
-  }
-
-  /**
-   * Returns any deadline set on this task, in milliseconds since the epoch.
-   * A returned value of zero indicates no deadline.
-   */
-  public long getDeadline() {
-    return deadlineMsSinceEpoch;
+    this(ReplicateContainerCommand.fromSources(containerId, sources),
+        replicator);
   }
 
   @Override
@@ -80,42 +65,30 @@ public class ReplicationTask {
       return false;
     }
     ReplicationTask that = (ReplicationTask) o;
-    return containerId == that.containerId;
+    return getContainerId() == that.getContainerId() &&
+        Objects.equals(getTarget(), that.getTarget());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(containerId);
+    return Objects.hash(getContainerId(), getTarget());
   }
 
   public long getContainerId() {
-    return containerId;
+    return cmd.getContainerID();
   }
 
   public List<DatanodeDetails> getSources() {
-    return sources;
-  }
-
-  public Status getStatus() {
-    return status;
-  }
-
-  public void setStatus(Status status) {
-    this.status = status;
+    return cmd.getSourceDatanodes();
   }
 
   @Override
   public String toString() {
     return "ReplicationTask{" +
-        "status=" + status +
-        ", containerId=" + containerId +
-        ", sources=" + sources +
-        ", queued=" + queued +
+        "status=" + getStatus() +
+        ", cmd={" + cmd + "}" +
+        ", queued=" + getQueued() +
         '}';
-  }
-
-  public Instant getQueued() {
-    return queued;
   }
 
   public long getTransferredBytes() {
@@ -126,17 +99,16 @@ public class ReplicationTask {
     this.transferredBytes = transferredBytes;
   }
 
-  long getTerm() {
-    return term;
+  DatanodeDetails getTarget() {
+    return cmd.getTargetDatanode();
   }
 
-  /**
-   * Status of the replication.
-   */
-  public enum Status {
-    QUEUED,
-    DOWNLOADING,
-    FAILED,
-    DONE
+  ReplicateContainerCommand getCommand() {
+    return cmd;
+  }
+
+  @Override
+  public void runTask() {
+    replicator.replicate(this);
   }
 }

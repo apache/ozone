@@ -143,11 +143,6 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
-share/ozone/lib/jgrapht-core.jar
-share/ozone/lib/jgrapht-ext.jar
-share/ozone/lib/jgrapht-guava.jar
-share/ozone/lib/jgraphx.jar
-share/ozone/lib/jheaps.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar

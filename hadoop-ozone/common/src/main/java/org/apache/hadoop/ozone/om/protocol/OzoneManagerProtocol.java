@@ -650,6 +650,19 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Delete snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  default void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name

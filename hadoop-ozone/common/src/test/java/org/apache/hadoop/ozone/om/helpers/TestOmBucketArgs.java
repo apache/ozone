@@ -79,7 +79,7 @@ public class TestOmBucketArgs {
             .setBucketName("bucket")
             .setVolumeName("volume")
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    EC, new ECReplicationConfig(3, 2)))
+                    new ECReplicationConfig(3, 2)))
             .build();
 
     argsFromProto = OmBucketArgs.getFromProtobuf(

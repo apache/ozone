@@ -195,7 +195,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         () -> ozoneManager.resolveBucketLink(resolvedVolumeArgs));
 
     boolean auditSuccess = true;
-    OmKeyArgs resolvedArgs = bucket.update(args);
+    OmKeyArgs resolvedArgs = bucket.update(resolvedVolumeArgs);
 
     try {
       if (isAclEnabled) {

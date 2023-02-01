@@ -146,9 +146,9 @@ public class TestOzoneContainerWithTLS {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME, "1s",
         TimeUnit.MILLISECONDS);
 
-    caClient = new CertificateClientTestImpl(conf, false);
+    caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
-        expiryTime, caClient.getCertificate().getSerialNumber().toString());
+        expiryTime);
   }
 
   @Test(expected = CertificateExpiredException.class)
@@ -271,7 +271,7 @@ public class TestOzoneContainerWithTLS {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);
       Path file = downloader.getContainerDataFromReplicas(
-          containerId, sourceDatanodes);
+          containerId, sourceDatanodes, null);
       downloader.close();
       Assert.assertNull(file);
       Assert.assertTrue(logCapture.getOutput().contains(
@@ -308,7 +308,8 @@ public class TestOzoneContainerWithTLS {
       for (Long cId : containerIdList) {
         downloader = new SimpleContainerDownloader(conf, caClient);
         try {
-          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes);
+          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
+                  null);
           downloader.close();
           Assert.assertNotNull(file);
         } finally {

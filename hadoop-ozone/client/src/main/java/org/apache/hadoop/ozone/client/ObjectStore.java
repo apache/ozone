@@ -538,6 +538,18 @@ public class ObjectStore {
   }
 
   /**
+   * Delete snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    proxy.deleteSnapshot(volumeName, bucketName, snapshotName);
+  }
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
@@ -548,6 +560,7 @@ public class ObjectStore {
       throws IOException {
     return proxy.listSnapshot(volumeName, bucketName);
   }
+
   public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
                                          String fromSnapshot, String toSnapshot)
       throws IOException {
