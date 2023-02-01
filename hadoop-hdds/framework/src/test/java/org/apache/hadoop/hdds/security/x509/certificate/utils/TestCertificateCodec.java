@@ -218,10 +218,10 @@ public class TestCertificateCodec {
         certificates.getCertificates().iterator();
     Certificate rereadPrependedCert = iterator.next();
     Certificate rereadFirstCert = iterator.next();
-    assertEquals(CertificateCodec.getCertificateHolder((X509Certificate) rereadPrependedCert),
-        firstCert);
-    assertEquals(CertificateCodec.getCertificateHolder((X509Certificate) rereadFirstCert),
-        secondCert);
+    assertEquals(CertificateCodec.getCertificateHolder(
+        (X509Certificate) rereadPrependedCert), firstCert);
+    assertEquals(CertificateCodec.getCertificateHolder(
+        (X509Certificate) rereadFirstCert), secondCert);
   }
 
   private X509CertificateHolder generateTestCert(HDDSKeyGenerator keyGenerator,

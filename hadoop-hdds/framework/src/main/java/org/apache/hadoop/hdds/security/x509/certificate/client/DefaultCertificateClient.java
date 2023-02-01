@@ -673,9 +673,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
       codec.writeCertificate(codec.getLocation(), certName,
           pemEncodedCert);
-      CertPath certPath = codec.getCertPathFromPemEncodedString(pemEncodedCert);
+      CertPath certificatePath =
+          codec.getCertPathFromPemEncodedString(pemEncodedCert);
       if (addToCertMap) {
-        certificateMap.putIfAbsent(cert.getSerialNumber().toString(), certPath);
+        certificateMap.putIfAbsent(
+            cert.getSerialNumber().toString(), certificatePath);
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,
@@ -823,8 +825,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return handleCase(init);
   }
 
-  private X509Certificate getTargetCertificate(CertPath certPath) {
-    return (X509Certificate) certPath.getCertificates().get(0);
+  private X509Certificate getTargetCertificate(CertPath certificatePath) {
+    return (X509Certificate) certificatePath.getCertificates().get(0);
   }
 
   /**
@@ -1387,7 +1389,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   @Override
   public abstract String signAndStoreCertificate(
-      PKCS10CertificationRequest request, Path certPath)
+      PKCS10CertificationRequest request, Path certificatePath)
       throws CertificateException;
 
   public String signAndStoreCertificate(PKCS10CertificationRequest request)

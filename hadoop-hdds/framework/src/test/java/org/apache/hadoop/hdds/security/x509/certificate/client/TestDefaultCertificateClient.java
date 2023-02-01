@@ -450,7 +450,7 @@ public class TestDefaultCertificateClient {
 
           @Override
           public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certPath)
+              PKCS10CertificationRequest request, Path certificatePath)
               throws CertificateException {
             return null;
           }

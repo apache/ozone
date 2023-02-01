@@ -74,15 +74,27 @@ public interface CertificateClient extends Closeable {
       throws CertificateException;
 
   /**
-   * Returns the certificate  of the specified component if it exists on the
-   * local system.
+   * Returns the full certificate path of the specified component if it
+   * exists on the local system.
    *
    * @return certificate or Null if there is no data.
    */
   CertPath getCertPath();
 
+  /**
+   * Returns the certificate used by the specified component if it exists
+   * on the local system.
+   *
+   * @return the target certificate or null if there is no data.
+   */
   X509Certificate getCertificate();
 
+  /**
+   * Returns the full certificate path for the CA certificate known to the
+   * client.
+   *
+   * @return latest ca certificate path known to the client
+   */
   CertPath getCACertPath();
 
   /**
@@ -372,6 +384,9 @@ public interface CertificateClient extends Closeable {
    */
   void registerNotificationReceiver(CertificateNotification receiver);
 
+  /**
+   * Type for specifying the type of the certificate to be stored.
+   */
   enum CertType {
     INTERMEDIATE,
     CA,

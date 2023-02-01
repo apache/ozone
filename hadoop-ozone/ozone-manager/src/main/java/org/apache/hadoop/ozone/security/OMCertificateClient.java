@@ -164,14 +164,14 @@ public class OMCertificateClient extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     try {
       SCMGetCertResponseProto response = getScmSecureClient()
           .getOMCertChain(omInfo, getEncodedString(request));
 
       String pemEncodedCert = response.getX509Certificate();
       CertificateCodec certCodec = new CertificateCodec(
-          getSecurityConfig(), certPath);
+          getSecurityConfig(), certificatePath);
 
       // Store SCM CA certificate.
       if (response.hasX509CACertificate()) {

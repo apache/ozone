@@ -148,7 +148,7 @@ public class CertificateClientTest implements CertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     return null;
   }
 

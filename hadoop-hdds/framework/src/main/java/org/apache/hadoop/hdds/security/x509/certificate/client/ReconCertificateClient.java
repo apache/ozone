@@ -96,7 +96,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     try {
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
       HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
@@ -113,7 +113,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
       if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         CertificateCodec certCodec = new CertificateCodec(
-            getSecurityConfig(), certPath);
+            getSecurityConfig(), certificatePath);
         storeCertificate(pemEncodedCert, CertType.INTERMEDIATE, certCodec,
             false);
         storeCertificate(response.getX509CACertificate(), CertType.CA,
