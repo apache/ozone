@@ -56,6 +56,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -816,7 +817,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
   public void filterRelevantSstFiles(Set<String> inputFiles,
       Map<String, String> tableToPrefixMap) {
-    for (String filename : inputFiles) {
+    for (Iterator<String> fileIterator =
+         inputFiles.iterator(); fileIterator.hasNext();) {
+      String filename = fileIterator.next();
       String filepath = getAbsoluteSstFilePath(filename);
       try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
         sstFileReader.open(filepath);
@@ -834,11 +837,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
               .constructBucketKey(new String(iterator.key(), UTF_8));
           if (!RocksDiffUtils
               .isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
-            inputFiles.remove(filename);
+            fileIterator.remove();
           }
         } else {
           // entry from other tables
-          inputFiles.remove(filename);
+          fileIterator.remove();
         }
       } catch (RocksDBException e) {
         e.printStackTrace();
