@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -158,14 +160,14 @@ public abstract class TestMisReplicationHandler {
     Map<DatanodeDetails, Integer> copyReplicaIdxMap = copy.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
             misReplicationHandler.processAndCreateCommands(availableReplicas,
                     pendingOp, result, maintenanceCnt);
-    Assertions.assertEquals(expectedNumberOfNodes,
-            datanodeDetailsSCMCommandMap.size());
-    Assertions.assertTrue(datanodeDetailsSCMCommandMap.keySet()
-            .containsAll(targetNodes));
-    for (SCMCommand<?> command : datanodeDetailsSCMCommandMap.values()) {
+    Assertions.assertEquals(expectedNumberOfNodes, commands.size());
+    Assertions.assertEquals(new HashSet<>(targetNodes),
+        commands.stream().map(Pair::getKey).collect(Collectors.toSet()));
+    for (Pair<DatanodeDetails, SCMCommand<?>> pair : commands) {
+      SCMCommand<?> command = pair.getValue();
       Assertions.assertTrue(command.getType() == replicateContainerCommand);
       ReplicateContainerCommand replicateContainerCommand =
               (ReplicateContainerCommand) command;

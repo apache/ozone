@@ -33,16 +33,16 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -665,16 +665,17 @@ public class TestDatanodeUpgradeToScmHA {
    * {@code containerID}.
    */
   public void importContainer(long containerID, File source) throws Exception {
-    DownloadAndImportReplicator replicator =
-        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
+    ContainerImporter replicator =
+        new ContainerImporter(dsm.getConf(),
+            dsm.getContainer().getContainerSet(),
             dsm.getContainer().getController(),
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+            new TarContainerPacker(), dsm.getContainer().getVolumeSet());
 
-    File tempFile = tempFolder.newFile();
+    File tempFile = tempFolder.newFile(
+        ContainerUtils.getContainerTarName(containerID));
     Files.copy(source.toPath(), tempFile.toPath(),
         StandardCopyOption.REPLACE_EXISTING);
-    replicator.importContainer(containerID, tempFile.toPath());
+    replicator.importContainer(containerID, tempFile.toPath(), null);
   }
 
   public void dispatchRequest(

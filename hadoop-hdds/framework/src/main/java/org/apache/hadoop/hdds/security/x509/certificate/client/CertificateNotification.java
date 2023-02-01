@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,7 +16,20 @@
  * limitations under the License.
  *
  */
+
+package org.apache.hadoop.hdds.security.x509.certificate.client;
+
 /**
- * Test classes for Certificate utilities.
+ * Class should implement this interface if it wants to be notified when there
+ * is some changes in Certificate.
  */
-package org.apache.hadoop.hdds.security.x509.certificate.utils;
+public interface CertificateNotification {
+  /**
+   * Notify the class implementing this interface that certificate is renewed.
+   * Note that the new leader can possibly be this server.
+   *
+   * @param oldCertId The old cert id before renew.
+   * @param newCertId The new cert id after renew.
+   */
+  void notifyCertificateRenewed(String oldCertId, String newCertId);
+}

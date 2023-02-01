@@ -45,12 +45,11 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -116,6 +115,7 @@ public class TestNSSummaryEndpointWithLegacy {
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
   private OzoneConfiguration conf;
+  private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
       "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -383,6 +383,7 @@ public class TestNSSummaryEndpointWithLegacy {
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, 
                                     reconOMMetadataManager, conf);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
+    commonUtils = new CommonUtils();
   }
 
   @Test
@@ -397,81 +398,48 @@ public class TestNSSummaryEndpointWithLegacy {
 
   @Test
   public void testGetBasicInfoRoot() throws Exception {
-    // Test root basics
-    Response rootResponse = nsSummaryEndpoint.getBasicInfo(ROOT_PATH);
-    NamespaceSummaryResponse rootResponseObj =
-        (NamespaceSummaryResponse) rootResponse.getEntity();
-    Assert.assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
-    Assert.assertEquals(2, rootResponseObj.getNumVolume());
-    Assert.assertEquals(4, rootResponseObj.getNumBucket());
-    Assert.assertEquals(5, rootResponseObj.getNumTotalDir());
-    Assert.assertEquals(10, rootResponseObj.getNumTotalKey());
+    commonUtils.testNSSummaryBasicInfoRoot(
+        nsSummaryEndpoint, reconOMMetadataManager);
   }
 
   @Test
   public void testGetBasicInfoVol() throws Exception {
     // Test volume basics
-    Response volResponse = nsSummaryEndpoint.getBasicInfo(VOL_PATH);
-    NamespaceSummaryResponse volResponseObj =
-        (NamespaceSummaryResponse) volResponse.getEntity();
-    Assert.assertEquals(EntityType.VOLUME, volResponseObj.getEntityType());
-    Assert.assertEquals(2, volResponseObj.getNumBucket());
-    Assert.assertEquals(4, volResponseObj.getNumTotalDir());
-    Assert.assertEquals(6, volResponseObj.getNumTotalKey());
+    commonUtils.testNSSummaryBasicInfoVolume(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoBucketOne() throws Exception {
     // Test bucket 1's basics
-    Response bucketOneResponse =
-        nsSummaryEndpoint.getBasicInfo(BUCKET_ONE_PATH);
-    NamespaceSummaryResponse bucketOneObj =
-        (NamespaceSummaryResponse) bucketOneResponse.getEntity();
-    Assert.assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
-    Assert.assertEquals(4, bucketOneObj.getNumTotalDir());
-    Assert.assertEquals(4, bucketOneObj.getNumTotalKey());
+    commonUtils.testNSSummaryBasicInfoBucketOne(
+        BucketLayout.LEGACY,
+        nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoBucketTwo() throws Exception {
     // Test bucket 2's basics
-    Response bucketTwoResponse =
-        nsSummaryEndpoint.getBasicInfo(BUCKET_TWO_PATH);
-    NamespaceSummaryResponse bucketTwoObj =
-        (NamespaceSummaryResponse) bucketTwoResponse.getEntity();
-    Assert.assertEquals(EntityType.BUCKET, bucketTwoObj.getEntityType());
-    Assert.assertEquals(0, bucketTwoObj.getNumTotalDir());
-    Assert.assertEquals(2, bucketTwoObj.getNumTotalKey());
+    commonUtils.testNSSummaryBasicInfoBucketTwo(
+        BucketLayout.LEGACY,
+        nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoDir() throws Exception {
     // Test intermediate directory basics
-    Response dirOneResponse = nsSummaryEndpoint.getBasicInfo(DIR_ONE_PATH);
-    NamespaceSummaryResponse dirOneObj =
-        (NamespaceSummaryResponse) dirOneResponse.getEntity();
-    Assert.assertEquals(EntityType.DIRECTORY, dirOneObj.getEntityType());
-    Assert.assertEquals(3, dirOneObj.getNumTotalDir());
-    Assert.assertEquals(3, dirOneObj.getNumTotalKey());
+    commonUtils.testNSSummaryBasicInfoDir(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoNoPath() throws Exception {
     // Test invalid path
-    Response invalidResponse = nsSummaryEndpoint.getBasicInfo(INVALID_PATH);
-    NamespaceSummaryResponse invalidObj =
-        (NamespaceSummaryResponse) invalidResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
-        invalidObj.getStatus());
+    commonUtils.testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoKey() throws Exception {
     // Test key
-    Response keyResponse = nsSummaryEndpoint.getBasicInfo(KEY_PATH);
-    NamespaceSummaryResponse keyResObj =
-        (NamespaceSummaryResponse) keyResponse.getEntity();
-    Assert.assertEquals(EntityType.KEY, keyResObj.getEntityType());
+    commonUtils.testNSSummaryBasicInfoKey(nsSummaryEndpoint);
   }
 
   @Test

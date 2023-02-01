@@ -73,7 +73,6 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -91,6 +90,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -146,6 +146,8 @@ public class ReconStorageContainerManagerFacade
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private ReconSafeModeManager safeModeManager;
+  private ReconSafeModeMgrTask reconSafeModeMgrTask;
 
   private ScheduledExecutorService scheduler;
 
@@ -157,7 +159,8 @@ public class ReconStorageContainerManagerFacade
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      ReconUtils reconUtils) throws IOException {
+      ReconUtils reconUtils,
+      ReconSafeModeManager safeModeManager) throws IOException {
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -208,7 +211,7 @@ public class ReconStorageContainerManagerFacade
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
 
-    SafeModeManager safeModeManager = new ReconSafeModeManager();
+    this.safeModeManager = safeModeManager;
     ReconPipelineReportHandler pipelineReportHandler =
         new ReconPipelineReportHandler(safeModeManager,
             pipelineManager, scmContext, conf, scmServiceProvider);
@@ -248,7 +251,6 @@ public class ReconStorageContainerManagerFacade
             pipelineManager, containerManager, scmContext);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
-
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
@@ -302,9 +304,11 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
-
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
+    reconSafeModeMgrTask = new ReconSafeModeMgrTask(
+        containerManager, nodeManager, safeModeManager,
+        reconTaskConfig, ozoneConfiguration);
   }
 
   /**
@@ -385,7 +389,10 @@ public class ReconStorageContainerManagerFacade
         interval,
         TimeUnit.MILLISECONDS);
     getDatanodeProtocolServer().start();
-    this.reconScmTasks.forEach(ReconScmTask::start);
+    reconSafeModeMgrTask.start();
+    if (!this.safeModeManager.getInSafeMode()) {
+      this.reconScmTasks.forEach(ReconScmTask::start);
+    }
   }
 
   /**

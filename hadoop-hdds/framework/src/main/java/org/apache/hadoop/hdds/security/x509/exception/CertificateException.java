@@ -17,7 +17,7 @@
  *
  */
 
-package org.apache.hadoop.hdds.security.x509.exceptions;
+package org.apache.hadoop.hdds.security.x509.exception;
 
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 

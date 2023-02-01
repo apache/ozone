@@ -17,7 +17,7 @@
  *
  */
 
-package org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles;
+package org.apache.hadoop.hdds.security.x509.certificate.authority.profile;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.codec.DecoderException;

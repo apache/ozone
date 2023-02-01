@@ -21,9 +21,9 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.Closeable;
@@ -362,4 +362,10 @@ public interface CertificateClient extends Closeable {
    * Return the store factory for key manager and trust manager for client.
    */
   KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+
+  /**
+   * Register a receiver that will be called after the certificate renewed.
+   * @param receiver
+   */
+  void registerNotificationReceiver(CertificateNotification receiver);
 }
