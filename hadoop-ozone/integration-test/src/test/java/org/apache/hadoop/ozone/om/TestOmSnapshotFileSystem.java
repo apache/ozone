@@ -477,7 +477,7 @@ public class TestOmSnapshotFileSystem {
   @Test
   public void testReadFileFromSnapshot() throws Exception {
     String keyName = "dir/file";
-    byte[] strBytes = "Sample text".getBytes();
+    byte[] strBytes = "Sample text".getBytes(StandardCharsets.UTF_8);
     Path parent = new Path("/");
     Path file = new Path(parent, "dir/file");
     try (FSDataOutputStream out1 = fs.create(file, FsPermission.getDefault(),
