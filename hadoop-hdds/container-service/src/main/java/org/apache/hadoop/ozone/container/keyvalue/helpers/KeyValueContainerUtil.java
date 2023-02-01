@@ -53,6 +53,8 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 /**
  * Class which defines utility methods for KeyValueContainer.
  */
@@ -66,8 +68,6 @@ public final class KeyValueContainerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueContainerUtil.class);
-
-  private static final String FILE_SEPARATOR = File.separator;
 
   /**
    *
@@ -490,9 +490,13 @@ public final class KeyValueContainerUtil {
           File dbFile = KeyValueContainerLocationUtil
               .getContainerDBFile(keyValueContainerData);
           keyValueContainerData.setDbFile(dbFile);
-          // Remove container from Rocks DB
-          BlockUtils.removeContainerFromDB(keyValueContainerData,
-              hddsVolume.getConf());
+          try {
+            // Remove container from Rocks DB
+            BlockUtils.removeContainerFromDB(keyValueContainerData,
+                hddsVolume.getConf());
+          } catch (IOException ex) {
+            LOG.error("Failed to remove container from Rocks DB", ex);
+          }
         }
 
         try {
@@ -560,9 +564,9 @@ public final class KeyValueContainerUtil {
       // tmp delete directory will be wiped, so this won't be an issue.
       if (success) {
         keyValueContainerData.setMetadataPath(destinationDirPath +
-            FILE_SEPARATOR + OzoneConsts.CONTAINER_META_PATH);
+            OZONE_URI_DELIMITER + OzoneConsts.CONTAINER_META_PATH);
         keyValueContainerData.setChunksPath(destinationDirPath +
-            FILE_SEPARATOR + OzoneConsts.STORAGE_DIR_CHUNKS);
+            OZONE_URI_DELIMITER + OzoneConsts.STORAGE_DIR_CHUNKS);
       }
       return success;
     }

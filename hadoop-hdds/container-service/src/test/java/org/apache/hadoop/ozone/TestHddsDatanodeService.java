@@ -46,6 +46,7 @@ import org.junit.jupiter.api.AfterEach;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -72,7 +73,6 @@ public class TestHddsDatanodeService {
   private final HddsDatanodeService service =
       HddsDatanodeService.createHddsDatanodeService(new String[] {});
   private static final int SCM_SERVER_COUNT = 1;
-  private static final String FILE_SEPARATOR = File.separator;
 
   @BeforeEach
   public void setUp() throws IOException {
@@ -100,7 +100,7 @@ public class TestHddsDatanodeService {
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
 
-    String volumeDir = testDir + FILE_SEPARATOR + "disk1";
+    String volumeDir = testDir + OZONE_URI_DELIMITER + "disk1";
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
