@@ -253,7 +253,6 @@ public class CertificateCodec {
    * @throws CertificateException - on Error.
    * @throws IOException          - on Error.
    */
-  //BUG HERE
   public X509CertificateHolder readCertificate() throws
       CertificateException, IOException {
     return readCertificate(this.location.toAbsolutePath(),

@@ -195,8 +195,8 @@ public final class HASecurityUtils {
       List<X509CertificateHolder> subSCMCertHolderList = rootCAServer.
           requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
 
-      X509CertificateHolder rootCACertificateHolder =
-          rootCAServer.getCACertificate();
+      List<X509CertificateHolder> rootCACertificateHolder =
+          rootCAServer.getCaCertBundle();
 
       String pemEncodedCert =
           CertificateCodec.getPEMEncodedString(subSCMCertHolderList);

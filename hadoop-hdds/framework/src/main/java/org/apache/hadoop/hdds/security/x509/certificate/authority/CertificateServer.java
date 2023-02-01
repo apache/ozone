@@ -66,6 +66,19 @@ public interface CertificateServer {
       throws CertificateException, IOException;
 
   /**
+   * Gets the certificate bundle for the CA certificate of this server.
+   * The first element of the list is the CA certificate. The issuer of an
+   * element of this list is always the next element of the list. The root CA
+   * certificate is the final element.
+   *
+   * @return the certificate bundle starting with the CA certificate.
+   * @throws CertificateException
+   * @throws IOException
+   */
+  List<X509CertificateHolder> getCaCertBundle() throws CertificateException,
+      IOException;
+
+  /**
    * Returns the Certificate corresponding to given certificate serial id if
    * exist. Return null if it doesn't exist.
    *
