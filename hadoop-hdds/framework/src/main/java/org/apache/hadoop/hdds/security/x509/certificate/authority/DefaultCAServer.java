@@ -51,7 +51,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -188,7 +187,8 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public List<X509CertificateHolder> getCaCertBundle() throws CertificateException, IOException {
+  public List<X509CertificateHolder> getCaCertBundle()
+      throws CertificateException, IOException {
     CertificateCodec codec = new CertificateCodec(config, componentName);
     return codec.getCertList();
   }
