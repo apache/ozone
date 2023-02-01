@@ -267,10 +267,10 @@ public class TestOzoneSnapshotRestore {
     // Bucket creation is async operation on server side, and it is possible
     // that destination bucket doesn't get created by the time copy command
     // starts.
-    // In that case, key doesn't exist in destination bucket check will fail
-    // because in scenarios when key doesn't exist. We check in other buckets
-    // for the key and create a fake dir if similar key exists in some
-    // another bucket.
+    // In that case, "key doesn't exist in destination bucket check" will fail
+    // because in scenario when key doesn't exist in requested bucket,
+    // we check in other buckets for the key and create a fake dir if similar
+    // key exists in some other bucket.
     deleteKeys(buck);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
