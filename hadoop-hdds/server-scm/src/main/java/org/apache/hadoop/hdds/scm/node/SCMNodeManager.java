@@ -827,7 +827,11 @@ public class SCMNodeManager implements NodeManager {
     // list
     for (DatanodeDetails node : healthyNodes) {
       SCMNodeStat stat = getNodeStatInternal(node);
-      datanodeUsageInfoList.add(new DatanodeUsageInfo(node, stat));
+      DatanodeUsageInfo datanodeUsageInfo = new DatanodeUsageInfo(node, stat);
+      try {
+        datanodeUsageInfo.setContainerCount(getContainers(node).size());
+      } catch (NodeNotFoundException e) {}
+      datanodeUsageInfoList.add(datanodeUsageInfo);
     }
 
     // sort the list according to appropriate comparator

@@ -31,6 +31,7 @@ public class DatanodeUsageInfo {
 
   private DatanodeDetails datanodeDetails;
   private SCMNodeStat scmNodeStat;
+  private int containerCount;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -133,6 +134,14 @@ public class DatanodeUsageInfo {
    */
   public SCMNodeStat getScmNodeStat() {
     return scmNodeStat;
+  }
+
+  public int getContainerCount() {
+    return containerCount;
+  }
+
+  public void setContainerCount(int containerCount) {
+    this.containerCount = containerCount;
   }
 
   /**

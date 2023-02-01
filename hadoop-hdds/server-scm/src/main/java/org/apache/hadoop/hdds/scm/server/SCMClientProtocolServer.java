@@ -1050,6 +1050,11 @@ public class SCMClientProtocolServer implements
       DatanodeDetails node, int clientVersion) {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
+    int containerCount = 0;
+    try {
+      containerCount = scm.getScmNodeManager().getContainers(node).size();
+    } catch (NodeNotFoundException e) {}
+
     long capacity = stat.getCapacity().get();
     long used = stat.getScmUsed().get();
     long remaining = stat.getRemaining().get();
@@ -1059,7 +1064,7 @@ public class SCMClientProtocolServer implements
         .setUsed(used)
         .setRemaining(remaining)
         .setNode(node.toProto(clientVersion))
-        .setContainerCount(getContainerCount(node))
+        .setContainerCount(containerCount)
         .build();
   }
 
@@ -1104,22 +1109,9 @@ public class SCMClientProtocolServer implements
 
     // return count number of DatanodeUsageInfoProto
     return datanodeUsageInfoList.stream()
-        .map(each -> each.toProto(clientVersion,
-                getContainerCount(each.getDatanodeDetails())))
+        .map(each -> each.toProto(clientVersion, each.getContainerCount()))
         .limit(count)
         .collect(Collectors.toList());
-  }
-
-  private long getContainerCount(DatanodeDetails datanodeDetails) {
-    long containerCount = -1;
-    try {
-      Set<ContainerID> containers = scm.getScmNodeManager()
-              .getContainers(datanodeDetails);
-      containerCount = containers.size();
-    } catch (NodeNotFoundException e) {
-      LOG.error("Node not found, error: ", e);
-    }
-    return containerCount;
   }
 
   @Override
