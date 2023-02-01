@@ -1616,9 +1616,7 @@ public class LegacyReplicationManager {
   private void setHealthStateForClosing(Set<ContainerReplica> replicas,
                                         ContainerInfo container,
                                         ReplicationManagerReport report) {
-    if (!replicas.stream().
-            anyMatch(r -> compareState(LifeCycleState.OPEN, r.getState()) ||
-                    compareState(LifeCycleState.CLOSED, r.getState()))) {
+    if (replicas.size() == 0) {
       report.incrementAndSample(HealthState.MISSING, container.containerID());
       report.incrementAndSample(HealthState.UNDER_REPLICATED,
               container.containerID());
