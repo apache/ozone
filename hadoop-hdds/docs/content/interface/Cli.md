@@ -210,7 +210,7 @@ $ ozone sh key get /vol1/bucket1/README.md /tmp/
 
 ## Querying Cli Results
 
-Ozone cli returns JSON responses. [jq]({{< ref "https://stedolan.github.io/jq/manual/" >}}) is a command line JSON processor that can be used to filter cli output for desired information.
+Ozone cli returns JSON responses. [jq](https://stedolan.github.io/jq/manual/) is a command line JSON processor that can be used to filter cli output for desired information.
 
 For example: 
 ```shell
