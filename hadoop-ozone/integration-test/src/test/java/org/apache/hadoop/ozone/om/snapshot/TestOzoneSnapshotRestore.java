@@ -259,6 +259,20 @@ public class TestOzoneSnapshotRestore {
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
     Assertions.assertEquals(5, volBucketKeyCount);
 
+    // Delete keys from the source bucket.
+    // This is temporary fix to make sure that test passes all the time.
+    // If we don't delete keys from the source bucket, copy command
+    // will fail. In copy command, there is a check to make sure that key
+    // doesn't exist in the destination bucket.
+    // Bucket creation is async operation on server side, and it is possible
+    // that destination bucket doesn't get created by the time copy command
+    // starts.
+    // In that case, key doesn't exist in destination bucket check will fail
+    // because in scenarios when key doesn't exist. We check in other buckets
+    // for the key and create a fake dir if similar key exists in some
+    // another bucket.
+    deleteKeys(buck);
+
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
         + OM_KEY_PREFIX + snapshotKeyPrefix;
     String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket2
