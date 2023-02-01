@@ -46,6 +46,7 @@ import com.google.common.base.Preconditions;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
 /**
  * Configuration for ozone.
@@ -308,7 +309,9 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("dfs.datanode.keytab.file",
             DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.scm.chunk.layout",
-            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY)
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
+        new DeprecationDelta("hdds.datanode.replication.work.dir",
+            OZONE_CONTAINER_COPY_WORKDIR)
     });
   }
 }

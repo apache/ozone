@@ -261,7 +261,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     BucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setDefaultReplicationConfig(new DefaultReplicationConfig(
-            EC, new ECReplicationConfig(3, 2)))
+            new ECReplicationConfig(3, 2)))
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
         .setIsVersionEnabled(true)
@@ -309,7 +309,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     BucketArgs bucketArgs = OmBucketArgs.newBuilder()
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    EC, new ECReplicationConfig(3, 2)))
+                    new ECReplicationConfig(3, 2)))
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
             .setIsVersionEnabled(true)
@@ -493,7 +493,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             .setVolumeName(volumeName2)
             .setBucketName(bucketName2)
             .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    EC, new ECReplicationConfig(3, 2)));
+                    new ECReplicationConfig(3, 2)));
 
     OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
     OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketInfo);
@@ -522,11 +522,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     Assert.assertEquals(EC,
             dbBucketInfoAfter.getDefaultReplicationConfig().getType());
     Assert.assertEquals(
-            dbBucketInfoBefore.getDefaultReplicationConfig().getType(),
-            dbBucketInfoAfter.getDefaultReplicationConfig().getType());
-    Assert.assertEquals(
-            dbBucketInfoBefore.getDefaultReplicationConfig().getFactor(),
-            dbBucketInfoAfter.getDefaultReplicationConfig().getFactor());
+            dbBucketInfoBefore.getDefaultReplicationConfig(),
+            dbBucketInfoAfter.getDefaultReplicationConfig());
     Assert.assertEquals(20 * GB,
             dbBucketInfoAfter.getQuotaInBytes());
     Assert.assertEquals(1000L,

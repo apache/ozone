@@ -372,6 +372,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
+    waitForFlushAndCommit(true);
+  }
+
+  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
     try {
       checkOpen();
       waitOnFlushFutures();
@@ -381,7 +385,7 @@ public class BlockOutputStream extends OutputStream {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, true);
     }
-    watchForCommit(true);
+    watchForCommit(bufferFull);
   }
 
   void releaseBuffersOnException() {

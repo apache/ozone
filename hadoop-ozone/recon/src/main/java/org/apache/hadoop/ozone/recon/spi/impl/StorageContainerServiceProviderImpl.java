@@ -175,7 +175,7 @@ public class StorageContainerServiceProviderImpl
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();
     File targetFile = new File(scmSnapshotDBParentDir, snapshotFileName +
-            ".tar.gz");
+            ".tar");
 
     try {
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
@@ -201,7 +201,8 @@ public class StorageContainerServiceProviderImpl
             try (SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
                 hostAddress, grpcPort, configuration,
                 new ReconCertificateClient(new SecurityConfig(configuration),
-                    reconStorage.getReconCertSerialId()))) {
+                    reconStorage.getReconCertSerialId(),
+                    reconStorage.getClusterID(), reconStorage.getReconId()))) {
               downloadClient.download(targetFile.toPath()).get();
             } catch (ExecutionException | InterruptedException e) {
               LOG.error("Rocks DB checkpoint downloading failed", e);

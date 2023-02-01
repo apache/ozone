@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -57,4 +58,13 @@ public class TestContainerUtils {
     assertEquals("<redacted>", dataBuffers.getBuffers(0).toString(UTF_8));
   }
 
+  @Test
+  public void testTarName() throws IOException {
+    long containerId = 100;
+    String tarName = "container-100.tar";
+    assertEquals(tarName, ContainerUtils.getContainerTarName(containerId));
+
+    assertEquals(containerId,
+        ContainerUtils.retrieveContainerIdFromTarName(tarName));
+  }
 }

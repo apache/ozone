@@ -79,4 +79,14 @@ public class CloseContainerCommand
   public PipelineID getPipelineID() {
     return pipelineID;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": containerID: ").append(getContainerID())
+        .append(", pipelineID: ").append(getPipelineID())
+        .append(", force: ").append(force);
+    return sb.toString();
+  }
 }

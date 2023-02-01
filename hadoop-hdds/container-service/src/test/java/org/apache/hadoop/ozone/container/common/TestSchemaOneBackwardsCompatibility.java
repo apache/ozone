@@ -239,14 +239,14 @@ public class TestSchemaOneBackwardsCompatibility {
     try (DBHandle db = BlockUtils.getDB(cData, conf)) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
-      metadataTable.delete(cData.blockCountKey());
-      assertNull(metadataTable.get(cData.blockCountKey()));
+      metadataTable.delete(cData.getBlockCountKey());
+      assertNull(metadataTable.get(cData.getBlockCountKey()));
 
-      metadataTable.delete(cData.bytesUsedKey());
-      assertNull(metadataTable.get(cData.bytesUsedKey()));
+      metadataTable.delete(cData.getBytesUsedKey());
+      assertNull(metadataTable.get(cData.getBytesUsedKey()));
 
-      metadataTable.delete(cData.pendingDeleteBlockCountKey());
-      assertNull(metadataTable.get(cData.pendingDeleteBlockCountKey()));
+      metadataTable.delete(cData.getPendingDeleteBlockCountKey());
+      assertNull(metadataTable.get(cData.getPendingDeleteBlockCountKey()));
     }
 
     // Create a new container data object, and fill in its metadata by
@@ -317,7 +317,7 @@ public class TestSchemaOneBackwardsCompatibility {
       Table<String, Long> metadataTable =
               refCountedDB.getStore().getMetadataTable();
       assertEquals(expectedRegularBlocks + expectedDeletingBlocks,
-              (long)metadataTable.get(cData.blockCountKey()));
+              (long)metadataTable.get(cData.getBlockCountKey()));
     }
   }
 
@@ -401,7 +401,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
       // Test encoding keys and decoding database values.
       for (String blockID: TestDB.BLOCK_IDS) {
-        String blockKey = cData.blockKey(Long.parseLong(blockID));
+        String blockKey = cData.getBlockKey(Long.parseLong(blockID));
         BlockData blockData = blockDataTable.get(blockKey);
         Assert.assertEquals(Long.toString(blockData.getLocalID()), blockID);
       }
@@ -444,7 +444,8 @@ public class TestSchemaOneBackwardsCompatibility {
           refCountedDB.getStore().getBlockDataTable();
 
       for (String blockID: TestDB.DELETING_BLOCK_IDS) {
-        String blockKey = cData.deletingBlockKey(Long.parseLong(blockID));
+        String blockKey = cData.getDeletingBlockKey(
+            Long.parseLong(blockID));
         BlockData blockData = blockDataTable.get(blockKey);
         Assert.assertEquals(Long.toString(blockData.getLocalID()), blockID);
       }
@@ -464,7 +465,7 @@ public class TestSchemaOneBackwardsCompatibility {
       // Apply the deleting prefix to the saved block IDs so we can compare
       // them to the retrieved keys.
       List<String> expectedKeys = TestDB.DELETING_BLOCK_IDS.stream()
-          .map(key -> cData.deletingBlockKey(Long.parseLong(key)))
+          .map(key -> cData.getDeletingBlockKey(Long.parseLong(key)))
           .collect(Collectors.toList());
 
       Assert.assertEquals(expectedKeys, decodedKeys);
@@ -496,11 +497,11 @@ public class TestSchemaOneBackwardsCompatibility {
           refCountedDB.getStore().getMetadataTable();
 
       Assert.assertEquals(TestDB.KEY_COUNT,
-          metadataTable.get(cData.blockCountKey()).longValue());
+          metadataTable.get(cData.getBlockCountKey()).longValue());
       Assert.assertEquals(TestDB.BYTES_USED,
-          metadataTable.get(cData.bytesUsedKey()).longValue());
+          metadataTable.get(cData.getBytesUsedKey()).longValue());
       Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
-          metadataTable.get(cData.pendingDeleteBlockCountKey())
+          metadataTable.get(cData.getPendingDeleteBlockCountKey())
               .longValue());
     }
   }

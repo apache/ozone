@@ -77,4 +77,14 @@ public interface PlacementPolicy<Replica> {
    */
   Set<Replica> replicasToCopyToFixMisreplication(
           Map<Replica, Boolean> replicas);
+
+  /**
+   * Given a set of replicas of a container which are overreplicated,
+   * return a set of replicas to delete to fix overreplication.
+   * @param replicas: Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica: Replication factor of each
+   *                                     unique replica
+   */
+  Set<Replica> replicasToRemoveToFixOverreplication(
+          Set<Replica> replicas, int expectedCountPerUniqueReplica);
 }

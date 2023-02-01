@@ -18,10 +18,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -285,20 +282,11 @@ public class MockOmTransport implements OmTransport {
     BucketInfo bucketInfo = buckets.get(infoBucketRequest.getVolumeName())
         .get(infoBucketRequest.getBucketName());
     if (!bucketInfo.hasDefaultReplicationConfig()) {
-      final ReplicationConfig replicationConfig = ReplicationConfig
-          .getDefault(new OzoneConfiguration());
-
-      bucketInfo = bucketInfo.toBuilder().setDefaultReplicationConfig(
-          new DefaultReplicationConfig(
-              ReplicationType.fromProto(replicationConfig.getReplicationType()),
-              replicationConfig
-                  .getReplicationType() != HddsProtos.ReplicationType.EC ?
-                  ReplicationFactor
-                      .valueOf(replicationConfig.getRequiredNodes()) :
-                  null, replicationConfig
-              .getReplicationType() == HddsProtos.ReplicationType.EC ?
-              (ECReplicationConfig) replicationConfig :
-              null).toProto()).build();
+      bucketInfo = bucketInfo.toBuilder()
+          .setDefaultReplicationConfig(new DefaultReplicationConfig(
+              ReplicationConfig.getDefault(new OzoneConfiguration())).toProto()
+          )
+          .build();
     }
     return InfoBucketResponse.newBuilder()
         .setBucketInfo(bucketInfo)

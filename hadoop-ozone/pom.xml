@@ -273,10 +273,14 @@
             <configuration>
               <rules>
                 <DependencyConvergence>
-                  <uniqueVersions>false</uniqueVersions>
+                  <uniqueVersions>true</uniqueVersions>
                 </DependencyConvergence>
               </rules>
             </configuration>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <phase>validate</phase>
           </execution>
         </executions>
       </plugin>
