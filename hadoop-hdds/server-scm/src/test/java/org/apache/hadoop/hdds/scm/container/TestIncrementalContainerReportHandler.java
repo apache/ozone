@@ -299,7 +299,8 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testDeleteContainer() throws IOException, TimeoutException {
+  public void testDeleteContainer() throws IOException, TimeoutException,
+      NodeNotFoundException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -316,20 +317,35 @@ public class TestIncrementalContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree);
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
+    containerReplicas.forEach(r -> {
+      containerStateManager.updateContainerReplica(container.containerID(), r);
+      try {
+        nodeManager.addContainer(
+            r.getDatanodeDetails(), container.containerID());
+      } catch (NodeNotFoundException e) {
+        Assertions.fail("Node should be found");
+      }
+    });
     Assertions.assertEquals(3, containerStateManager
         .getContainerReplicas(container.containerID()).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeOne).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
+        .size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
             ContainerReplicaProto.State.DELETED,
-            datanodeThree.getUuidString());
+            datanodeOne.getUuidString());
     final IncrementalContainerReportFromDatanode icr =
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
     Assertions.assertEquals(2, containerStateManager
         .getContainerReplicas(container.containerID()).size());
+    Assertions.assertEquals(0, nodeManager.getContainers(datanodeOne).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
+        .size());
   }
 
   @Test
