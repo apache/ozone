@@ -80,6 +80,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -194,7 +195,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File exportTar = folder.newFile("exported.tar");
-    TarContainerPacker packer = new TarContainerPacker();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
       keyValueContainer.exportContainerData(fos, packer);
@@ -221,9 +222,8 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = folder.newFile("exported.tar");
-    for (Map.Entry<CopyContainerCompression, String> entry :
-        CopyContainerCompression.getCompressionMapping().entrySet()) {
-      TarContainerPacker packer = new TarContainerPacker(entry.getValue());
+    for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+      TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
       try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
@@ -364,7 +364,7 @@ public class TestKeyValueContainer {
 
     AtomicReference<String> failed = new AtomicReference<>();
 
-    TarContainerPacker packer = new TarContainerPacker();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     List<Thread> threads = IntStream.range(0, 20)
         .mapToObj(i -> new Thread(() -> {
           try {
