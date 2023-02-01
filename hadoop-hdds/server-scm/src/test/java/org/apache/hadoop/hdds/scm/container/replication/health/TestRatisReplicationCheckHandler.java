@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 
 /**
@@ -294,6 +296,80 @@ public class TestRatisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.MISSING));
   }
 
+  /**
+   * Replicas with ContainerReplicaProto#State UNHEALTHY don't contribute to
+   * the redundancy of a container. This tests that a CLOSED container with {
+   * CLOSED, CLOSED, UNHEALTHY, UNHEALTHY} replicas is under replicated.
+   */
+  @Test
+  public void testUnderReplicatedWithUnhealthyReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+    Set<ContainerReplica> unhealthyReplicas =
+        createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
+    replicas.addAll(unhealthyReplicas);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  @Test
+  public void testSufficientReplicationWithMismatchedReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSING, 0, 0, 0);
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    ContainerHealthResult result =
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+
+    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testHandlerReturnsFalseWhenAllReplicasAreUnhealthy() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), State.UNHEALTHY, 0, 0, 0, 0);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+
+    /*
+    Here, UNDER_REPLICATED health state simply means there aren't enough
+    healthy replicas. This handler cannot make a decision about
+    replication/deleting replicas when all of them are unhealthy.
+     */
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(0, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+
+    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
   @Test
   public void testOverReplicatedContainer() {
     ContainerInfo container = createContainerInfo(repConfig);
@@ -323,6 +399,61 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  @Test
+  public void testOverReplicatedContainerWithMismatchedReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.QUASI_CLOSED, 0, 0);
+    Set<ContainerReplica> unhealthyReplicas =
+        createReplicas(container.containerID(), State.CLOSING, 0, 0);
+    replicas.addAll(unhealthyReplicas);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+
+    OverReplicatedHealthResult result = (OverReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(1, result.getExcessRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    /*
+    We have an excess replica, but we hold off on adding to the over
+    replication queue until all the mismatched replicas match the container
+    state.
+     */
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  @Test
+  public void testHandlerReturnsFalseForExcessUnhealthyReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+    ContainerReplica mismatchedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.CLOSING);
+    Set<ContainerReplica> unhealthyReplicas =
+        createReplicas(container.containerID(), State.UNHEALTHY, 0, 0, 0);
+    replicas.add(mismatchedReplica);
+    replicas.addAll(unhealthyReplicas);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    ContainerHealthResult result =
+        healthCheck.checkHealth(requestBuilder.build());
+
+    // this handler does not deal with an excess of unhealthy replicas when
+    // the container is otherwise sufficiently replicated
+    Assert.assertEquals(HealthState.UNHEALTHY, result.getHealthState());
+
+    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test

@@ -20,7 +20,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -46,8 +45,8 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
@@ -169,7 +168,7 @@ public class TestECContainerRecovery {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -296,22 +295,23 @@ public class TestECContainerRecovery {
       dn.getDatanodeStateMachine().getContainer()
               .getContainerSet().setRecoveringTimeout(100);
 
-      ECReconstructionSupervisor ecReconstructionSupervisor =
-              GenericTestUtils.getFieldReflection(dn.getDatanodeStateMachine(),
-                      "ecReconstructionSupervisor");
+      ReconstructECContainersCommandHandler handler = GenericTestUtils
+          .getFieldReflection(dn.getDatanodeStateMachine(),
+              "reconstructECContainersCommandHandler");
+
       ECReconstructionCoordinator coordinator = GenericTestUtils
-              .mockFieldReflection(ecReconstructionSupervisor,
-                      "reconstructionCoordinator");
+              .mockFieldReflection(handler,
+                      "coordinator");
 
       Mockito.doAnswer(invocation -> {
         GenericTestUtils.waitFor(() ->
-                        dn.getDatanodeStateMachine()
-                                .getContainer()
-                                .getContainerSet()
-                                .getContainer(finalContainer.getContainerID())
-                                .getContainerState() ==
-                        ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-                1000, 100000);
+            dn.getDatanodeStateMachine()
+                .getContainer()
+                .getContainerSet()
+                .getContainer(finalContainer.getContainerID())
+                .getContainerState() ==
+                    ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+            1000, 100000);
         reconstructedDN.set(dn);
         invocation.callRealMethod();
         return null;

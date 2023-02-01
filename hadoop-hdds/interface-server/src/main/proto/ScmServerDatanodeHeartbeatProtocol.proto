@@ -407,6 +407,11 @@ message DeleteContainerCommandProto {
   optional int32 replicaIndex = 4;
 }
 
+enum ReplicationCommandPriority {
+  NORMAL = 1;
+  LOW = 2;
+}
+
 /**
 This command asks the datanode to replicate a container from specific sources.
 */
@@ -415,6 +420,8 @@ message ReplicateContainerCommandProto {
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
   optional int32 replicaIndex = 4;
+  optional DatanodeDetailsProto target = 5;
+  optional ReplicationCommandPriority priority = 6 [default = NORMAL];
 }
 
 /**

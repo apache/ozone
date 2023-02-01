@@ -502,6 +502,16 @@ message CopyContainerResponseProto {
   optional int64 checksum = 6;
 }
 
+message SendContainerRequest {
+  required int64 containerID = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
+  optional int64 checksum = 4;
+}
+
+message SendContainerResponse {
+}
+
 service XceiverClientProtocolService {
   // A client-to-datanode RPC to send container commands
   rpc send(stream ContainerCommandRequestProto) returns
@@ -512,4 +522,5 @@ service XceiverClientProtocolService {
 service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+  rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
 }

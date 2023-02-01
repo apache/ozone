@@ -24,7 +24,6 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -38,7 +37,6 @@ import java.util.LinkedHashSet;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -46,12 +44,12 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
-import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeDBCheckpointToStream;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -101,7 +99,7 @@ public class TestOMDbCheckpointServlet {
     conf = new OzoneConfiguration();
 
     tempFile = File.createTempFile("testDoGet_" + System
-        .currentTimeMillis(), ".tar.gz");
+        .currentTimeMillis(), ".tar");
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
 
@@ -181,7 +179,7 @@ public class TestOMDbCheckpointServlet {
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
-    doNothing().when(responseMock).setContentType("application/x-tgz");
+    doNothing().when(responseMock).setContentType("application/x-tar");
     doNothing().when(responseMock).setHeader(Matchers.anyString(),
         Matchers.anyString());
 
@@ -261,34 +259,28 @@ public class TestOMDbCheckpointServlet {
   @Test
   public void testWriteCheckpointToOutputStream() throws Exception {
 
-    FileInputStream fis = null;
-    FileOutputStream fos = null;
+    String testDirName = folder.newFolder().getAbsolutePath();
+    File checkpoint = new File(testDirName, "checkpoint");
+    checkpoint.mkdir();
+    File file = new File(checkpoint, "temp1.txt");
+    OutputStreamWriter writer = new OutputStreamWriter(
+        new FileOutputStream(file), StandardCharsets.UTF_8);
+    writer.write("Test data 1");
+    writer.close();
 
-    try {
-      String testDirName = folder.newFolder().getAbsolutePath();
-      File file = new File(testDirName + "/temp1.txt");
-      OutputStreamWriter writer = new OutputStreamWriter(
-          new FileOutputStream(file), StandardCharsets.UTF_8);
-      writer.write("Test data 1");
-      writer.close();
+    file = new File(checkpoint, "/temp2.txt");
+    writer = new OutputStreamWriter(
+        new FileOutputStream(file), StandardCharsets.UTF_8);
+    writer.write("Test data 2");
+    writer.close();
 
-      file = new File(testDirName + "/temp2.txt");
-      writer = new OutputStreamWriter(
-          new FileOutputStream(file), StandardCharsets.UTF_8);
-      writer.write("Test data 2");
-      writer.close();
-
-      File outputFile =
-          new File(Paths.get(testDirName, "output_file.tgz").toString());
-      TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-          Paths.get(testDirName));
-      writeDBCheckpointToStream(dbCheckpoint,
-          new FileOutputStream(outputFile));
-      assertNotNull(outputFile);
-    } finally {
-      IOUtils.closeStream(fis);
-      IOUtils.closeStream(fos);
-    }
+    File outputFile =
+        new File(Paths.get(testDirName, "output_file.tar").toString());
+    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
+        checkpoint.toPath());
+    writeDBCheckpointToStream(dbCheckpoint,
+        new FileOutputStream(outputFile));
+    assertNotNull(outputFile);
   }
 }
 

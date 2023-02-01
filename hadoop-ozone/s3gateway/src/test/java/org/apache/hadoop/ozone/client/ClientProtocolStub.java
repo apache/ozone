@@ -617,6 +617,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName)
+      throws IOException {
+
+  }
+
+  @Override
   public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
       throws IOException {
     return null;

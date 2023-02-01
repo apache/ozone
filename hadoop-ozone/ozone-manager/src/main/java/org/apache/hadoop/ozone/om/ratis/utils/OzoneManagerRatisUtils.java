@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenReques
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
@@ -212,6 +213,8 @@ public final class OzoneManagerRatisUtils {
       return new OMSetRangerServiceVersionRequest(omRequest);
     case CreateSnapshot:
       return new OMSnapshotCreateRequest(omRequest);
+    case DeleteSnapshot:
+      return new OMSnapshotDeleteRequest(omRequest);
     case DeleteOpenKeys:
       BucketLayout bktLayout = BucketLayout.DEFAULT;
       if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {

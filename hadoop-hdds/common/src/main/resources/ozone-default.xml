@@ -1588,9 +1588,9 @@
   <property>
     <name>hdds.datanode.replication.work.dir</name>
     <tag>DATANODE</tag>
-    <description>Temporary which is used during the container replication
-      betweeen datanodes. Should have enough space to store multiple container
-      (in compressed format), but doesn't require fast io access such as SSD.
+    <description>This configuration is deprecated. Temporary sub directory under
+      each hdds.datanode.dir will be used during the container replication between
+      datanodes to save the downloaded container(in compressed format).
     </description>
   </property>
 
@@ -3512,6 +3512,16 @@
     <tag>OZONE, OM</tag>
     <description>
       The time to live for container location cache in Ozone.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.enable.ofs.shared.tmp.dir</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable shared ofs tmp directory ofs://tmp.  Allows a root tmp
+      directory with sticky-bit behaviour.
     </description>
   </property>
 
