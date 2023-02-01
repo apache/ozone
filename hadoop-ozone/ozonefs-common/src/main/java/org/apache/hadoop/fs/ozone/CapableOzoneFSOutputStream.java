@@ -48,8 +48,8 @@ public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
       return false;
     } else if (os instanceof KeyOutputStream) {
       switch (StringUtils.toLowerCase(capability)) {
-      case OzoneStreamCapabilities.HFLUSH:
-      case OzoneStreamCapabilities.HSYNC:
+      case StreamCapabilities.HFLUSH:
+      case StreamCapabilities.HSYNC:
         // TODO: switch to true after HDDS-7688
         return false;
       default:
@@ -57,7 +57,6 @@ public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
       }
     }
     // deal with CryptoOutputStream
-    return StoreImplementationUtils.hasCapability(
-      getWrappedOutputStream().getOutputStream(), capability);
+    return StoreImplementationUtils.hasCapability(os, capability);
   }
 }
