@@ -118,21 +118,15 @@ public final class OMHAMetrics implements MetricsSource {
 
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
 
-    if (currNodeId.equals(leaderId)) {
-      omhaInfo.setNodeId(currNodeId);
-      omhaInfo.setOzoneManagerHALeaderState(1);
+    // Check current node state (1 leader, 0 follower)
+    int state = currNodeId.equals(leaderId) ? 1 : 0;
+    omhaInfo.setNodeId(currNodeId);
+    omhaInfo.setOzoneManagerHALeaderState(state);
 
-      recordBuilder
-          .tag(OMHAMetricsInfo.NodeId, currNodeId)
-          .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, 1);
-    } else {
-      omhaInfo.setNodeId(currNodeId);
-      omhaInfo.setOzoneManagerHALeaderState(0);
+    recordBuilder
+        .tag(OMHAMetricsInfo.NodeId, currNodeId)
+        .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, state);
 
-      recordBuilder
-          .tag(OMHAMetricsInfo.NodeId, currNodeId)
-          .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, 0);
-    }
     recordBuilder.endRecord();
   }
 

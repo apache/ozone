@@ -1838,7 +1838,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             "Ratis server leader.", ex);
       }
       if (Objects.nonNull(leader)) {
-        leaderId += leader.getId().toString();
+        leaderId = leader.getId().toString();
       }
     }
     omHAMetricsInit(leaderId);
