@@ -31,6 +31,8 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.fromProto;
+
 /**
  * Service to make containers available for replication.
  */
@@ -55,9 +57,7 @@ public class GrpcReplicationService extends
   public void download(CopyContainerRequestProto request,
       StreamObserver<CopyContainerResponseProto> responseObserver) {
     long containerID = request.getContainerID();
-    String compression = request.hasCompression() ?
-        request.getCompression().toString() : CopyContainerCompression
-        .getDefaultCompression().toString();
+    CopyContainerCompression compression = fromProto(request.getCompression());
     LOG.info("Streaming container data ({}) to other datanode " +
         "with compression {}", containerID, compression);
     try {

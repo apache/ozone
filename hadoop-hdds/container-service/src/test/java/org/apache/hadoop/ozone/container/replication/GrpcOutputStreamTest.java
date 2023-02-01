@@ -207,7 +207,7 @@ abstract class GrpcOutputStreamTest<T> {
     return bytes;
   }
 
-  private static byte[] getRandomBytes(int size) {
+  static byte[] getRandomBytes(int size) {
     byte[] bytes = new byte[size];
     RND.nextBytes(bytes);
     return bytes;
