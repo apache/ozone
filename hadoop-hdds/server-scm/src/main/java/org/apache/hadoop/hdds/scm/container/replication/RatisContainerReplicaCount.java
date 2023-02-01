@@ -86,24 +86,20 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     for (ContainerReplica cr : this.replicas) {
       HddsProtos.NodeOperationalState state =
           cr.getDatanodeDetails().getPersistedOpState();
-      if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        unhealthyReplicaCount++;
-        if (!considerUnhealthy) {
-          continue;
-        }
-      }
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
       } else {
         if (!ReplicationManager.compareState(container.getState(),
-            cr.getState()) &&
-            cr.getState() != ContainerReplicaProto.State.UNHEALTHY) {
-          healthyReplicaCount++;
-          misMatchedReplicaCount++;
-        } else if (ReplicationManager.compareState(container.getState(),
             cr.getState())) {
+          if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+            unhealthyReplicaCount++;
+          } else {
+            healthyReplicaCount++;
+            misMatchedReplicaCount++;
+          }
+        } else {
           healthyReplicaCount++;
           matchingReplicaCount++;
         }
@@ -168,24 +164,20 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     for (ContainerReplica cr : this.replicas) {
       HddsProtos.NodeOperationalState state =
           cr.getDatanodeDetails().getPersistedOpState();
-      if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        unhealthyReplicaCount++;
-        if (!considerUnhealthy) {
-          continue;
-        }
-      }
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
       } else {
         if (!ReplicationManager.compareState(container.getState(),
-            cr.getState()) &&
-            cr.getState() != ContainerReplicaProto.State.UNHEALTHY) {
-          healthyReplicaCount++;
-          misMatchedReplicaCount++;
-        } else if (ReplicationManager.compareState(container.getState(),
             cr.getState())) {
+          if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+            unhealthyReplicaCount++;
+          } else {
+            healthyReplicaCount++;
+            misMatchedReplicaCount++;
+          }
+        } else {
           healthyReplicaCount++;
           matchingReplicaCount++;
         }

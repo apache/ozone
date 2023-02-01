@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -500,15 +499,11 @@ class TestRatisContainerReplicaCount {
         createContainerReplica(ContainerID.valueOf(1L), 0,
             DECOMMISSIONED, UNHEALTHY);
     replicas.add(unhealthyReplica);
-    List<ContainerReplicaOp> pendingOps =
-        ImmutableList.of(ContainerReplicaOp.create(
-            ContainerReplicaOp.PendingOpType.DELETE,
-            unhealthyReplica.getDatanodeDetails(), 0));
 
     // First, test by not considering UNHEALTHY replicas.
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replicas,
-            pendingOps, 2, false);
+            Collections.emptyList(), 2, false);
     assertTrue(rcnt.isSufficientlyReplicated());
     assertFalse(rcnt.isOverReplicated());
     assertEquals(0, rcnt.getExcessRedundancy(true));
@@ -519,14 +514,14 @@ class TestRatisContainerReplicaCount {
     assertEquals(1, rcnt.getMisMatchedReplicaCount());
     // CLOSED + CLOSED = 2
     assertEquals(2, rcnt.getMatchingReplicaCount());
-    // UNHEALTHY = 1
-    assertEquals(1, rcnt.getUnhealthyReplicaCount());
-    // should be 0 because we're not considering unhealthy replicas
-    assertEquals(0, rcnt.getDecommissionCount());
+    // UNHEALTHY should be 0 because it is counted as decommissioned
+    assertEquals(0, rcnt.getUnhealthyReplicaCount());
+    // 1 because the UNHEALTHY replica is on a decommissioned node
+    assertEquals(1, rcnt.getDecommissionCount());
 
     // Now, test by considering UNHEALTHY replicas
     rcnt = new RatisContainerReplicaCount(container, replicas,
-        pendingOps, 2, true);
+        Collections.emptyList(), 2, true);
     assertTrue(rcnt.isSufficientlyReplicated());
     assertFalse(rcnt.isOverReplicated());
     assertEquals(0, rcnt.getExcessRedundancy(true));
@@ -537,8 +532,8 @@ class TestRatisContainerReplicaCount {
     assertEquals(1, rcnt.getMisMatchedReplicaCount());
     // CLOSED + CLOSED = 2
     assertEquals(2, rcnt.getMatchingReplicaCount());
-    // UNHEALTHY = 1
-    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // UNHEALTHY should be 0 because it is counted as decommissioned
+    assertEquals(0, rcnt.getUnhealthyReplicaCount());
     assertEquals(1, rcnt.getDecommissionCount());
   }
 

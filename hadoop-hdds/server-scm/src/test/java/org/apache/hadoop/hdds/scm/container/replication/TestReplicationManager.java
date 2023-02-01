@@ -244,6 +244,30 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testUnderReplicatedClosedContainerWithOnlyUnhealthyReplicas()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    // Container is closed but replicas are UNHEALTHY
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.UNHEALTHY, 0, 0);
+    ContainerReplica unhealthyOnDecommissioning = createContainerReplica(
+        container.containerID(), 0, DECOMMISSIONING,
+        ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyOnDecommissioning);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
   public void testHealthyContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
