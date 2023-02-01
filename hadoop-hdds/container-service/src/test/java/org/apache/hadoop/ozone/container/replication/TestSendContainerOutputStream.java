@@ -19,10 +19,14 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.io.OutputStream;
 
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
 
 /**
  * Test for {@link SendContainerOutputStream}.
@@ -37,7 +41,28 @@ class TestSendContainerOutputStream
   @Override
   protected OutputStream createSubject() {
     return new SendContainerOutputStream(getObserver(),
-        getContainerId(), getBufferSize());
+        getContainerId(), getBufferSize(), NO_COMPRESSION);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void usesCompression(CopyContainerCompression compression) throws Exception {
+    OutputStream subject = new SendContainerOutputStream(
+        getObserver(), getContainerId(), getBufferSize(), compression);
+
+    byte[] bytes = getRandomBytes(16);
+    subject.write(bytes, 0, bytes.length);
+    subject.close();
+
+    SendContainerRequest req = SendContainerRequest.newBuilder()
+        .setContainerID(getContainerId())
+        .setOffset(0)
+        .setData(ByteString.copyFrom(bytes))
+        .setCompression(compression.toProto())
+        .build();
+
+    verify(getObserver()).onNext(req);
+    verify(getObserver()).onCompleted();
   }
 
   protected ByteString verifyPart(SendContainerRequest response,

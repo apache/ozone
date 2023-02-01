@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -206,8 +205,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerController(containerSet, handlers);
 
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
-        controller, new TarContainerPacker(), null);
-    replicator = new DownloadAndImportReplicator(containerSet, importer,
+        controller, null);
+    replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
         new SimpleContainerDownloader(conf, null));
 
     ReplicationServer.ReplicationConfig replicationConfig

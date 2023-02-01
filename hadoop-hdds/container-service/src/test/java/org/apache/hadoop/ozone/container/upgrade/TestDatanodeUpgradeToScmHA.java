@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -69,6 +68,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Tests upgrading a single datanode from pre-SCM HA volume format that used
@@ -655,7 +656,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     File destination = tempFolder.newFile();
     try (FileOutputStream fos = new FileOutputStream(destination)) {
-      replicationSource.copyData(containerId, fos, "NO_COMPRESSION");
+      replicationSource.copyData(containerId, fos, NO_COMPRESSION);
     }
     return destination;
   }
@@ -669,13 +670,14 @@ public class TestDatanodeUpgradeToScmHA {
         new ContainerImporter(dsm.getConf(),
             dsm.getContainer().getContainerSet(),
             dsm.getContainer().getController(),
-            new TarContainerPacker(), dsm.getContainer().getVolumeSet());
+            dsm.getContainer().getVolumeSet());
 
     File tempFile = tempFolder.newFile(
         ContainerUtils.getContainerTarName(containerID));
     Files.copy(source.toPath(), tempFile.toPath(),
         StandardCopyOption.REPLACE_EXISTING);
-    replicator.importContainer(containerID, tempFile.toPath(), null);
+    replicator.importContainer(containerID, tempFile.toPath(), null,
+        NO_COMPRESSION);
   }
 
   public void dispatchRequest(

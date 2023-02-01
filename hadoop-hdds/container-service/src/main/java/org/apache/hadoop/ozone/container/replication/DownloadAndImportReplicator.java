@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -44,14 +45,16 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
+  private final CopyContainerCompression compression;
 
   public DownloadAndImportReplicator(
-      ContainerSet containerSet,
+      ConfigurationSource conf, ContainerSet containerSet,
       ContainerImporter containerImporter,
       ContainerDownloader downloader) {
     this.containerSet = containerSet;
     this.downloader = downloader;
     this.containerImporter = containerImporter;
+    compression = CopyContainerCompression.getConf(conf);
   }
 
   @Override
@@ -74,7 +77,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =
           downloader.getContainerDataFromReplicas(containerID, sourceDatanodes,
-              ContainerImporter.getUntarDirectory(targetVolume));
+              ContainerImporter.getUntarDirectory(targetVolume), compression);
       if (tarFilePath == null) {
         task.setStatus(Status.FAILED);
         return;
@@ -84,7 +87,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
               containerID, bytes);
       task.setTransferredBytes(bytes);
 
-      containerImporter.importContainer(containerID, tarFilePath, targetVolume);
+      containerImporter.importContainer(containerID, tarFilePath, targetVolume,
+          compression);
 
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);
