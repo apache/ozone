@@ -184,7 +184,8 @@ public class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public Iterator<? extends OzoneKey> listKeys(String keyPrefix) {
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
+      String delimiter) {
     Map<String, OzoneKey> sortedKey = new TreeMap<String, OzoneKey>(keyDetails);
     return sortedKey.values()
         .stream()
@@ -195,7 +196,7 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
-      String prevKey) {
+      String delimiter, String prevKey) {
     Map<String, OzoneKey> sortedKey = new TreeMap<String, OzoneKey>(keyDetails);
     return sortedKey.values()
         .stream()

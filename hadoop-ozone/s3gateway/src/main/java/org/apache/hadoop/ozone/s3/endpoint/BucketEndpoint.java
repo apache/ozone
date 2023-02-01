@@ -134,13 +134,15 @@ public class BucketEndpoint extends EndpointBase {
       if (startAfter != null && continueToken != null) {
         // If continuation token and start after both are provided, then we
         // ignore start After
-        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
+        ozoneKeyIterator = bucket.listKeys(prefix, delimiter,
+            decodedToken.getLastKey());
       } else if (startAfter != null && continueToken == null) {
-        ozoneKeyIterator = bucket.listKeys(prefix, startAfter);
+        ozoneKeyIterator = bucket.listKeys(prefix, delimiter, startAfter);
       } else if (startAfter == null && continueToken != null) {
-        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
+        ozoneKeyIterator = bucket.listKeys(prefix, delimiter,
+            decodedToken.getLastKey());
       } else {
-        ozoneKeyIterator = bucket.listKeys(prefix);
+        ozoneKeyIterator = bucket.listKeys(prefix, delimiter);
       }
     } catch (OMException ex) {
       AUDIT.logReadFailure(

@@ -183,7 +183,8 @@ public class TestOmBucketReadWriteKeyOps {
   private void verifyKeyCreation(int expectedCount, OzoneBucket bucket,
                                  String keyPrefix) throws IOException {
     int actual = 0;
-    Iterator<? extends OzoneKey> ozoneKeyIterator = bucket.listKeys(keyPrefix);
+    Iterator<? extends OzoneKey> ozoneKeyIterator =
+        bucket.listKeys(keyPrefix, null);
     while (ozoneKeyIterator.hasNext()) {
       ozoneKeyIterator.next();
       ++actual;

@@ -123,7 +123,7 @@ public class TestBucketOwner {
     //Bucket Delete
     volume.deleteBucket("bucket3");
     //List Keys
-    ozoneBucket.listKeys("key");
+    ozoneBucket.listKeys("key", null);
     //Get Acls
     ozoneBucket.getAcls();
     //Add Acls
@@ -172,7 +172,7 @@ public class TestBucketOwner {
       OzoneVolume volume = cluster.getClient().getObjectStore()
               .getVolume("volume1");
       ozoneBucket = volume.getBucket("bucket1");
-      ozoneBucket.listKeys("key");
+      ozoneBucket.listKeys("key", null);
       fail("List keys as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
@@ -213,7 +213,7 @@ public class TestBucketOwner {
     //Key Delete
     ozoneBucket.deleteKey("key2");
     //List Keys
-    ozoneBucket.listKeys("key");
+    ozoneBucket.listKeys("key", null);
     //Get Acls
     ozoneBucket.getAcls();
     //Add Acls

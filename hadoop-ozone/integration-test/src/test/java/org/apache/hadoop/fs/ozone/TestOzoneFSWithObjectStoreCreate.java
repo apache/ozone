@@ -386,18 +386,18 @@ public class TestOzoneFSWithObjectStoreCreate {
     // Iterator with key name as prefix.
 
     Iterator<? extends OzoneKey > ozoneKeyIterator =
-        ozoneBucket.listKeys("/dir1//");
+        ozoneBucket.listKeys("/dir1//", null);
 
     checkKeyList(ozoneKeyIterator, keys);
 
     // Iterator with with normalized key prefix.
     ozoneKeyIterator =
-        ozoneBucket.listKeys("dir1/");
+        ozoneBucket.listKeys("dir1/", null);
 
     checkKeyList(ozoneKeyIterator, keys);
 
     // Iterator with key name as previous key.
-    ozoneKeyIterator = ozoneBucket.listKeys(null,
+    ozoneKeyIterator = ozoneBucket.listKeys(null, null,
         "/dir1///dir2/file1/");
 
     // Remove keys before //dir1/dir2/file1
@@ -408,7 +408,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     checkKeyList(ozoneKeyIterator, keys);
 
     // Iterator with  normalized key as previous key.
-    ozoneKeyIterator = ozoneBucket.listKeys(null,
+    ozoneKeyIterator = ozoneBucket.listKeys(null, null,
         OmUtils.normalizeKey(key1, false));
 
     checkKeyList(ozoneKeyIterator, keys);
