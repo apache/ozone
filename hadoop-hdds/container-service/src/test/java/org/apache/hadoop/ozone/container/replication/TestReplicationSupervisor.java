@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.time.Instant;
@@ -28,6 +29,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -39,6 +41,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -68,6 +71,10 @@ import javax.annotation.Nonnull;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
+import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 
 /**
  * Test the replication supervisor.
@@ -350,6 +357,121 @@ public class TestReplicationSupervisor {
     Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
   }
 
+  @Test
+  public void testPriorityOrdering() throws InterruptedException {
+    long deadline = clock.millis() + 1000;
+    long containerId = 1;
+    long term = 1;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+    repConf.setReplicationMaxStreams(1);
+    ReplicationSupervisor supervisor =
+        new ReplicationSupervisor(null, repConf, clock);
+
+    final CountDownLatch indicateRunning = new CountDownLatch(1);
+    final CountDownLatch completeRunning = new CountDownLatch(1);
+    // Going to create 5 tasks below, so this counter needs to be set to 5.
+    final CountDownLatch tasksCompleteLatch = new CountDownLatch(5);
+
+    supervisor.addTask(new BlockingTask(containerId, deadline, term,
+        indicateRunning, completeRunning));
+    // Wait for the first task to block the single threaded executor
+    indicateRunning.await();
+
+    List<String> completionOrder = new ArrayList<>();
+    // Now load some tasks out of order.
+    clock.fastForward(10);
+    supervisor.addTask(new OrderedTask(containerId, deadline, term, clock,
+        LOW, "LOW_10", completionOrder, tasksCompleteLatch));
+    clock.rewind(5);
+    supervisor.addTask(new OrderedTask(containerId, deadline, term, clock,
+        LOW, "LOW_5", completionOrder, tasksCompleteLatch));
+
+    supervisor.addTask(new OrderedTask(containerId, deadline, term, clock,
+        NORMAL, "HIGH_5", completionOrder, tasksCompleteLatch));
+    clock.rewind(4);
+    supervisor.addTask(new OrderedTask(containerId, deadline, term, clock,
+        NORMAL, "HIGH_1", completionOrder, tasksCompleteLatch));
+    clock.fastForward(10);
+    supervisor.addTask(new OrderedTask(containerId, deadline, term, clock,
+        NORMAL, "HIGH_11", completionOrder, tasksCompleteLatch));
+
+    List<String> expectedOrder = new ArrayList<>();
+    expectedOrder.add("HIGH_1");
+    expectedOrder.add("HIGH_5");
+    expectedOrder.add("HIGH_11");
+    expectedOrder.add("LOW_5");
+    expectedOrder.add("LOW_10");
+
+    // Before unblocking the queue, check the queue count for the OrderedTask.
+    // We loaded 3 High / normal priority and 2 low. The counter should not
+    // include the low counts.
+    Assert.assertEquals(3,
+        supervisor.getInFlightReplications(OrderedTask.class));
+    Assert.assertEquals(1,
+        supervisor.getInFlightReplications(BlockingTask.class));
+
+    // Unblock the queue
+    completeRunning.countDown();
+    // Wait for all tasks to complete
+    tasksCompleteLatch.await();
+    Assert.assertEquals(expectedOrder, completionOrder);
+    Assert.assertEquals(0,
+        supervisor.getInFlightReplications(OrderedTask.class));
+    Assert.assertEquals(0,
+        supervisor.getInFlightReplications(BlockingTask.class));
+  }
+
+  private static class BlockingTask extends AbstractReplicationTask {
+
+    private CountDownLatch runningLatch;
+    private CountDownLatch waitForCompleteLatch;
+
+    BlockingTask(long containerId, long deadlineEpochMs, long term,
+        CountDownLatch running, CountDownLatch waitForCompletion) {
+      super(containerId, deadlineEpochMs, term);
+      this.runningLatch = running;
+      this.waitForCompleteLatch = waitForCompletion;
+    }
+
+    @Override
+    public void runTask() {
+      runningLatch.countDown();
+      try {
+        waitForCompleteLatch.await();
+      } catch (InterruptedException e) {
+        fail("Interrupted waiting for the completion latch to be released");
+      }
+      setStatus(DONE);
+    }
+  }
+
+  private static class OrderedTask extends  AbstractReplicationTask {
+
+    private final String name;
+    private final List<String> completeList;
+    private final CountDownLatch completeLatch;
+
+    @SuppressWarnings("checkstyle:parameterNumber")
+    OrderedTask(long containerId, long deadlineEpochMs, long term,
+        Clock clock, ReplicationCommandPriority priority,
+        String name, List<String> completeList, CountDownLatch completeLatch) {
+      super(containerId, deadlineEpochMs, term, clock);
+      this.completeList = completeList;
+      this.name = name;
+      this.completeLatch = completeLatch;
+      setPriority(priority);
+    }
+
+    @Override
+    public void runTask() {
+      completeList.add(name);
+      setStatus(DONE);
+      completeLatch.countDown();
+    }
+  }
+
   private ReplicationSupervisor supervisorWithReplicator(
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory) {
     return supervisorWith(replicatorFactory, newDirectExecutorService());
@@ -441,7 +563,7 @@ public class TestReplicationSupervisor {
 
       try {
         set.addContainer(kvc);
-        task.setStatus(ReplicationTask.Status.DONE);
+        task.setStatus(DONE);
       } catch (Exception e) {
         Assert.fail("Unexpected error: " + e.getMessage());
       }

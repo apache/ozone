@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -47,6 +50,10 @@ public class ReplicationSupervisor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
+
+  private static final Comparator<TaskRunner> TASK_RUNNER_COMPARATOR =
+      Comparator.comparing(TaskRunner::getTaskPriority)
+          .thenComparing(TaskRunner::getTaskQueueTime);
 
   private final ExecutorService executor;
   private final StateContext context;
@@ -84,7 +91,7 @@ public class ReplicationSupervisor {
         new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
+            new PriorityBlockingQueue<>(),
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("ContainerReplicationThread-%d")
                 .build()),
@@ -96,13 +103,23 @@ public class ReplicationSupervisor {
    */
   public void addTask(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
-      taskCounter.computeIfAbsent(task.getClass(),
-          k -> new AtomicInteger()).incrementAndGet();
+      if (task.getPriority() != ReplicationCommandPriority.LOW) {
+        // Low priority tasks are not included in the replication queue sizes
+        // returned to SCM in the heartbeat, so we only update the count for
+        // priorities other than low.
+        taskCounter.computeIfAbsent(task.getClass(),
+            k -> new AtomicInteger()).incrementAndGet();
+      }
       executor.execute(new TaskRunner(task));
     }
   }
 
   private void decrementTaskCounter(AbstractReplicationTask task) {
+    if (task.getPriority() == ReplicationCommandPriority.LOW) {
+      // LOW tasks are not included in the counter, so skip decrementing the
+      // counter.
+      return;
+    }
     AtomicInteger counter = taskCounter.get(task.getClass());
     if (counter != null) {
       counter.decrementAndGet();
@@ -153,7 +170,7 @@ public class ReplicationSupervisor {
   /**
    * An executable form of a replication task with status handling.
    */
-  public final class TaskRunner implements Runnable {
+  public final class TaskRunner implements Comparable, Runnable {
     private final AbstractReplicationTask task;
 
     public TaskRunner(AbstractReplicationTask task) {
@@ -216,6 +233,36 @@ public class ReplicationSupervisor {
     @Override
     public String toString() {
       return task.toString();
+    }
+
+    public ReplicationCommandPriority getTaskPriority() {
+      return task.getPriority();
+    }
+
+    public long getTaskQueueTime() {
+      return task.getQueued().toEpochMilli();
+    }
+
+    @Override
+    public int compareTo(Object o) {
+      return TASK_RUNNER_COMPARATOR.compare(this, (TaskRunner) o);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(task);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      TaskRunner that = (TaskRunner) o;
+      return task.equals(that.task);
     }
   }
 
