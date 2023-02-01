@@ -264,13 +264,14 @@ public class TestOzoneSnapshotRestore {
     // If we don't delete keys from the source bucket, copy command
     // will fail. In copy command, there is a check to make sure that key
     // doesn't exist in the destination bucket.
-    // Bucket creation is async operation on server side, and it is possible
-    // that destination bucket doesn't get created by the time copy command
-    // starts.
-    // In that case, "key doesn't exist in destination bucket check" will fail
-    // because in scenario when key doesn't exist in requested bucket,
-    // we check in other buckets for the key and create a fake dir if similar
-    // key exists in some other bucket.
+    // Problem is that RocksDB's seek operation doesn't 100% guarantee that
+    // item key is available. Tho we believe that it is in
+    // `createFakeDirIfShould` function. When we seek if there is a directory
+    // for the key name, sometime it returns non-null response but in reality
+    // item doesn't exist.
+    // In the case when seek returns non-null response, "key doesn't exist in
+    // the destination bucket" check fails because getFileStatus returns
+    // dir with key name exists.
     deleteKeys(buck);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
