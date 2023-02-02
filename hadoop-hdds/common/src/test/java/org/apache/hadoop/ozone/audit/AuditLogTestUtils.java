@@ -22,9 +22,9 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 
 /**
@@ -58,7 +58,7 @@ public final class AuditLogTestUtils {
   public static boolean auditLogContains(String... strings) {
     File file = new File(AUDITLOG_FILENAME);
     try {
-      String contents = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+      String contents = FileUtils.readFileToString(file, UTF_8);
       for (String s : strings) {
         if (!contents.contains(s)) {
           return false;
