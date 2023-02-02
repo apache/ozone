@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -32,34 +33,23 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "OzoneManager HA Metrics", context = OzoneConsts.OZONE)
 public final class OMHAMetrics implements MetricsSource {
 
-  private enum OMHAMetricsInfo implements MetricsInfo {
-
-    OzoneManagerHALeaderState("Leader active state " +
-        "of OzoneManager node (1 leader, 0 follower)"),
-    NodeId("OM node Id");
-
-    private final String description;
-
-    OMHAMetricsInfo(String description) {
-      this.description = description;
-    }
-
-    @Override
-    public String description() {
-      return description;
-    }
-  }
-
   /**
-   * Private nested class to hold
-   * the values of OMHAMetricsInfo.
+   * Private nested class to hold the values
+   * of MetricsInfo for OMHAMetrics.
    */
-  private static final class OMHAInfo {
+  private static final class OMHAMetricsInfo {
+
+    private static final MetricsInfo OZONE_MANAGER_HA_LEADER_STATE =
+        Interns.info("OzoneManagerHALeaderState",
+            "Leader active state of OzoneManager node (1 leader, 0 follower)");
+
+    private static final MetricsInfo NODE_ID =
+        Interns.info("NodeId", "OM node Id");
 
     private long ozoneManagerHALeaderState;
     private String nodeId;
 
-    OMHAInfo() {
+    OMHAMetricsInfo() {
       this.ozoneManagerHALeaderState = 0L;
       this.nodeId = "";
     }
@@ -83,13 +73,13 @@ public final class OMHAMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME =
       OMHAMetrics.class.getSimpleName();
-  private final OMHAInfo omhaInfo = new OMHAInfo();
+  private final OMHAMetricsInfo omhaMetricsInfo = new OMHAMetricsInfo();
   private MetricsRegistry metricsRegistry;
 
   private String currNodeId;
   private String leaderId;
 
-  public OMHAMetrics(String currNodeId, String leaderId) {
+  private OMHAMetrics(String currNodeId, String leaderId) {
     this.currNodeId = currNodeId;
     this.leaderId = leaderId;
     this.metricsRegistry = new MetricsRegistry(SOURCE_NAME);
@@ -99,7 +89,7 @@ public final class OMHAMetrics implements MetricsSource {
    * Create and return OMHAMetrics instance.
    * @return OMHAMetrics
    */
-  public static synchronized OMHAMetrics create(
+  public static OMHAMetrics create(
       String nodeId, String leaderId) {
     OMHAMetrics metrics = new OMHAMetrics(nodeId, leaderId);
     return DefaultMetricsSystem.instance()
@@ -120,23 +110,23 @@ public final class OMHAMetrics implements MetricsSource {
 
     // Check current node state (1 leader, 0 follower)
     int state = currNodeId.equals(leaderId) ? 1 : 0;
-    omhaInfo.setNodeId(currNodeId);
-    omhaInfo.setOzoneManagerHALeaderState(state);
+    omhaMetricsInfo.setNodeId(currNodeId);
+    omhaMetricsInfo.setOzoneManagerHALeaderState(state);
 
     recordBuilder
-        .tag(OMHAMetricsInfo.NodeId, currNodeId)
-        .addGauge(OMHAMetricsInfo.OzoneManagerHALeaderState, state);
+        .tag(OMHAMetricsInfo.NODE_ID, currNodeId)
+        .addGauge(OMHAMetricsInfo.OZONE_MANAGER_HA_LEADER_STATE, state);
 
     recordBuilder.endRecord();
   }
 
   @VisibleForTesting
   public String getOmhaInfoNodeId() {
-    return omhaInfo.getNodeId();
+    return omhaMetricsInfo.getNodeId();
   }
 
   @VisibleForTesting
   public long getOmhaInfoOzoneManagerHALeaderState() {
-    return omhaInfo.getOzoneManagerHALeaderState();
+    return omhaMetricsInfo.getOzoneManagerHALeaderState();
   }
 }
