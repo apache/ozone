@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.lock.BootstrapStateLock;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -67,7 +69,8 @@ import org.slf4j.LoggerFactory;
  * metadata accordingly, if scm returns success for keys, then clean up those
  * keys.
  */
-public class KeyDeletingService extends BackgroundService {
+public class KeyDeletingService extends BackgroundService implements
+    BootstrapStateLock {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
@@ -83,6 +86,7 @@ public class KeyDeletingService extends BackgroundService {
   private final int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicLong runCount;
+  private final Semaphore bootstrapStateLock = new Semaphore(1);
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -139,6 +143,20 @@ public class KeyDeletingService extends BackgroundService {
       return false;
     }
     return ozoneManager.isRatisEnabled();
+  }
+
+  @Override
+  public void lockBootstrapState() {
+    try {
+      bootstrapStateLock.acquire();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Override
+  public void unlockBootstrapState() {
+    bootstrapStateLock.release();
   }
 
   /**

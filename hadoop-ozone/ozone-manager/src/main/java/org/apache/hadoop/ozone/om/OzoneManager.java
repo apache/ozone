@@ -3401,6 +3401,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
+      keyManager.getDeletingService().lockBootstrapState();
       return null;
     }
 
