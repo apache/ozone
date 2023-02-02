@@ -3879,7 +3879,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Return the list of Ozone administrators in effect.
    */
-  Collection<String> getOmAdminUsernames() {
+  public Collection<String> getOmAdminUsernames() {
     return omAdmins.getAdminUsernames();
   }
 
@@ -4401,7 +4401,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override // ReconfigurableBase
-  protected String reconfigurePropertyImpl(String property, String newVal)
+  public String reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
     if (property.equals(OZONE_ADMINISTRATORS)) {
       return reconfOzoneAdmins(newVal);

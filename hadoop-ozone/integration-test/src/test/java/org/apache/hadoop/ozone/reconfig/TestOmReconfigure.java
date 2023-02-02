@@ -1,4 +1,4 @@
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.reconfig;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -77,9 +78,7 @@ public class TestOmReconfigure {
   }
 
   /**
-   * Currently this is a No-Op finalization since there is only one layout
-   * version in OM. But this test is expected to remain consistent when a
-   * new version is added.
+   * Test reconfigure om "ozone.administrators".
    */
   @Test
   public void testOmAdminUsersReconfigure() throws Exception {
