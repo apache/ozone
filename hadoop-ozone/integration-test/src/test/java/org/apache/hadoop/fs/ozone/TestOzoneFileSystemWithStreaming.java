@@ -55,7 +55,7 @@ public class TestOzoneFileSystemWithStreaming {
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
 
-  private static OzoneConfiguration conf = new OzoneConfiguration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   @BeforeAll
   public static void init() throws Exception {
@@ -65,11 +65,11 @@ public class TestOzoneFileSystemWithStreaming {
     final int blockSize = 2 * maxFlushSize;
     final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-    conf.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
-    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    CONF.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
+    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
         .setBlockSize(blockSize)
@@ -99,11 +99,11 @@ public class TestOzoneFileSystemWithStreaming {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final Path file = new Path("/file");
 
-    try (FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(CONF)) {
       runTestCreateFile(fs, file);
     }
   }
@@ -112,14 +112,14 @@ public class TestOzoneFileSystemWithStreaming {
   public void testOfsCreateFile() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file");
 
-    try (FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(CONF)) {
       runTestCreateFile(fs, file);
     }
   }

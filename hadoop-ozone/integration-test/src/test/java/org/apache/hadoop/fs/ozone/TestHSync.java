@@ -63,7 +63,7 @@ public class TestHSync {
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
 
-  private static OzoneConfiguration conf = new OzoneConfiguration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   @BeforeAll
   public static void init() throws Exception {
@@ -73,9 +73,9 @@ public class TestHSync {
     final int blockSize = 2 * maxFlushSize;
     final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
-    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
         .setBlockSize(blockSize)
@@ -105,11 +105,11 @@ public class TestHSync {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final Path file = new Path("/file");
 
-    try (FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(CONF)) {
       runTestHSync(fs, file);
     }
   }
@@ -118,14 +118,14 @@ public class TestHSync {
   public void testOfsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file");
 
-    try (FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(CONF)) {
       runTestHSync(fs, file);
     }
   }
@@ -159,14 +159,14 @@ public class TestHSync {
   @Test
   public void testStreamCapability() throws Exception {
     final String rootPath = String.format("%s://%s/",
-            OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+            OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
             + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file");
 
-    try (FileSystem fs = FileSystem.get(conf);
+    try (FileSystem fs = FileSystem.get(CONF);
          final FSDataOutputStream os = fs.create(file, true)) {
       // Verify output stream supports hsync() and hflush().
       assertTrue(os.hasCapability(StreamCapabilities.HFLUSH),
@@ -192,13 +192,13 @@ public class TestHSync {
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, ecUri);
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, ecUri);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file");
 
-    try (FileSystem fs = FileSystem.get(conf);
+    try (FileSystem fs = FileSystem.get(CONF);
          final FSDataOutputStream os = fs.create(file, true)) {
       // Verify output stream supports hsync() and hflush().
       assertFalse(os.hasCapability(StreamCapabilities.HFLUSH),

@@ -163,8 +163,12 @@ public class SnapshotDiffManager {
               new ManagedColumnFamilyOptions()));
 
       // ObjectId to keyName map to keep key info for fromSnapshot.
-      // Keeping keyName instead of OmKeyInfo to reduce the memory footprint.
-      final PersistentMap<Long, String> oldObjIdToKeyPersistentMap =
+      // objectIdToKeyNameMap is used to identify what keys were touched
+      // in which snapshot and to know the difference if operation was
+      // creation, deletion, modify or rename.
+      // Stores only keyName instead of OmKeyInfo to reduce the memory
+      // footprint.
+      final PersistentMap<Long, String> objectIdToKeyNameMapForFromSnapshot =
           new RocksDbPersistentMap<>(db,
               fromSnapshotColumnFamily,
               codecRegistry,
@@ -172,7 +176,7 @@ public class SnapshotDiffManager {
               String.class);
 
       // ObjectId to keyName map to keep key info for toSnapshot.
-      final PersistentMap<Long, String> newObjIdToKeyPersistentMap =
+      final PersistentMap<Long, String> objectIdToKeyNameMapForToSnapshot =
           new RocksDbPersistentMap<>(db,
               toSnapshotColumnFamily,
               codecRegistry,
@@ -205,8 +209,8 @@ public class SnapshotDiffManager {
       addToObjectIdMap(fsKeyTable,
           tsKeyTable,
           deltaFilesForKeyOrFileTable,
-          oldObjIdToKeyPersistentMap,
-          newObjIdToKeyPersistentMap,
+          objectIdToKeyNameMapForFromSnapshot,
+          objectIdToKeyNameMapForToSnapshot,
           objectIDsToCheckMap,
           false);
 
@@ -224,16 +228,16 @@ public class SnapshotDiffManager {
         addToObjectIdMap(fsDirTable,
             tsDirTable,
             deltaFilesForDirTable,
-            oldObjIdToKeyPersistentMap,
-            newObjIdToKeyPersistentMap,
+            objectIdToKeyNameMapForFromSnapshot,
+            objectIdToKeyNameMapForToSnapshot,
             objectIDsToCheckMap,
             true);
       }
 
       generateDiffReport(requestId,
           objectIDsToCheckMap,
-          oldObjIdToKeyPersistentMap,
-          newObjIdToKeyPersistentMap,
+          objectIdToKeyNameMapForFromSnapshot,
+          objectIdToKeyNameMapForToSnapshot,
           diffReport);
 
       // TODO: Need to change it to pagination.
