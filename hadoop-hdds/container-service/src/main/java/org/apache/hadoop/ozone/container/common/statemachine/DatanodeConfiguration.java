@@ -368,7 +368,9 @@ public class DatanodeConfiguration {
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
-      description = "Auto compact small SST files (rocksdb.auto-compaction-small-sst-file-size-threshold) when count exceeds (rocksdb.auto-compaction-small-sst-file-num-threshold)"
+      description = "Auto compact small SST files " +
+          "(rocksdb.auto-compaction-small-sst-file-size-threshold) when " +
+          "count exceeds (rocksdb.auto-compaction-small-sst-file-num-threshold)"
   )
   private boolean autoCompactionSmallSstFile = true;
 
@@ -376,7 +378,8 @@ public class DatanodeConfiguration {
       defaultValue = "1MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
-      description = "SST files smaller than this configuration will be auto compacted."
+      description = "SST files smaller than this configuration will be " +
+          "auto compacted."
   )
   private long autoCompactionSmallSstFileSize = 1024 * 1024;
 
