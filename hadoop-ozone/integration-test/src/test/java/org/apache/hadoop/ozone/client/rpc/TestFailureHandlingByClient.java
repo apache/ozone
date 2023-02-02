@@ -163,6 +163,7 @@ public class TestFailureHandlingByClient {
   }
 
   @Test
+  @Flaky("HDDS-7877")
   public void testBlockWritesWithDnFailures() throws Exception {
     startCluster();
     String keyName = UUID.randomUUID().toString();
@@ -352,6 +353,7 @@ public class TestFailureHandlingByClient {
 
 
   @Test
+  @Flaky("HDDS-7878")
   public void testContainerExclusionWithClosedContainerException()
       throws Exception {
     startCluster();
