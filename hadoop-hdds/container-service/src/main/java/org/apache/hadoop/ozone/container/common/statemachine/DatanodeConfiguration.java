@@ -384,7 +384,7 @@ public class DatanodeConfiguration {
       defaultValue = "512",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "Auto compaction will happen if the number of small Sst " +
+      description = "Auto compaction will happen if the number of small SST " +
           " files exceeds this threshold."
   )
   private int autoCompactionSmallSstFileNum = 512;
