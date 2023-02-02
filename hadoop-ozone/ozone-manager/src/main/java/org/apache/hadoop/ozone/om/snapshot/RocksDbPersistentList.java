@@ -29,7 +29,7 @@ import org.rocksdb.RocksIterator;
 /**
  * Persistent list backed by RocksDB.
  */
-public class RocksDBPersistentList<E> implements PersistentList<E> {
+public class RocksDbPersistentList<E> implements PersistentList<E> {
 
   private final RocksDB db;
   private final ColumnFamilyHandle columnFamilyHandle;
@@ -37,17 +37,16 @@ public class RocksDBPersistentList<E> implements PersistentList<E> {
   private final Class<E> entryType;
   private int currentIndex;
 
-  RocksDBPersistentList(RocksDB db,
-                       ColumnFamilyHandle columnFamilyHandle,
-                       CodecRegistry codecRegistry,
-                       Class<E> entryType) {
+  public RocksDbPersistentList(RocksDB db,
+                               ColumnFamilyHandle columnFamilyHandle,
+                               CodecRegistry codecRegistry,
+                               Class<E> entryType) {
     this.db = db;
     this.columnFamilyHandle = columnFamilyHandle;
     this.codecRegistry = codecRegistry;
     this.entryType = entryType;
     this.currentIndex = 0;
   }
-
 
   @Override
   public boolean add(E entry) {
@@ -84,6 +83,39 @@ public class RocksDBPersistentList<E> implements PersistentList<E> {
   public Iterator<E> iterator() {
     RocksIterator rocksIterator = db.newIterator(columnFamilyHandle);
     rocksIterator.seekToFirst();
+
+    return new Iterator<E>() {
+      @Override
+      public boolean hasNext() {
+        return rocksIterator.isValid();
+      }
+
+      @Override
+      public E next() {
+        byte[] rawKey = rocksIterator.value();
+        rocksIterator.next();
+        try {
+          return codecRegistry.asObject(rawKey, entryType);
+        } catch (IOException exception) {
+          // TODO:: Fail gracefully.
+          throw new RuntimeException(exception);
+        }
+      }
+    };
+  }
+
+  @Override
+  public Iterator<E> iterator(int index) {
+    byte[] target;
+    try {
+      target = codecRegistry.asRawData(index);
+    } catch (IOException e) {
+      // TODO:: Fail gracefully.
+      throw new RuntimeException(e);
+    }
+
+    RocksIterator rocksIterator = db.newIterator(columnFamilyHandle);
+    rocksIterator.seek(target);
 
     return new Iterator<E>() {
       @Override

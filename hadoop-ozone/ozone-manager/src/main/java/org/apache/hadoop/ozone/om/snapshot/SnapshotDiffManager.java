@@ -165,7 +165,7 @@ public class SnapshotDiffManager {
        * is to reduce the memory footprint.
        */
       final PersistentMap<Long, String> oldObjIdToKeyPersistentMap =
-          new RocksDBPersistentMap<>(rocksDB,
+          new RocksDbPersistentMap<>(rocksDB,
               fromSnapshotColumnFamily,
               codecRegistry,
               Long.class,
@@ -174,20 +174,20 @@ public class SnapshotDiffManager {
       // Long --> const. length
       // String --> var. length "/dir1/dir2/dir3/dir4/dir5/key1"
       final PersistentMap<Long, String> newObjIdToKeyPersistentMap =
-          new RocksDBPersistentMap<>(rocksDB,
+          new RocksDbPersistentMap<>(rocksDB,
               toSnapshotColumnFamily,
               codecRegistry,
               Long.class,
               String.class);
 
       final PersistentSet<Long> objectIDsToCheckMap =
-          new RocksDBPersistentSet<>(rocksDB,
+          new RocksDbPersistentSet<>(rocksDB,
               objectIDsColumnFamily,
               codecRegistry,
               Long.class);
 
       final PersistentList<DiffReportEntry> diffReport =
-          new RocksDBPersistentList<>(rocksDB,
+          new RocksDbPersistentList<>(rocksDB,
               diffReportColumnFamily,
               codecRegistry,
               DiffReportEntry.class);
@@ -526,7 +526,7 @@ public class SnapshotDiffManager {
   private PersistentList<DiffReportEntry> createDiffReportPersistentList(
       ColumnFamilyHandle columnFamilyHandle
   ) {
-    return new RocksDBPersistentList<>(rocksDB,
+    return new RocksDbPersistentList<>(rocksDB,
         columnFamilyHandle,
         codecRegistry,
         DiffReportEntry.class);

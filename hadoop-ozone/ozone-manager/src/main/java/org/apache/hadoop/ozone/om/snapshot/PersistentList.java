@@ -32,4 +32,6 @@ public interface PersistentList<E> {
   E get(int index);
 
   Iterator<E> iterator();
+
+  Iterator<E> iterator(int index);
 }

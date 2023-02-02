@@ -302,7 +302,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
                     <allowedImport>org.rocksdb.RocksDBException</allowedImport>
                   </allowedImports>
-                  <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                 </RestrictImports>
               </rules>
             </configuration>

@@ -24,6 +24,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.nio.file.Paths;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -47,7 +48,9 @@ import javax.annotation.Nonnull;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
@@ -72,7 +75,7 @@ public final class OmSnapshotManager implements AutoCloseable {
             .getStore()
             .getRocksDBCheckpointDiffer();
 
-    this.rocksDB = createRocksDbForSnapshotDiff();
+    this.rocksDB = createRocksDbForSnapshotDiff(ozoneManager.getConfiguration());
     this.snapshotDiffManager = new SnapshotDiffManager(rocksDB, differ);
 
     // size of lru cache
@@ -277,18 +280,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
-  private RocksDB createRocksDbForSnapshotDiff() {
-
+  private RocksDB createRocksDbForSnapshotDiff(OzoneConfiguration config) {
     final Options options = new Options().setCreateIfMissing(true);
 
-    // TODO: Temp DB dir for draft PR. Change it later.
-    final File dbDirPath = new File("/tmp");
-    if (!dbDirPath.mkdirs() && !dbDirPath.exists()) {
-      throw new IllegalArgumentException("Unable to create directory " +
-          dbDirPath);
-    }
+    final File dbDirPath =
+        ServerUtils.getDBPath(config, OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
 
-    String dbPath = Paths.get(dbDirPath.toString(), "snapshot.diff.db")
+    String dbPath = Paths.get(dbDirPath.toString(), OM_SNAPSHOT_DIFF_DB_NAME)
         .toFile()
         .getAbsolutePath();
 
