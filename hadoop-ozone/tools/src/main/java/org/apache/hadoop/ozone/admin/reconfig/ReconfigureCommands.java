@@ -15,10 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.ozone.admin.reconfig;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -33,26 +34,26 @@ import java.util.concurrent.Callable;
  */
 @Command(
     name = "reconfig",
-    description = "Dynamically reconfig OM without restarting server",
+    description = "Dynamically reconfigure server without restarting it",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        ReconfigureOMStartSubcommand.class, 
-        ReconfigureOMStatusSubcommand.class,
-        ReconfigureOMPropertiesSubcommand.class
+        ReconfigureStartSubcommand.class, 
+        ReconfigureStatusSubcommand.class,
+        ReconfigurePropertiesSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
-public class ReconfigureOMCommands implements Callable<Void>,
+public class ReconfigureCommands implements Callable<Void>,
     SubcommandWithParent {
 
   @CommandLine.ParentCommand
-  private OMAdmin parent;
+  private OzoneAdmin parent;
 
   @Spec
   private CommandSpec spec;
 
-  @CommandLine.Option(names = {"-address"},
-      description = "om node address: <ip:port> or <hostname:port>",
+  @CommandLine.Option(names = {"--address"},
+      description = "node address: <ip:port> or <hostname:port>",
       required = true)
   private String address;
 
@@ -68,7 +69,7 @@ public class ReconfigureOMCommands implements Callable<Void>,
 
   @Override
   public Class<?> getParentType() {
-    return OMAdmin.class;
+    return OzoneAdmin.class;
   }
 
 }

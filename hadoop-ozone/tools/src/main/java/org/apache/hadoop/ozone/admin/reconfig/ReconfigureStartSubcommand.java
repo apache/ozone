@@ -15,38 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.ozone.admin.reconfig;
 
-import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * Handler of ozone admin om reconfigure properties command.
+ * Handler of ozone admin reconfig start command.
  */
 @Command(
-    name = "properties",
-    description = "List reconfigurable properties",
+    name = "start",
+    description = "Start reconfig asynchronously",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReconfigureOMPropertiesSubcommand implements Callable<Void> {
+public class ReconfigureStartSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private ReconfigureOMCommands parent;
+  private ReconfigureCommands parent;
 
   @Override
   public Void call() throws Exception {
-    ReconfigureProtocol reconfigProxy = ReconfigureOMSubCommandUtil
-        .getSingleOMReconfigureProxy(parent.getAddress());
-    List<String> properties = reconfigProxy.listReconfigureProperties();
-    System.out.printf("OM Node [%s] Reconfigurable properties:%n",
+    ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
+        .getSingleNodeReconfigureProxy(parent.getAddress());
+    reconfigProxy.startReconfigure();
+    System.out.printf("Started reconfiguration task on node [%s].%n",
         parent.getAddress());
-    for (String name : properties) {
-      System.out.println(name);
-    }
     return null;
   }
 

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.ozone.admin.reconfig;
 
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil;
@@ -30,22 +30,22 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
- * Handler of ozone admin om reconfig status command.
+ * Handler of ozone admin reconfig status command.
  */
 @Command(
     name = "status",
     description = "Check reconfig status",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReconfigureOMStatusSubcommand implements Callable<Void> {
+public class ReconfigureStatusSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private ReconfigureOMCommands parent;
+  private ReconfigureCommands parent;
 
   @Override
   public Void call() throws Exception {
-    ReconfigureProtocol reconfigProxy = ReconfigureOMSubCommandUtil
-        .getSingleOMReconfigureProxy(parent.getAddress());
+    ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
+        .getSingleNodeReconfigureProxy(parent.getAddress());
     ReconfigurationTaskStatus status = reconfigProxy.getReconfigureStatus();
     System.out.printf("Reconfiguring status for node [%s]: ",
         parent.getAddress());
@@ -72,13 +72,13 @@ public class ReconfigureOMStatusSubcommand implements Callable<Void> {
         result : status.getStatus().entrySet()) {
       if (!result.getValue().isPresent()) {
         System.out.printf(
-            "SUCCESS: Changed OM property %s%n\tFrom: \"%s\"%n\tTo: \"%s\"%n",
+            "SUCCESS: Changed property %s%n\tFrom: \"%s\"%n\tTo: \"%s\"%n",
             result.getKey().prop, result.getKey().oldVal,
             result.getKey().newVal);
       } else {
         final String errorMsg = result.getValue().get();
         System.out.printf(
-            "FAILED: Change OM property %s%n\tFrom: \"%s\"%n\tTo: \"%s\"%n",
+            "FAILED: Change property %s%n\tFrom: \"%s\"%n\tTo: \"%s\"%n",
             result.getKey().prop, result.getKey().oldVal,
             result.getKey().newVal);
         System.out.println("\tError: " + errorMsg + ".");

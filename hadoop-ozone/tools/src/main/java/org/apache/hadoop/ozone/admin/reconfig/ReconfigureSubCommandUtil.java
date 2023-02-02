@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.admin.om;
+package org.apache.hadoop.ozone.admin.reconfig;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
@@ -29,13 +29,13 @@ import java.net.InetSocketAddress;
 /**
  * Reconfigure subcommand utils.
  */
-public final class ReconfigureOMSubCommandUtil {
+final class ReconfigureSubCommandUtil {
 
-  private ReconfigureOMSubCommandUtil() {
+  private ReconfigureSubCommandUtil() {
   }
 
-  public static ReconfigureProtocol getSingleOMReconfigureProxy(String address)
-      throws IOException {
+  public static ReconfigureProtocol getSingleNodeReconfigureProxy(
+      String address) throws IOException {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     InetSocketAddress nodeAddr = NetUtils.createSocketAddr(address);
