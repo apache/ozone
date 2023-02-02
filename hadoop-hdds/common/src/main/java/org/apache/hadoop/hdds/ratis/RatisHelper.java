@@ -47,7 +47,6 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
-import org.apache.ratis.datastream.SupportedDataStreamType;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
@@ -305,8 +304,6 @@ public final class RatisHelper {
   public static RaftProperties setRpcType(RaftProperties properties,
       RpcType rpcType) {
     RaftConfigKeys.Rpc.setType(properties, rpcType);
-    RaftConfigKeys.DataStream.setType(properties,
-        SupportedDataStreamType.NETTY);
     return properties;
   }
 
