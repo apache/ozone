@@ -3616,6 +3616,8 @@
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
+      This default value, in combination with hdds.secret.key.rotate.duration=1d, result in that 7 secret keys for the
+      last 7 days will are kept valid at any point of time.
     </description>
   </property>
   <property>
@@ -3632,7 +3634,9 @@
     <tag>SCM, SECURITY</tag>
     <description>
       The duration that SCM periodically checks if it's time to generate new symmetric secret keys.
-      This must be smaller than hdds.secret.key.rotate.duration.
+      This config has an impact on the practical correctness of secret key expiry and rotation period. For example,
+      if hdds.secret.key.rotate.duration=1d and hdds.secret.key.rotate.check.duration=10m, the actual key rotation
+      will happen each 1d +/- 10m.
     </description>
   </property>
   <property>
