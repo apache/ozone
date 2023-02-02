@@ -40,7 +40,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
-  private OmSnapshot fromSnapshot;
   private OmSnapshot nextSnapshot;
   private List<KeyValuePair> activeDBKeysList;
   private List<KeyValuePair> nextDBKeysList;

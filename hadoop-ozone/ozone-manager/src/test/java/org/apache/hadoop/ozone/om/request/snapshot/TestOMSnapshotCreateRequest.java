@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -185,7 +186,11 @@ public class TestOMSnapshotCreateRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
         volumeName, bucketName, snapshotName);
@@ -224,7 +229,11 @@ public class TestOMSnapshotCreateRequest {
 
   @Test
   public void testEntryExists() throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
         volumeName, bucketName, snapshotName);
