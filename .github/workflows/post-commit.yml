@@ -15,12 +15,13 @@
 name: build-branch
 on:
   pull_request:
-    types: [opened, ready_for_review, synchronize]
+    types: [opened, ready_for_review, synchronize, edited]
   push:
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   CI:
+    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     uses: ./.github/workflows/ci.yml
     secrets: inherit
