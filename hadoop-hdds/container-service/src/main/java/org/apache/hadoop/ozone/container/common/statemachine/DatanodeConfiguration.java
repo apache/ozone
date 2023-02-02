@@ -376,7 +376,7 @@ public class DatanodeConfiguration {
       defaultValue = "1MB",
       type = ConfigType.SIZE,
       tags = { DATANODE },
-      description = "Sst files with size smaller than threshold is a target."
+      description = "SST files smaller than this configuration will be auto compacted."
   )
   private long autoCompactionSmallSstFileSize = 1024 * 1024;
 
