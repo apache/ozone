@@ -540,7 +540,7 @@ public class BlockOutputStream extends OutputStream {
   /**
    * @param close whether the flush is happening as part of closing the stream
    */
-  void handleFlush(boolean close) throws IOException {
+  protected void handleFlush(boolean close) throws IOException {
     try {
       handleFlushInternal(close);
     } catch (ExecutionException e) {
@@ -559,7 +559,7 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  protected void handleFlushInternal(boolean close)
+  private void handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
@@ -763,7 +763,7 @@ public class BlockOutputStream extends OutputStream {
    * @param ex
    * @throws IOException
    */
-  protected void handleExecutionException(Exception ex) throws IOException {
+  private void handleExecutionException(Exception ex) throws IOException {
     setIoException(ex);
     adjustBuffersOnException();
     throw getIoException();
