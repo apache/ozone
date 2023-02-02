@@ -704,7 +704,7 @@ public class TestKeyValueContainer {
         if (volume == newVolume) {
           File folderToExport =
               folder.newFile(containerId + "_exported.tar.gz");
-          TarContainerPacker packer = new TarContainerPacker();
+          TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           //export the container
           try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
             container.exportContainerData(fos, packer);
@@ -731,7 +731,7 @@ public class TestKeyValueContainer {
         container.populatePathFields(scmId, hddsVolume);
         try (FileInputStream fis =
                  new FileInputStream(exportFiles.get(index))) {
-          TarContainerPacker packer = new TarContainerPacker();
+          TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           container.importContainerData(fis, packer);
           containerList.add(container);
         }
