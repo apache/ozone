@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyValuePair;
@@ -31,9 +32,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.
  */
+@CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
   private OmSnapshot fromSnapshot;
@@ -42,10 +46,9 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private List<KeyValuePair> nextDBKeysList;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
-       OmSnapshot omFromSnapshot, OmSnapshot omNextSnapshot,
-       List<KeyValuePair> activeDBKeysList, List<KeyValuePair> nextDBKeysList) {
+       OmSnapshot omNextSnapshot, List<KeyValuePair> activeDBKeysList,
+       List<KeyValuePair> nextDBKeysList) {
     super(omResponse);
-    this.fromSnapshot = omFromSnapshot;
     this.nextSnapshot = omNextSnapshot;
     this.activeDBKeysList = activeDBKeysList;
     this.nextDBKeysList = nextDBKeysList;

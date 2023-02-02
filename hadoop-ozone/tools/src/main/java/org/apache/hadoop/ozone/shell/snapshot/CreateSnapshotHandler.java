@@ -27,17 +27,16 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * ozone snapshot create.
+ * ozone sh snapshot create.
  */
 @CommandLine.Command(name = "create",
-    description = "create snapshot")
+    description = "Create a snapshot")
 public class CreateSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
   private BucketUri snapshotPath;
 
-
-  @CommandLine.Parameters(description = "optional snapshot name",
+  @CommandLine.Parameters(description = "Snapshot name (Optional)",
       index = "1", arity = "0..1")
   private String snapshotName;
 
@@ -56,8 +55,8 @@ public class CreateSnapshotHandler extends Handler {
     String newName = client.getObjectStore()
         .createSnapshot(volumeName, bucketName, snapshotName);
     if (isVerbose()) {
-      out().format("created snapshot '%s/%s %s'.%n", volumeName, bucketName,
-          newName);
+      out().format("Created snapshot '%s' under '%s/%s'.%n",
+          newName, volumeName, bucketName);
     }
   }
 }

@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -146,9 +147,9 @@ public class TestOzoneContainerWithTLS {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME, "1s",
         TimeUnit.MILLISECONDS);
 
-    caClient = new CertificateClientTestImpl(conf, false);
+    caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
-        expiryTime, caClient.getCertificate().getSerialNumber().toString());
+        expiryTime);
   }
 
   @Test(expected = CertificateExpiredException.class)
@@ -271,7 +272,7 @@ public class TestOzoneContainerWithTLS {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);
       Path file = downloader.getContainerDataFromReplicas(
-          containerId, sourceDatanodes);
+          containerId, sourceDatanodes, null, NO_COMPRESSION);
       downloader.close();
       Assert.assertNull(file);
       Assert.assertTrue(logCapture.getOutput().contains(
@@ -308,7 +309,8 @@ public class TestOzoneContainerWithTLS {
       for (Long cId : containerIdList) {
         downloader = new SimpleContainerDownloader(conf, caClient);
         try {
-          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes);
+          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
+                  null, NO_COMPRESSION);
           downloader.close();
           Assert.assertNotNull(file);
         } finally {

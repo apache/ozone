@@ -60,9 +60,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     SnapshotMoveDeletedKeysRequest moveDeletedKeysRequest =
         getOmRequest().getSnapshotMoveDeletedKeysRequest();
 
-    SnapshotInfo fromSnapshot = SnapshotInfo
-        .getFromProtobuf(moveDeletedKeysRequest.getFromSnapshot());
-
     // If there is no Non-Deleted Snapshot move the
     // keys to Active Object Store.
     SnapshotInfo nextSnapshot = null;
@@ -80,11 +77,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OmSnapshot omNextSnapshot = null;
 
     try {
-      omFromSnapshot = (OmSnapshot) omSnapshotManager
-          .checkForSnapshot(fromSnapshot.getVolumeName(),
-              fromSnapshot.getBucketName(),
-              getSnapshotPrefix(fromSnapshot.getName()));
-
       if (nextSnapshot != null) {
         omNextSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(nextSnapshot.getVolumeName(),
@@ -101,7 +93,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
     OMClientResponse omClientResponse =
         new OMSnapshotMoveDeletedKeysResponse(omResponse.build(),
-        omFromSnapshot, omNextSnapshot, activeDBKeysList, nextDBKeysList);
+        omNextSnapshot, activeDBKeysList, nextDBKeysList);
 
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);

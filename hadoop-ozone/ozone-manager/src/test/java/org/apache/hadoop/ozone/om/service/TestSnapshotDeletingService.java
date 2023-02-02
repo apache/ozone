@@ -227,7 +227,7 @@ public class TestSnapshotDeletingService {
       } catch (IOException e) {
         e.printStackTrace();
       }
-      return null;
+      return false;
     }, 1000, 10000);
   }
 }

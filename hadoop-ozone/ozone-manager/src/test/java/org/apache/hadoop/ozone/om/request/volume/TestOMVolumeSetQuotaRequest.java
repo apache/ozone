@@ -204,4 +204,27 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         contains("Total buckets quota in this volume " +
             "should not be greater than volume quota"));
   }
+
+  @Test
+  public void testValidateAndUpdateCacheQuotaSetFailureWhenBucketQuotaNotSet()
+      throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName,
+        bucketName, omMetadataManager);
+    OMRequest originalRequest =
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
+            5 * GB, 100L);
+
+    OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
+        new OMVolumeSetQuotaRequest(originalRequest);
+
+    OMClientResponse omClientResponse = omVolumeSetQuotaRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
+  }
 }

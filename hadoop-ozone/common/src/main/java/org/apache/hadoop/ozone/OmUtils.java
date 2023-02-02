@@ -325,6 +325,7 @@ public final class OmUtils {
     case TenantRevokeAdmin:
     case SetRangerServiceVersion:
     case CreateSnapshot:
+    case DeleteSnapshot:
     case SnapshotMoveDeletedKeys:
       return false;
     default:

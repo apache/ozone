@@ -163,6 +163,7 @@ public class TestFailureHandlingByClient {
   }
 
   @Test
+  @Flaky("HDDS-7877")
   public void testBlockWritesWithDnFailures() throws Exception {
     startCluster();
     String keyName = UUID.randomUUID().toString();
@@ -268,7 +269,7 @@ public class TestFailureHandlingByClient {
             .getContainer(containerId1)).getContainerData();
     try (DBHandle containerDb1 = BlockUtils.getDB(containerData1, conf)) {
       BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
-          containerData1.blockKey(locationList.get(0).getBlockID()
+          containerData1.getBlockKey(locationList.get(0).getBlockID()
               .getLocalID()));
       // The first Block could have 1 or 2 chunkSize of data
       int block1NumChunks = blockData1.getChunks().size();
@@ -287,7 +288,7 @@ public class TestFailureHandlingByClient {
             .getContainer(containerId2)).getContainerData();
     try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
       BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
-          containerData2.blockKey(locationList.get(1).getBlockID()
+          containerData2.getBlockKey(locationList.get(1).getBlockID()
               .getLocalID()));
       // The second Block should have 0.5 chunkSize of data
       Assert.assertEquals(block2ExpectedChunkCount,
@@ -352,6 +353,7 @@ public class TestFailureHandlingByClient {
 
 
   @Test
+  @Flaky("HDDS-7878")
   public void testContainerExclusionWithClosedContainerException()
       throws Exception {
     startCluster();

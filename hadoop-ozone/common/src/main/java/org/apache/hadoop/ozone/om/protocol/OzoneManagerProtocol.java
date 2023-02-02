@@ -249,6 +249,20 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /**
+   * Synchronize the key length. This will make the change from the client
+   * visible. The client is identified by the clientID.
+   *
+   * @param args the key to commit
+   * @param clientID the client identification
+   * @throws IOException
+   */
+  default void hsyncKey(OmKeyArgs args, long clientID)
+          throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+            "this to be implemented, as write requests use a new approach.");
+  }
+
 
   /**
    * Allocate a new block, it is assumed that the client is having an open key
@@ -644,6 +658,19 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   default String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
+   * Delete snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  default void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

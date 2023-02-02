@@ -24,9 +24,15 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.AfterClass;
@@ -35,6 +41,7 @@ import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -44,6 +51,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 
 /**
@@ -156,5 +165,57 @@ public class TestHSync {
       }
     }
     Assertions.assertEquals(data.length, offset);
+  }
+
+  @Test
+  public void testStreamCapability() throws Exception {
+    final String rootPath = String.format("%s://%s/",
+            OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+            + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file");
+
+    FileSystem fs = FileSystem.get(conf);
+    final FSDataOutputStream os = fs.create(file, true);
+    // Verify output stream supports hsync() and hflush().
+    assertTrue("KeyOutputStream should support hflush()!",
+            os.hasCapability(StreamCapabilities.HFLUSH));
+    assertTrue("KeyOutputStream should support hsync()!",
+            os.hasCapability(StreamCapabilities.HSYNC));
+    os.close();
+  }
+
+  @Test
+  public void testECStreamCapability() throws Exception {
+    // create EC bucket to be used by OzoneFileSystem
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    builder.setDefaultReplicationConfig(
+            new DefaultReplicationConfig(
+                    new ECReplicationConfig(
+                            3, 2, ECReplicationConfig.EcCodec.RS, 1024)));
+    BucketArgs omBucketArgs = builder.build();
+    String ecBucket = UUID.randomUUID().toString();
+    TestDataUtil.createBucket(cluster, bucket.getVolumeName(), omBucketArgs,
+            ecBucket);
+    String ecUri = String.format("%s://%s.%s/",
+            OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, ecUri);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+            + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file");
+
+    FileSystem fs = FileSystem.get(conf);
+    final FSDataOutputStream os = fs.create(file, true);
+    // Verify output stream supports hsync() and hflush().
+    assertFalse("ECKeyOutputStream should not support hflush()!",
+            os.hasCapability(StreamCapabilities.HFLUSH));
+    assertFalse("ECKeyOutputStream should not support hsync()!",
+            os.hasCapability(StreamCapabilities.HSYNC));
+    os.close();
   }
 }

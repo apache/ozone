@@ -195,29 +195,6 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheWithOnlyVolumeQuotaExceeded()
-      throws Exception {
-    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
-        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
-        false, true);
-
-    // add volume and create bucket with quota limit 1
-    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager, 1L);
-    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-
-    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
-    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
-
-    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
-    OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
-    Assert.assertTrue(omFileCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-  }
-
-  @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,

@@ -26,6 +26,7 @@ public enum OMAction implements AuditAction {
   ALLOCATE_BLOCK,
   ALLOCATE_KEY,
   COMMIT_KEY,
+  HSYNC,
   CREATE_VOLUME,
   CREATE_BUCKET,
   DELETE_VOLUME,
@@ -89,8 +90,10 @@ public enum OMAction implements AuditAction {
   TENANT_ASSIGN_ADMIN,
   TENANT_REVOKE_ADMIN,
   TENANT_LIST_USER,
+
   CREATE_SNAPSHOT,
   LIST_SNAPSHOT,
+  DELETE_SNAPSHOT,
   SNAPSHOT_MOVE_DELETED_KEYS;
 
   @Override

@@ -952,6 +952,25 @@ public class RpcClient implements ClientProtocol {
         bucketName, snapshotName);
   }
 
+  /**
+   * Delete Snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  @Override
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(snapshotName),
+        "snapshot name can't be null or empty.");
+    ozoneManagerClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+  }
+
   @Override
   public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
                                          String fromSnapshot, String toSnapshot)

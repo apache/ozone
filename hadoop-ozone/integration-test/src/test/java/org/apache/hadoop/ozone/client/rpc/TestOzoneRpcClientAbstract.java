@@ -345,12 +345,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = null;
     store.createVolume(volumeName);
 
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "10GB", "10000"));
     store.getVolume(volumeName).createBucket(bucketName);
-    volume = store.getVolume(volumeName);
-    Assert.assertEquals(10 * GB, volume.getQuotaInBytes());
-    Assert.assertEquals(10000L, volume.getQuotaInNamespace());
     OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInBytes());
     Assert.assertEquals(OzoneConsts.QUOTA_RESET, bucket.getQuotaInNamespace());
@@ -368,6 +363,12 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket ozoneBucket2 =
         store.getVolume(volumeName).getBucket(bucketName2);
     Assert.assertEquals(1024L, ozoneBucket2.getQuotaInBytes());
+
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+        "10GB", "10000"));
+    volume = store.getVolume(volumeName);
+    Assert.assertEquals(10 * GB, volume.getQuotaInBytes());
+    Assert.assertEquals(10000L, volume.getQuotaInNamespace());
 
     LambdaTestUtils.intercept(IOException.class, "Can not clear bucket" +
         " spaceQuota because volume spaceQuota is not cleared.",
@@ -407,8 +408,6 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        "10GB", "1000"));
     store.getVolume(volumeName).createBucket(bucketName);
 
     // test bucket set quota 0
@@ -954,14 +953,15 @@ public abstract class TestOzoneRpcClientAbstract {
     volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
+    bucket.setQuota(OzoneQuota.parseQuota("1 B", "100"));
 
     // Test bucket quota.
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota(Long.MAX_VALUE + " B", "100"));
     bucketName = UUID.randomUUID().toString();
     volume.createBucket(bucketName);
     bucket = volume.getBucket(bucketName);
     bucket.setQuota(OzoneQuota.parseQuota("1 B", "100"));
+    store.getVolume(volumeName).setQuota(
+        OzoneQuota.parseQuota(Long.MAX_VALUE + " B", "100"));
 
     // Test bucket quota: write key.
     // The remaining quota does not satisfy a block size, so the write fails.
@@ -1310,8 +1310,8 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(0L, volumeWithLinkedBucket.getUsedNamespace());
 
     // Reset volume quota, the original usedNamespace needs to remain the same
-    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
-        100 + " GB", "100"));
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseNameSpaceQuota(
+        "100"));
     Assert.assertEquals(1L,
         store.getVolume(volumeName).getUsedNamespace());
 
@@ -1889,7 +1889,8 @@ public abstract class TestOzoneRpcClientAbstract {
         KeyValueContainerData cData =
             (KeyValueContainerData) container.getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
-          db.getStore().getMetadataTable().put(cData.bcsIdKey(), newBCSID);
+          db.getStore().getMetadataTable().put(cData.getBcsIdKey(),
+              newBCSID);
         }
         container.updateBlockCommitSequenceId(newBCSID);
         index++;
@@ -2115,6 +2116,10 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(toKeyName, key.getName());
   }
 
+  /**
+   * Test of the deprecated rename keys API, which only works on object store
+   * or legacy buckets.
+   */
   @Test
   public void testKeysRename() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -2128,7 +2133,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String value = "sample value";
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, keyName1, value);
     createTestKey(bucket, keyName2, value);
@@ -2147,6 +2153,10 @@ public abstract class TestOzoneRpcClientAbstract {
     assertKeyRenamedEx(bucket, keyName2);
   }
 
+  /**
+   * Legacy test for the keys rename API, which is deprecated and only
+   * supported for object store and legacy bucket layout types.
+   */
   @Test
   public void testKeysRenameFail() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -2160,7 +2170,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String value = "sample value";
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Create only keyName1 to test the partial failure of renameKeys.
@@ -2698,7 +2709,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
+    // TODO: HDDS-3402. Files/dirs in FSO buckets currently do not inherit
+    //  parent ACLs.
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     // Add ACL on Bucket
@@ -3668,20 +3682,23 @@ public abstract class TestOzoneRpcClientAbstract {
     sb.append(part1);
     sb.append(part2);
     sb.append(part3);
-    Assert.assertEquals(sb.toString(), new String(fileContent, UTF_8));
+    Assertions.assertEquals(sb.toString(), new String(fileContent, UTF_8));
 
-    String ozoneKey = ozoneManager.getMetadataManager()
-        .getOzoneKey(bucket.getVolumeName(), bucket.getName(), keyName);
-    OmKeyInfo omKeyInfo =
-        ozoneManager.getMetadataManager().getKeyTable(getBucketLayout())
-            .get(ozoneKey);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(keyName)
+        .build();
+    OmKeyInfo omKeyInfo = ozoneManager.getKeyManager().getKeyInfo(keyArgs,
+        UUID.randomUUID().toString());
 
     OmKeyLocationInfoGroup latestVersionLocations =
         omKeyInfo.getLatestVersionLocations();
-    Assert.assertEquals(true, latestVersionLocations.isMultipartKey());
+    Assertions.assertNotNull(latestVersionLocations);
+    Assertions.assertTrue(latestVersionLocations.isMultipartKey());
     latestVersionLocations.getBlocksLatestVersionOnly()
         .forEach(omKeyLocationInfo ->
-            Assert.assertTrue(omKeyLocationInfo.getPartNumber() != -1));
+            Assertions.assertTrue(omKeyLocationInfo.getPartNumber() != -1));
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
@@ -3773,7 +3790,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
+    // This test uses object store layout to make manual key modifications
+    // easier.
     BucketArgs args = BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
         .addMetadata(OzoneConsts.GDPR_FLAG, "true").build();
     volume.createBucket(bucketName, args);
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -3978,9 +3998,11 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
-    // Bucket created with versioning false.
-    volume.createBucket(bucketName,
-        BucketArgs.newBuilder().setVersioning(versioning).build());
+    // This test inspects RocksDB delete table to check for versioning
+    // information. This is easier to do with object store keys.
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+        .setVersioning(versioning)
+        .setBucketLayout(BucketLayout.OBJECT_STORE).build());
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     OzoneOutputStream out = bucket.createKey(keyName,

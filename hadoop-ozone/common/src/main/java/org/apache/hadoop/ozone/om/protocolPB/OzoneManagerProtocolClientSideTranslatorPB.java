@@ -84,6 +84,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -92,6 +93,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
@@ -740,8 +742,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getAllocateBlockResponse();
     return OmKeyLocationInfo.getFromProtobuf(resp.getKeyLocation());
   }
+
+  @Override
+  public void hsyncKey(OmKeyArgs args, long clientId)
+          throws IOException {
+    updateKey(args, clientId, true);
+  }
+
   @Override
   public void commitKey(OmKeyArgs args, long clientId)
+          throws IOException {
+    updateKey(args, clientId, false);
+  }
+
+  private void updateKey(OmKeyArgs args, long clientId, boolean hsync)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
@@ -769,6 +783,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     req.setKeyArgs(keyArgsBuilder.build());
     req.setClientID(clientId);
+    req.setHsync(hsync);
 
 
     OMRequest omRequest = createOMRequest(Type.CommitKey)
@@ -1108,9 +1123,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       String bucketName, String snapshotName)
       throws IOException {
 
-    final OzoneManagerProtocolProtos.CreateSnapshotRequest.Builder
-        requestBuilder =
-        OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
+    final CreateSnapshotRequest.Builder requestBuilder =
+        CreateSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName);
     if (!StringUtils.isBlank(snapshotName)) {
@@ -1127,6 +1141,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return snapshotInfo.getName();
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName)
+      throws IOException {
+
+    final DeleteSnapshotRequest.Builder requestBuilder =
+        DeleteSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotName(snapshotName);
+
+    final OMRequest omRequest = createOMRequest(Type.DeleteSnapshot)
+        .setDeleteSnapshotRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
       throws IOException {
