@@ -50,6 +50,7 @@ class SendContainerRequestHandler
   private OutputStream output;
   private HddsVolume volume;
   private Path path;
+  private CopyContainerCompression compression;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -74,6 +75,7 @@ class SendContainerRequestHandler
         Files.createDirectories(dir);
         path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
         output = Files.newOutputStream(path);
+        compression = CopyContainerCompression.fromProto(req.getCompression());
       }
 
       assertSame(containerId, req.getContainerID(), "containerID");
@@ -105,7 +107,7 @@ class SendContainerRequestHandler
     closeOutput();
 
     try {
-      importer.importContainer(containerId, path, volume);
+      importer.importContainer(containerId, path, volume, compression);
       LOG.info("Imported container {}", containerId);
       responseObserver.onNext(SendContainerResponse.newBuilder().build());
       responseObserver.onCompleted();
