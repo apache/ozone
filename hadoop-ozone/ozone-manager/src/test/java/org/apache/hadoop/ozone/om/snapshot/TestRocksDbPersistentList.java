@@ -24,15 +24,15 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,43 +42,44 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 public class TestRocksDbPersistentList {
   private ColumnFamilyHandle columnFamily;
-  private RocksDB rocksDB;
+  private ManagedRocksDB db;
   private File file;
   private CodecRegistry codecRegistry;
 
   @BeforeEach
   public void init() throws RocksDBException, IOException {
-    Options options = new Options().setCreateIfMissing(true);
+    ManagedOptions options = new ManagedOptions();
+    options.setCreateIfMissing(true);
     file = new File("./test-persistent-list");
     if (!file.mkdirs() && !file.exists()) {
       throw new IllegalArgumentException("Unable to create directory " +
           file);
     }
 
-    rocksDB = RocksDB.open(options,
+    db = ManagedRocksDB.open(options,
         Paths.get(file.toString(), "rocks.db").toFile().getAbsolutePath());
 
     codecRegistry = new CodecRegistry();
     codecRegistry.addCodec(Integer.class, new IntegerCodec());
 
-    columnFamily = rocksDB.createColumnFamily(
+    columnFamily = db.get().createColumnFamily(
         new ColumnFamilyDescriptor(
             codecRegistry.asRawData("testList"),
-            new ColumnFamilyOptions()));
+            new ManagedColumnFamilyOptions()));
   }
 
   @AfterEach
   public void teardown() throws RocksDBException {
     deleteDirectory(file);
 
-    if (columnFamily != null && rocksDB != null) {
-      rocksDB.dropColumnFamily(columnFamily);
+    if (columnFamily != null && db != null) {
+      db.get().dropColumnFamily(columnFamily);
     }
     if (columnFamily != null) {
       columnFamily.close();
     }
-    if (rocksDB != null) {
-      rocksDB.close();
+    if (db != null) {
+      db.close();
     }
   }
 
@@ -86,7 +87,7 @@ public class TestRocksDbPersistentList {
   @ParameterizedTest
   public void testRocksDBPersistentList(int index) {
     PersistentList<String> persistentList = new RocksDbPersistentList<>(
-        rocksDB,
+        db,
         columnFamily,
         codecRegistry,
         String.class

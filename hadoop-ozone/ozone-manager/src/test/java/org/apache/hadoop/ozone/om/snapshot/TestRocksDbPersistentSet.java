@@ -25,14 +25,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,49 +43,50 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  */
 public class TestRocksDbPersistentSet {
   private ColumnFamilyHandle columnFamily;
-  private RocksDB rocksDB;
+  private ManagedRocksDB db;
   private File file;
   private CodecRegistry codecRegistry;
 
   @BeforeEach
   public void init() throws RocksDBException, IOException {
-    Options options = new Options().setCreateIfMissing(true);
+    ManagedOptions options = new ManagedOptions();
+    options.setCreateIfMissing(true);
     file = new File("./test-persistent-set");
     if (!file.mkdirs() && !file.exists()) {
       throw new IllegalArgumentException("Unable to create directory " +
           file);
     }
 
-    rocksDB = RocksDB.open(options,
+    db = ManagedRocksDB.open(options,
         Paths.get(file.toString(), "rocks.db").toFile().getAbsolutePath());
 
     codecRegistry = new CodecRegistry();
 
-    columnFamily = rocksDB.createColumnFamily(
+    columnFamily = db.get().createColumnFamily(
         new ColumnFamilyDescriptor(
             codecRegistry.asRawData("testSet"),
-            new ColumnFamilyOptions()));
+            new ManagedColumnFamilyOptions()));
   }
 
   @AfterEach
   public void teardown() throws RocksDBException {
     deleteDirectory(file);
 
-    if (columnFamily != null && rocksDB != null) {
-      rocksDB.dropColumnFamily(columnFamily);
+    if (columnFamily != null && db != null) {
+      db.get().dropColumnFamily(columnFamily);
     }
     if (columnFamily != null) {
       columnFamily.close();
     }
-    if (rocksDB != null) {
-      rocksDB.close();
+    if (db != null) {
+      db.close();
     }
   }
 
   @Test
   public void testRocksDBPersistentSetForString() {
     PersistentSet<String> persistentSet = new RocksDbPersistentSet<>(
-        rocksDB,
+        db,
         columnFamily,
         codecRegistry,
         String.class
@@ -108,7 +109,7 @@ public class TestRocksDbPersistentSet {
   @Test
   public void testRocksDBPersistentSetForLong() {
     PersistentSet<Long> persistentSet = new RocksDbPersistentSet<>(
-        rocksDB,
+        db,
         columnFamily,
         codecRegistry,
         Long.class

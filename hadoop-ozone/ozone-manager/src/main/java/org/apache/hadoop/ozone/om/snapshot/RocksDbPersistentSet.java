@@ -21,22 +21,22 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.io.IOException;
 import java.util.Iterator;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 
 /**
  * Persistent set backed by RocksDB.
  */
 public class RocksDbPersistentSet<E> implements PersistentSet<E> {
-  private final RocksDB db;
+  private final ManagedRocksDB db;
   private final ColumnFamilyHandle columnFamilyHandle;
   private final CodecRegistry codecRegistry;
   private final Class<E> entryType;
   private final byte[] emptyByteArray = new byte[0];
 
-  public RocksDbPersistentSet(RocksDB db,
+  public RocksDbPersistentSet(ManagedRocksDB db,
                               ColumnFamilyHandle columnFamilyHandle,
                               CodecRegistry codecRegistry,
                               Class<E> entryType) {
@@ -52,7 +52,7 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
     try {
       byte[] rawKey = codecRegistry.asRawData(entry);
       byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
-      db.put(columnFamilyHandle, rawKey, rawValue);
+      db.get().put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
       // TODO:: Fail gracefully.
       throw new RuntimeException(exception);
@@ -61,19 +61,20 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
 
   @Override
   public Iterator<E> iterator() {
-    RocksIterator rocksIterator = db.newIterator(columnFamilyHandle);
-    rocksIterator.seekToFirst();
+    ManagedRocksIterator managedRocksIterator =
+        new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
+    managedRocksIterator.get().seekToFirst();
 
     return new Iterator<E>() {
       @Override
       public boolean hasNext() {
-        return rocksIterator.isValid();
+        return managedRocksIterator.get().isValid();
       }
 
       @Override
       public E next() {
-        byte[] rawKey = rocksIterator.key();
-        rocksIterator.next();
+        byte[] rawKey = managedRocksIterator.get().key();
+        managedRocksIterator.get().next();
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {

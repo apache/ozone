@@ -21,23 +21,23 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.io.IOException;
 import java.util.Iterator;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 
 /**
  * Persistent list backed by RocksDB.
  */
 public class RocksDbPersistentList<E> implements PersistentList<E> {
 
-  private final RocksDB db;
+  private final ManagedRocksDB db;
   private final ColumnFamilyHandle columnFamilyHandle;
   private final CodecRegistry codecRegistry;
   private final Class<E> entryType;
   private int currentIndex;
 
-  public RocksDbPersistentList(RocksDB db,
+  public RocksDbPersistentList(ManagedRocksDB db,
                                ColumnFamilyHandle columnFamilyHandle,
                                CodecRegistry codecRegistry,
                                Class<E> entryType) {
@@ -53,7 +53,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
     try {
       byte[] rawKey = codecRegistry.asRawData(currentIndex++);
       byte[] rawValue = codecRegistry.asRawData(entry);
-      db.put(columnFamilyHandle, rawKey, rawValue);
+      db.get().put(columnFamilyHandle, rawKey, rawValue);
       return true;
     } catch (IOException | RocksDBException exception) {
       // TODO:: Fail gracefully.
@@ -71,7 +71,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
   public E get(int index) {
     try {
       byte[] rawKey = codecRegistry.asRawData(index);
-      byte[] rawValue = db.get(columnFamilyHandle, rawKey);
+      byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, entryType);
     } catch (IOException | RocksDBException exception) {
       // TODO:: Fail gracefully.
@@ -81,19 +81,20 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
 
   @Override
   public Iterator<E> iterator() {
-    RocksIterator rocksIterator = db.newIterator(columnFamilyHandle);
-    rocksIterator.seekToFirst();
+    ManagedRocksIterator managedRocksIterator
+        = new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
+    managedRocksIterator.get().seekToFirst();
 
     return new Iterator<E>() {
       @Override
       public boolean hasNext() {
-        return rocksIterator.isValid();
+        return managedRocksIterator.get().isValid();
       }
 
       @Override
       public E next() {
-        byte[] rawKey = rocksIterator.value();
-        rocksIterator.next();
+        byte[] rawKey = managedRocksIterator.get().value();
+        managedRocksIterator.get().next();
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
@@ -114,19 +115,20 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       throw new RuntimeException(e);
     }
 
-    RocksIterator rocksIterator = db.newIterator(columnFamilyHandle);
-    rocksIterator.seek(target);
+    ManagedRocksIterator managedRocksIterator =
+        new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
+    managedRocksIterator.get().seek(target);
 
     return new Iterator<E>() {
       @Override
       public boolean hasNext() {
-        return rocksIterator.isValid();
+        return managedRocksIterator.get().isValid();
       }
 
       @Override
       public E next() {
-        byte[] rawKey = rocksIterator.value();
-        rocksIterator.next();
+        byte[] rawKey = managedRocksIterator.get().value();
+        managedRocksIterator.get().next();
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {

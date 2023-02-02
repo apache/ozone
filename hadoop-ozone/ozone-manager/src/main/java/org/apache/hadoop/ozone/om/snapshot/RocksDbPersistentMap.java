@@ -20,21 +20,21 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 /**
  * Persistent map backed by RocksDB.
  */
 public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
-  private final RocksDB db;
+  private final ManagedRocksDB db;
   private final ColumnFamilyHandle columnFamilyHandle;
   private final CodecRegistry codecRegistry;
   private final Class<K> keyType;
   private final Class<V> valueType;
 
-  public RocksDbPersistentMap(RocksDB db,
+  public RocksDbPersistentMap(ManagedRocksDB db,
                               ColumnFamilyHandle columnFamilyHandle,
                               CodecRegistry codecRegistry,
                               Class<K> keyType,
@@ -50,7 +50,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   public V get(K key) {
     try {
       byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = db.get(columnFamilyHandle, rawKey);
+      byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, valueType);
     } catch (IOException | RocksDBException exception) {
       // TODO:: Fail gracefully.
@@ -63,7 +63,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
     try {
       byte[] rawKey = codecRegistry.asRawData(key);
       byte[] rawValue = codecRegistry.asRawData(value);
-      db.put(columnFamilyHandle, rawKey, rawValue);
+      db.get().put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
       // TODO:: Fail gracefully.
       throw new RuntimeException(exception);

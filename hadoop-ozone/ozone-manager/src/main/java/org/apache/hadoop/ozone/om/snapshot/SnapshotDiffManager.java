@@ -23,6 +23,8 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -43,8 +45,6 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.jetbrains.annotations.NotNull;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,11 +69,12 @@ public class SnapshotDiffManager {
   private static final Logger LOG =
           LoggerFactory.getLogger(SnapshotDiffManager.class);
   private final RocksDBCheckpointDiffer differ;
-  private final RocksDB rocksDB;
+  private final ManagedRocksDB db;
   private final CodecRegistry codecRegistry;
 
-  public SnapshotDiffManager(RocksDB rocksDB, RocksDBCheckpointDiffer differ) {
-    this.rocksDB = rocksDB;
+  public SnapshotDiffManager(ManagedRocksDB db,
+                             RocksDBCheckpointDiffer differ) {
+    this.db = db;
     this.differ = differ;
     this.codecRegistry = new CodecRegistry();
 
@@ -144,50 +145,50 @@ public class SnapshotDiffManager {
     try {
       // RequestId is prepended to column family name to make it unique
       // for request.
-      fromSnapshotColumnFamily = rocksDB.createColumnFamily(
+      fromSnapshotColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-fromSnapshot"),
-              new ColumnFamilyOptions()));
-      toSnapshotColumnFamily = rocksDB.createColumnFamily(
+              new ManagedColumnFamilyOptions()));
+      toSnapshotColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-toSnapshot"),
-              new ColumnFamilyOptions()));
-      objectIDsColumnFamily = rocksDB.createColumnFamily(
+              new ManagedColumnFamilyOptions()));
+      objectIDsColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-objectIDs"),
-              new ColumnFamilyOptions()));
-      diffReportColumnFamily = rocksDB.createColumnFamily(
+              new ManagedColumnFamilyOptions()));
+      diffReportColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-diffReport"),
-              new ColumnFamilyOptions()));
-      /*
-       * The reason for having ObjectID to KeyName mapping instead of OmKeyInfo
-       * is to reduce the memory footprint.
-       */
+              new ManagedColumnFamilyOptions()));
+
+      // ObjectId to keyName map to keep key info for fromSnapshot.
+      // Keeping keyName instead of OmKeyInfo to reduce the memory footprint.
       final PersistentMap<Long, String> oldObjIdToKeyPersistentMap =
-          new RocksDbPersistentMap<>(rocksDB,
+          new RocksDbPersistentMap<>(db,
               fromSnapshotColumnFamily,
               codecRegistry,
               Long.class,
               String.class);
 
-      // Long --> const. length
-      // String --> var. length "/dir1/dir2/dir3/dir4/dir5/key1"
+      // ObjectId to keyName map to keep key info for toSnapshot.
       final PersistentMap<Long, String> newObjIdToKeyPersistentMap =
-          new RocksDbPersistentMap<>(rocksDB,
+          new RocksDbPersistentMap<>(db,
               toSnapshotColumnFamily,
               codecRegistry,
               Long.class,
               String.class);
 
+      // Set of unique objectId between fromSnapshot and toSnapshot.
       final PersistentSet<Long> objectIDsToCheckMap =
-          new RocksDbPersistentSet<>(rocksDB,
+          new RocksDbPersistentSet<>(db,
               objectIDsColumnFamily,
               codecRegistry,
               Long.class);
 
+      // Final diff report.
       final PersistentList<DiffReportEntry> diffReport =
-          new RocksDbPersistentList<>(rocksDB,
+          new RocksDbPersistentList<>(db,
               diffReportColumnFamily,
               codecRegistry,
               DiffReportEntry.class);
@@ -250,22 +251,22 @@ public class SnapshotDiffManager {
       // Drop diff report table only if there was any failure in
       // diff computation.
       if (diffReportColumnFamily != null) {
-        rocksDB.dropColumnFamily(diffReportColumnFamily);
+        db.get().dropColumnFamily(diffReportColumnFamily);
         diffReportColumnFamily.close();
       }
       throw exception;
     } finally {
       // Clean up: drop the intermediate column family and close them.
       if (fromSnapshotColumnFamily != null) {
-        rocksDB.dropColumnFamily(fromSnapshotColumnFamily);
+        db.get().dropColumnFamily(fromSnapshotColumnFamily);
         fromSnapshotColumnFamily.close();
       }
       if (toSnapshotColumnFamily != null) {
-        rocksDB.dropColumnFamily(toSnapshotColumnFamily);
+        db.get().dropColumnFamily(toSnapshotColumnFamily);
         toSnapshotColumnFamily.close();
       }
       if (objectIDsColumnFamily != null) {
-        rocksDB.dropColumnFamily(objectIDsColumnFamily);
+        db.get().dropColumnFamily(objectIDsColumnFamily);
         objectIDsColumnFamily.close();
       }
     }
@@ -402,22 +403,22 @@ public class SnapshotDiffManager {
     try {
       // RequestId is prepended to column family name to make it unique
       // for request.
-      deleteDiffColumnFamily = rocksDB.createColumnFamily(
+      deleteDiffColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-deleteDiff"),
-              new ColumnFamilyOptions()));
-      renameDiffColumnFamily = rocksDB.createColumnFamily(
+              new ManagedColumnFamilyOptions()));
+      renameDiffColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-renameDiff"),
-              new ColumnFamilyOptions()));
-      createDiffColumnFamily = rocksDB.createColumnFamily(
+              new ManagedColumnFamilyOptions()));
+      createDiffColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-createDiff"),
-              new ColumnFamilyOptions()));
-      modifyDiffColumnFamily = rocksDB.createColumnFamily(
+              new ManagedColumnFamilyOptions()));
+      modifyDiffColumnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData(requestId + "-modifyDiff"),
-              new ColumnFamilyOptions()));
+              new ManagedColumnFamilyOptions()));
 
       final PersistentList<DiffReportEntry> deleteDiffs =
           createDiffReportPersistentList(deleteDiffColumnFamily);
@@ -505,19 +506,19 @@ public class SnapshotDiffManager {
       diffReport.addAll(modifyDiffs);
     } finally {
       if (deleteDiffColumnFamily != null) {
-        rocksDB.dropColumnFamily(deleteDiffColumnFamily);
+        db.get().dropColumnFamily(deleteDiffColumnFamily);
         deleteDiffColumnFamily.close();
       }
       if (renameDiffColumnFamily != null) {
-        rocksDB.dropColumnFamily(renameDiffColumnFamily);
+        db.get().dropColumnFamily(renameDiffColumnFamily);
         renameDiffColumnFamily.close();
       }
       if (createDiffColumnFamily != null) {
-        rocksDB.dropColumnFamily(createDiffColumnFamily);
+        db.get().dropColumnFamily(createDiffColumnFamily);
         createDiffColumnFamily.close();
       }
       if (modifyDiffColumnFamily != null) {
-        rocksDB.dropColumnFamily(modifyDiffColumnFamily);
+        db.get().dropColumnFamily(modifyDiffColumnFamily);
         modifyDiffColumnFamily.close();
       }
     }
@@ -526,7 +527,7 @@ public class SnapshotDiffManager {
   private PersistentList<DiffReportEntry> createDiffReportPersistentList(
       ColumnFamilyHandle columnFamilyHandle
   ) {
-    return new RocksDbPersistentList<>(rocksDB,
+    return new RocksDbPersistentList<>(db,
         columnFamilyHandle,
         codecRegistry,
         DiffReportEntry.class);

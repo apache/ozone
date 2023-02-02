@@ -23,29 +23,27 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutionException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-
-import java.io.IOException;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
@@ -64,7 +62,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final OzoneManager ozoneManager;
   private final SnapshotDiffManager snapshotDiffManager;
   private final LoadingCache<String, OmSnapshot> snapshotCache;
-  private final RocksDB rocksDB;
+  private final ManagedRocksDB snapshotDiffDb;
 
   OmSnapshotManager(OzoneManager ozoneManager) {
     this.ozoneManager = ozoneManager;
@@ -75,9 +73,9 @@ public final class OmSnapshotManager implements AutoCloseable {
             .getStore()
             .getRocksDBCheckpointDiffer();
 
-    this.rocksDB =
-        createRocksDbForSnapshotDiff(ozoneManager.getConfiguration());
-    this.snapshotDiffManager = new SnapshotDiffManager(rocksDB, differ);
+    this.snapshotDiffDb =
+        createDbForSnapshotDiff(ozoneManager.getConfiguration());
+    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ);
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
@@ -281,8 +279,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
-  private RocksDB createRocksDbForSnapshotDiff(OzoneConfiguration config) {
-    final Options options = new Options().setCreateIfMissing(true);
+  private ManagedRocksDB createDbForSnapshotDiff(OzoneConfiguration config) {
+    final ManagedOptions managedOptions = new ManagedOptions();
+    managedOptions.setCreateIfMissing(true);
 
     final File dbDirPath =
         ServerUtils.getDBPath(config, OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
@@ -292,7 +291,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getAbsolutePath();
 
     try {
-      return RocksDB.open(options, dbPath);
+      return ManagedRocksDB.open(managedOptions, dbPath);
     } catch (RocksDBException exception) {
       // TODO: Fail gracefully.
       throw new RuntimeException(exception);
@@ -301,8 +300,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
-    if (rocksDB != null) {
-      rocksDB.close();
+    if (snapshotDiffDb != null) {
+      snapshotDiffDb.close();
     }
   }
 }
