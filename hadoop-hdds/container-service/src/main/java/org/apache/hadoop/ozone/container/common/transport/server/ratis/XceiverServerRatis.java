@@ -77,10 +77,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
-import org.apache.ratis.datastream.SupportedDataStreamType;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
@@ -233,8 +231,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT,
           OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
-    RaftConfigKeys.DataStream.setType(properties,
-        SupportedDataStreamType.NETTY);
+    RatisHelper.enableNettyStreaming(properties);
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     int dataStreamAsyncRequestThreadPoolSize =
         conf.getObject(DatanodeRatisServerConfig.class)
