@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.CompactRangeOptions;
 
 /**
- * Managed IngestExternalFileOptions.
+ * Managed CompactRangeOptions.
  */
 public class ManagedCompactRangeOptions extends CompactRangeOptions {
 
