@@ -249,6 +249,20 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /**
+   * Synchronize the key length. This will make the change from the client
+   * visible. The client is identified by the clientID.
+   *
+   * @param args the key to commit
+   * @param clientID the client identification
+   * @throws IOException
+   */
+  default void hsyncKey(OmKeyArgs args, long clientID)
+          throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+            "this to be implemented, as write requests use a new approach.");
+  }
+
 
   /**
    * Allocate a new block, it is assumed that the client is having an open key
