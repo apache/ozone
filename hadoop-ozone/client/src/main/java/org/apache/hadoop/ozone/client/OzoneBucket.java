@@ -1421,9 +1421,12 @@ public class OzoneBucket extends WithMetadata {
       addedKeyPrefix = true;
 
       // not required to addKeyPrefix
-      // case-1) if keyPrefix is null or empty
+      // case-1) if keyPrefix is null/empty/just contains snapshot indicator
+      // (The snapshot indicator is the null prefix equivalent for snapshot
+      //  reads.)
       // case-2) if startKey is not null or empty
-      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey)) {
+      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey) ||
+          OmUtils.isBucketSnapshotIndicator(keyPrefix)) {
         return;
       }
 

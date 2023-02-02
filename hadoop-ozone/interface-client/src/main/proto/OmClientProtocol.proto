@@ -122,8 +122,14 @@ enum Type {
 
   SetRangerServiceVersion = 107;
   RangerBGSync = 109;
+
   EchoRPC = 110;
   GetKeyInfo = 111;
+
+  CreateSnapshot = 112;
+  ListSnapshot = 113;
+  SnapshotDiff = 114;
+  DeleteSnapshot = 115;
 }
 
 message OMRequest {
@@ -228,8 +234,15 @@ message OMRequest {
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
   optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
+
   optional EchoRPCRequest                   EchoRPCRequest                 = 110;
   optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
+
+  optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 113;
+  optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
+  optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
+
 }
 
 message OMResponse {
@@ -327,8 +340,14 @@ message OMResponse {
 
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
   optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
+
   optional EchoRPCResponse                   EchoRPCResponse               = 110;
   optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
+
+  optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
+  optional ListSnapshotResponse              ListSnapshotResponse          = 113;
+  optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
+  optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
 }
 
 enum Status {
@@ -439,6 +458,10 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
+    INVALID_SNAPSHOT_ERROR = 87;
+
+    CONTAINS_SNAPSHOT = 88;
 }
 
 /**
@@ -719,6 +742,34 @@ message PrefixInfo {
     optional uint64 objectID = 4;
     optional uint64 updateID = 5;
 }
+
+/**
+ * SnapshotStatus - snapshot states.
+ * Snapshot in one of : active, deleted, or reclaimed state
+ */
+enum SnapshotStatusProto {
+  SNAPSHOT_ACTIVE = 1;
+  SNAPSHOT_DELETED = 2;
+  SNAPSHOT_RECLAIMED = 3;
+}
+
+/**
+ * SnapshotInfo table entry for Bucket/Volume snapshot metadata
+ */
+message SnapshotInfo {
+  optional string snapshotID = 1;
+  optional string name = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
+  optional SnapshotStatusProto snapshotStatus = 5;
+  optional uint64 creationTime = 6;
+  optional uint64 deletionTime = 7;
+  optional string pathPreviousSnapshotID = 8;
+  optional string globalPreviousSnapshotID = 9;
+  optional string snapshotPath = 10;
+  optional string checkpointDir = 11;
+  optional int64 dbTxSequenceNumber = 12;
+ }
 
 message OzoneObj {
   enum ObjectType {
@@ -1613,6 +1664,32 @@ message SetRangerServiceVersionRequest {
     required uint64 rangerServiceVersion = 1;
 }
 
+message CreateSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional string snapshotId = 4;
+}
+
+message ListSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+}
+
+message SnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+}
+
+message DeleteSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional uint64 deletionTime = 4;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1648,6 +1725,42 @@ message CreateTenantResponse {
 }
 
 message SetRangerServiceVersionResponse {
+}
+
+message CreateSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
+}
+
+message ListSnapshotResponse {
+  repeated SnapshotInfo snapshotInfo = 1;
+}
+
+message SnapshotDiffResponse {
+  optional SnapshotDiffReportProto snapshotDiffReport = 1;
+}
+
+message DeleteSnapshotResponse {
+
+}
+
+message SnapshotDiffReportProto {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+  repeated DiffReportEntryProto diffList = 5;
+}
+
+message DiffReportEntryProto {
+  enum DiffTypeProto {
+    CREATE = 1;
+    MODIFY = 2;
+    DELETE= 3;
+    RENAME = 4;
+  }
+  optional DiffTypeProto diffType = 1;
+  optional string sourcePath = 2;
+  optional string targetPath = 3;
 }
 
 message DeleteTenantResponse {
