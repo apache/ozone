@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockitoAnnotations;
@@ -89,19 +88,6 @@ public class TestAbstractLayoutVersionManager {
     assertThrowsExactly(IOException.class,
         () -> versionManager.init(3, getTestLayoutFeatures(2)),
         "Cannot initialize VersionManager.");
-  }
-
-  @Test
-  public void testInitFailsIfLayoutFeaturesVersionsAreNotStrictlyIncreasing() {
-    assertThrowsExactly(IOException.class,
-        () -> versionManager.init(3, getDecreasingLayoutFeatures(3)),
-        "Cannot initialize VersionManager."
-    );
-
-    assertThrowsExactly(IOException.class,
-        () -> versionManager.init(3, getNonUniqueLayoutFeatures()),
-        "Cannot initialize VersionManager."
-    );
   }
 
   @Test
@@ -209,33 +195,6 @@ public class TestAbstractLayoutVersionManager {
         }
       };
     }
-    return lfs;
-  }
-
-  private LayoutFeature[] getDecreasingLayoutFeatures(int num) {
-    LayoutFeature[] lfs = getTestLayoutFeatures(num);
-    ArrayUtils.reverse(lfs);
-    return lfs;
-  }
-
-  private LayoutFeature[] getNonUniqueLayoutFeatures() {
-    LayoutFeature[] lfs = getTestLayoutFeatures(3);
-    lfs[1] = new LayoutFeature() {
-      @Override
-      public String name() {
-        return lfs[1].name();
-      }
-
-      @Override
-      public int layoutVersion() {
-        return 0;
-      }
-
-      @Override
-      public String description() {
-        return lfs[1].description();
-      }
-    };
     return lfs;
   }
 

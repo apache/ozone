@@ -62,7 +62,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private ObjectName mBean;
 
   protected void init(int version, T[] lfs) throws IOException {
-    validateLayoutFeatureVersions(lfs);
     lock.writeLock().lock();
     try {
       metadataLayoutVersion = version;
@@ -156,24 +155,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       return metadataLayoutVersion > softwareLayoutVersion;
     } finally {
       lock.readLock().unlock();
-    }
-  }
-
-  private void validateLayoutFeatureVersions(T[] lfs) throws IOException {
-    if (lfs.length <= 1) {
-      return;
-    }
-    for (int i = 0; i < lfs.length - 1; i++) {
-      if (lfs[i + 1].layoutVersion() <= lfs[i].layoutVersion()) {
-        throw new IOException(
-          String.format(
-            "Cannot initialize VersionManager. " +
-              "Layout features' versions (%d) and (%d) are not " +
-              "strictly increasing",
-            lfs[i].layoutVersion(), lfs[i + 1].layoutVersion()
-          )
-        );
-      }
     }
   }
 
