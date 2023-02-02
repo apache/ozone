@@ -209,7 +209,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons.lang.version>2.6</commons.lang.version>
     <zookeeper.version>3.5.6</zookeeper.version>
     <snappy.java.version>1.1.8.2</snappy.java.version>
-      
+
     <compile-testing.version>0.19</compile-testing.version>
     <errorprone-annotations.version>2.2.0</errorprone-annotations.version>
     <guava.version>31.1-jre</guava.version>
@@ -299,6 +299,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
+    <awaitility.version>4.2.0</awaitility.version>
   </properties>
 
 
@@ -1479,6 +1480,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${sqlite.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.awaitility</groupId>
+        <artifactId>awaitility</artifactId>
+        <version>${awaitility.version}</version>
+      </dependency>
+      <dependency>
         <groupId>jakarta.activation</groupId>
         <artifactId>jakarta.activation-api</artifactId>
         <version>${jakarta.activation.version}</version>
@@ -1785,6 +1791,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <allowedImport>org.rocksdb.StatsLevel</allowedImport>
                       <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
                       <allowedImport>org.rocksdb.TickerType</allowedImport>
+                      <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
 
                       <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
                       <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
