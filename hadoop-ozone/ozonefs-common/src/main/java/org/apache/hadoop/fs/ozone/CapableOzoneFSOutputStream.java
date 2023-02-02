@@ -50,8 +50,7 @@ public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
       switch (StringUtils.toLowerCase(capability)) {
       case StreamCapabilities.HFLUSH:
       case StreamCapabilities.HSYNC:
-        // TODO: switch to true after HDDS-7688
-        return false;
+        return true;
       default:
         return false;
       }
