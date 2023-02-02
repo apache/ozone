@@ -1178,24 +1178,19 @@ public class KeyManagerImpl implements KeyManager {
       String keyName, BucketLayout layout) throws IOException {
     OmKeyInfo fakeDirKeyInfo = null;
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
+    String targetKey = OzoneFSUtils.addTrailingSlashIfNeeded(
+        metadataManager.getOzoneKey(volume, bucket, keyName));
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
-      Table.KeyValue<String, OmKeyInfo> keyValue =
-          keyTblItr
-              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+      Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.seek(targetKey);
 
-      if (keyValue != null) {
-        OmKeyInfo omKeyInfo = keyValue.getValue();
-        if (omKeyInfo.getVolumeName().equals(volume)
-            && omKeyInfo.getBucketName().equals(bucket)) {
-          Path fullPath = Paths.get(omKeyInfo.getKeyName());
-          Path subPath = Paths.get(dirKey);
-          if (fullPath.startsWith(subPath)) {
-            // create fake directory
-            fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
-          }
-        }
+      // HDDS-7871: RocksIterator#seek() may position at the key
+      // past the target, we should check the full dbKeyName.
+      // For example, seeking "/vol1/bucket1/dir1/"
+      // may return "/vol1/bucket2/dir1/key1"
+      if (keyValue != null && keyValue.getKey().startsWith(targetKey)) {
+        // create fake directory
+        fakeDirKeyInfo = createDirectoryKey(keyValue.getValue(), dirKey);
       }
     }
 
