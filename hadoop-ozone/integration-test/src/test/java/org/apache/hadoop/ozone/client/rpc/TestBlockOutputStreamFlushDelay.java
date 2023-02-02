@@ -42,23 +42,18 @@ import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests TestBlockOutputStreamFlushDelay class.
  */
+@Timeout(300)
 public class TestBlockOutputStreamFlushDelay {
 
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -78,7 +73,7 @@ public class TestBlockOutputStreamFlushDelay {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
@@ -116,7 +111,7 @@ public class TestBlockOutputStreamFlushDelay {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
