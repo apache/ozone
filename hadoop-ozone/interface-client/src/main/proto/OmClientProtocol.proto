@@ -129,6 +129,7 @@ enum Type {
   CreateSnapshot = 112;
   ListSnapshot = 113;
   SnapshotDiff = 114;
+  SnapshotMoveDeletedKeys = 115;
 }
 
 message OMRequest {
@@ -240,6 +241,7 @@ message OMRequest {
   optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 115;
 
 }
 
@@ -345,6 +347,7 @@ message OMResponse {
   optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
   optional ListSnapshotResponse              ListSnapshotResponse          = 113;
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
+  optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 115;
 }
 
 enum Status {
@@ -1680,6 +1683,18 @@ message SnapshotDiffRequest {
   required string toSnapshot = 4;
 }
 
+message SnapshotMoveDeletedKeysRequest {
+  required SnapshotInfo fromSnapshot = 1;
+  optional SnapshotInfo nextSnapshot = 2;
+  repeated KeyValuePair activeDBKeys = 3;
+  repeated KeyValuePair nextDBKeys = 4;
+}
+
+message KeyValuePair {
+  required string key = 1;
+  repeated KeyInfo keyInfos = 2;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1728,6 +1743,10 @@ message ListSnapshotResponse {
 
 message SnapshotDiffResponse {
   required SnapshotDiffReportProto snapshotDiffReport = 1;
+}
+
+message SnapshotMoveDeletedKeysResponse {
+
 }
 
 message SnapshotDiffReportProto {

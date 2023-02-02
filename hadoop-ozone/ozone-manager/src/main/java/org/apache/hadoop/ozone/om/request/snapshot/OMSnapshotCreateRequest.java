@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -114,7 +115,9 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    
+    SnapshotChainManager snapshotChainManager =
+        ozoneManager.getSnapshotChainManager();
+
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
@@ -145,6 +148,26 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           ((RDBStore) omMetadataManager.getStore()).getDb()
               .getLatestSequenceNumber();
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
+
+      // Set previous path and global snapshot
+      String latestPathSnapshot =
+          snapshotChainManager.getLatestPathSnapshot(snapshotPath);
+      String latestGlobalSnapshot =
+          snapshotChainManager.getLatestGlobalSnapshot();
+
+      if (latestPathSnapshot == null || latestPathSnapshot.isEmpty()) {
+        snapshotInfo.setPathPreviousSnapshotID("");
+      } else {
+        snapshotInfo.setPathPreviousSnapshotID(latestPathSnapshot);
+      }
+
+      if (latestGlobalSnapshot == null || latestGlobalSnapshot.isEmpty()) {
+        snapshotInfo.setGlobalPreviousSnapshotID("");
+      } else {
+        snapshotInfo.setGlobalPreviousSnapshotID(latestGlobalSnapshot);
+      }
+
+      snapshotChainManager.addSnapshot(snapshotInfo);
 
       omMetadataManager.getSnapshotInfoTable()
           .addCacheEntry(new CacheKey<>(key),

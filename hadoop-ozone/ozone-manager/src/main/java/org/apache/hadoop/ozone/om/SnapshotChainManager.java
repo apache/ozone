@@ -49,6 +49,7 @@ public class SnapshotChainManager {
       snapshotChainPath;
   private Map<String, String> latestPathSnapshotID;
   private String latestGlobalSnapshotID;
+  private Map<String, String> snapshotPathToKey;
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotChainManager.class);
 
@@ -57,6 +58,7 @@ public class SnapshotChainManager {
     snapshotChainGlobal = new LinkedHashMap<>();
     snapshotChainPath = new HashMap<>();
     latestPathSnapshotID = new HashMap<>();
+    snapshotPathToKey = new HashMap<>();
     latestGlobalSnapshotID = null;
     loadFromSnapshotInfoTable(metadataManager);
   }
@@ -91,8 +93,8 @@ public class SnapshotChainManager {
   };
 
   private void addSnapshotPath(String snapshotPath,
-                               String snapshotID,
-                               String prevPathID) throws IOException {
+      String snapshotID, String prevPathID, String snapTableKey)
+      throws IOException {
     // set previous snapshotID to null if it is "" for
     // internal in-mem structure
     if (prevPathID != null && prevPathID.isEmpty()) {
@@ -131,6 +133,7 @@ public class SnapshotChainManager {
             new SnapshotChainInfo(snapshotID, prevPathID, null));
 
     // set state variable latestPath snapshot entry to this snapshotID
+    snapshotPathToKey.put(snapshotID, snapTableKey);
     latestPathSnapshotID.put(snapshotPath, snapshotID);
   };
 
@@ -246,7 +249,7 @@ public class SnapshotChainManager {
     return status;
   }
 
-  private void loadFromSnapshotInfoTable(OMMetadataManager metadataManager)
+  public void loadFromSnapshotInfoTable(OMMetadataManager metadataManager)
           throws IOException {
     // read from snapshotInfo table to populate
     // snapshot chains - both global and local path
@@ -275,7 +278,8 @@ public class SnapshotChainManager {
         sinfo.getGlobalPreviousSnapshotID());
     addSnapshotPath(sinfo.getSnapshotPath(),
         sinfo.getSnapshotID(),
-        sinfo.getPathPreviousSnapshotID());
+        sinfo.getPathPreviousSnapshotID(),
+        sinfo.getTableKey());
   }
 
   /**
@@ -501,6 +505,10 @@ public class SnapshotChainManager {
         .get(snapshotPath)
         .get(snapshotID)
         .getPreviousSnapshotID();
+  }
+
+  public String getTableKey(String snapshotPath) {
+    return snapshotPathToKey.get(snapshotPath);
   }
 
   @VisibleForTesting

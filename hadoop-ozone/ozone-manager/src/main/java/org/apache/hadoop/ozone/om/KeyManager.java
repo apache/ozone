@@ -248,4 +248,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   BackgroundService getSnapshotSstFilteringService();
+
+  /**
+   * Returns the instance of Snapshot Deleting service.
+   * @return Background service.
+   */
+  BackgroundService getSnapshotDeletingService();
 }
