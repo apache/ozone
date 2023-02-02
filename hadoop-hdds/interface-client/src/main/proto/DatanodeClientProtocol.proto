@@ -507,6 +507,7 @@ message SendContainerRequest {
   required uint64 offset = 2;
   required bytes data = 3;
   optional int64 checksum = 4;
+  optional CopyContainerCompressProto compression = 5;
 }
 
 message SendContainerResponse {

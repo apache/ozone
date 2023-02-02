@@ -1283,6 +1283,7 @@ message ListKeysResponse {
 message CommitKeyRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
+    optional bool hsync = 3;
 }
 
 message CommitKeyResponse {

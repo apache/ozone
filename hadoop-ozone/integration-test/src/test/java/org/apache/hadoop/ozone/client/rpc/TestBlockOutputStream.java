@@ -44,23 +44,20 @@ import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.junit.AfterClass;
+
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests BlockOutputStream class.
  */
+@Timeout(300)
 public class TestBlockOutputStream {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -80,7 +77,7 @@ public class TestBlockOutputStream {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
@@ -124,7 +121,7 @@ public class TestBlockOutputStream {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -326,6 +323,7 @@ public class TestBlockOutputStream {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testMultiChunkWrite() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -421,6 +419,7 @@ public class TestBlockOutputStream {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testMultiChunkWrite2() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -497,6 +496,7 @@ public class TestBlockOutputStream {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testFullBufferCondition() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
