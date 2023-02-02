@@ -128,7 +128,7 @@ class TestContainerReplication {
     DatanodeStateMachine datanodeStateMachine =
         cluster.getHddsDatanode(dn).getDatanodeStateMachine();
     final ReplicationSupervisor supervisor =
-       datanodeStateMachine.getSupervisor();
+        datanodeStateMachine.getSupervisor();
     final long replicationCount = supervisor.getReplicationSuccessCount();
     StateContext context = datanodeStateMachine.getContext();
     context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
