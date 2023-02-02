@@ -120,4 +120,16 @@
         <name>fs.contract.supports-unix-permissions</name>
         <value>false</value>
     </property>
+
+    <property>
+        <name>fs.contract.supports-hsync</name>
+        <value>false</value>
+        <!-- TODO: switch to true after HDDS-7688 -->
+    </property>
+
+    <property>
+        <name>fs.contract.supports-hflush</name>
+        <value>false</value>
+        <!-- TODO: switch to true after HDDS-7688 -->
+    </property>
 </configuration>

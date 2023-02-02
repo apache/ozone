@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -39,8 +38,8 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
 
   public RatisMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, NodeManager nodeManager) {
-    super(containerPlacement, conf, nodeManager);
+          ConfigurationSource conf, NodeManager nodeManager, boolean push) {
+    super(containerPlacement, conf, nodeManager, push);
   }
 
   @Override
@@ -70,9 +69,8 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
   }
 
   @Override
-  protected ReplicateContainerCommand getReplicateCommand(
-          ContainerInfo containerInfo, ContainerReplica replica) {
-    return new ReplicateContainerCommand(containerInfo.getContainerID(),
-            Collections.singletonList(replica.getDatanodeDetails()));
+  protected ReplicateContainerCommand updateReplicateCommand(
+          ReplicateContainerCommand command, ContainerReplica replica) {
+    return command;
   }
 }

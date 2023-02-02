@@ -46,6 +46,6 @@ public class LegacyRatisContainerReplicaCount extends
 
   @Override
   protected int healthyReplicaCountAdapter() {
-    return 0;
+    return -getMisMatchedReplicaCount();
   }
 }

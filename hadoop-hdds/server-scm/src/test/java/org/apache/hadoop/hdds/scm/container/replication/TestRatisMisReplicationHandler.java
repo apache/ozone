@@ -173,6 +173,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
   protected MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           NodeManager nodeManager) {
-    return new RatisMisReplicationHandler(placementPolicy, conf, nodeManager);
+    return new RatisMisReplicationHandler(placementPolicy, conf, nodeManager,
+        false);
   }
 }

@@ -231,7 +231,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
   private class MockTokenManager extends ShortLivedTokenSecretManager<T> {
 
     MockTokenManager(SecurityConfig conf) {
-      super(conf, TimeUnit.HOURS.toMillis(1), CERT_ID, LOG);
+      super(conf, TimeUnit.HOURS.toMillis(1), LOG);
     }
 
     @Override

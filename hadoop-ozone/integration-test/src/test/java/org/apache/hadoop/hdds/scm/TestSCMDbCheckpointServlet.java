@@ -131,7 +131,7 @@ public class TestSCMDbCheckpointServlet {
           Matchers.anyString());
 
       tempFile = File.createTempFile("testDoGet_" + System
-          .currentTimeMillis(), ".tar.gz");
+          .currentTimeMillis(), ".tar");
 
       FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
       when(responseMock.getOutputStream()).thenReturn(

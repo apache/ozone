@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -106,6 +107,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
@@ -286,9 +289,19 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setGetKeyInfoResponse(
             getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
         break;
+      case ListSnapshot:
+        OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
+            getSnapshots(request.getListSnapshotRequest());
+        responseBuilder.setListSnapshotResponse(listSnapshotResponse);
+        break;
+      case SnapshotDiff:
+        SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
+            request.getSnapshotDiffRequest());
+        responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
+        break;
       case EchoRPC:
         EchoRPCResponse echoRPCResponse =
-                echoRPC(request.getEchoRPCRequest());
+            echoRPC(request.getEchoRPCRequest());
         responseBuilder.setEchoRPCResponse(echoRPCResponse);
       default:
         responseBuilder.setSuccess(false);
@@ -1197,15 +1210,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl.getS3VolumeContext().getProtobuf();
   }
 
+  private SnapshotDiffResponse snapshotDiff(
+      SnapshotDiffRequest snapshotDiffRequest) throws IOException {
+    return SnapshotDiffResponse.newBuilder().setSnapshotDiffReport(
+        impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
+            snapshotDiffRequest.getBucketName(),
+            snapshotDiffRequest.getFromSnapshot(),
+            snapshotDiffRequest.getToSnapshot()).toProtobuf()).build();
+  }
+
+
   public OzoneManager getOzoneManager() {
     return impl;
   }
 
   private EchoRPCResponse echoRPC(EchoRPCRequest req) {
-    EchoRPCResponse.Builder builder = 
+    EchoRPCResponse.Builder builder =
             EchoRPCResponse.newBuilder();
 
-    byte[] payloadBytes = new byte[0];    
+    byte[] payloadBytes = new byte[0];
     int payloadRespSize = Math.min(
             req.getPayloadSizeResp()
                     * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
@@ -1216,4 +1239,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  private OzoneManagerProtocolProtos.ListSnapshotResponse getSnapshots(
+      OzoneManagerProtocolProtos.ListSnapshotRequest request)
+      throws IOException {
+    List<SnapshotInfo> snapshotInfos = impl.listSnapshot(
+        request.getVolumeName(), request.getBucketName());
+    List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList =
+        snapshotInfos.stream().map(SnapshotInfo::getProtobuf)
+            .collect(Collectors.toList());
+    return OzoneManagerProtocolProtos.ListSnapshotResponse.newBuilder()
+        .addAllSnapshotInfo(snapshotInfoList).build();
+  }
 }
