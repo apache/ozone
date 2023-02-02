@@ -39,9 +39,11 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
@@ -319,6 +321,7 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testMultiChunkWrite() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -414,6 +417,7 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testMultiChunkWrite2() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -490,6 +494,7 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testFullBufferCondition() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
