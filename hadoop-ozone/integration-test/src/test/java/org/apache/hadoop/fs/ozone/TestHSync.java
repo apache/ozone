@@ -134,7 +134,7 @@ public class TestHSync {
     final byte[] data = new byte[1 << 20];
     ThreadLocalRandom.current().nextBytes(data);
 
-    try (final FSDataOutputStream stream = fs.create(file, true)) {
+    try (FSDataOutputStream stream = fs.create(file, true)) {
       stream.write(data);
       stream.hsync();
     }
@@ -167,7 +167,7 @@ public class TestHSync {
     final Path file = new Path(dir, "file");
 
     try (FileSystem fs = FileSystem.get(CONF);
-         final FSDataOutputStream os = fs.create(file, true)) {
+         FSDataOutputStream os = fs.create(file, true)) {
       // Verify output stream supports hsync() and hflush().
       assertTrue(os.hasCapability(StreamCapabilities.HFLUSH),
           "KeyOutputStream should support hflush()!");
@@ -199,7 +199,7 @@ public class TestHSync {
     final Path file = new Path(dir, "file");
 
     try (FileSystem fs = FileSystem.get(CONF);
-         final FSDataOutputStream os = fs.create(file, true)) {
+         FSDataOutputStream os = fs.create(file, true)) {
       // Verify output stream supports hsync() and hflush().
       assertFalse(os.hasCapability(StreamCapabilities.HFLUSH),
           "ECKeyOutputStream should not support hflush()!");
