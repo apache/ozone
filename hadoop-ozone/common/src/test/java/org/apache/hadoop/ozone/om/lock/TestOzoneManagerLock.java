@@ -265,7 +265,8 @@ public class TestOzoneManagerLock {
     if (resource == OzoneManagerLock.Resource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString()};
-    } else if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+    } else if ((resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) ||
+        (resource == OzoneManagerLock.Resource.SNAPSHOT_LOCK)) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString(), UUID.randomUUID().toString()};
     } else {
@@ -284,12 +285,16 @@ public class TestOzoneManagerLock {
       return OzoneManagerLockUtil.generateBucketLockName(resources[0],
           resources[1]);
     } else if (resources.length == 3 &&
+        resource == OzoneManagerLock.Resource.SNAPSHOT_LOCK) {
+      return OzoneManagerLockUtil.generateSnapshotLockName(resources[0],
+          resources[1], resources[2]);
+    } else if (resources.length == 3 &&
         resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
       return OzoneManagerLockUtil.generateKeyPathLockName(resources[0],
           resources[1], resources[2]);
     } else {
       throw new IllegalArgumentException("acquire lock is supported on single" +
-          " resource for all locks except for resource bucket");
+          " resource for all locks except for resource bucket/snapshot");
     }
   }
 
