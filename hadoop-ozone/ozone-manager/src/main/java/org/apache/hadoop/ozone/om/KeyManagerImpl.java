@@ -1186,12 +1186,15 @@ public class KeyManagerImpl implements KeyManager {
               .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
 
       if (keyValue != null) {
-        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
-        Path subPath = Paths.get(dirKey);
         OmKeyInfo omKeyInfo = keyValue.getValue();
-        if (fullPath.startsWith(subPath)) {
-          // create fake directory
-          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+        if (omKeyInfo.getVolumeName().equals(volume)
+            && omKeyInfo.getBucketName().equals(bucket)) {
+          Path fullPath = Paths.get(omKeyInfo.getKeyName());
+          Path subPath = Paths.get(dirKey);
+          if (fullPath.startsWith(subPath)) {
+            // create fake directory
+            fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+          }
         }
       }
     }

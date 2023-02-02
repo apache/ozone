@@ -159,6 +159,7 @@ public class TestKeyManagerImpl {
   private static long scmBlockSize;
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
+  private static final String BUCKET2_NAME = "bucket2";
   private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
@@ -223,6 +224,7 @@ public class TestKeyManagerImpl {
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME, false);
+    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
     createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
   }
 
@@ -1349,6 +1351,51 @@ public class TestKeyManagerImpl {
     ozoneFileStatus = keyManager.getFileStatus(keyArgs);
     Assert.assertEquals(fileName, ozoneFileStatus.getKeyInfo().getFileName());
     Assert.assertTrue(ozoneFileStatus.isFile());
+  }
+
+  @Test
+  public void testGetFileStatusWithFakeDirForHDDS7871() throws IOException {
+    String dirName = "foo2";
+    String fileName = "bar2";
+    String keyName1 = "foo1";
+    // keyName2 = "foo2/bar2"
+    String keyName2 = dirName + OZONE_URI_DELIMITER + fileName;
+    OzoneFileStatus ozoneFileStatus;
+
+    // create a key "foo1" in bucket1
+    OmKeyArgs keyArgs = createBuilder(BUCKET_NAME).setKeyName(keyName1).build();
+    OpenKeySession keySession = writeClient.openKey(keyArgs);
+    keyArgs.setLocationInfoList(
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
+    writeClient.commitKey(keyArgs, keySession.getId());
+
+    // create a key "foo2/bar2" in bucket2
+    keyArgs = createBuilder(BUCKET2_NAME).setKeyName(keyName2).build();
+    keySession = writeClient.createFile(keyArgs, true, true);
+    keyArgs.setLocationInfoList(
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
+    writeClient.commitKey(keyArgs, keySession.getId());
+
+    // Verify the following dbKeys in key table:
+    // 1. "volume1/bucket1/foo1"
+    // 2. "volume1/bucket2/foo2/bar2"
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName1)));
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
+
+    // get a non-existing "foo2" from bucket1, RocksIter#seek() will find the
+    // 2nd dbKey "volume1/bucket2/foo2/bar2", which is not belong to bucket1.
+    keyArgs = createBuilder(BUCKET_NAME).setKeyName(dirName).build();
+    OmKeyArgs finalKeyArgs = keyArgs;
+    Assert.assertThrows(OMException.class, () -> keyManager.getFileStatus(
+        finalKeyArgs));
+
+    // get a non-existing "foo2" from bucket2 should return a fake key.
+    keyArgs = createBuilder(BUCKET2_NAME).setKeyName(dirName).build();
+    ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+    Assert.assertEquals(dirName, ozoneFileStatus.getKeyInfo().getFileName());
+    Assert.assertTrue(ozoneFileStatus.isDirectory());
   }
 
   @Test
