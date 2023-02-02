@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -163,15 +164,10 @@ public class RatisOverReplicationHandler
 
     // retain one replica per unique origin datanode if the container is not
     // closed
-    final Map<UUID, ContainerReplica> uniqueReplicas =
-        new LinkedHashMap<>();
     if (replicaCount.getContainer().getState() !=
         HddsProtos.LifeCycleState.CLOSED) {
-      eligibleReplicas.forEach(r -> uniqueReplicas
-          .putIfAbsent(r.getOriginDatanodeId(), r));
-
-      // note that this preserves order of the List
-      eligibleReplicas.removeAll(uniqueReplicas.values());
+      saveReplicasWithUniqueOrigins(eligibleReplicas,
+          replicaCount.getContainer());
     }
 
     Set<DatanodeDetails> pendingDeletion = new HashSet<>();
@@ -190,6 +186,46 @@ public class RatisOverReplicationHandler
             pendingDeletion.contains(replica.getDatanodeDetails()));
 
     return eligibleReplicas;
+  }
+
+  /**
+   * This method will remove the replicas that need to be saved from the
+   * specified list, so the remaining replicas are eligible to be deleted.
+   * Removes one replica per unique origin node UUID. Prefers saving healthy
+   * replicas over UNHEALTHY ones. Maintains order of the specified replicas
+   * list.
+   *
+   * @param eligibleReplicas List of replicas that are eligible to be deleted
+   * and from which replicas with unique origin node ID need to be saved
+   * @param container Container which should not be CLOSED. This method is
+   * irrelevant for CLOSED containers
+   */
+  private void saveReplicasWithUniqueOrigins(
+      List<ContainerReplica> eligibleReplicas,
+      ContainerInfo container) {
+    final Map<UUID, ContainerReplica> uniqueOrigins = new LinkedHashMap<>();
+    eligibleReplicas.stream()
+        // get replicas with state that matches container state
+        .filter(r -> ReplicationManager.compareState(
+            container.getState(), r.getState()))
+        .forEach(r -> uniqueOrigins
+            .putIfAbsent(r.getOriginDatanodeId(), r));
+
+    /*
+     Now that we've checked healthy replicas, see if some unhealthy replicas
+     need to be saved. For example, in the case of {QUASI_CLOSED,
+     QUASI_CLOSED, QUASI_CLOSED, UNHEALTHY}, if both the first and last
+     replicas have the same origin node ID (which is unique), we prefer
+     saving the QUASI_CLOSED replica and deleting the UNHEALTHY one.
+     */
+    for (ContainerReplica replica : eligibleReplicas) {
+      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        uniqueOrigins.putIfAbsent(replica.getOriginDatanodeId(), replica);
+      }
+    }
+
+    // note that this preserves order of the List
+    eligibleReplicas.removeAll(uniqueOrigins.values());
   }
 
   /**
