@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.snapshot.SnapshotHandler;
+import org.apache.hadoop.ozone.shell.snapshot.BucketSnapshotHandler;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -40,7 +40,7 @@ import picocli.CommandLine.Command;
 @Command(name = "list",
     aliases = "ls",
     description = "list all keys in a given bucket or snapshot")
-public class ListKeyHandler extends SnapshotHandler {
+public class ListKeyHandler extends BucketSnapshotHandler {
 
   @CommandLine.Mixin
   private ListOptions listOptions;
@@ -80,8 +80,8 @@ public class ListKeyHandler extends SnapshotHandler {
           "result. Use --length (-l) to override max returned keys.");
     } else if (isVerbose()) {
       if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
-        // snapshot[0] = .snapshot
-        // snapshot[1] = snapshot name
+        // snapshotValues[0] = ".snapshot"
+        // snapshotValues[1] = snapshot name
         String[] snapshotValues = snapshotNameWithIndicator.split("/");
 
         out().printf("Found : %d keys for snapshot %s " +

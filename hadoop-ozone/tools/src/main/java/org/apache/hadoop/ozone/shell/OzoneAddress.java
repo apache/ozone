@@ -363,7 +363,7 @@ public class OzoneAddress {
       throws OzoneClientException {
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
-        snapshotNameWithIndicator += keyName;
+        snapshotNameWithIndicator = keyName;
       } else {
         throw new OzoneClientException(
             "Delimiters (/) not allowed following " +

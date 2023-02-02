@@ -22,9 +22,9 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 /**
- * Base class for snapshot command handlers.
+ * Base class for bucket commands that require a snapshot URI.
  */
-public abstract class SnapshotHandler extends Handler {
+public abstract class BucketSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
   private SnapshotUri address;
