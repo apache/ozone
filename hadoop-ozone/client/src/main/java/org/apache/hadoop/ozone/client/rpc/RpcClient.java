@@ -688,7 +688,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     String replicationType = defaultReplicationConfig == null 
-        ? "with server-side default replication type"
+        ? "server-side default replication type"
         : defaultReplicationConfig.getType().toString();
 
     String layoutMsg = bucketLayout != null
