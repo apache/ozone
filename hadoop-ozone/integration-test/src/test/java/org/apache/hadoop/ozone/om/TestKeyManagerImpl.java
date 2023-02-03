@@ -1354,7 +1354,7 @@ public class TestKeyManagerImpl {
   }
 
   @Test
-  public void testGetFileStatusWithFakeDirForHDDS7871() throws IOException {
+  public void testGetFileStatusWithFakeDirFalsePositive() throws IOException {
     String dirName = "foo2";
     String fileName = "bar2";
     String keyName1 = "foo1";
