@@ -74,7 +74,7 @@ public class CertificateCodec {
       = new JcaX509CertificateConverter();
   private final SecurityConfig securityConfig;
   private final Path location;
-  private Set<PosixFilePermission> permissionSet =
+  private final Set<PosixFilePermission> permissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE, OWNER_EXECUTE)
           .collect(Collectors.toSet());
   /**
@@ -105,11 +105,12 @@ public class CertificateCodec {
     return CERTIFICATE_CONVERTER.getCertificate(holder);
   }
 
-  public static String getPEMEncodedString(List<X509CertificateHolder> certs)
+  public static String getPEMEncodedString(CertPath certPath)
       throws SCMSecurityException {
-    ArrayList<String> pemEncodedList = new ArrayList<>(certs.size());
-    for (X509CertificateHolder cert : certs) {
-      pemEncodedList.add(getPEMEncodedString(cert));
+    List<? extends Certificate> certsInPath = certPath.getCertificates();
+    ArrayList<String> pemEncodedList = new ArrayList<>(certsInPath.size());
+    for (Certificate cert : certsInPath) {
+      pemEncodedList.add(getPEMEncodedString((X509Certificate) cert));
     }
     return StringUtils.join(pemEncodedList, "\n");
   }
@@ -235,81 +236,7 @@ public class CertificateCodec {
     Files.setPosixFilePermissions(certificateFile.toPath(), permissionSet);
   }
 
-  private void checkBasePathDirectory(Path basePath) throws IOException {
-    if (!basePath.toFile().exists()) {
-      if (!basePath.toFile().mkdirs()) {
-        LOG.error("Unable to create file path. Path: {}", basePath);
-        throw new IOException("Creation of the directories failed."
-            + basePath);
-      }
-    }
-  }
-
-  /**
-   * Rertuns a default certificate using the default paths for this component.
-   *
-   * @return X509CertificateHolder.
-   * @throws SCMSecurityException - on Error.
-   * @throws CertificateException - on Error.
-   * @throws IOException          - on Error.
-   */
-  public X509CertificateHolder readCertificate() throws
-      CertificateException, IOException {
-    return readCertificate(this.location.toAbsolutePath(),
-        this.securityConfig.getCertificateFileName());
-  }
-
-  /**
-   * Returns the certificate from the specific PEM encoded file.
-   *
-   * @param basePath - base path
-   * @param fileName - fileName
-   * @return X%09 Certificate
-   * @throws IOException          - on Error.
-   * @throws SCMSecurityException - on Error.
-   * @throws CertificateException - on Error.
-   */
-  public synchronized X509CertificateHolder readCertificate(Path basePath,
-      String fileName) throws IOException, CertificateException {
-    File certificateFile = Paths.get(basePath.toString(), fileName).toFile();
-    return getX509CertificateHolder(certificateFile);
-  }
-
-
-  /**
-   * Helper function to read certificate.
-   *
-   * @param certificateFile - Full path to certificate file.
-   * @return X509CertificateHolder
-   * @throws IOException          - On Error.
-   * @throws CertificateException - On Error.
-   */
-  private X509CertificateHolder getX509CertificateHolder(File certificateFile)
-      throws IOException, CertificateException {
-    if (!certificateFile.exists()) {
-      throw new IOException("Unable to find the requested certificate. Path: "
-          + certificateFile.toString());
-    }
-
-    CertificateFactory fact = new CertificateFactory();
-    try (FileInputStream is = new FileInputStream(certificateFile)) {
-      return getCertificateHolder(
-          (X509Certificate) fact.engineGenerateCertificate(is));
-    }
-  }
-
-  public List<X509CertificateHolder> getCertList()
-      throws IOException, CertificateException {
-    CertPath certPath =
-        getCertPath(this.securityConfig.getCertificateFileName());
-    ArrayList<X509CertificateHolder> certList = new ArrayList<>();
-    for (Certificate cert : certPath.getCertificates()) {
-      certList.add(getCertificateHolder((X509Certificate) cert));
-    }
-    return certList;
-  }
-
-  public CertPath getCertPathFromPemEncodedString(
+  public static CertPath getCertPathFromPemEncodedString(
       String pemString) throws CertificateException, IOException {
     try (InputStream is =
              new ByteArrayInputStream(pemString.getBytes(DEFAULT_CHARSET))) {
@@ -317,17 +244,11 @@ public class CertificateCodec {
     }
   }
 
-  private CertPath generateCertPathFromInputStream(InputStream inputStream)
-      throws CertificateException {
-    CertificateFactory fact = new CertificateFactory();
-    return fact.engineGenerateCertPath(inputStream, "PEM");
-  }
-
-  public CertPath getCertPath(String fileName)
-      throws IOException, CertificateException {
-    checkBasePathDirectory(location.toAbsolutePath());
+  private CertPath getCertPath(Path path, String fileName) throws IOException,
+      CertificateException {
+    checkBasePathDirectory(path.toAbsolutePath());
     File certFile =
-        Paths.get(location.toAbsolutePath().toString(), fileName).toFile();
+        Paths.get(path.toAbsolutePath().toString(), fileName).toFile();
     if (!certFile.exists()) {
       throw new IOException("Unable to find the requested certificate file. " +
           "Path: " + certFile);
@@ -335,6 +256,15 @@ public class CertificateCodec {
     try (FileInputStream is = new FileInputStream(certFile)) {
       return generateCertPathFromInputStream(is);
     }
+  }
+
+  public CertPath getCertPath(String fileName)
+      throws IOException, CertificateException {
+    return getCertPath(location, fileName);
+  }
+
+  public CertPath getCertPath() throws CertificateException, IOException {
+    return getCertPath(this.securityConfig.getCertificateFileName());
   }
 
   /**
@@ -349,5 +279,47 @@ public class CertificateCodec {
       X509Certificate x509cert)
       throws CertificateEncodingException, IOException {
     return new X509CertificateHolder(x509cert.getEncoded());
+  }
+
+  public CertPath prependCertToCertPath(X509CertificateHolder certHolder,
+      CertPath path) throws CertificateException {
+    List<? extends Certificate> certificates = path.getCertificates();
+    ArrayList<X509Certificate> updatedList = new ArrayList<>();
+    updatedList.add(getX509Certificate(certHolder));
+    for (Certificate cert : certificates) {
+      updatedList.add((X509Certificate) cert);
+    }
+    CertificateFactory factory = new CertificateFactory();
+    return factory.engineGenerateCertPath(updatedList);
+  }
+
+  public X509CertificateHolder getTargetCertHolder(Path path,
+      String fileName) throws CertificateException, IOException {
+    CertPath certPath = getCertPath(path, fileName);
+    X509Certificate certificate =
+        (X509Certificate) certPath.getCertificates().get(0);
+    return getCertificateHolder(certificate);
+  }
+
+  public X509CertificateHolder getTargetCertHolder()
+      throws CertificateException, IOException {
+    return getTargetCertHolder(
+        location, securityConfig.getCertificateFileName());
+  }
+
+  private static CertPath generateCertPathFromInputStream(
+      InputStream inputStream) throws CertificateException {
+    CertificateFactory fact = new CertificateFactory();
+    return fact.engineGenerateCertPath(inputStream, "PEM");
+  }
+
+  private void checkBasePathDirectory(Path basePath) throws IOException {
+    if (!basePath.toFile().exists()) {
+      if (!basePath.toFile().mkdirs()) {
+        LOG.error("Unable to create file path. Path: {}", basePath);
+        throw new IOException("Creation of the directories failed."
+            + basePath);
+      }
+    }
   }
 }

@@ -39,7 +39,6 @@ import org.apache.ozone.test.LambdaTestUtils;
 
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +51,7 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
@@ -197,12 +197,11 @@ public class TestDefaultCAServer {
     testCA.init(new SecurityConfig(conf),
         SELF_SIGNED_CA);
 
-    Future<List<X509CertificateHolder>> holder =
-        testCA.requestCertificate(csrString,
-            CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
+    Future<CertPath> holder = testCA.requestCertificate(
+        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get().get(0));
+    assertNotNull(holder.get().getCertificates().get(0));
   }
 
   /**
@@ -242,11 +241,11 @@ public class TestDefaultCAServer {
     testCA.init(new SecurityConfig(conf),
         SELF_SIGNED_CA);
 
-    Future<List<X509CertificateHolder>> holder = testCA.requestCertificate(
+    Future<CertPath> holder = testCA.requestCertificate(
         csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get());
+    assertNotNull(holder.get().getCertificates().get(0));
   }
 
   @Test
@@ -276,11 +275,11 @@ public class TestDefaultCAServer {
     // Let us convert this to a string to mimic the common use case.
     String csrString = CertificateSignRequest.getEncodedString(csr);
 
-    Future<List<X509CertificateHolder>> holder = testCA.requestCertificate(
+    Future<CertPath> holder = testCA.requestCertificate(
         csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
 
     X509Certificate certificate =
-        new JcaX509CertificateConverter().getCertificate(holder.get().get(0));
+        (X509Certificate) holder.get().getCertificates().get(0);
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
@@ -330,7 +329,7 @@ public class TestDefaultCAServer {
     LambdaTestUtils.intercept(ExecutionException.class, "ScmId and " +
             "ClusterId in CSR subject are incorrect",
         () -> {
-          Future<List<X509CertificateHolder>> holder =
+          Future<CertPath> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
           holder.get();
@@ -433,12 +432,13 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    Future<List<X509CertificateHolder>> holder = rootCA.requestCertificate(csr,
+    Future<CertPath> holder = rootCA.requestCertificate(csr,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     assertTrue(holder.isDone());
-
-    X509CertificateHolder certificateHolder = holder.get().get(0);
-
+    X509Certificate certificate = (X509Certificate) holder.get()
+        .getCertificates().get(0);
+    X509CertificateHolder certificateHolder =
+        CertificateCodec.getCertificateHolder(certificate);
 
     assertNotNull(certificateHolder);
     LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()

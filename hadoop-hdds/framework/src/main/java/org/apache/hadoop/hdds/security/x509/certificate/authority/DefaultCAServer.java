@@ -51,6 +51,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -180,17 +182,17 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certificateCodec =
         new CertificateCodec(config, componentName);
     try {
-      return certificateCodec.readCertificate();
+      return certificateCodec.getTargetCertHolder();
     } catch (CertificateException e) {
       throw new IOException(e);
     }
   }
 
   @Override
-  public List<X509CertificateHolder> getCaCertBundle()
+  public CertPath getCaCertPath()
       throws CertificateException, IOException {
     CertificateCodec codec = new CertificateCodec(config, componentName);
-    return codec.getCertList();
+    return codec.getCertPath();
   }
 
   /**
@@ -220,7 +222,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<List<X509CertificateHolder>> requestCertificate(
+  public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
@@ -238,7 +240,7 @@ public class DefaultCAServer implements CertificateServer {
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
-    CompletableFuture<List<X509CertificateHolder>> xCertHolders
+    CompletableFuture<CertPath> xCertHolders
         = new CompletableFuture<>();
 
     if (xcertHolder.isCompletedExceptionally()) {
@@ -248,7 +250,7 @@ public class DefaultCAServer implements CertificateServer {
       xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
           "verify the CSR."));
     }
-    List<X509CertificateHolder> allCerts;
+    List<Certificate> allCerts;
     try {
       switch (approverType) {
       case MANUAL:
@@ -267,10 +269,9 @@ public class DefaultCAServer implements CertificateServer {
           xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
         CertificateCodec codec = new CertificateCodec(config, componentName);
-        allCerts = codec.getCertList();
-        allCerts.add(0, xcert);
-
-        xCertHolders.complete(allCerts);
+        CertPath certPath = codec.getCertPath();
+        CertPath updatedCertPath = codec.prependCertToCertPath(xcert, certPath);
+        xCertHolders.complete(updatedCertPath);
         break;
       default:
         return null; // cannot happen, keeping checkstyle happy.
@@ -308,7 +309,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<List<X509CertificateHolder>> requestCertificate(String csr,
+  public Future<CertPath> requestCertificate(String csr,
       CertificateApprover.ApprovalType type, NodeType nodeType)
       throws IOException {
     PKCS10CertificationRequest request =
@@ -618,7 +619,7 @@ public class DefaultCAServer implements CertificateServer {
         throw new IOException("External cert path is not correct: " +
             extCertPath);
       }
-      X509CertificateHolder certHolder = certificateCodec.readCertificate(
+      X509CertificateHolder certHolder = certificateCodec.getTargetCertHolder(
           extCertParent, extCertName.toString());
       Path extPrivateKeyParent = extPrivateKeyPath.getParent();
       Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();

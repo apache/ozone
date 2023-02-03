@@ -281,7 +281,7 @@ public class TestCRLCodec {
         new CertificateCodec(securityConfig, COMPONENT);
 
     X509CertificateHolder x509CertHolder =
-        codec.readCertificate(basePath.toPath(), TMP_CERT_FILE_NAME);
+        codec.getTargetCertHolder(basePath.toPath(), TMP_CERT_FILE_NAME);
 
     assertNotNull(x509CertHolder);
 

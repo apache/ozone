@@ -658,8 +658,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       CertificateCodec codec, boolean addToCertMap)
       throws CertificateException {
     try {
+      CertPath certificatePath =
+          CertificateCodec.getCertPathFromPemEncodedString(pemEncodedCert);
       X509Certificate cert =
-          CertificateCodec.getX509Certificate(pemEncodedCert);
+          (X509Certificate) certificatePath.getCertificates().get(0);
+
       String certName = String.format(CERT_FILE_NAME_FORMAT,
           cert.getSerialNumber().toString());
 
@@ -671,10 +674,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         rootCaCertId = cert.getSerialNumber().toString();
       }
 
-      codec.writeCertificate(codec.getLocation(), certName,
+      codec.writeCertificate(certName,
           pemEncodedCert);
-      CertPath certificatePath =
-          codec.getCertPathFromPemEncodedString(pemEncodedCert);
       if (addToCertMap) {
         certificateMap.putIfAbsent(
             cert.getSerialNumber().toString(), certificatePath);

@@ -19,12 +19,14 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,9 +40,6 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -84,14 +83,13 @@ public class TestCertificateCodec {
     LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         generateTestCert(keyGenerator, startDate, endDate);
-    CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
-    String pemString = codec.getPEMEncodedString(cert);
+    String pemString = CertificateCodec.getPEMEncodedString(cert);
     assertTrue(pemString.startsWith(CertificateCodec.BEGIN_CERT));
     assertTrue(pemString.endsWith(CertificateCodec.END_CERT + "\n"));
 
     // Read back the certificate and verify that all the comparisons pass.
-    X509CertificateHolder newCert =
-        codec.getCertificateHolder(codec.getX509Certificate(pemString));
+    X509CertificateHolder newCert = CertificateCodec.getCertificateHolder(
+        CertificateCodec.getX509Certificate(pemString));
     assertEquals(cert, newCert);
 
     // Just make sure we can decode both these classes to Java Std. lIb classes.
@@ -120,11 +118,11 @@ public class TestCertificateCodec {
     X509CertificateHolder cert =
         generateTestCert(keyGenerator, startDate, endDate);
     CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
-    String pemString = codec.getPEMEncodedString(cert);
+    String pemString = CertificateCodec.getPEMEncodedString(cert);
     codec.writeCertificate(basePath, "pemcertificate.crt",
         pemString);
     X509CertificateHolder certHolder =
-        codec.readCertificate(basePath, "pemcertificate.crt");
+        codec.getTargetCertHolder(basePath, "pemcertificate.crt");
     assertNotNull(certHolder);
     assertEquals(cert.getSerialNumber(),
         certHolder.getSerialNumber());
@@ -140,7 +138,7 @@ public class TestCertificateCodec {
    * @throws NoSuchAlgorithmException - on Error.
    */
   @Test
-  public void testwriteCertificateDefault()
+  public void testWriteCertificateDefault()
       throws IOException, SCMSecurityException, CertificateException,
       NoSuchProviderException, NoSuchAlgorithmException {
     HDDSKeyGenerator keyGenerator =
@@ -151,7 +149,7 @@ public class TestCertificateCodec {
         generateTestCert(keyGenerator, startDate, endDate);
     CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
     codec.writeCertificate(cert);
-    X509CertificateHolder certHolder = codec.readCertificate();
+    X509CertificateHolder certHolder = codec.getTargetCertHolder();
     assertNotNull(certHolder);
     assertEquals(cert.getSerialNumber(), certHolder.getSerialNumber());
   }
@@ -180,48 +178,53 @@ public class TestCertificateCodec {
     // Rewrite with force support
     codec.writeCertificate(cert, "newcert.crt");
     X509CertificateHolder x509CertificateHolder =
-        codec.readCertificate(codec.getLocation(), "newcert.crt");
+        codec.getTargetCertHolder(codec.getLocation(), "newcert.crt");
     assertNotNull(x509CertificateHolder);
   }
 
   @Test
   public void testMultipleCertReadWrite() throws IOException,
       NoSuchAlgorithmException, NoSuchProviderException, CertificateException {
-    //Given two certificates
+    //Given a certificate path of one certificate and another certificate
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
-    X509CertificateHolder firstCert =
+
+    X509CertificateHolder certToPrepend =
         generateTestCert(keyGenerator, startDate, endDate);
 
-    X509CertificateHolder secondCert =
+    X509CertificateHolder initialCert =
         generateTestCert(keyGenerator, startDate, endDate);
-    assertNotEquals(firstCert, secondCert);
+    assertNotEquals(certToPrepend, initialCert);
 
-    List<X509CertificateHolder> certificateList = new ArrayList<>();
-    certificateList.add(firstCert);
-    certificateList.add(secondCert);
+    CertificateFactory certificateFactory = new CertificateFactory();
+    CertPath certPath =
+        certificateFactory.engineGenerateCertPath(
+            ImmutableList.of(CertificateCodec.getX509Certificate(initialCert)));
 
-
-    //When prepending the second one before the first one
+    //When prepending the second one before the first one and reading them back
     CertificateCodec codec =
         new CertificateCodec(keyGenerator.getSecurityConfig(), "ca");
+
+    CertPath updatedCertPath =
+        codec.prependCertToCertPath(certToPrepend, certPath);
+
     String certFileName = "newcert.crt";
     String pemEncodedStrings =
-        CertificateCodec.getPEMEncodedString(certificateList);
+        CertificateCodec.getPEMEncodedString(updatedCertPath);
     codec.writeCertificate(certFileName, pemEncodedStrings);
 
-    CertPath certificates =
+    CertPath rereadCertPath =
         codec.getCertPath(certFileName);
-    Iterator<? extends Certificate> iterator =
-        certificates.getCertificates().iterator();
-    Certificate rereadPrependedCert = iterator.next();
-    Certificate rereadFirstCert = iterator.next();
+
+    //Then the two certificates are the same as before
+    Certificate rereadPrependedCert = rereadCertPath.getCertificates().get(0);
+    Certificate rereadSecondCert = rereadCertPath.getCertificates().get(1);
     assertEquals(CertificateCodec.getCertificateHolder(
-        (X509Certificate) rereadPrependedCert), firstCert);
+        (X509Certificate) rereadPrependedCert), certToPrepend);
     assertEquals(CertificateCodec.getCertificateHolder(
-        (X509Certificate) rereadFirstCert), secondCert);
+        (X509Certificate) rereadSecondCert), initialCert);
   }
 
   private X509CertificateHolder generateTestCert(HDDSKeyGenerator keyGenerator,

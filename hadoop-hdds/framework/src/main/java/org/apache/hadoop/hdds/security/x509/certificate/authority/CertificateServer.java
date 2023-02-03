@@ -31,6 +31,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
@@ -75,7 +76,7 @@ public interface CertificateServer {
    * @throws CertificateException
    * @throws IOException
    */
-  List<X509CertificateHolder> getCaCertBundle() throws CertificateException,
+  CertPath getCaCertPath() throws CertificateException,
       IOException;
 
   /**
@@ -100,7 +101,7 @@ public interface CertificateServer {
    * approved.
    * @throws SCMSecurityException - on Error.
    */
-  Future<List<X509CertificateHolder>> requestCertificate(
+  Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType type, NodeType role)
       throws SCMSecurityException;
@@ -117,7 +118,7 @@ public interface CertificateServer {
    * approved.
    * @throws SCMSecurityException - on Error.
    */
-  Future<List<X509CertificateHolder>> requestCertificate(String csr,
+  Future<CertPath> requestCertificate(String csr,
       ApprovalType type, NodeType nodeType) throws IOException;
 
   /**
