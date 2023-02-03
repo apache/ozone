@@ -278,4 +278,46 @@ public class TestOzoneFsSnapshot {
       shell.close();
     }
   }
+
+  @Test
+  public void testDeleteBucketWithSnapshot() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    String key = "key-" + RandomStringUtils.randomNumeric(5);
+    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+
+    String testVolBucket = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
+    String testKey = testVolBucket + OM_KEY_PREFIX + key;
+
+    createVolBuckKey(testVolBucket, testKey);
+
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+    try {
+      int res = ToolRunner.run(shell,
+              new String[]{"-createSnapshot", testVolBucket, snapshotName});
+      // Asserts that create request succeeded
+      assertEquals(0, res);
+
+      res = ToolRunner.run(shell,
+              new String[]{"-rm", "-r", "-skipTrash", testKey});
+      assertEquals(0, res);
+
+      res = ToolRunner.run(shell,
+              new String[]{"-rm", "-r", "-skipTrash", testVolBucket});
+      assertEquals(1, res);
+
+      res = ToolRunner.run(shell,
+              new String[]{"-ls", testVolBucket});
+      assertEquals(0, res);
+
+      String snapshotPath = testVolBucket + OM_KEY_PREFIX + ".snapshot"
+              + OM_KEY_PREFIX + snapshotName + OM_KEY_PREFIX;
+      res = ToolRunner.run(shell,
+              new String[]{"-ls", snapshotPath});
+      assertEquals(0, res);
+
+    } finally {
+      shell.close();
+    }
+  }
 }

@@ -96,7 +96,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     if (!ozoneManager.isAdmin(ugi) &&
         !ozoneManager.isOwner(ugi, bucketOwner)) {
       throw new OMException(
-          "Only bucket owners/admins can create snapshots",
+          "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
     return omRequest;
@@ -135,7 +135,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
       //Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
-        LOG.debug("snapshot: {} already exists ", key);
+        LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
       }
 
@@ -177,11 +177,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         snapshotInfo.toAuditMap(), exception, userInfo));
     
     if (exception == null) {
-      LOG.info("created snapshot: name {} in snapshotPath: {}", snapshotName,
-          snapshotPath);
+      LOG.info("Created snapshot '{}' under path '{}'",
+          snapshotName, snapshotPath);
     } else {
       omMetrics.incNumSnapshotCreateFails();
-      LOG.error("Snapshot creation failed for name:{} in snapshotPath:{}",
+      LOG.error("Failed to create snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
     }
     return omClientResponse;

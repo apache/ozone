@@ -126,7 +126,7 @@ public class OmRatisSnapshotProvider {
         + "-" + snapshotTime;
     String snapshotFilePath = Paths.get(omSnapshotDir.getAbsolutePath(),
         snapshotFileName).toFile().getAbsolutePath();
-    File targetFile = new File(snapshotFilePath + ".tar.gz");
+    File targetFile = new File(snapshotFilePath + ".tar");
 
     String omCheckpointUrl = peerNodesMap.get(leaderOMNodeID)
         .getOMDBCheckpointEnpointUrl(httpPolicy.isHttpEnabled());

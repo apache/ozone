@@ -445,7 +445,7 @@ Apache License 2.0
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
    software.amazon.ion:ion-java
-
+   org.awaitility:awaitility
 
 MIT
 =====================
@@ -465,9 +465,6 @@ EPL 2.0
 
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
-   org.jgrapht:jgrapht-core
-   org.jgrapht:jgrapht-guava
-   org.jgrapht:jgrapht-ext
 
 
 CDDL + GPLv2 with classpath exception

@@ -328,7 +328,7 @@ public class BlockOutputStreamEntryPool {
       // in test, this could be null
       long length = getKeyLength();
       Preconditions.checkArgument(offset == length,
-          "Epected offset: " + offset + " expected len: " + length);
+          "Expected offset: " + offset + " expected len: " + length);
       keyArgs.setDataSize(length);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not
@@ -339,6 +339,27 @@ public class BlockOutputStreamEntryPool {
             omClient.commitMultipartUploadPart(keyArgs, openID);
       } else {
         omClient.commitKey(keyArgs, openID);
+      }
+    } else {
+      LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
+  }
+
+  void hsyncKey(long offset) throws IOException {
+    if (keyArgs != null) {
+      // in test, this could be null
+      long length = getKeyLength();
+      Preconditions.checkArgument(offset == length,
+              "Expected offset: " + offset + " expected len: " + length);
+      keyArgs.setDataSize(length);
+      keyArgs.setLocationInfoList(getLocationInfoList());
+      // When the key is multipart upload part file upload, we should not
+      // commit the key, as this is not an actual key, this is a just a
+      // partial key of a large file.
+      if (keyArgs.getIsMultipartKey()) {
+        throw new IOException("Hsync is unsupported for multipart keys.");
+      } else {
+        omClient.hsyncKey(keyArgs, openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");

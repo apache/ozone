@@ -345,7 +345,8 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public InputStream readFile(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_READ, 1);
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr,
+        config);
     String key = ofsPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
@@ -370,7 +371,7 @@ public class BasicRootedOzoneClientAdapterImpl
   public OzoneFSOutputStream createFile(String pathStr, short replication,
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
       throw new IOException("Cannot create file under root or volume.");
     }
@@ -399,7 +400,7 @@ public class BasicRootedOzoneClientAdapterImpl
       short replication, boolean overWrite, boolean recursive)
       throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
       throw new IOException("Cannot create file under root or volume.");
     }
@@ -444,8 +445,8 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public void rename(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED, 1);
-    OFSPath ofsPath = new OFSPath(path);
-    OFSPath ofsNewPath = new OFSPath(newPath);
+    OFSPath ofsPath = new OFSPath(path, config);
+    OFSPath ofsNewPath = new OFSPath(newPath, config);
 
     // Check path and newPathName are in the same volume and same bucket.
     // This should have been checked in BasicRootedOzoneFileSystem#rename
@@ -470,8 +471,8 @@ public class BasicRootedOzoneClientAdapterImpl
   void rename(OzoneBucket bucket, String path, String newPath)
       throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED, 1);
-    OFSPath ofsPath = new OFSPath(path);
-    OFSPath ofsNewPath = new OFSPath(newPath);
+    OFSPath ofsPath = new OFSPath(path, config);
+    OFSPath ofsNewPath = new OFSPath(newPath, config);
     // No same-bucket policy check here since this call path is controlled
     String key = ofsPath.getKeyName();
     String newKey = ofsNewPath.getKeyName();
@@ -488,7 +489,7 @@ public class BasicRootedOzoneClientAdapterImpl
   public boolean createDirectory(String pathStr) throws IOException {
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.getVolumeName().isEmpty()) {
       // Volume name unspecified, invalid param, return failure
       return false;
@@ -530,7 +531,7 @@ public class BasicRootedOzoneClientAdapterImpl
       throws IOException {
     LOG.trace("issuing delete for path to key: {}", path);
     incrementCounter(Statistic.OBJECTS_DELETED, 1);
-    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsPath = new OFSPath(path, config);
     String keyName = ofsPath.getKeyName();
     if (keyName.length() == 0) {
       return false;
@@ -565,11 +566,12 @@ public class BasicRootedOzoneClientAdapterImpl
       return true;
     }
     String firstKeyPath = keyNameList.get(0);
-    final String volAndBucket = new OFSPath(firstKeyPath).getNonKeyPath();
+    final String volAndBucket = new OFSPath(firstKeyPath, config)
+        .getNonKeyPath();
     // return true only if all key paths' volume and bucket in the list match
     // the first element's
     return keyNameList.stream().skip(1).allMatch(p ->
-        new OFSPath(p).getNonKeyPath().equals(volAndBucket));
+        new OFSPath(p, config).getNonKeyPath().equals(volAndBucket));
   }
 
   /**
@@ -595,7 +597,7 @@ public class BasicRootedOzoneClientAdapterImpl
       return false;
     }
     try {
-      OFSPath firstKeyPath = new OFSPath(keyNameList.get(0));
+      OFSPath firstKeyPath = new OFSPath(keyNameList.get(0), config);
       OzoneBucket bucket = getBucket(firstKeyPath, false);
       return deleteObjects(bucket, keyNameList);
     } catch (IOException ioe) {
@@ -616,7 +618,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   boolean deleteObjects(OzoneBucket bucket, List<String> keyNameList) {
     List<String> keyList = keyNameList.stream()
-        .map(p -> new OFSPath(p).getKeyName())
+        .map(p -> new OFSPath(p, config).getKeyName())
         .collect(Collectors.toList());
     try {
       incrementCounter(Statistic.OBJECTS_DELETED, keyNameList.size());
@@ -632,7 +634,7 @@ public class BasicRootedOzoneClientAdapterImpl
   public FileStatusAdapter getFileStatus(String path, URI uri,
       Path qualifiedPath, String userName) throws IOException {
     incrementCounter(Statistic.OBJECTS_QUERY, 1);
-    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsPath = new OFSPath(path, config);
     String key = ofsPath.getKeyName();
     if (ofsPath.isRoot()) {
       return getFileStatusAdapterForRoot(uri);
@@ -717,7 +719,7 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public Iterator<BasicKeyInfo> listKeys(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     String key = ofsPath.getKeyName();
     OzoneBucket bucket;
     try {
@@ -736,7 +738,7 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean recursive, String startPath, long numEntries,
       URI uri, Path workingDir, String username) throws IOException {
 
-    OFSPath ofsStartPath = new OFSPath(startPath);
+    OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list volumes
     Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
         username, null, ofsStartPath.getVolumeName());
@@ -760,7 +762,7 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean recursive, String startPath, long numEntries,
       URI uri, Path workingDir, String username) throws IOException {
 
-    OFSPath ofsStartPath = new OFSPath(startPath);
+    OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list buckets in the volume
     OzoneVolume volume = objectStore.getVolume(volumeStr);
     UserGroupInformation ugi =
@@ -824,12 +826,12 @@ public class BasicRootedOzoneClientAdapterImpl
     //  OFSPath initializer will error out.
     //  The goal is to refuse processing startPaths from other authorities.
 
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot()) {
       return listStatusRoot(
           recursive, startPath, numEntries, uri, workingDir, username);
     }
-    OFSPath ofsStartPath = new OFSPath(startPath);
+    OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
       String startBucket = ofsStartPath.getBucketName();
       return listStatusVolume(ofsPath.getVolumeName(),
@@ -1148,7 +1150,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
 
-    OFSPath ofsPath = new OFSPath(keyName);
+    OFSPath ofsPath = new OFSPath(keyName, config);
 
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
@@ -1161,7 +1163,7 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public String createSnapshot(String pathStr, String snapshotName)
           throws IOException {
-    OFSPath ofsPath = new OFSPath(pathStr);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
     return proxy.createSnapshot(ofsPath.getVolumeName(),
             ofsPath.getBucketName(),
             snapshotName);

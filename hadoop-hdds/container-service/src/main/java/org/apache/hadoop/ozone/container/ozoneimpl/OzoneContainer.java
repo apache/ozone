@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
@@ -204,7 +205,9 @@ public class OzoneContainer {
         controller,
         conf.getObject(ReplicationConfig.class),
         secConf,
-        certClient);
+        certClient,
+        new ContainerImporter(conf, containerSet, controller,
+            volumeSet));
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);

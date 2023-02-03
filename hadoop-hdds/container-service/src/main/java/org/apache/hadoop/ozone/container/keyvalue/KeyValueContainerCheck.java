@@ -97,8 +97,6 @@ public class KeyValueContainerCheck {
       valid = true;
 
     } catch (IOException e) {
-      LOG.info("Marking Container {} UNHEALTHY as it failed metadata check",
-              containerID);
       handleCorruption(e);
     }
 
@@ -277,7 +275,7 @@ public class KeyValueContainerCheck {
   private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
       throws IOException {
     String blockKey =
-        onDiskContainerData.blockKey(block.getBlockID().getLocalID());
+        onDiskContainerData.getBlockKey(block.getBlockID().getLocalID());
     return db.getStore().getBlockDataTable().get(blockKey);
   }
 
@@ -398,9 +396,7 @@ public class KeyValueContainerCheck {
   }
 
   private void handleCorruption(IOException e) {
-    String errStr =
-        "Corruption detected in container: [" + containerID + "] ";
-    String logMessage = errStr + "Exception: [" + e.getMessage() + "]";
-    LOG.error(logMessage);
+    LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
+            containerID, e);
   }
 }

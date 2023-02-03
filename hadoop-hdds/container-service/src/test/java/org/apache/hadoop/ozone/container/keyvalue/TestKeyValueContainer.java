@@ -80,6 +80,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -193,8 +194,8 @@ public class TestKeyValueContainer {
     checkContainerFilesPresent(data, 0);
 
     //destination path
-    File exportTar = folder.newFile("exported.tar.gz");
-    TarContainerPacker packer = new TarContainerPacker();
+    File exportTar = folder.newFile("exported.tar");
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
       keyValueContainer.exportContainerData(fos, packer);
@@ -220,10 +221,9 @@ public class TestKeyValueContainer {
     populate(numberOfKeysToWrite);
 
     //destination path
-    File folderToExport = folder.newFile("exported.tar.gz");
-    for (Map.Entry<CopyContainerCompression, String> entry :
-        CopyContainerCompression.getCompressionMapping().entrySet()) {
-      TarContainerPacker packer = new TarContainerPacker(entry.getValue());
+    File folderToExport = folder.newFile("exported.tar");
+    for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+      TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
       try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
@@ -333,14 +333,14 @@ public class TestKeyValueContainer {
               metadataStore.getStore().getBlockDataTable();
 
       for (long i = 0; i < numberOfKeysToWrite; i++) {
-        blockDataTable.put(cData.blockKey(i),
+        blockDataTable.put(cData.getBlockKey(i),
             new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
       metadataStore.getStore().getMetadataTable()
-              .put(cData.blockCountKey(), numberOfKeysToWrite);
+              .put(cData.getBlockCountKey(), numberOfKeysToWrite);
     }
 
     Map<String, String> metadata = new HashMap<>();
@@ -364,11 +364,11 @@ public class TestKeyValueContainer {
 
     AtomicReference<String> failed = new AtomicReference<>();
 
-    TarContainerPacker packer = new TarContainerPacker();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     List<Thread> threads = IntStream.range(0, 20)
         .mapToObj(i -> new Thread(() -> {
           try {
-            File file = folder.newFile("concurrent" + i + ".tar.gz");
+            File file = folder.newFile("concurrent" + i + ".tar");
             try (OutputStream out = new FileOutputStream(file)) {
               keyValueContainer.exportContainerData(out, packer);
             }

@@ -129,6 +129,7 @@ enum Type {
   CreateSnapshot = 112;
   ListSnapshot = 113;
   SnapshotDiff = 114;
+  DeleteSnapshot = 115;
 }
 
 message OMRequest {
@@ -240,6 +241,7 @@ message OMRequest {
   optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
+  optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
 
 }
 
@@ -345,6 +347,7 @@ message OMResponse {
   optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
   optional ListSnapshotResponse              ListSnapshotResponse          = 113;
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
+  optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
 }
 
 enum Status {
@@ -1280,6 +1283,7 @@ message ListKeysResponse {
 message CommitKeyRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
+    optional bool hsync = 3;
 }
 
 message CommitKeyResponse {
@@ -1662,22 +1666,29 @@ message SetRangerServiceVersionRequest {
 }
 
 message CreateSnapshotRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
   optional string snapshotName = 3;
   optional string snapshotId = 4;
 }
 
 message ListSnapshotRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
 }
 
 message SnapshotDiffRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string fromSnapshot = 3;
-  required string toSnapshot = 4;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+}
+
+message DeleteSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional uint64 deletionTime = 4;
 }
 
 message DeleteTenantRequest {
@@ -1718,23 +1729,26 @@ message SetRangerServiceVersionResponse {
 }
 
 message CreateSnapshotResponse {
-  required SnapshotInfo snapshotInfo = 1;
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message ListSnapshotResponse {
   repeated SnapshotInfo snapshotInfo = 1;
 }
 
-
 message SnapshotDiffResponse {
-  required SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional SnapshotDiffReportProto snapshotDiffReport = 1;
+}
+
+message DeleteSnapshotResponse {
+
 }
 
 message SnapshotDiffReportProto {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string fromSnapshot = 3;
-  required string toSnapshot = 4;
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   repeated DiffReportEntryProto diffList = 5;
 }
 
@@ -1745,8 +1759,8 @@ message DiffReportEntryProto {
     DELETE= 3;
     RENAME = 4;
   }
-  required DiffTypeProto diffType = 1;
-  required string sourcePath = 2;
+  optional DiffTypeProto diffType = 1;
+  optional string sourcePath = 2;
   optional string targetPath = 3;
 }
 

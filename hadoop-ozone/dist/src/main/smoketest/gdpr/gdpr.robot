@@ -47,7 +47,7 @@ Test GDPR -g=false
 Test GDPR(disabled) without explicit options
     [arguments]     ${volume}
                     Execute             ozone sh volume create /${volume} --space-quota 100TB --namespace-quota 100
-                    Execute             ozone sh bucket create /${volume}/mybucket1
+                    Execute             ozone sh bucket create /${volume}/mybucket1 --space-quota 1TB
     ${result} =     Execute             ozone sh bucket info /${volume}/mybucket1 | jq -r '. | select(.name=="mybucket1") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null
                     Execute             ozone sh key put /${volume}/mybucket1/mykey /opt/hadoop/NOTICE.txt
@@ -58,7 +58,7 @@ Test GDPR(disabled) without explicit options
 
 Test GDPR with --enforcegdpr=true
     [arguments]     ${volume}
-                    Execute             ozone sh bucket create --enforcegdpr=true /${volume}/mybucket2
+                    Execute             ozone sh bucket create --enforcegdpr=true /${volume}/mybucket2 --space-quota 1TB
     ${result} =     Execute             ozone sh bucket info /${volume}/mybucket2 | jq -r '. | select(.name=="mybucket2") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key put /${volume}/mybucket2/mykey /opt/hadoop/NOTICE.txt
@@ -69,7 +69,7 @@ Test GDPR with --enforcegdpr=true
 
 Test GDPR with -g=true
     [arguments]     ${volume}
-                    Execute             ozone sh bucket create -g=true /${volume}/mybucket3
+                    Execute             ozone sh bucket create -g=true /${volume}/mybucket3 --space-quota 1TB
     ${result} =     Execute             ozone sh bucket info /${volume}/mybucket3 | jq -r '. | select(.name=="mybucket3") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key put /${volume}/mybucket3/mykey /opt/hadoop/NOTICE.txt
@@ -80,7 +80,7 @@ Test GDPR with -g=true
 
 Test GDPR with -g=false
     [arguments]     ${volume}
-                    Execute             ozone sh bucket create /${volume}/mybucket4
+                    Execute             ozone sh bucket create /${volume}/mybucket4 --space-quota 1TB
     ${result} =     Execute             ozone sh bucket info /${volume}/mybucket4 | jq -r '. | select(.name=="mybucket4") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null
                     Execute             ozone sh key put /${volume}/mybucket4/mykey /opt/hadoop/NOTICE.txt
