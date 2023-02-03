@@ -1388,8 +1388,9 @@ public class TestKeyManagerImpl {
     // 2nd dbKey "volume1/bucket2/foo2/bar2", which is not belong to bucket1.
     keyArgs = createBuilder(BUCKET_NAME).setKeyName(dirName).build();
     OmKeyArgs finalKeyArgs = keyArgs;
-    Assert.assertThrows(OMException.class, () -> keyManager.getFileStatus(
-        finalKeyArgs));
+    OMException ex = Assert.assertThrows(OMException.class,
+        () -> keyManager.getFileStatus(finalKeyArgs));
+    Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
 
     // get a non-existing "foo2" from bucket2 should return a fake key.
     keyArgs = createBuilder(BUCKET2_NAME).setKeyName(dirName).build();
