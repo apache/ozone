@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.junit.Assert;
+import com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TestConfigurationSource {
 
@@ -29,22 +29,17 @@ class TestConfigurationSource {
   void getPropsMatchPrefixAndTrimPrefix() {
     MutableConfigurationSource c = new InMemoryConfiguration();
     c.set("somePrefix.key", "value");
-    ConfigurationSource config = c;
-    Map<String, String> entry =
-        config.getPropsMatchPrefixAndTrimPrefix("somePrefix.");
-    Assert.assertEquals("key", entry.keySet().toArray()[0]);
-    Assert.assertEquals("value", entry.values().toArray()[0]);
+
+    assertEquals(ImmutableMap.of("key", "value"),
+        c.getPropsMatchPrefixAndTrimPrefix("somePrefix."));
   }
 
   @Test
   void getPropsMatchPrefix() {
     MutableConfigurationSource c = new InMemoryConfiguration();
     c.set("somePrefix.key", "value");
-    ConfigurationSource config = c;
-    Map<String, String> entry =
-        config.getPropsMatchPrefix("somePrefix.");
-    Assert.assertEquals("somePrefix.key",
-        entry.keySet().toArray()[0]);
-    Assert.assertEquals("value", entry.values().toArray()[0]);
+
+    assertEquals(ImmutableMap.of("somePrefix.key", "value"),
+        c.getPropsMatchPrefix("somePrefix."));
   }
 }
