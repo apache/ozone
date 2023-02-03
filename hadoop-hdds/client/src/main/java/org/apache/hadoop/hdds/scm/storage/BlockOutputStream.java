@@ -554,7 +554,7 @@ public class BlockOutputStream extends OutputStream {
       throw e;
     } finally {
       if (close) {
-        cleanup(false);
+        cleanup(true);
       }
     }
   }
@@ -591,14 +591,16 @@ public class BlockOutputStream extends OutputStream {
 
   @Override
   public void close() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0) {
-      handleFlush(true);
-      // TODO: Turn the below buffer empty check on when Standalone pipeline
-      // is removed in the write path in tests
-      // Preconditions.checkArgument(buffer.position() == 0);
-      // bufferPool.checkBufferPoolEmpty();
-
+    if (xceiverClientFactory != null && xceiverClient != null) {
+      if (bufferPool != null && bufferPool.getSize() > 0) {
+        handleFlush(true);
+        // TODO: Turn the below buffer empty check on when Standalone pipeline
+        // is removed in the write path in tests
+        // Preconditions.checkArgument(buffer.position() == 0);
+        // bufferPool.checkBufferPoolEmpty();
+      } else {
+        cleanup(true);
+      }
     }
   }
 
