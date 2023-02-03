@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import com.google.common.collect.ImmutableSet;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -78,5 +81,18 @@ class TestConfigurationReflectionUtil {
     Optional<String> defaultValue = ConfigurationReflectionUtil.getDefaultValue(
         testClass, fieldName);
     assertEquals(expectedDefault, defaultValue);
+  }
+
+  @Test
+  void listReconfigurableProperties() {
+    Set<String> props =
+        ConfigurationReflectionUtil.mapReconfigurableProperties(
+            ConfigurationExample.class).keySet();
+
+    String prefix = "ozone.scm.client";
+    assertEquals(ImmutableSet.of(
+        prefix + ".dynamic",
+        prefix + ".grandpa.dyna"
+    ), props);
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,24 +17,22 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /**
- * Example configuration to test inherited configuration injection.
+ * Test for {@link ReconfigurableConfig}.
  */
-public class ConfigurationExampleGrandParent extends ReconfigurableConfig {
+class TestReconfigurableConfig {
 
-  @Config(key = "number", defaultValue = "2", description = "Example numeric "
-      + "configuration", tags = ConfigTag.MANAGEMENT)
-  private int number = 1;
+  @Test
+  void testReconfigureProperty() {
+    ConfigurationExample subject = new InMemoryConfiguration()
+        .getObject(ConfigurationExample.class);
 
-  @Config(key = "grandpa.dyna", reconfigurable = true, defaultValue = "x",
-      description = "Test inherited dynamic property", tags = {})
-  private String grandpaDynamic;
+    subject.reconfigureProperty("ozone.scm.client.dynamic", "updated");
 
-  public int getNumber() {
-    return number;
-  }
-
-  public void setNumber(int number) {
-    this.number = number;
+    assertEquals("updated", subject.getDynamic());
   }
 }
