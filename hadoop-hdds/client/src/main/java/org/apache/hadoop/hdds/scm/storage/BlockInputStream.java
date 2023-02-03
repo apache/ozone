@@ -320,7 +320,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
           if (isConnectivityIssue(ex)) {
             handleReadError(ex);
           } else {
-            current.releaseClient();
+            current.releaseClient(false);
           }
           continue;
         } else {
@@ -435,7 +435,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized void close() {
-    releaseClient();
+    releaseClient(true);
     xceiverClientFactory = null;
 
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
@@ -446,9 +446,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private void releaseClient() {
+  private void releaseClient(boolean invalidateClient) {
     if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClient(xceiverClient, false);
+      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
       xceiverClient = null;
     }
   }
@@ -487,7 +487,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void unbuffer() {
     storePosition();
-    releaseClient();
+    releaseClient(true);
 
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {
@@ -514,11 +514,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void handleReadError(IOException cause) throws IOException {
-    releaseClient();
+    releaseClient(false);
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {
       for (ChunkInputStream is : inputStreams) {
-        is.releaseClient();
+        is.releaseClient(false);
       }
     }
 

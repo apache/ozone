@@ -282,12 +282,13 @@ public class ChunkInputStream extends InputStream
   @Override
   public synchronized void close() {
     releaseBuffers();
-    releaseClient();
+    releaseClient(true);
   }
 
-  protected synchronized void releaseClient() {
+  protected synchronized void releaseClient(boolean invalidateClient) {
     if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
+      xceiverClientFactory.releaseClientForReadData(
+          xceiverClient, invalidateClient);
       xceiverClient = null;
     }
   }
@@ -738,7 +739,7 @@ public class ChunkInputStream extends InputStream
   public synchronized void unbuffer() {
     storePosition();
     releaseBuffers();
-    releaseClient();
+    releaseClient(true);
   }
 
   @VisibleForTesting

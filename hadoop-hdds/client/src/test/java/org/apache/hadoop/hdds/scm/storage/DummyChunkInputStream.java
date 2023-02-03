@@ -82,7 +82,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
   }
 
   @Override
-  protected void releaseClient() {
+  protected void releaseClient(boolean invalidateClient) {
     // no-op
   }
 
