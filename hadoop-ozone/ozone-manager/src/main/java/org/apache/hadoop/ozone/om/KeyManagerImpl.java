@@ -1186,10 +1186,9 @@ public class KeyManagerImpl implements KeyManager {
 
       // HDDS-7871: RocksIterator#seek() may position at the key
       // past the target, we should check the full dbKeyName.
-      // For example, seeking "/vol1/bucket1/dir1/"
-      // may return "/vol1/bucket2/dir1/key1"
+      // For example, seeking "/vol1/bucket1/dir2/" may return a key
+      // in different volume/bucket, such as "/vol1/bucket2/dir2/key2".
       if (keyValue != null && keyValue.getKey().startsWith(targetKey)) {
-        // create fake directory
         fakeDirKeyInfo = createDirectoryKey(keyValue.getValue(), dirKey);
       }
     }
