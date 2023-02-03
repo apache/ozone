@@ -649,8 +649,9 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
-   * Check OFSPath to determine whether we are on a bucket path
-   * or a snapshot path and return FileStatusAdapter.
+   * Return FileStatusAdapter based on OFSPath being a
+   * valid bucket path or valid snapshot path.
+   * Throws exception in case of failure.
    */
   private FileStatusAdapter getFileStatusForKeyOrSnapshot(
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
