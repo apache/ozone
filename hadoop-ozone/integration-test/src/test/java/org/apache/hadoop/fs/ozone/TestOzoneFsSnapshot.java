@@ -16,9 +16,14 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.UUID;
+import java.util.stream.Stream;
+
+import com.google.common.base.Strings;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,13 +34,13 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
@@ -55,12 +60,19 @@ public class TestOzoneFsSnapshot {
   private static MiniOzoneCluster cluster;
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static OzoneManager ozoneManager;
-  private OzoneFsShell shell;
-  private String volume;
-  private String bucket;
-  private String key;
-  private String bucketPath;
-  private String bucketWithSnapshotIndicatorPath;
+  private static OzoneFsShell shell;
+  private static final String VOLUME =
+      "vol-" + RandomStringUtils.randomNumeric(5);;
+  private static final String BUCKET =
+      "buck-" + RandomStringUtils.randomNumeric(5);
+  private static final String KEY =
+      "key-" + RandomStringUtils.randomNumeric(5);
+  private static final String BUCKET_PATH =
+      OM_KEY_PREFIX + VOLUME + OM_KEY_PREFIX + BUCKET;
+  private static final String BUCKET_WITH_SNAPSHOT_INDICATOR_PATH =
+      BUCKET_PATH + OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR;
+  private static final String KEY_PATH =
+      BUCKET_PATH + OM_KEY_PREFIX + KEY;
 
   @BeforeAll
   public static void initClass() throws Exception {
@@ -75,10 +87,7 @@ public class TestOzoneFsSnapshot {
         .build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-  }
 
-  @BeforeEach
-  public void init() throws Exception {
     String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + OM_SERVICE_ID;
     OzoneConfiguration clientConf =
         new OzoneConfiguration(cluster.getConf());
@@ -86,42 +95,28 @@ public class TestOzoneFsSnapshot {
 
     shell = new OzoneFsShell(clientConf);
 
-    this.volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    this.bucket = "buck-" + RandomStringUtils.randomNumeric(5);
-    this.key = "key-" + RandomStringUtils.randomNumeric(5);
-
-    this.bucketPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket;
-    this.bucketWithSnapshotIndicatorPath = bucketPath +
-        OM_KEY_PREFIX + OM_SNAPSHOT_INDICATOR;
-
-    String keyPath = bucketPath + OM_KEY_PREFIX + key;
-    createVolBuckKey(bucketPath, keyPath);
-  }
-
-  @AfterEach
-  public void cleanup() throws IOException {
-    shell.close();
+    createVolBuckKey();
   }
 
   @AfterAll
-  public static void shutdown() {
+  public static void shutdown() throws IOException {
+    shell.close();
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  private void createVolBuckKey(String testVolBucket, String testKey)
+  private static void createVolBuckKey()
       throws Exception {
-
     // Create volume and bucket
     int res = ToolRunner.run(shell,
-        new String[]{"-mkdir", "-p", testVolBucket});
+        new String[]{"-mkdir", "-p", BUCKET_PATH});
     Assertions.assertEquals(0, res);
     // Create key
-    res = ToolRunner.run(shell, new String[]{"-touch", testKey});
+    res = ToolRunner.run(shell, new String[]{"-touch", KEY_PATH});
     Assertions.assertEquals(0, res);
     // List the bucket to make sure that bucket exists.
-    res = ToolRunner.run(shell, new String[]{"-ls", testVolBucket});
+    res = ToolRunner.run(shell, new String[]{"-ls", BUCKET_PATH});
     Assertions.assertEquals(0, res);
 
   }
@@ -131,12 +126,12 @@ public class TestOzoneFsSnapshot {
     String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
 
     int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
+        new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request succeeded
     Assertions.assertEquals(0, res);
 
     res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
+        new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request fails since snapshot name provided twice
     Assertions.assertEquals(1, res);
   }
@@ -152,14 +147,14 @@ public class TestOzoneFsSnapshot {
   public void testCreateSnapshotSuccess(String snapshotName)
       throws Exception {
     int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
+        new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request succeeded
     Assertions.assertEquals(0, res);
 
     SnapshotInfo snapshotInfo = ozoneManager
         .getMetadataManager()
         .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volume, bucket, snapshotName));
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
 
     // Assert that snapshot exists in RocksDB.
     // We can't use list or valid if snapshot directory exists because DB
@@ -167,115 +162,153 @@ public class TestOzoneFsSnapshot {
     Assertions.assertNotNull(snapshotInfo);
   }
 
-  /**
-   * Create snapshot should fail.
-   * 1st case: snapshot name contains invalid char
-   * 2nd case: snapshot name consists only of numbers
-   * 3rd case: bucket path is invalid
-   * 4th case: snapshot name length is more than 64 chars
-   */
-  @ParameterizedTest
-  @ValueSource(strings = {"snapa?b", "1234",
-      "snap156808943643007724443266605711479126926050896107709081166294"})
-  public void testCreateSnapshotFailure(String snapshotName)
-      throws Exception {
+  private static Stream<Arguments> createSnapshotFailureScenarios() {
+    String invalidBucketPath = "/invalid/uri";
+    return Stream.of(
+        Arguments.of("1st case: snapshot name contains invalid char",
+            BUCKET_PATH,
+            "snapa?b",
+            "Invalid snapshot name"),
+        Arguments.of("2nd case: snapshot name consists only of numbers",
+            BUCKET_PATH,
+            "1234",
+            "Invalid snapshot name"),
+        Arguments.of("3rd case: bucket path is invalid",
+            invalidBucketPath,
+            "validSnapshotName12",
+            "No such file or directory"),
+        Arguments.of("4th case: snapshot name length is more than 64 chars",
+            BUCKET_PATH,
+            "snap156808943643007724443266605711479126926050896107709081166294",
+            "Invalid snapshot name")
+    );
+  }
 
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
-    // Asserts that create request failed
-    Assertions.assertEquals(1, res);
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("createSnapshotFailureScenarios")
+  public void testCreateSnapshotFailure(String description,
+                                        String paramBucketPath,
+                                        String snapshotName,
+                                        String expectedMessage)
+      throws Exception {
+    String errorMessage = execShellCommandAndGetOutput(false,
+        new String[]{"-createSnapshot", paramBucketPath, snapshotName});
+
+    Assertions.assertTrue(errorMessage
+        .contains(expectedMessage));
   }
 
   @Test
-  public void testCreateSnapshotParameterMissing() throws Exception {
-
+  public void testCreateSnapshotAllParametersMissing() throws Exception {
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot"});
     // Asserts that create request failed since mandatory params not passed
     Assertions.assertEquals(-1, res);
   }
 
-  @Test
-  public void testCreateSnapshotInvalidURI() throws Exception {
-
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", "invalidURI"});
-    // Asserts that create request failed since
-    // invalid volume-bucket URI passed
-    Assertions.assertEquals(1, res);
-  }
-
   /**
-   * Test list snapshots with "ozone fs -ls".
+   * Test list snapshot and snapshot keys with "ozone fs -ls".
    */
   @Test
   public void testFsLsSnapshot() throws Exception {
+    String newKey = "key-" + RandomStringUtils.randomNumeric(5);
+    String newKeyPath = BUCKET_PATH + OM_KEY_PREFIX + newKey;
+
+    // Create new key, while the old one
+    // might be deleted from a previous test.
+    execShellCommandAndGetOutput(true,
+        new String[]{"-touch", newKeyPath});
+
+    // Create snapshot
     String snapshotName = createSnapshot();
-
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-
-      // Check for snapshot with "ozone fs -ls"
-      int res = ToolRunner.run(shell,
-          new String[]{"-ls", bucketWithSnapshotIndicatorPath});
-      // Asserts that -ls request succeeded
-      Assertions.assertEquals(0, res);
-
-      // Assert that output contains above snapshotName
-      Assertions.assertTrue(capture.getOutput()
-          .contains(bucketWithSnapshotIndicatorPath
-              + OM_KEY_PREFIX + snapshotName));
-    }
-  }
-
-  /**
-   * Test list snapshot keys with "ozone fs -ls".
-   */
-  @Test
-  public void testFsLsSnapshotKeys() throws Exception {
-    String snapshotName = createSnapshot();
-    String snapshotPath = bucketWithSnapshotIndicatorPath +
+    // Setup snapshot paths
+    String snapshotPath = BUCKET_WITH_SNAPSHOT_INDICATOR_PATH +
         OM_KEY_PREFIX + snapshotName;
-    String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + key;
+    String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + newKey;
 
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
+    // Check for snapshot with "ozone fs -ls"
+    String listSnapOut = execShellCommandAndGetOutput(true,
+        new String[]{"-ls", BUCKET_WITH_SNAPSHOT_INDICATOR_PATH});
 
-      // Check for snapshot keys with "ozone fs -ls"
-      int res = ToolRunner.run(shell,
-          new String[]{"-ls", snapshotPath});
-      // Asserts that -ls request succeeded
-      Assertions.assertEquals(0, res);
+    // Assert that output contains above snapshotName
+    Assertions.assertTrue(listSnapOut
+        .contains(snapshotPath));
 
-      // Assert that output contains the snapshot key
-      Assertions.assertTrue(capture.getOutput()
-          .contains(snapshotKeyPath));
-    }
+    // Check for snapshot keys with "ozone fs -ls"
+    String listSnapKeyOut = execShellCommandAndGetOutput(true,
+        new String[]{"-ls", snapshotPath});
+
+    // Assert that output contains the snapshot key
+    Assertions.assertTrue(listSnapKeyOut
+        .contains(snapshotKeyPath));
   }
 
   @Test
   public void testDeleteBucketWithSnapshot() throws Exception {
     String snapshotName = createSnapshot();
 
-    String keyPath = bucketPath + OM_KEY_PREFIX + key;
-    String snapshotPath = bucketWithSnapshotIndicatorPath
+    String snapshotPath = BUCKET_WITH_SNAPSHOT_INDICATOR_PATH
         + OM_KEY_PREFIX + snapshotName;
+    String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + KEY;
 
-    int res = ToolRunner.run(shell,
-            new String[]{"-rm", "-r", "-skipTrash", keyPath});
-    Assertions.assertEquals(0, res);
+    // Delete bucket key should succeed
+    String deleteKeyOut = execShellCommandAndGetOutput(true,
+        new String[]{"-rm", "-r", "-skipTrash", KEY_PATH});
 
-    res = ToolRunner.run(shell,
-            new String[]{"-rm", "-r", "-skipTrash", bucketPath});
-    Assertions.assertEquals(1, res);
+    Assertions.assertTrue(deleteKeyOut
+        .contains("Deleted " + BUCKET_PATH));
 
-    res = ToolRunner.run(shell,
-            new String[]{"-ls", bucketPath});
-    Assertions.assertEquals(0, res);
+    // Delete bucket should fail due to existing snapshot
+    String deleteBucketOut = execShellCommandAndGetOutput(false,
+        new String[]{"-rm", "-r", "-skipTrash", BUCKET_PATH});
+    Assertions.assertTrue(deleteBucketOut
+          .contains(BUCKET + " can't be deleted when it has snapshots"));
 
-    res = ToolRunner.run(shell,
-            new String[]{"-ls", snapshotPath});
-    Assertions.assertEquals(0, res);
+    // Key shouldn't exist under bucket
+    String listKeyOut = execShellCommandAndGetOutput(true,
+        new String[]{"-ls", BUCKET_PATH});
+    Assertions.assertTrue(Strings.isNullOrEmpty(listKeyOut));
+
+    // Key should still exist under snapshot
+    String listSnapKeyOut = execShellCommandAndGetOutput(true,
+        new String[]{"-ls", snapshotPath});
+    Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
+  }
+
+  /**
+   * Execute a shell command with provided arguments
+   * and return a string of the output.
+   */
+  private String execShellCommandAndGetOutput(
+      boolean success, String[] args) throws Exception {
+    ByteArrayOutputStream successBytes = new ByteArrayOutputStream();
+    ByteArrayOutputStream errorBytes = new ByteArrayOutputStream();
+
+    // Setup output streams
+    System.setOut(new PrintStream(successBytes));
+    System.setErr(new PrintStream(errorBytes));
+
+    // Execute command
+    int res = ToolRunner.run(shell, args);
+    int expectedRes = success ? 0 : 1;
+    Assertions.assertEquals(expectedRes, res);
+
+    // Store command output to a string,
+    // if command should succeed then
+    // get successBytes else get errorBytes
+    String output = success ?
+        successBytes.toString() :
+        errorBytes.toString();
+
+    // Flush byte array streams
+    successBytes.flush();
+    errorBytes.flush();
+
+    // Restore output streams
+    System.setOut(new PrintStream(successBytes));
+    System.setErr(new PrintStream(errorBytes));
+
+    return output;
   }
 
   private String createSnapshot() throws Exception {
@@ -283,7 +316,7 @@ public class TestOzoneFsSnapshot {
 
     // Create snapshot
     int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot", bucketPath, snapshotName});
+        new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request succeeded
     Assertions.assertEquals(0, res);
 
@@ -293,7 +326,7 @@ public class TestOzoneFsSnapshot {
     // wait till the snapshot directory exists
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volume, bucket, snapshotName));
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
     String snapshotDirName = metaDir + OM_KEY_PREFIX +
         OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
         snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
