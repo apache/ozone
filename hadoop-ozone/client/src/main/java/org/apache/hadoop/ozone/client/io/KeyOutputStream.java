@@ -91,6 +91,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
 
   private long clientID;
 
+  private OzoneManagerProtocol omClient;
+
   public KeyOutputStream(ContainerClientMetrics clientMetrics) {
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
@@ -156,6 +158,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
+    this.omClient = omClient;
   }
 
   /**
@@ -450,11 +453,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   public void hsync() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.HSYNC);
-    //TODO HDDS-7593: send hsyncKey to update length;
-    //     where the hsyncKey op is similar to
-    //     blockOutputStreamEntryPool.commitKey(offset)
-    //     except that hsyncKey only updates the key length
-    //     instead of committing it.
+    blockOutputStreamEntryPool.hsyncKey(offset);
   }
 
   /**

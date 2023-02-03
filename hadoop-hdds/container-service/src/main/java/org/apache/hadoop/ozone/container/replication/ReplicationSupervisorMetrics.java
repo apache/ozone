@@ -60,7 +60,7 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
     collector.addRecord(SOURCE)
         .addGauge(Interns.info("numInFlightReplications",
             "Number of pending replications(including queued replications"),
-            supervisor.getInFlightReplications())
+            supervisor.getTotalInFlightReplications())
         .addGauge(Interns.info("numQueuedReplications",
             "Number of replications in queue"),
             supervisor.getQueueSize())

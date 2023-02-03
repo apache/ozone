@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -112,6 +113,11 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
+    // These tests manually insert keys into RocksDB. This is easier to do
+    // with object store layout so keys with path IDs do not need to be
+    // constructed.
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
         .setScmId(SCM_ID)

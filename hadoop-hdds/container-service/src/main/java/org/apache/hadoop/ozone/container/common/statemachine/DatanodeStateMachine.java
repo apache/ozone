@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -57,8 +58,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Repl
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -106,7 +105,6 @@ public class DatanodeStateMachine implements Closeable {
   private volatile Thread stateMachineThread = null;
   private Thread cmdProcessThread = null;
   private final ReplicationSupervisor supervisor;
-  private final ECReconstructionSupervisor ecReconstructionSupervisor;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
@@ -121,9 +119,13 @@ public class DatanodeStateMachine implements Closeable {
    * constructor in a non-thread-safe way - see HDDS-3116.
    */
   private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
-  private final MeasuredReplicator replicatorMetrics;
+  private final MeasuredReplicator pullReplicatorWithMetrics;
+  private final MeasuredReplicator pushReplicatorWithMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
   private final ECReconstructionMetrics ecReconstructionMetrics;
+  // This is an instance variable as mockito needs to access it in a test
+  private final ReconstructECContainersCommandHandler
+      reconstructECContainersCommandHandler;
 
   private final DatanodeQueueMetrics queueMetrics;
   /**
@@ -178,18 +180,18 @@ public class DatanodeStateMachine implements Closeable {
     ContainerImporter importer = new ContainerImporter(conf,
         container.getContainerSet(),
         container.getController(),
-        new TarContainerPacker(), container.getVolumeSet());
+        container.getVolumeSet());
     ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
-        container.getContainerSet(),
+        conf, container.getContainerSet(),
         importer,
         new SimpleContainerDownloader(conf, dnCertClient));
-    ContainerReplicator pushReplicator = new PushReplicator(
-        // TODO compression, metrics
+    ContainerReplicator pushReplicator = new PushReplicator(conf,
         new OnDemandContainerReplicationSource(container.getController()),
         new GrpcContainerUploader(conf, dnCertClient)
     );
 
-    replicatorMetrics = new MeasuredReplicator(pullReplicator);
+    pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
+    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
@@ -203,12 +205,12 @@ public class DatanodeStateMachine implements Closeable {
     ECReconstructionCoordinator ecReconstructionCoordinator =
         new ECReconstructionCoordinator(conf, certClient, context,
             ecReconstructionMetrics);
-    ecReconstructionSupervisor =
-        new ECReconstructionSupervisor(container.getContainerSet(), context,
-            replicationConfig.getReplicationMaxStreams(),
-            ecReconstructionCoordinator, clock);
 
-
+    // This is created as an instance variable as Mockito needs to access it in
+    // a test. The test mocks it in a running mini-cluster.
+    reconstructECContainersCommandHandler =
+        new ReconstructECContainersCommandHandler(conf, supervisor,
+        ecReconstructionCoordinator);
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
@@ -217,9 +219,8 @@ public class DatanodeStateMachine implements Closeable {
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
-            replicatorMetrics, pushReplicator))
-        .addHandler(new ReconstructECContainersCommandHandler(conf,
-            ecReconstructionSupervisor))
+            pullReplicatorWithMetrics, pushReplicatorWithMetrics))
+        .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock))
         .addHandler(new ClosePipelineCommandHandler())
@@ -416,10 +417,6 @@ public class DatanodeStateMachine implements Closeable {
       Thread.currentThread().interrupt();
     }
 
-    if (ecReconstructionSupervisor != null) {
-      ecReconstructionSupervisor.close();
-    }
-
     if (connectionManager != null) {
       connectionManager.close();
     }
@@ -594,11 +591,7 @@ public class DatanodeStateMachine implements Closeable {
    */
   public synchronized void stopDaemon() {
     try {
-      try {
-        replicatorMetrics.close();
-      } catch (Exception e) {
-        LOG.error("Couldn't stop replicator metrics", e);
-      }
+      IOUtils.close(LOG, pushReplicatorWithMetrics, pullReplicatorWithMetrics);
       supervisor.stop();
       context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);
