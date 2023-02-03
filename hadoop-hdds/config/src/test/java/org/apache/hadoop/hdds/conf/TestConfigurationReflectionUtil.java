@@ -17,99 +17,69 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Optional;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test the configuration reflection utility class.
  */
-@RunWith(Parameterized.class)
-public class TestConfigurationReflectionUtil {
+class TestConfigurationReflectionUtil {
 
-  private final ConfigType type;
-  private final String key;
-  private final String defaultValue;
-  private final Class testClass;
-  private final String fieldName;
-  private final boolean typePresent;
-  private final boolean keyPresent;
-  private final boolean defaultValuePresent;
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][]{
-        {ConfigurationExample.class, "waitTime",
+  static Stream<Arguments> data() {
+    return Stream.of(
+        arguments(ConfigurationExample.class, "waitTime",
             ConfigType.TIME, true,
             "ozone.scm.client.wait", true,
-            "30m", true},
-        {ConfigurationExampleGrandParent.class, "number",
+            "30m", true),
+        arguments(ConfigurationExampleGrandParent.class, "number",
             ConfigType.AUTO, true,
             "number", true,
-            "2", true},
-        {ConfigurationExample.class, "secure",
+            "2", true),
+        arguments(ConfigurationExample.class, "secure",
             ConfigType.AUTO, true,
             "ozone.scm.client.secure", true,
-            "true", true},
-        {ConfigurationExample.class, "no-such-field",
+            "true", true),
+        arguments(ConfigurationExample.class, "no-such-field",
             null, false,
             "", false,
-            "", false},
-        {ConfigFileAppender.class, "document",
+            "", false),
+        arguments(ConfigFileAppender.class, "document",
             null, false,
             "", false,
-            "", false},
-        {ConfigurationExample.class, "threshold",
+            "", false),
+        arguments(ConfigurationExample.class, "threshold",
             ConfigType.DOUBLE, true,
             "ozone.scm.client.threshold", true,
-            "10", true},
-    });
+            "10", true)
+    );
   }
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public TestConfigurationReflectionUtil(
-      Class testClass, String fieldName,
-      ConfigType type, boolean typePresent,
-      String key, boolean keyPresent,
-      String defaultValue, boolean defaultValuePresent) {
-    this.testClass = testClass;
-    this.fieldName = fieldName;
-    this.typePresent = typePresent;
-    this.type = type;
-    this.key = key;
-    this.keyPresent = keyPresent;
-    this.defaultValue = defaultValue;
-    this.defaultValuePresent = defaultValuePresent;
-  }
+  @ParameterizedTest
+  @MethodSource("data")
+  void testForGivenClasses(Class<?> testClass, String fieldName,
+      ConfigType expectedType, boolean typePresent,
+      String expectedKey, boolean keyPresent,
+      String expectedDefault, boolean defaultValuePresent) {
+    Optional<ConfigType> type = ConfigurationReflectionUtil.getType(
+        testClass, fieldName);
+    assertEquals(typePresent, type.isPresent());
+    type.ifPresent(actual -> assertEquals(expectedType, actual));
 
-  @Test
-  public void testForGivenClasses() {
-    Optional<ConfigType> actualType =
-        ConfigurationReflectionUtil.getType(
-            testClass, fieldName);
-    Assert.assertEquals(typePresent, actualType.isPresent());
-    if (typePresent) {
-      Assert.assertEquals(type, actualType.get());
-    }
+    Optional<String> key = ConfigurationReflectionUtil.getKey(
+        testClass, fieldName);
+    assertEquals(keyPresent, key.isPresent());
+    key.ifPresent(actual -> assertEquals(expectedKey, actual));
 
-    Optional<String> actualKey =
-        ConfigurationReflectionUtil.getKey(
-            testClass, fieldName);
-    Assert.assertEquals(keyPresent, actualKey.isPresent());
-    if (keyPresent) {
-      Assert.assertEquals(key, actualKey.get());
-    }
-    Optional<String> actualDefaultValue =
-        ConfigurationReflectionUtil.getDefaultValue(
-            testClass, fieldName);
-    Assert.assertEquals(defaultValuePresent, actualDefaultValue.isPresent());
-    if (defaultValuePresent) {
-      Assert.assertEquals(defaultValue, actualDefaultValue.get());
-    }
+    Optional<String> defaultValue = ConfigurationReflectionUtil.getDefaultValue(
+        testClass, fieldName);
+    assertEquals(defaultValuePresent, defaultValue.isPresent());
+    defaultValue.ifPresent(actual -> assertEquals(expectedDefault, actual));
   }
 }
