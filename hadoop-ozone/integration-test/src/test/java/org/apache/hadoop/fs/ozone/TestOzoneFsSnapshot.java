@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -285,8 +286,10 @@ public class TestOzoneFsSnapshot {
     ByteArrayOutputStream errorBytes = new ByteArrayOutputStream();
 
     // Setup output streams
-    System.setOut(new PrintStream(successBytes));
-    System.setErr(new PrintStream(errorBytes));
+    System.setOut(new PrintStream(
+        successBytes, false, StandardCharsets.UTF_8.name()));
+    System.setErr(new PrintStream(
+        errorBytes, false, StandardCharsets.UTF_8.name()));
 
     // Execute command
     int res = ToolRunner.run(shell, args);
@@ -297,16 +300,18 @@ public class TestOzoneFsSnapshot {
     // if command should succeed then
     // get successBytes else get errorBytes
     String output = success ?
-        successBytes.toString() :
-        errorBytes.toString();
+        successBytes.toString(StandardCharsets.UTF_8.name()) :
+        errorBytes.toString(StandardCharsets.UTF_8.name());
 
     // Flush byte array streams
     successBytes.flush();
     errorBytes.flush();
 
     // Restore output streams
-    System.setOut(new PrintStream(successBytes));
-    System.setErr(new PrintStream(errorBytes));
+    System.setOut(new PrintStream(
+        successBytes, false, StandardCharsets.UTF_8.name()));
+    System.setErr(new PrintStream(
+        errorBytes, false, StandardCharsets.UTF_8.name()));
 
     return output;
   }
