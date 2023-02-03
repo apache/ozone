@@ -1384,7 +1384,8 @@ public class TestKeyManagerImpl {
     Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
 
-    // get a non-existing "foo2" from bucket1, RocksIter#seek() will find the
+    // get a non-existing "foo2" from bucket1 should throw FILE_NOT_FOUND.
+    // RocksIterator#seek("volume1/bucket1/foo2/") will position at the
     // 2nd dbKey "volume1/bucket2/foo2/bar2", which is not belong to bucket1.
     keyArgs = createBuilder(BUCKET_NAME).setKeyName(dirName).build();
     OmKeyArgs finalKeyArgs = keyArgs;
