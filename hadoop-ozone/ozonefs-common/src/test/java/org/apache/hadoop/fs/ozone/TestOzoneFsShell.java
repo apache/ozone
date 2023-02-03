@@ -19,7 +19,6 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.shell.Command;
 import org.apache.hadoop.fs.shell.CommandFactory;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.util.ToolRunner;
 
 import java.io.ByteArrayOutputStream;
@@ -45,7 +44,6 @@ public class TestOzoneFsShell {
     final String rmCmd = "-" + rmCmdName;
     final String arg = "arg1";
     OzoneFsShell shell = new OzoneFsShell();
-    OzoneConfiguration conf = new OzoneConfiguration();
     String[] argv = {arg, arg};
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     PrintStream bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
@@ -66,6 +64,5 @@ public class TestOzoneFsShell {
       shell.close();
       System.setErr(oldErr);
     }
-
   }
 }
