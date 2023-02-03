@@ -35,51 +35,48 @@ class TestConfigurationReflectionUtil {
   static Stream<Arguments> data() {
     return Stream.of(
         arguments(ConfigurationExample.class, "waitTime",
-            ConfigType.TIME, true,
-            "ozone.scm.client.wait", true,
-            "30m", true),
+            Optional.of(ConfigType.TIME),
+            Optional.of("ozone.scm.client.wait"),
+            Optional.of("30m")),
         arguments(ConfigurationExampleGrandParent.class, "number",
-            ConfigType.AUTO, true,
-            "number", true,
-            "2", true),
+            Optional.of(ConfigType.AUTO),
+            Optional.of("number"),
+            Optional.of("2")),
         arguments(ConfigurationExample.class, "secure",
-            ConfigType.AUTO, true,
-            "ozone.scm.client.secure", true,
-            "true", true),
+            Optional.of(ConfigType.AUTO),
+            Optional.of("ozone.scm.client.secure"),
+            Optional.of("true")),
         arguments(ConfigurationExample.class, "no-such-field",
-            null, false,
-            "", false,
-            "", false),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty()),
         arguments(ConfigFileAppender.class, "document",
-            null, false,
-            "", false,
-            "", false),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty()),
         arguments(ConfigurationExample.class, "threshold",
-            ConfigType.DOUBLE, true,
-            "ozone.scm.client.threshold", true,
-            "10", true)
+            Optional.of(ConfigType.DOUBLE),
+            Optional.of("ozone.scm.client.threshold"),
+            Optional.of("10"))
     );
   }
 
   @ParameterizedTest
   @MethodSource("data")
   void testForGivenClasses(Class<?> testClass, String fieldName,
-      ConfigType expectedType, boolean typePresent,
-      String expectedKey, boolean keyPresent,
-      String expectedDefault, boolean defaultValuePresent) {
+      Optional<ConfigType> expectedType,
+      Optional<String> expectedKey,
+      Optional<String> expectedDefault) {
     Optional<ConfigType> type = ConfigurationReflectionUtil.getType(
         testClass, fieldName);
-    assertEquals(typePresent, type.isPresent());
-    type.ifPresent(actual -> assertEquals(expectedType, actual));
+    assertEquals(expectedType, type);
 
     Optional<String> key = ConfigurationReflectionUtil.getKey(
         testClass, fieldName);
-    assertEquals(keyPresent, key.isPresent());
-    key.ifPresent(actual -> assertEquals(expectedKey, actual));
+    assertEquals(expectedKey, key);
 
     Optional<String> defaultValue = ConfigurationReflectionUtil.getDefaultValue(
         testClass, fieldName);
-    assertEquals(defaultValuePresent, defaultValue.isPresent());
-    defaultValue.ifPresent(actual -> assertEquals(expectedDefault, actual));
+    assertEquals(expectedDefault, defaultValue);
   }
 }
