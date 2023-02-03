@@ -425,5 +425,5 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT
       = false;
   public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
-      = "ozone.om.snapshot.diff.db.dirs";
+      = "ozone.om.snapshot.diff.db.dir";
 }
