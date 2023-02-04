@@ -1646,7 +1646,8 @@ public class TestKeyManagerImpl {
     return keyNames;
   }
 
-  private void createFile(String bucketName, String keyName) throws IOException {
+  private void createFile(String bucketName, String keyName)
+      throws IOException {
     OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     keyArgs.setLocationInfoList(
