@@ -57,7 +57,7 @@ prepare_for_image "$OZONE_UPGRADE_FROM"
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 start_docker_env
-callback with_old_version
+callback with_this_version
 
 prepare_oms
 stop_docker_env
@@ -76,7 +76,7 @@ set_downgrade_om_args
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
 OUTPUT_NAME="$OZONE_UPGRADE_FROM"-downgraded
 OZONE_KEEP_RESULTS=true start_docker_env
-callback with_old_version_downgraded
+callback with_this_version_downgraded
 
 prepare_oms
 stop_docker_env

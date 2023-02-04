@@ -45,13 +45,12 @@ get_cluster_setup_file() {
   echo "$TEST_DIR"/compose/ha/load.sh
 }
 
-with_old_version() {
+with_this_version() {
   generate old1
   validate old1
 }
 
 with_new_version_pre_finalized() {
-  execute_robot_test scm --include pre-finalized upgrade/check-finalization.robot
   validate old1
   # HDDS-6261: overwrite the same keys intentionally
   generate old1 --exclude create-volume-and-bucket
@@ -60,7 +59,7 @@ with_new_version_pre_finalized() {
   validate new1
 }
 
-with_old_version_downgraded() {
+with_this_version_downgraded() {
   validate old1
   validate new1
 

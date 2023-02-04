@@ -19,5 +19,5 @@ source "$TEST_DIR"/testlib.sh
 
 get_cluster_setup_file() {
   # Ozone 1.1.0 did not support SCM HA.
-  source "$TEST_DIR"/compose/om-ha/load.sh
+  echo "$TEST_DIR"/compose/om-ha/load.sh
 }

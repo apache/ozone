@@ -41,9 +41,9 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 
 - Supported Callbacks:
     1. `setup`: Run before ozone is started in the old version.
-    3. `with_old_version`: Run while ozone is running in the old version.
+    3. `with_this_version`: Run while ozone is running in the old version.
     3. `with_new_version_pre_finalized`: Run after ozone is stopped in the old version, and brought back up and running in the new version pre-finalized.
-    4. `with_old_version_downgraded`: Run after ozone is stopped in the new version pre-finalized, and restarted in the old version again.
+    4. `with_this_version_downgraded`: Run after ozone is stopped in the new version pre-finalized, and restarted in the old version again.
     5. `with_new_version_finalized`: Run after ozone is stopped in the old version after donwgrade, started again in the new version pre-finalized, and then finalized.
         - The upgrade is complete when this callback runs.
 
@@ -60,8 +60,8 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 - This is primarily for testing upgrades from versions before the non-rolling upgrade framework was introduced.
 
 - Supported Callbacks:
-    1. `setup_with_old_version`: Run before ozone is started in the old version.
-    3. `with_old_version`: Run while ozone is running in the old version.
+    1. `setup_with_this_version`: Run before ozone is started in the old version.
+    3. `with_this_version`: Run while ozone is running in the old version.
     3. `setup_with_new_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
     4. `with_new_version`: Run while ozone is running in the new version.
 

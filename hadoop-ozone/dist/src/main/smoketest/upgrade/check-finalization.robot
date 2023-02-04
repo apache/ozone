@@ -20,24 +20,26 @@ Test Timeout        10 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
-Check Finalized
-    [Tags]    finalized
+Check OM Finalized
+    [Tags]    om    finalized
     ${result} =        Execute      ozone admin om finalizationstatus
                        Log    ${result}
                        Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
 
-
+Check SCM Finalized
+    [Tags]    scm    finalized
     ${result} =        Execute      ozone admin scm finalizationstatus
                        Log    ${result}
                        Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
 
-Check Pre Finalized
-    [Tags]    pre-finalized
+Check OM Pre Finalized
+    [Tags]    om    pre-finalized
     ${result} =        Execute      ozone admin om finalizationstatus
                        Log    ${result}
                        Should Contain Any    ${result}    FINALIZATION_REQUIRED
 
-
+Check SCM Pre Finalized
+    [Tags]    scm    pre-finalized
     ${result} =        Execute      ozone admin scm finalizationstatus
                        Log    ${result}
                        Should Contain Any    ${result}    FINALIZATION_REQUIRED

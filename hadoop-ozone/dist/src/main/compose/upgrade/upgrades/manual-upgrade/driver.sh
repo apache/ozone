@@ -41,7 +41,7 @@ callback setup_old_version
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 start_docker_env
-callback with_old_version
+callback with_this_version
 stop_docker_env
 
 echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"

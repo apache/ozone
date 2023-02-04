@@ -18,20 +18,23 @@
 source "$TEST_DIR"/testlib.sh
 
 
-with_old_version() {
+with_this_version() {
   # 1.2.0 was the first version with the upgrade framework where we can check
   # finalization status.
-  execute_robot_test scm --include finalized upgrade/check-finalization
-  .robot
+  execute_robot_test scm --include finalized upgrade/check-finalization.robot
 }
 
 with_new_version_pre_finalized() {
+  # The next version of Ozone had OM and HDDS layout features, so OM and SCM
+  # should be pre-finalized regardless of the new version we are upgrading to.
+  execute_robot_test scm --include pre-finalized upgrade/check-finalization.robot
   execute_robot_test scm --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
 }
 
-with_old_version_downgraded() {
-  execute_robot_test scm --include finalized upgrade/check-finalization
-  .robot
+with_this_version_downgraded() {
+  # Metadata layout versions should not have changed on the disk, so the old
+  # version should be finalized with its older layout features.
+  execute_robot_test scm --include finalized upgrade/check-finalization.robot
 }
 
 with_new_version_finalized() {
