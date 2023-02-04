@@ -1015,6 +1015,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
               ofsPath.getVolumeName());
       if (volume.getQuotaInBytes() > -1) {
         quota = volume.getQuotaInBytes();
+        usedBytes = volume.getUsedBytes();
       }
     }
     return new FsStatus(quota, usedBytes, quota - usedBytes);

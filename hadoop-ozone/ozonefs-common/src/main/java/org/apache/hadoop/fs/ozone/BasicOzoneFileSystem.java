@@ -1026,6 +1026,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       OzoneVolume volume = adapterImpl.getVolume();
       if (volume.getQuotaInBytes() > -1) {
         quota = volume.getQuotaInBytes();
+        usedBytes = volume.getUsedBytes();
       }
     }
     return new FsStatus(quota, usedBytes, quota - usedBytes);

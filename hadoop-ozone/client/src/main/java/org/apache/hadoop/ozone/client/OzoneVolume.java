@@ -476,6 +476,19 @@ public class OzoneVolume extends WithMetadata {
   }
 
   /**
+   * Computes the used bytes of all buckets in this volume.
+   * @return volUsedBytes
+   */
+  public long getUsedBytes() {
+    Iterator<? extends OzoneBucket> bucketIter = listBuckets("");
+    long volUsedBytes = 0L;
+    while (bucketIter.hasNext()) {
+      volUsedBytes += bucketIter.next().getUsedBytes();
+    }
+    return volUsedBytes;
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneBucket} list.
    */
   private class BucketIterator implements Iterator<OzoneBucket> {
