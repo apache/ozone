@@ -1376,16 +1376,10 @@ public class TestKeyManagerImpl {
     // get a non-existing "dir2" from bucket1 should throw FILE_NOT_FOUND.
     // RocksIterator#seek("volume1/bucket1/dir2/") will position at the
     // 2nd dbKey "volume1/bucket2/dir2/file2", which is not belong to bucket1.
-    OmKeyArgs fpKey = createBuilder(BUCKET_NAME).setKeyName(dir2).build();
-    OMException ex = Assert.assertThrows(OMException.class,
-        () -> keyManager.getFileStatus(fpKey));
-    Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+    assertFileNotFound(BUCKET_NAME, dir2);
 
     // get a non-existing "dir2" from bucket2 should return a fake key.
-    OmKeyArgs fakeKey = createBuilder(BUCKET2_NAME).setKeyName(dir2).build();
-    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(fakeKey);
-    Assert.assertEquals(dir2, ozoneFileStatus.getKeyInfo().getFileName());
-    Assert.assertTrue(ozoneFileStatus.isDirectory());
+    assertIsDirectory(BUCKET2_NAME, dir2);
   }
 
   @Test
@@ -1613,6 +1607,22 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
+  }
+
+  private void assertFileNotFound(String bucketName, String keyName)
+      throws IOException {
+    OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+    OMException ex = Assert.assertThrows(OMException.class,
+        () -> keyManager.getFileStatus(keyArgs));
+    Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+  }
+
+  private void assertIsDirectory(String bucketName, String keyName)
+      throws IOException {
+    OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+    Assert.assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
+    Assert.assertTrue(ozoneFileStatus.isDirectory());
   }
 
   private List<String> createFiles(String parent,
