@@ -1360,21 +1360,11 @@ public class TestKeyManagerImpl {
     String keyName1 = "foo1";
     // keyName2 = "foo2/bar2"
     String keyName2 = dirName + OZONE_URI_DELIMITER + fileName;
-    OzoneFileStatus ozoneFileStatus;
 
     // create a key "foo1" in bucket1
-    OmKeyArgs keyArgs = createBuilder(BUCKET_NAME).setKeyName(keyName1).build();
-    OpenKeySession keySession = writeClient.openKey(keyArgs);
-    keyArgs.setLocationInfoList(
-        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
-    writeClient.commitKey(keyArgs, keySession.getId());
-
+    createFile(BUCKET_NAME, keyName1);
     // create a key "foo2/bar2" in bucket2
-    keyArgs = createBuilder(BUCKET2_NAME).setKeyName(keyName2).build();
-    keySession = writeClient.createFile(keyArgs, true, true);
-    keyArgs.setLocationInfoList(
-        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
-    writeClient.commitKey(keyArgs, keySession.getId());
+    createFile(BUCKET2_NAME, keyName2);
 
     // Verify the following dbKeys in key table:
     // 1. "volume1/bucket1/foo1"
@@ -1387,15 +1377,14 @@ public class TestKeyManagerImpl {
     // get a non-existing "foo2" from bucket1 should throw FILE_NOT_FOUND.
     // RocksIterator#seek("volume1/bucket1/foo2/") will position at the
     // 2nd dbKey "volume1/bucket2/foo2/bar2", which is not belong to bucket1.
-    keyArgs = createBuilder(BUCKET_NAME).setKeyName(dirName).build();
-    OmKeyArgs finalKeyArgs = keyArgs;
+    OmKeyArgs fpKey = createBuilder(BUCKET_NAME).setKeyName(dirName).build();
     OMException ex = Assert.assertThrows(OMException.class,
-        () -> keyManager.getFileStatus(finalKeyArgs));
+        () -> keyManager.getFileStatus(fpKey));
     Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
 
     // get a non-existing "foo2" from bucket2 should return a fake key.
-    keyArgs = createBuilder(BUCKET2_NAME).setKeyName(dirName).build();
-    ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+    OmKeyArgs fakeKey = createBuilder(BUCKET2_NAME).setKeyName(dirName).build();
+    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(fakeKey);
     Assert.assertEquals(dirName, ozoneFileStatus.getKeyInfo().getFileName());
     Assert.assertTrue(ozoneFileStatus.isDirectory());
   }
@@ -1617,6 +1606,14 @@ public class TestKeyManagerImpl {
     }
     directoryMap.put(parent, new ArrayList<>(keyNames));
     return keyNames;
+  }
+
+  private void createFile(String bucketName, String keyName) throws IOException {
+    OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+    OpenKeySession keySession = writeClient.openKey(keyArgs);
+    keyArgs.setLocationInfoList(
+        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
+    writeClient.commitKey(keyArgs, keySession.getId());
   }
 
   private List<String> createFiles(String parent,
