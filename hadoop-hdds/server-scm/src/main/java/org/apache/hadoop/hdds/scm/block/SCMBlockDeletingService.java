@@ -18,12 +18,16 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -143,11 +147,15 @@ public class SCMBlockDeletingService extends BackgroundService
             return EmptyTaskResult.newResult();
           }
 
+          Set<Long> processedTxIDs = new HashSet<>();
           for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
               transactions.getDatanodeTransactionMap().entrySet()) {
             UUID dnId = entry.getKey();
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
             if (!dnTXs.isEmpty()) {
+              processedTxIDs.addAll(dnTXs.stream()
+                  .map(DeletedBlocksTransaction::getTxID)
+                  .collect(Collectors.toSet()));
               // TODO commandQueue needs a cap.
               // We should stop caching new commands if num of un-processed
               // command is bigger than a limit, e.g 50. In case datanode goes
@@ -174,6 +182,7 @@ public class SCMBlockDeletingService extends BackgroundService
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
               Time.monotonicNow() - startTime);
+          deletedBlockLog.incrementCount(new ArrayList<>(processedTxIDs));
         } catch (NotLeaderException nle) {
           LOG.warn("Skip current run, since not leader any more.", nle);
           return EmptyTaskResult.newResult();
