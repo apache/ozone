@@ -812,13 +812,11 @@ public class BasicRootedOzoneClientAdapterImpl
     List<OzoneSnapshot> snapshotList =
         objectStore.listSnapshot(volumeName, bucketName);
 
-    OzoneVolume volume = objectStore.getVolume(volumeName);
+    OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(volume.getOwner());
+        UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
     String group = getGroupName(ugi);
-
-    OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
 
     return snapshotList.stream()
         .map(ozoneSnapshot -> getFileStatusAdapterForBucketSnapshot(
