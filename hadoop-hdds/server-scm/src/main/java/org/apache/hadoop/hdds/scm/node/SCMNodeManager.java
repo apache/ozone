@@ -830,7 +830,10 @@ public class SCMNodeManager implements NodeManager {
       DatanodeUsageInfo datanodeUsageInfo = new DatanodeUsageInfo(node, stat);
       try {
         datanodeUsageInfo.setContainerCount(getContainers(node).size());
-      } catch (NodeNotFoundException e) {}
+      } catch (NodeNotFoundException ex) {
+        LOG.error("Received container report from unknown datanode {}.",
+                node, ex);
+      }
       datanodeUsageInfoList.add(datanodeUsageInfo);
     }
 

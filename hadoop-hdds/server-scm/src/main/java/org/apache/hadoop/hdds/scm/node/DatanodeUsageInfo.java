@@ -44,6 +44,7 @@ public class DatanodeUsageInfo {
       SCMNodeStat scmNodeStat) {
     this.datanodeDetails = datanodeDetails;
     this.scmNodeStat = scmNodeStat;
+    this.containerCount = -1;
   }
 
   /**

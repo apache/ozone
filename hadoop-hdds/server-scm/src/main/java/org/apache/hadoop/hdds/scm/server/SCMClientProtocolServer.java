@@ -1050,10 +1050,13 @@ public class SCMClientProtocolServer implements
       DatanodeDetails node, int clientVersion) {
     SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
 
-    int containerCount = 0;
+    int containerCount = -1;
     try {
       containerCount = scm.getScmNodeManager().getContainers(node).size();
-    } catch (NodeNotFoundException e) {}
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Received container report from unknown datanode {}.",
+              node, ex);
+    }
 
     long capacity = stat.getCapacity().get();
     long used = stat.getScmUsed().get();
