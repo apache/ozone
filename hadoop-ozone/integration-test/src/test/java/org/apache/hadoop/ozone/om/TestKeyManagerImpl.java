@@ -1355,8 +1355,10 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testGetFileStatusWithFakeDirFalsePositive() throws IOException {
+    String dir0 = "dir0";
     String dir1 = "dir1";
     String dir2 = "dir2";
+    String dir3 = "dir3";
     String keyName1 = dir1 + OZONE_URI_DELIMITER + "file1";
     String keyName2 = dir2 + OZONE_URI_DELIMITER + "file2";
 
@@ -1373,13 +1375,20 @@ public class TestKeyManagerImpl {
     Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
 
-    // get a non-existing "dir2" from bucket1 should throw FILE_NOT_FOUND.
+    assertFileNotFound(BUCKET_NAME, dir0);
+    // true positive: fake dir "volume1/bucket1/dir1" should be returned.
+    assertIsDirectory(BUCKET_NAME, dir1);
     // RocksIterator#seek("volume1/bucket1/dir2/") will position at the
     // 2nd dbKey "volume1/bucket2/dir2/file2", which is not belong to bucket1.
+    // This might be a false positive, see HDDS-7871.
     assertFileNotFound(BUCKET_NAME, dir2);
+    assertFileNotFound(BUCKET_NAME, dir3);
 
-    // get a non-existing "dir2" from bucket2 should return a fake key.
+    assertFileNotFound(BUCKET2_NAME, dir0);
+    assertFileNotFound(BUCKET2_NAME, dir1);
+    // true positive: fake dir "volume1/bucket1/dir1" should be returned.
     assertIsDirectory(BUCKET2_NAME, dir2);
+    assertFileNotFound(BUCKET2_NAME, dir3);
   }
 
   @Test
