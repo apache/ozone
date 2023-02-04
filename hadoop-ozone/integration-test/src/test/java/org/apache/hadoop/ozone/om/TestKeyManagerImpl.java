@@ -1355,37 +1355,36 @@ public class TestKeyManagerImpl {
 
   @Test
   public void testGetFileStatusWithFakeDirFalsePositive() throws IOException {
-    String dirName = "foo2";
-    String fileName = "bar2";
-    String keyName1 = "foo1";
-    // keyName2 = "foo2/bar2"
-    String keyName2 = dirName + OZONE_URI_DELIMITER + fileName;
+    String dir1 = "dir1";
+    String dir2 = "dir2";
+    String keyName1 = dir1 + OZONE_URI_DELIMITER + "file1";
+    String keyName2 = dir2 + OZONE_URI_DELIMITER + "file2";
 
-    // create a key "foo1" in bucket1
+    // create a key "dir1/file1" in bucket1
     createFile(BUCKET_NAME, keyName1);
-    // create a key "foo2/bar2" in bucket2
+    // create a key "dir2/file2" in bucket2
     createFile(BUCKET2_NAME, keyName2);
 
     // Verify the following dbKeys in key table:
-    // 1. "volume1/bucket1/foo1"
-    // 2. "volume1/bucket2/foo2/bar2"
+    // 1. "volume1/bucket1/dir1/file1"
+    // 2. "volume1/bucket2/dir2/file2"
     Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName1)));
     Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
 
-    // get a non-existing "foo2" from bucket1 should throw FILE_NOT_FOUND.
-    // RocksIterator#seek("volume1/bucket1/foo2/") will position at the
-    // 2nd dbKey "volume1/bucket2/foo2/bar2", which is not belong to bucket1.
-    OmKeyArgs fpKey = createBuilder(BUCKET_NAME).setKeyName(dirName).build();
+    // get a non-existing "dir2" from bucket1 should throw FILE_NOT_FOUND.
+    // RocksIterator#seek("volume1/bucket1/dir2/") will position at the
+    // 2nd dbKey "volume1/bucket2/dir2/file2", which is not belong to bucket1.
+    OmKeyArgs fpKey = createBuilder(BUCKET_NAME).setKeyName(dir2).build();
     OMException ex = Assert.assertThrows(OMException.class,
         () -> keyManager.getFileStatus(fpKey));
     Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
 
-    // get a non-existing "foo2" from bucket2 should return a fake key.
-    OmKeyArgs fakeKey = createBuilder(BUCKET2_NAME).setKeyName(dirName).build();
+    // get a non-existing "dir2" from bucket2 should return a fake key.
+    OmKeyArgs fakeKey = createBuilder(BUCKET2_NAME).setKeyName(dir2).build();
     OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(fakeKey);
-    Assert.assertEquals(dirName, ozoneFileStatus.getKeyInfo().getFileName());
+    Assert.assertEquals(dir2, ozoneFileStatus.getKeyInfo().getFileName());
     Assert.assertTrue(ozoneFileStatus.isDirectory());
   }
 
