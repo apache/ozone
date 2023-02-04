@@ -37,6 +37,16 @@ x-datanode:
     - 9864
     - 9882
 
+x-scm:
+  &scm
+  command: ["ozone","scm"]
+  <<: *common-config
+  environment:
+    <<: *replication
+    OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+  ports:
+    - 9876
+
 x-om:
   &om
   command: ["ozone","om","${OM_HA_ARGS}"]
@@ -81,27 +91,47 @@ services:
       - *ozone-dir
       - *transformation
 
-  scm:
-    command: ["ozone","scm"]
-    <<: *common-config
+  scm1:
+    <<: *scm
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
-      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
     networks:
       net:
         ipv4_address: 10.9.0.14
-    ports:
-      - 9876:9876
     volumes:
-      - ${OZONE_VOLUME}/scm:/data
+      - ${OZONE_VOLUME}/scm1:/data
       - *ozone-dir
       - *transformation
+  scm2:
+    <<: *scm
+    environment:
+      WAITFOR: scm1:9894
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+    networks:
+      net:
+        ipv4_address: 10.9.0.15
+    volumes:
+      - ${OZONE_VOLUME}/scm2:/data
+      - *ozone-dir
+      - *transformation
+  scm3:
+    <<: *scm
+    environment:
+      WAITFOR: scm2:9894
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+    networks:
+      net:
+        ipv4_address: 10.9.0.16
+    volumes:
+      - ${OZONE_VOLUME}/scm3:/data
+      - *ozone-dir
+      - *transformation
+
   dn1:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.15
+        ipv4_address: 10.9.0.17
     volumes:
       - ${OZONE_VOLUME}/dn1:/data
       - *ozone-dir
@@ -110,7 +140,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.16
+        ipv4_address: 10.9.0.18
     volumes:
       - ${OZONE_VOLUME}/dn2:/data
       - *ozone-dir
@@ -119,7 +149,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.17
+        ipv4_address: 10.9.0.19
     volumes:
       - ${OZONE_VOLUME}/dn3:/data
       - *ozone-dir
@@ -128,7 +158,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.18
+        ipv4_address: 10.9.0.20
     volumes:
       - ${OZONE_VOLUME}/dn4:/data
       - *ozone-dir
@@ -137,7 +167,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.19
+        ipv4_address: 10.9.0.21
     volumes:
       - ${OZONE_VOLUME}/dn5:/data
       - *ozone-dir
@@ -149,7 +179,7 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.20
+        ipv4_address: 10.9.0.22
     ports:
       - 9888:9888
     volumes:
@@ -163,13 +193,14 @@ services:
       <<: *replication
     networks:
       net:
-        ipv4_address: 10.9.0.21
+        ipv4_address: 10.9.0.23
     ports:
       - 9878:9878
     volumes:
       - ${OZONE_VOLUME}/s3g:/data
       - *ozone-dir
       - *transformation
+
 networks:
   net:
     driver: bridge
