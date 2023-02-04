@@ -1392,6 +1392,42 @@ public class TestKeyManagerImpl {
   }
 
   @Test
+  public void testGetFileStatusWithFakeDirFalseNegative() throws IOException {
+    String dir1 = "dir1";
+    String keyName1 = dir1 + OZONE_URI_DELIMITER + "file1";
+    String keyName2 = dir1 + OZONE_URI_DELIMITER + "file2";
+    String keyName3 = dir1 + OZONE_URI_DELIMITER + "file3";
+
+    createFile(BUCKET_NAME, keyName1);
+    createFile(BUCKET_NAME, keyName2);
+    createFile(BUCKET_NAME, keyName3);
+    createFile(BUCKET2_NAME, keyName1);
+    createFile(BUCKET2_NAME, keyName2);
+
+    // Verify the following dbKeys in key table:
+    // 1. "volume1/bucket1/dir1/file1"
+    // 2. "volume1/bucket1/dir1/file2"
+    // 3. "volume1/bucket1/dir1/file3"
+    // 4. "volume1/bucket2/dir1/file1"
+    // 5. "volume1/bucket2/dir1/file2"
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName1)));
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName2)));
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName3)));
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName1)));
+    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
+
+    // get "volume1/bucket1/dir1" should return a fake dir.
+    assertIsDirectory(BUCKET_NAME, dir1);
+    // get "volume1/bucket2/dir1" should return a fake dir.
+    assertIsDirectory(BUCKET2_NAME, dir1);
+  }
+
+  @Test
   public void testRefreshPipeline() throws Exception {
 
     OzoneManager ozoneManager = om;
