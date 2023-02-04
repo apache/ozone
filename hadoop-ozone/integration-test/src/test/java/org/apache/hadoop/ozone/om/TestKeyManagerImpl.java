@@ -1646,6 +1646,23 @@ public class TestKeyManagerImpl {
     return keyNames;
   }
 
+  private List<String> createFiles(String parent,
+      Map<String, List<String>> fileMap, int numFiles) throws IOException {
+    List<String> keyNames = new ArrayList<>();
+    for (int i = 0; i < numFiles; i++) {
+      String keyName = parent + "/" + RandomStringUtils.randomAlphabetic(5);
+      OmKeyArgs keyArgs = createBuilder().setKeyName(keyName).build();
+      OpenKeySession keySession = writeClient.createFile(keyArgs, false, false);
+      keyArgs.setLocationInfoList(
+          keySession.getKeyInfo().getLatestVersionLocations()
+              .getLocationList());
+      writeClient.commitKey(keyArgs, keySession.getId());
+      keyNames.add(keyName);
+    }
+    fileMap.put(parent, keyNames);
+    return keyNames;
+  }
+
   private void createFile(String bucketName, String keyName)
       throws IOException {
     OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
@@ -1669,23 +1686,6 @@ public class TestKeyManagerImpl {
     OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
     Assert.assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
     Assert.assertTrue(ozoneFileStatus.isDirectory());
-  }
-
-  private List<String> createFiles(String parent,
-      Map<String, List<String>> fileMap, int numFiles) throws IOException {
-    List<String> keyNames = new ArrayList<>();
-    for (int i = 0; i < numFiles; i++) {
-      String keyName = parent + "/" + RandomStringUtils.randomAlphabetic(5);
-      OmKeyArgs keyArgs = createBuilder().setKeyName(keyName).build();
-      OpenKeySession keySession = writeClient.createFile(keyArgs, false, false);
-      keyArgs.setLocationInfoList(
-          keySession.getKeyInfo().getLatestVersionLocations()
-              .getLocationList());
-      writeClient.commitKey(keyArgs, keySession.getId());
-      keyNames.add(keyName);
-    }
-    fileMap.put(parent, keyNames);
-    return keyNames;
   }
 
   private OmKeyArgs.Builder createBuilder() throws IOException {
