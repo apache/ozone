@@ -3604,7 +3604,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.diff.db.dirs</name>
+    <name>ozone.om.snapshot.diff.db.dir</name>
     <value/>
     <tag>OZONE, OM</tag>
     <description>
