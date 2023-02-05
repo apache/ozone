@@ -871,7 +871,7 @@ public class LegacyReplicationManager {
       // check whether {Existing replicas + Target_Dn - Source_Dn}
       // satisfies current placement policy
       if (!isPolicySatisfiedAfterMove(cif, srcDn, targetDn,
-          currentReplicas.stream().collect(Collectors.toList()))) {
+          new ArrayList<>(currentReplicas))) {
         ret.complete(MoveResult.PLACEMENT_POLICY_NOT_SATISFIED);
         return ret;
       }
@@ -905,8 +905,7 @@ public class LegacyReplicationManager {
   private boolean isPolicySatisfiedAfterMove(ContainerInfo cif,
                     DatanodeDetails srcDn, DatanodeDetails targetDn,
                     final List<ContainerReplica> replicas) {
-    Set<ContainerReplica> movedReplicas =
-        replicas.stream().collect(Collectors.toSet());
+    Set<ContainerReplica> movedReplicas = new HashSet<>(replicas);
     movedReplicas.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
     movedReplicas.add(ContainerReplica.newBuilder()
         .setDatanodeDetails(targetDn)
@@ -1368,8 +1367,7 @@ public class LegacyReplicationManager {
         cif.getReplicationConfig().getRequiredNodes();
     ContainerPlacementStatus currentCPS =
         getPlacementStatus(replicaSet, replicationFactor);
-    Set<ContainerReplica> newReplicaSet = replicaSet.
-        stream().collect(Collectors.toSet());
+    Set<ContainerReplica> newReplicaSet = new HashSet<>(replicaSet);
     newReplicaSet.removeIf(r -> r.getDatanodeDetails().equals(srcDn));
     ContainerPlacementStatus newCPS =
         getPlacementStatus(newReplicaSet, replicationFactor);
@@ -1474,21 +1472,24 @@ public class LegacyReplicationManager {
    * datanode.
    *
    * @param container Container to be replicated
-   * @param datanode The destination datanode to replicate
+   * @param target The destination datanode to replicate
    * @param sources List of source nodes from where we can replicate
    */
   private void sendReplicateCommand(final ContainerInfo container,
-                                    final DatanodeDetails datanode,
+                                    final DatanodeDetails target,
                                     final List<DatanodeDetails> sources) {
 
-    LOG.info("Sending replicate container command for container {}" +
-            " to datanode {} from datanodes {}",
-        container.containerID(), datanode, sources);
-
     final ContainerID id = container.containerID();
-    final ReplicateContainerCommand replicateCommand =
-        new ReplicateContainerCommand(id.getId(), sources);
-    final boolean sent = sendAndTrackDatanodeCommand(datanode, replicateCommand,
+    final long containerID = id.getId();
+    final boolean push = rmConf.isPush();
+    final ReplicateContainerCommand replicateCommand = push
+        ? ReplicateContainerCommand.toTarget(containerID, target)
+        : ReplicateContainerCommand.fromSources(containerID, sources);
+    final DatanodeDetails source = sources.get(0); // TODO randomize
+    final DatanodeDetails receiver = push ? source : target;
+    LOG.info("Sending {} to {}", replicateCommand, receiver);
+
+    final boolean sent = sendAndTrackDatanodeCommand(receiver, replicateCommand,
         action -> addInflight(InflightType.REPLICATION, id, action));
 
     if (sent) {

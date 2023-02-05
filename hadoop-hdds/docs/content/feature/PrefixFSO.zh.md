@@ -58,7 +58,7 @@ OzoneManager 支持两种元数据布局格式：简单布局格式和基于前�
 可以在 `ozone-site.xml` 中加入以下配置来设定创建桶时，客户端未指定桶样式时的默认的桶样式：
 可用的值有 `OBJECT_STORE`, `FILE_SYSTEM_OPTIMIZED` 和 `LEGACY`.
 
-若该配置的值为空，则默认值为 `LEGACY`.
+若该配置的值为空，则默认值为 `FILE_SYSTEM_OPTIMIZED`.
 
 ```XML
 

@@ -231,6 +231,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT,
           OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
+    RatisHelper.enableNettyStreaming(properties);
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     int dataStreamAsyncRequestThreadPoolSize =
         conf.getObject(DatanodeRatisServerConfig.class)

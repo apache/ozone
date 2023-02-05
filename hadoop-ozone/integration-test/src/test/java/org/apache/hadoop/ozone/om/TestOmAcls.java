@@ -38,6 +38,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -102,11 +103,13 @@ public class TestOmAcls {
     if (cluster != null) {
       cluster.shutdown();
     }
+    AuditLogTestUtils.deleteAuditLogFile();
   }
 
   @Before
-  public void setup() {
+  public void setup() throws IOException {
     logCapturer.clearOutput();
+    AuditLogTestUtils.truncateAuditLogFile();
 
     TestOmAcls.volumeAclAllow = true;
     TestOmAcls.bucketAclAllow = true;
@@ -115,7 +118,7 @@ public class TestOmAcls {
   }
 
   @Test
-  public void testCreateVolumePermissionDenied() {
+  public void testCreateVolumePermissionDenied() throws Exception {
     TestOmAcls.volumeAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
@@ -142,7 +145,7 @@ public class TestOmAcls {
   }
 
   @Test
-  public void testCreateBucketPermissionDenied() {
+  public void testCreateBucketPermissionDenied() throws Exception {
     TestOmAcls.bucketAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
