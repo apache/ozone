@@ -169,19 +169,28 @@ public class TestOzoneFsSnapshot {
         Arguments.of("1st case: snapshot name contains invalid char",
             BUCKET_PATH,
             "snapa?b",
-            "Invalid snapshot name"),
+            "Invalid snapshot name",
+            1),
         Arguments.of("2nd case: snapshot name consists only of numbers",
             BUCKET_PATH,
             "1234",
-            "Invalid snapshot name"),
+            "Invalid snapshot name",
+            1),
         Arguments.of("3rd case: bucket path is invalid",
             invalidBucketPath,
             "validSnapshotName12",
-            "No such file or directory"),
+            "No such file or directory",
+            1),
         Arguments.of("4th case: snapshot name length is more than 64 chars",
             BUCKET_PATH,
             "snap156808943643007724443266605711479126926050896107709081166294",
-            "Invalid snapshot name")
+            "Invalid snapshot name",
+            1),
+        Arguments.of("5th case: all parameters are missing",
+            "",
+            "",
+            "Can not create a Path from an empty string",
+            -1)
     );
   }
 
@@ -190,21 +199,14 @@ public class TestOzoneFsSnapshot {
   public void testCreateSnapshotFailure(String description,
                                         String paramBucketPath,
                                         String snapshotName,
-                                        String expectedMessage)
+                                        String expectedMessage,
+                                        int expectedResponse)
       throws Exception {
-    String errorMessage = execShellCommandAndGetOutput(false,
+    String errorMessage = execShellCommandAndGetOutput(expectedResponse,
         new String[]{"-createSnapshot", paramBucketPath, snapshotName});
 
     Assertions.assertTrue(errorMessage
         .contains(expectedMessage));
-  }
-
-  @Test
-  public void testCreateSnapshotAllParametersMissing() throws Exception {
-    int res = ToolRunner.run(shell,
-        new String[]{"-createSnapshot"});
-    // Asserts that create request failed since mandatory params not passed
-    Assertions.assertEquals(-1, res);
   }
 
   /**
@@ -217,7 +219,7 @@ public class TestOzoneFsSnapshot {
 
     // Create new key, while the old one
     // might be deleted from a previous test.
-    execShellCommandAndGetOutput(true,
+    execShellCommandAndGetOutput(0,
         new String[]{"-touch", newKeyPath});
 
     // Create snapshot
@@ -228,7 +230,7 @@ public class TestOzoneFsSnapshot {
     String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + newKey;
 
     // Check for snapshot with "ozone fs -ls"
-    String listSnapOut = execShellCommandAndGetOutput(true,
+    String listSnapOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", BUCKET_WITH_SNAPSHOT_INDICATOR_PATH});
 
     // Assert that output contains above snapshotName
@@ -236,7 +238,7 @@ public class TestOzoneFsSnapshot {
         .contains(snapshotPath));
 
     // Check for snapshot keys with "ozone fs -ls"
-    String listSnapKeyOut = execShellCommandAndGetOutput(true,
+    String listSnapKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", snapshotPath});
 
     // Assert that output contains the snapshot key
@@ -253,25 +255,25 @@ public class TestOzoneFsSnapshot {
     String snapshotKeyPath = snapshotPath + OM_KEY_PREFIX + KEY;
 
     // Delete bucket key should succeed
-    String deleteKeyOut = execShellCommandAndGetOutput(true,
+    String deleteKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-rm", "-r", "-skipTrash", KEY_PATH});
 
     Assertions.assertTrue(deleteKeyOut
         .contains("Deleted " + BUCKET_PATH));
 
     // Delete bucket should fail due to existing snapshot
-    String deleteBucketOut = execShellCommandAndGetOutput(false,
+    String deleteBucketOut = execShellCommandAndGetOutput(1,
         new String[]{"-rm", "-r", "-skipTrash", BUCKET_PATH});
     Assertions.assertTrue(deleteBucketOut
           .contains(BUCKET + " can't be deleted when it has snapshots"));
 
     // Key shouldn't exist under bucket
-    String listKeyOut = execShellCommandAndGetOutput(true,
+    String listKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", BUCKET_PATH});
     Assertions.assertTrue(Strings.isNullOrEmpty(listKeyOut));
 
     // Key should still exist under snapshot
-    String listSnapKeyOut = execShellCommandAndGetOutput(true,
+    String listSnapKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", snapshotPath});
     Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
   }
@@ -281,7 +283,7 @@ public class TestOzoneFsSnapshot {
    * and return a string of the output.
    */
   private String execShellCommandAndGetOutput(
-      boolean success, String[] args) throws Exception {
+      int response, String[] args) throws Exception {
     ByteArrayOutputStream successBytes = new ByteArrayOutputStream();
     ByteArrayOutputStream errorBytes = new ByteArrayOutputStream();
 
@@ -293,13 +295,12 @@ public class TestOzoneFsSnapshot {
 
     // Execute command
     int res = ToolRunner.run(shell, args);
-    int expectedRes = success ? 0 : 1;
-    Assertions.assertEquals(expectedRes, res);
+    Assertions.assertEquals(response, res);
 
     // Store command output to a string,
     // if command should succeed then
     // get successBytes else get errorBytes
-    String output = success ?
+    String output = response == 0 ?
         successBytes.toString(StandardCharsets.UTF_8.name()) :
         errorBytes.toString(StandardCharsets.UTF_8.name());
 
