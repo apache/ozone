@@ -100,6 +100,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
@@ -201,7 +202,8 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket bucket = volume.getBucket(bucketName);
       if (length == 0 &&
           ozoneConfiguration
-              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, true) &&
+              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
           bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
         // create directory

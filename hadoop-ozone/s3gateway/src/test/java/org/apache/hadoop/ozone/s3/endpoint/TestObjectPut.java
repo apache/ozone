@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -303,7 +304,6 @@ public class TestObjectPut {
   public void testDirectoryCreation() throws IOException,
       OS3Exception {
     // GIVEN
-    final String bucketname = "bucketName";
     final String path = "dir";
     final long length = 0L;
     final int partNumber = 0;
@@ -324,22 +324,21 @@ public class TestObjectPut {
     when(headers.getHeaderString(any())).thenReturn("");
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getObjectStore().getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(bucketname)).thenReturn(bucket);
+    when(volume.getBucket(bucketName)).thenReturn(bucket);
     when(bucket.getBucketLayout())
         .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     when(client.getProxy()).thenReturn(protocol);
-    final Response response = objEndpoint.put(bucketname, path, length,
+    final Response response = objEndpoint.put(bucketName, path, length,
         partNumber, uploadId, body);
 
     // THEN
     Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
-    Mockito.verify(protocol).createDirectory(any(), any(), any());
+    Mockito.verify(protocol).createDirectory(any(), eq(bucketName), eq(path));
   }
 
   @Test
   public void testDirectoryCreationOverFile() throws IOException {
     // GIVEN
-    final String bucketname = "bucketName";
     final String path = "key";
     final long length = 0L;
     final int partNumber = 0;
@@ -360,7 +359,7 @@ public class TestObjectPut {
     // WHEN
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getObjectStore().getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(bucketname)).thenReturn(bucket);
+    when(volume.getBucket(bucketName)).thenReturn(bucket);
     when(bucket.getBucketLayout())
         .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     when(client.getProxy()).thenReturn(protocol);
@@ -371,7 +370,7 @@ public class TestObjectPut {
     // THEN
     final OS3Exception exception = Assertions.assertThrows(OS3Exception.class,
         () -> objEndpoint
-            .put(bucketname, path, length, partNumber, uploadId, body));
+            .put(bucketName, path, length, partNumber, uploadId, body));
     Assertions.assertEquals("Conflict", exception.getCode());
     Assertions.assertEquals(409, exception.getHttpCode());
     Mockito.verify(protocol, times(1)).createDirectory(any(), any(), any());
