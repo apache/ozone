@@ -37,9 +37,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator.CONTAINER_COPY_DIR;
-
-
 /**
  * Simple ContainerDownloaderImplementation to download the missing container
  * from the first available datanode.
@@ -54,23 +51,21 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
-  private final String compression;
 
   public SimpleContainerDownloader(
       ConfigurationSource conf, CertificateClient certClient) {
     securityConfig = new SecurityConfig(conf);
     this.certClient = certClient;
-    this.compression = CopyContainerCompression.getConf(conf).toString();
   }
 
   @Override
   public Path getContainerDataFromReplicas(
       long containerId, List<DatanodeDetails> sourceDatanodes,
-      Path downloadDir) {
+      Path downloadDir, CopyContainerCompression compression) {
 
     if (downloadDir == null) {
       downloadDir = Paths.get(System.getProperty("java.io.tmpdir"))
-              .resolve(CONTAINER_COPY_DIR);
+              .resolve(ContainerImporter.CONTAINER_COPY_DIR);
     }
 
     final List<DatanodeDetails> shuffledDatanodes =
@@ -79,7 +74,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
         CompletableFuture<Path> result =
-            downloadContainer(containerId, datanode, downloadDir);
+            downloadContainer(containerId, datanode, downloadDir, compression);
         return result.get();
       } catch (ExecutionException | IOException e) {
         LOG.error("Error on replicating container: {} from {}/{}", containerId,
@@ -111,16 +106,16 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   @VisibleForTesting
-  protected CompletableFuture<Path> downloadContainer(
-      long containerId, DatanodeDetails datanode, Path downloadDir)
-      throws IOException {
+  protected CompletableFuture<Path> downloadContainer(long containerId,
+      DatanodeDetails datanode, Path downloadDir,
+      CopyContainerCompression compression) throws IOException {
     CompletableFuture<Path> result;
     GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
-            downloadDir, securityConfig, certClient, compression);
+            securityConfig, certClient, compression);
 
-    result = grpcReplicationClient.download(containerId)
+    result = grpcReplicationClient.download(containerId, downloadDir)
         .whenComplete((r, ex) -> {
           try {
             grpcReplicationClient.close();

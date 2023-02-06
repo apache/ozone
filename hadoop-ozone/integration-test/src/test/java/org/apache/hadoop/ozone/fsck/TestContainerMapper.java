@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.FileUtils;
 import org.junit.AfterClass;
@@ -102,7 +104,11 @@ public class TestContainerMapper {
     ozoneManager = cluster.getOzoneManager();
     store.createVolume(volName);
     OzoneVolume volume = store.getVolume(volName);
-    volume.createBucket(bucketName);
+    // TODO: HDDS-5463
+    //  Recon's container ID to key mapping does not yet support FSO buckets.
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+            .setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     byte[] data = generateData(10 * 1024 * 1024, (byte)98);
 

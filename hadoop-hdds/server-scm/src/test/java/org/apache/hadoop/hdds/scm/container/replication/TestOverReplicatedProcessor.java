@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,8 +33,8 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 
@@ -67,11 +68,11 @@ public class TestOverReplicatedProcessor {
         .thenReturn(
             new ContainerHealthResult.OverReplicatedHealthResult(container, 3,
                 false), null);
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
     DeleteContainerCommand cmd =
         new DeleteContainerCommand(container.getContainerID());
     cmd.setReplicaIndex(5);
-    commands.put(MockDatanodeDetails.randomDatanodeDetails(), cmd);
+    commands.add(Pair.of(MockDatanodeDetails.randomDatanodeDetails(), cmd));
 
     Mockito
         .when(replicationManager.processOverReplicatedContainer(any()))

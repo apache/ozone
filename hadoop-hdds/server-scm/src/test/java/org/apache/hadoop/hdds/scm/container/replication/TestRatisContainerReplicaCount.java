@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -26,7 +27,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -35,7 +39,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -410,6 +419,43 @@ class TestRatisContainerReplicaCount {
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     assertFalse(rcnt.isHealthy());
+  }
+
+  @Test
+  void testSufficientReplicationWithMismatchedReplicaState() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0);
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, CLOSING));
+
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2);
+    assertTrue(rcnt.isSufficientlyReplicated());
+  }
+
+  @Test
+  void testSufficientReplicationWithPendingDeleteOnUnhealthyReplica() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        ContainerID.valueOf(1L), 0, IN_SERVICE, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    List<ContainerReplicaOp> ops = new ArrayList<>();
+    ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplica.getDatanodeDetails(), 0));
+    RatisContainerReplicaCount replicaCount =
+        new RatisContainerReplicaCount(container, replicas, ops, 2);
+    assertTrue(replicaCount.isSufficientlyReplicated());
   }
 
   @Test
