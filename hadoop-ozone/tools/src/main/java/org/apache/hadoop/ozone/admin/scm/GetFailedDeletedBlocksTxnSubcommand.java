@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  */
 @CommandLine.Command(
     name = "ls",
-    description = "Print the failed DeletedBlocksTxn (retry count is -1)",
+    description = "Print the failed DeletedBlocksTxn (retry count = -1)",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
