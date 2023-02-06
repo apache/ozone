@@ -1048,27 +1048,15 @@ public class SCMClientProtocolServer implements
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
       DatanodeDetails node, int clientVersion) {
-    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
-
-    int containerCount = -1;
+    DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
     try {
-      containerCount = scm.getScmNodeManager().getContainers(node).size();
+      int containerCount = scm.getScmNodeManager().getContainers(node).size();
+      usageInfo.setContainerCount(containerCount);
     } catch (NodeNotFoundException ex) {
       LOG.error("Received container report from unknown datanode {}.",
               node, ex);
     }
-
-    long capacity = stat.getCapacity().get();
-    long used = stat.getScmUsed().get();
-    long remaining = stat.getRemaining().get();
-
-    return HddsProtos.DatanodeUsageInfoProto.newBuilder()
-        .setCapacity(capacity)
-        .setUsed(used)
-        .setRemaining(remaining)
-        .setNode(node.toProto(clientVersion))
-        .setContainerCount(containerCount)
-        .build();
+    return usageInfo.toProto(clientVersion);
   }
 
   /**
