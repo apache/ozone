@@ -184,7 +184,7 @@ public class TestDeletedBlocksTxnShell {
   }
   
   @Test
-  public void testCmd() throws Exception {
+  public void testDeletedBlocksTxnSubcommand() throws Exception {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     int currentValidTxnNum;
     // add 30 block deletion transactions
