@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -305,14 +306,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // metadata constructor for snapshots
-  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName)
-      throws IOException {
+  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
+      boolean isSnapshotInCache) throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     String snapshotDir = OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    setStore(loadDB(conf, new File(snapshotDir),
-        OM_DB_NAME + snapshotDirName, true));
+    File metaDir = new File(snapshotDir);
+    String dbName = OM_DB_NAME + snapshotDirName;
+    if (isSnapshotInCache) {
+      File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
+      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+    }
+    setStore(loadDB(conf, metaDir, dbName, true));
     initializeOmTables(false);
   }
 
@@ -325,9 +331,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @throws IOException
    */
   public static OmMetadataManagerImpl createSnapshotMetadataManager(
-      OzoneConfiguration conf, String snapshotDirName) throws IOException {
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
-        snapshotDirName);
+      OzoneConfiguration conf, String snapshotDirName,
+      boolean isSnapshotInCache) throws IOException {
+    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf, snapshotDirName,
+        isSnapshotInCache);
     return smm;
   }
 
@@ -908,6 +915,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
       // Making sure that entry is not for delete key request.
       if (key.startsWith(keyPrefix) && omKeyInfo != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+  static boolean isSnapshotPresentInTableCache(String keyPrefix, Table table) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
+        table.cacheIterator();
+    while (iterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry =
+          iterator.next();
+      String key = entry.getKey().getCacheKey();
+      SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
+      // Making sure that entry is not for delete key request.
+      if (key.startsWith(keyPrefix) && snapshotInfo != null) {
         return true;
       }
     }

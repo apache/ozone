@@ -113,7 +113,8 @@ public class RDBCheckpointManager implements Closeable {
    * Wait for checkpoint directory to be created for 5 secs with 100 millis
    * poll interval.
    */
-  private void waitForCheckpointDirectoryExist(File file) throws IOException {
+  public static void waitForCheckpointDirectoryExist(File file)
+      throws IOException {
     Instant start = Instant.now();
     try {
       with().atMost(POLL_MAX_DURATION)
