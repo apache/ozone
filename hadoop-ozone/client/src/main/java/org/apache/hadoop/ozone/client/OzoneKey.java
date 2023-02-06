@@ -48,7 +48,7 @@ public class OzoneKey {
   /**
    * Name of the Key owner.
    */
-  private final String ownerName;
+  private final String owner;
   /**
    * Size of the data.
    */
@@ -96,7 +96,7 @@ public class OzoneKey {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
-    this.ownerName = owner;
+    this.owner = owner;
   }
 
   @SuppressWarnings("parameternumber")
@@ -141,8 +141,8 @@ public class OzoneKey {
    *
    * @return keyName
    */
-  public String getOwnerName() {
-    return ownerName;
+  public String getOwner() {
+    return owner;
   }
 
   /**

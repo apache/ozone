@@ -181,7 +181,7 @@ public class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
           ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.getOwnerName());
+          ozoneKeyDetails.getOwner());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }

@@ -365,9 +365,9 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertNotNull(bucket.getKey(key1));
       Assert.assertNotNull(bucket.getKey(key2));
       Assert.assertEquals(user1.getShortUserName(),
-          bucket.getKey(key1).getOwnerName());
+          bucket.getKey(key1).getOwner());
       Assert.assertEquals(user2.getShortUserName(),
-          bucket.getKey(key2).getOwnerName());
+          bucket.getKey(key2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
       ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());

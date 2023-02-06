@@ -53,9 +53,9 @@ public class OzoneKeyDetails extends OzoneKey {
                          List<OzoneKeyLocation> ozoneKeyLocations,
                          ReplicationType type, Map<String, String> metadata,
                          FileEncryptionInfo feInfo, int replicationFactor,
-                         String ownerName) {
+                         String owner) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor, ownerName);
+        modificationTime, type, replicationFactor, owner);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.setMetadata(metadata);
@@ -73,9 +73,9 @@ public class OzoneKeyDetails extends OzoneKey {
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
       SupplierWithIOException<OzoneInputStream> contentSupplier,
-      String ownerName) {
+      String owner) {
     super(volumeName, bucketName, keyName, size, creationTime,
-            modificationTime, replicationConfig, metadata, ownerName);
+            modificationTime, replicationConfig, metadata, owner);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
