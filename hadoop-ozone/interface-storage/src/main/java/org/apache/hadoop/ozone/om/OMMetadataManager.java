@@ -40,8 +40,9 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto.
@@ -82,7 +83,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return OzoneManagerLock
    */
-  OzoneManagerLock getLock();
+  IOzoneManagerLock getLock();
 
   /**
    * Returns the epoch associated with current OM process.
@@ -220,6 +221,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
+
+  /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return list of snapshot
+   */
+  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
+      throws IOException;
 
   /**
    * Recover trash allows the user to recover the keys
@@ -370,6 +380,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, OmDBTenantState> getTenantStateTable();
 
+  Table<String, SnapshotInfo> getSnapshotInfoTable();
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.
@@ -433,7 +445,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
       getBucketIterator();
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator();
+      getKeyIterator() throws IOException;
 
   /**
    * Given parent object id and path component name, return the corresponding
@@ -447,6 +459,16 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOzonePathKey(long volumeId, long bucketId,
                          long parentObjectId, String pathComponentName);
+
+  /**
+   * Given ozone path key, component id, return the corresponding 
+   * DB path key for delete table.
+   *
+   * @param objectId - object Id
+   * @param pathKey   - path key of component
+   * @return DB Delete directory key as String.
+   */
+  String getOzoneDeletePathKey(long objectId, String pathKey);
 
   /**
    * Returns DB key name of an open file in OM metadata store. Should be

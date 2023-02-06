@@ -327,14 +327,13 @@ public class TestHddsVolume {
         CONTAINER_DB_NAME);
     assertTrue(containerDBFile.exists());
     assertNotNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+        containerDBFile.getAbsolutePath(), CONF));
 
     // Make it a bad volume
     volume.failVolume();
 
     // The db should be removed from cache
-    assertNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+    assertEquals(0, DatanodeStoreCache.getInstance().size());
   }
 
   @Test
@@ -361,14 +360,13 @@ public class TestHddsVolume {
         CONTAINER_DB_NAME);
     assertTrue(containerDBFile.exists());
     assertNotNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+        containerDBFile.getAbsolutePath(), CONF));
 
     // Make it a bad volume
     volume.failVolume();
 
     // The db should be removed from cache
-    assertNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+    assertEquals(0, DatanodeStoreCache.getInstance().size());
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {

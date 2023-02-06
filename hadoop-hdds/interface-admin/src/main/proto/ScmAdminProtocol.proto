@@ -176,7 +176,8 @@ enum Type {
   GetContainerReplicas = 34;
   GetReplicationManagerReport = 35;
   ResetDeletedBlockRetryCount = 36;
-  GetFailedDeletedBlocksTransaction = 37;
+  GetClosedContainerCount = 37;
+  GetFailedDeletedBlocksTransaction = 38;
 }
 
 /**

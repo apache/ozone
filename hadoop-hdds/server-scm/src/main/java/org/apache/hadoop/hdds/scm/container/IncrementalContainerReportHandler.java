@@ -88,8 +88,10 @@ public class IncrementalContainerReportHandler extends
             // Ensure we reuse the same ContainerID instance in containerInfo
             id = container.containerID();
           } finally {
-            if (!replicaProto.getState().equals(
+            if (replicaProto.getState().equals(
                 ContainerReplicaProto.State.DELETED)) {
+              nodeManager.removeContainer(dd, id);
+            } else {
               nodeManager.addContainer(dd, id);
             }
           }

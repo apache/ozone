@@ -153,6 +153,10 @@ public class DatanodeSchemaThreeDBDefinition
         getContainerKeyPrefix(0L)).length;
   }
 
+  public static String getKeyWithoutPrefix(String keyWithPrefix) {
+    return keyWithPrefix.substring(keyWithPrefix.indexOf(separator) + 1);
+  }
+
   private void setSeparator(String keySeparator) {
     separator = keySeparator;
   }

@@ -70,6 +70,8 @@ import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRevokeUserAccessIdRe
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
@@ -80,7 +82,6 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetQuotaRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeAddAclRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeSetAclRequest;
-import org.apache.hadoop.ozone.om.request.OMEchoRPCRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
@@ -210,6 +211,10 @@ public final class OzoneManagerRatisUtils {
       return new OMTenantRevokeAdminRequest(omRequest);
     case SetRangerServiceVersion:
       return new OMSetRangerServiceVersionRequest(omRequest);
+    case CreateSnapshot:
+      return new OMSnapshotCreateRequest(omRequest);
+    case DeleteSnapshot:
+      return new OMSnapshotDeleteRequest(omRequest);
     case DeleteOpenKeys:
       BucketLayout bktLayout = BucketLayout.DEFAULT;
       if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {
@@ -217,7 +222,6 @@ public final class OzoneManagerRatisUtils {
             omRequest.getDeleteOpenKeysRequest().getBucketLayout());
       }
       return new OMOpenKeysDeleteRequest(omRequest, bktLayout);
-
     /*
      * Key requests that can have multiple variants based on the bucket layout
      * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
@@ -290,8 +294,6 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
-    case EchoRPC:
-      return new OMEchoRPCRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);

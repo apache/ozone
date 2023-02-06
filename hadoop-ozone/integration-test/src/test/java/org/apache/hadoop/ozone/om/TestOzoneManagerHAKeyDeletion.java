@@ -70,8 +70,14 @@ public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
     // Check delete table is empty or not on all OMs.
     getCluster().getOzoneManagersList().forEach((om) -> {
       try {
-        GenericTestUtils.waitFor(() ->
-                !om.getMetadataManager().getDeletedTable().iterator().hasNext(),
+        GenericTestUtils.waitFor(() -> {
+          try {
+            return !om.getMetadataManager().getDeletedTable().iterator()
+                .hasNext();
+          } catch (Exception ex) {
+            return false;
+          }
+        },
             10000, 120000);
       } catch (Exception ex) {
         fail("TestOzoneManagerHAKeyDeletion failed");

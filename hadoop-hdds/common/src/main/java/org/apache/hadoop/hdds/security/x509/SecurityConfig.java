@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
@@ -37,6 +38,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
@@ -63,12 +70,18 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_FILE_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_FILE_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
@@ -88,7 +101,7 @@ public class SecurityConfig {
   private final int size;
   private final String keyAlgo;
   private final String providerString;
-  private final String metadatDir;
+  private final String metadataDir;
   private final String keyDir;
   private final String privateKeyFileName;
   private final String publicKeyFileName;
@@ -100,9 +113,15 @@ public class SecurityConfig {
   private final String certificateFileName;
   private final boolean grpcTlsEnabled;
   private final Duration defaultCertDuration;
+  private final Duration renewalGracePeriod;
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
+  private final long keystoreReloadInterval;
+  private final long truststoreReloadInterval;
+  private final String externalRootCaPublicKeyPath;
+  private final String externalRootCaPrivateKeyPath;
+  private final String externalRootCaCert;
 
   /**
    * Constructs a SecurityConfig.
@@ -120,10 +139,8 @@ public class SecurityConfig {
 
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
-    // TODO: We might want to fix this later.
-    this.metadatDir = this.configuration.get(HDDS_METADATA_DIR_NAME,
-        configuration.get(OZONE_METADATA_DIRS,
-            configuration.get(HDDS_DATANODE_DIR_KEY)));
+    this.metadataDir = this.configuration.get(HDDS_METADATA_DIR_NAME,
+        configuration.get(OZONE_METADATA_DIRS));
     this.keyDir = this.configuration.get(HDDS_KEY_DIR_NAME,
         HDDS_KEY_DIR_NAME_DEFAULT);
     this.privateKeyFileName = this.configuration.get(HDDS_PRIVATE_KEY_FILE_NAME,
@@ -164,16 +181,25 @@ public class SecurityConfig {
         this.configuration.get(HDDS_X509_DEFAULT_DURATION,
             HDDS_X509_DEFAULT_DURATION_DEFAULT);
     defaultCertDuration = Duration.parse(certDurationString);
+    String renewalGraceDurationString = this.configuration.get(
+        HDDS_X509_RENEW_GRACE_DURATION,
+        HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
+    renewalGracePeriod = Duration.parse(renewalGraceDurationString);
 
-    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
-      LOG.error("Certificate duration {} should not be greater than Maximum " +
-          "Certificate duration {}", maxCertDuration, defaultCertDuration);
-      throw new IllegalArgumentException("Certificate duration should not be " +
-          "greater than maximum Certificate duration");
-    }
+    validateCertificateValidityConfig();
+
+    this.externalRootCaCert = this.configuration.get(
+        HDDS_X509_ROOTCA_CERTIFICATE_FILE,
+        HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT);
+    this.externalRootCaPublicKeyPath = this.configuration.get(
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT);
+    this.externalRootCaPrivateKeyPath = this.configuration.get(
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
 
     this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
-                                          HDDS_X509_CRL_NAME_DEFAULT);
+        HDDS_X509_CRL_NAME_DEFAULT);
 
     // First Startup -- if the provider is null, check for the provider.
     if (SecurityConfig.provider == null) {
@@ -185,6 +211,53 @@ public class SecurityConfig {
           provider = initSecurityProvider(this.providerString);
         }
       }
+    }
+
+    this.keystoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.truststoreReloadInterval = this.configuration.getTimeDuration(
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
+        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Check for certificate validity configuration.
+   */
+  private void validateCertificateValidityConfig() {
+    if (maxCertDuration.isNegative() || maxCertDuration.isZero()) {
+      String msg = "Property " + HDDS_X509_MAX_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+    if (defaultCertDuration.isNegative() || defaultCertDuration.isZero()) {
+      String msg = "Property " + HDDS_X509_DEFAULT_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+    if (renewalGracePeriod.isNegative() || renewalGracePeriod.isZero()) {
+      String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+
+    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
+      String msg = "Property " + HDDS_X509_DEFAULT_DURATION +
+              " should not be greater than Property " + HDDS_X509_MAX_DURATION;
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+    if (defaultCertDuration.compareTo(renewalGracePeriod) < 0) {
+      String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
+              " should not be greater than Property "
+              + HDDS_X509_DEFAULT_DURATION;
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
     }
   }
 
@@ -214,6 +287,17 @@ public class SecurityConfig {
    */
   public Duration getDefaultCertDuration() {
     return defaultCertDuration;
+  }
+
+  /**
+   * Duration of the grace period within which a certificate should be
+   * renewed before the current one expires.
+   * Default is 28 days.
+   *
+   * @return the value of hdds.x509.renew.grace.duration property
+   */
+  public Duration getRenewalGracePeriod() {
+    return renewalGracePeriod;
   }
 
   /**
@@ -253,9 +337,9 @@ public class SecurityConfig {
    * @return Path Key location.
    */
   public Path getKeyLocation(String component) {
-    Preconditions.checkNotNull(this.metadatDir, "Metadata directory can't be"
+    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
         + " null. Please check configs.");
-    return Paths.get(metadatDir, component, keyDir);
+    return Paths.get(metadataDir, component, keyDir);
   }
 
   /**
@@ -266,9 +350,9 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getCertificateLocation(String component) {
-    Preconditions.checkNotNull(this.metadatDir, "Metadata directory can't be"
+    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
         + " null. Please check configs.");
-    return Paths.get(metadatDir, component, certificateDir);
+    return Paths.get(metadataDir, component, certificateDir);
   }
 
   /**
@@ -369,6 +453,18 @@ public class SecurityConfig {
         HDDS_GRPC_TLS_PROVIDER_DEFAULT));
   }
 
+  public String getExternalRootCaPrivateKeyPath() {
+    return externalRootCaPrivateKeyPath;
+  }
+
+  public String getExternalRootCaPublicKeyPath() {
+    return externalRootCaPublicKeyPath;
+  }
+
+  public String getExternalRootCaCert() {
+    return externalRootCaCert;
+  }
+
   /**
    * Return true if using test certificates with authority as localhost. This
    * should be used only for unit test where certificates are generated by
@@ -405,5 +501,13 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
+  }
+
+  public long getSslKeystoreReloadInterval() {
+    return keystoreReloadInterval;
+  }
+
+  public long getSslTruststoreReloadInterval() {
+    return truststoreReloadInterval;
   }
 }

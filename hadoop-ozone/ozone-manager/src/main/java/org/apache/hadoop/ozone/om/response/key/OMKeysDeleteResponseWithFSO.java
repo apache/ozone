@@ -70,8 +70,10 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
           ozoneDbKey);
+      String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+          omKeyInfo.getObjectID(), ozoneDbKey);
       omMetadataManager.getDeletedDirTable().putWithBatch(
-          batchOperation, ozoneDbKey, omKeyInfo);
+          batchOperation, ozoneDeleteKey, omKeyInfo);
     }
 
     // remove keys from FileTable and add to DeletedTable

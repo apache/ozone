@@ -22,6 +22,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -136,6 +137,18 @@ public class BlockOutputStreamEntry extends OutputStream {
   public void flush() throws IOException {
     if (isInitialized()) {
       getOutputStream().flush();
+    }
+  }
+
+  void hsync() throws IOException {
+    if (isInitialized()) {
+      final OutputStream out = getOutputStream();
+      if (!(out instanceof Syncable)) {
+        throw new UnsupportedOperationException(
+            out.getClass() + " is not " + Syncable.class.getSimpleName());
+      }
+
+      ((Syncable)out).hsync();
     }
   }
 

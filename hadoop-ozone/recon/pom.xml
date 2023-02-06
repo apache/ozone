@@ -18,7 +18,7 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <name>Apache Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
@@ -330,7 +330,6 @@
     <dependency>
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
-      <version>10.14.2.0</version>
     </dependency>
     <dependency>
       <groupId>org.xerial</groupId>
@@ -353,7 +352,6 @@
     <dependency>
       <groupId>org.javassist</groupId>
       <artifactId>javassist</artifactId>
-      <version>3.21.0-GA</version>
     </dependency>
   </dependencies>
 </project>

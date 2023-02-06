@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.ContainerStat;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -43,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeoutException;
 
 import javax.management.openmbean.CompositeData;
@@ -101,24 +99,6 @@ public class TestSCMMXBean {
     String clientRpcPort = (String)mbs.getAttribute(bean,
         "ClientRpcPort");
     assertEquals(scm.getClientRpcPort(), clientRpcPort);
-
-    ConcurrentMap<String, ContainerStat> map = scm.getContainerReportCache();
-    ContainerStat stat = new ContainerStat(1, 2, 3, 4, 5, 6, 7);
-    map.put("nodeID", stat);
-    TabularData data = (TabularData) mbs.getAttribute(
-        bean, "ContainerReport");
-
-    // verify report info
-    assertEquals(1, data.values().size());
-    for (Object obj : data.values()) {
-      assertTrue(obj instanceof CompositeData);
-      CompositeData d = (CompositeData) obj;
-      Iterator<?> it = d.values().iterator();
-      String key = it.next().toString();
-      String value = it.next().toString();
-      assertEquals("nodeID", key);
-      assertEquals(stat.toJsonString(), value);
-    }
 
     boolean inSafeMode = (boolean) mbs.getAttribute(bean,
         "InSafeMode");

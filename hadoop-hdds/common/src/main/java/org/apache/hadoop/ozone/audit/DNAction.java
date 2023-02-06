@@ -38,7 +38,8 @@ public enum DNAction implements AuditAction {
   PUT_SMALL_FILE,
   GET_SMALL_FILE,
   CLOSE_CONTAINER,
-  GET_COMMITTED_BLOCK_LENGTH;
+  GET_COMMITTED_BLOCK_LENGTH,
+  STREAM_INIT;
 
   @Override
   public String getAction() {
