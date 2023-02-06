@@ -60,7 +60,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -292,30 +291,82 @@ public class TestOMDbCheckpointServlet {
   }
 
   @Test
-  public void testWriteCheckpointToOutputStream() throws Exception {
+  public void testWriteDbDataToStream() throws Exception {
+    prepSnapshotData();
+    // Set http param to include snapshot data.
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn("true");
 
+    // Get the tarball.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
+          fileOutputStream);
+    }
+
+    // Untar the file into a temp folder to be examined.
     String testDirName = folder.newFolder().getAbsolutePath();
-    File checkpoint = new File(testDirName, "checkpoint");
-    checkpoint.mkdir();
-    File file = new File(checkpoint, "temp1.txt");
-    OutputStreamWriter writer = new OutputStreamWriter(
-        new FileOutputStream(file), StandardCharsets.UTF_8);
-    writer.write("Test data 1");
-    writer.close();
+    int testDirLength = testDirName.length() + 1;
+    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
+    int newDbDirLength = newDbDirName.length() + 1;
+    File newDbDir = new File(newDbDirName);
+    newDbDir.mkdirs();
+    FileUtil.unTar(tempFile, newDbDir);
 
-    file = new File(checkpoint, "/temp2.txt");
-    writer = new OutputStreamWriter(
-        new FileOutputStream(file), StandardCharsets.UTF_8);
-    writer.write("Test data 2");
-    writer.close();
+    // Move snapshot dir to correct location.
+    new File(newDbDirName, OM_SNAPSHOT_DIR)
+        .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR));
 
-    File outputFile =
-        new File(Paths.get(testDirName, "output_file.tar").toString());
-    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-        checkpoint.toPath());
-    writeDBCheckpointToStream(dbCheckpoint,
-        new FileOutputStream(outputFile));
-    assertNotNull(outputFile);
+
+    // Confirm the checkpoint directories match, (after remove extras).
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(newDbDirName);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        newDbDirLength);
+
+    Assert.assertTrue("hardlink file exists in checkpoint dir",
+        finalCheckpointSet.contains(OM_HARDLINK_FILE));
+    finalCheckpointSet.remove(OM_HARDLINK_FILE);
+    Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
+
+    int metaDirLength = metaDir.toString().length() + 1;
+    String shortSnapshotLocation =
+        truncateFileName(metaDirLength, Paths.get(snapshotDirName));
+    String shortSnapshotLocation2 =
+        truncateFileName(metaDirLength, Paths.get(snapshotDirName2));
+    String shortCompactionDirLocation =
+        truncateFileName(metaDirLength, compactionDirPath);
+
+    Set<String> finalFullSet =
+        getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
+
+    // Check each line in the hard link file.
+    Stream<String> lines = Files.lines(Paths.get(newDbDirName,
+        OM_HARDLINK_FILE));
+
+    List<String> fabricatedLinkLines = new ArrayList<>();
+    for (String line: lines.collect(Collectors.toList())) {
+      Assert.assertFalse("CURRENT file is not a hard link",
+          line.contains("CURRENT"));
+      if (line.contains("fabricatedFile")) {
+        fabricatedLinkLines.add(line);
+      } else {
+        checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
+        // add links to the final set
+        finalFullSet.add(line.split("\t")[0]);
+      }
+    }
+
+    Set<String> directories = Sets.newHashSet(
+        shortSnapshotLocation, shortSnapshotLocation2,
+        shortCompactionDirLocation);
+    checkFabricatedLines(directories, fabricatedLinkLines, testDirName);
+
+    Set<String> initialFullSet =
+        getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
+    Assert.assertEquals("found expected snapshot files",
+        initialFullSet, finalFullSet);
   }
 
   @Test

@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -120,7 +121,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
                                   OutputStream destination)
-      throws IOException, InterruptedException, CompressorException {
+      throws IOException, InterruptedException {
     // Map of inodes to path.
     Map<Object, Path> copyFiles = new HashMap<>();
     // Map of link to path.
@@ -129,19 +130,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
         includeSnapshotData(request));
 
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(
-            CompressorStreamFactory.GZIP, destination);
-         TarArchiveOutputStream archiveOutputStream = 
-             new TarArchiveOutputStream(gzippedOut)
-    ) {
+    try (TarArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
     }
   }
 
