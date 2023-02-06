@@ -51,14 +51,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests the Certificate codecs.
  */
 public class TestCertificateCodec {
-  private static final OzoneConfiguration conf = new OzoneConfiguration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static final String COMPONENT = "test";
   private SecurityConfig securityConfig;
 
   @BeforeEach
   public void init(@TempDir Path tempDir) {
-    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
-    securityConfig = new SecurityConfig(conf);
+    CONF.set(OZONE_METADATA_DIRS, tempDir.toString());
+    securityConfig = new SecurityConfig(CONF);
   }
 
   /**
@@ -259,7 +259,7 @@ public class TestCertificateCodec {
   private X509CertificateHolder generateTestCert()
       throws IOException, NoSuchProviderException, NoSuchAlgorithmException {
     HDDSKeyGenerator keyGenerator =
-        new HDDSKeyGenerator(conf);
+        new HDDSKeyGenerator(CONF);
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
     return SelfSignedCertificate.newBuilder()
