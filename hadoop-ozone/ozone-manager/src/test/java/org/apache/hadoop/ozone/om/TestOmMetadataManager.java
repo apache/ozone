@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -48,7 +49,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -593,7 +593,7 @@ public class TestOmMetadataManager {
     final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
 
     final long expiredOpenKeyCreationTime =
-        Instant.now().minus(expireThreshold).toEpochMilli();
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
     // Add expired keys to open key table.
     // The method under test does not check for expired open keys in the
@@ -601,7 +601,7 @@ public class TestOmMetadataManager {
     Set<String> expiredKeys = new HashSet<>();
     for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
       final long creationTime = i < numExpiredOpenKeys ?
-          expiredOpenKeyCreationTime : Instant.now().toEpochMilli();
+          expiredOpenKeyCreationTime : Time.now();
       final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
           bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.ONE, 0L, creationTime);
