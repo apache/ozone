@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -28,6 +29,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
@@ -40,8 +43,8 @@ import org.slf4j.event.Level;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
@@ -56,6 +59,7 @@ public class TestRatisOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
+  private NodeManager nodeManager;
 
   @Before
   public void setup() throws NodeNotFoundException {
@@ -66,6 +70,10 @@ public class TestRatisOverReplicationHandler {
     Mockito.when(policy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+
+    nodeManager = Mockito.mock(NodeManager.class);
+    Mockito.when(nodeManager.getNodeStatus(Mockito.any()))
+        .thenReturn(NodeStatus.inServiceHealthy());
 
     GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
   }
@@ -86,6 +94,23 @@ public class TestRatisOverReplicationHandler {
     // created
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(),
         1);
+  }
+
+  /**
+   * Container has 4 replicas and 1 stale so none should be deleted.
+   */
+  @Test
+  public void testOverReplicatedClosedContainerWithStale() throws IOException,
+      NodeNotFoundException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+
+    ContainerReplica stale = replicas.stream().findFirst().get();
+    Mockito.when(nodeManager.getNodeStatus(stale.getDatanodeDetails()))
+        .thenReturn(NodeStatus.inServiceStale());
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
   }
 
   /**
@@ -123,31 +148,6 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
-  }
-
-  /**
-   * When a quasi closed container is over replicated, the handler should
-   * prioritize creating delete commands for unhealthy replicas over quasi
-   * closed replicas.
-   */
-  @Test
-  public void testOverReplicatedQuasiClosedContainerWithUnhealthyReplica()
-      throws IOException {
-    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
-        RATIS_REPLICATION_CONFIG);
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    ContainerReplica unhealthyReplica =
-        createContainerReplica(container.containerID(), 0,
-            HddsProtos.NodeOperationalState.IN_SERVICE,
-            ContainerReplicaProto.State.UNHEALTHY);
-    replicas.add(unhealthyReplica);
-
-    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
-        Collections.emptyList(), getOverReplicatedHealthResult(), 1);
-    Assert.assertTrue(
-        commands.containsKey(unhealthyReplica.getDatanodeDetails()));
   }
 
   /**
@@ -196,10 +196,12 @@ public class TestRatisOverReplicationHandler {
             Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
-    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
-        Collections.emptyList(), getOverReplicatedHealthResult(), 2);
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
+        replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
+    Set<DatanodeDetails> datanodes =
+        commands.stream().map(Pair::getKey).collect(Collectors.toSet());
     Assert.assertTrue(
-        commands.containsKey(quasiClosedReplica.getDatanodeDetails()));
+        datanodes.contains(quasiClosedReplica.getDatanodeDetails()));
   }
 
   @Test
@@ -218,12 +220,14 @@ public class TestRatisOverReplicationHandler {
     replicas.add(decommissioningReplica);
     replicas.add(maintenanceReplica);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands = testProcessing(replicas,
-        Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
+        replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    Set<DatanodeDetails> datanodes =
+        commands.stream().map(Pair::getKey).collect(Collectors.toSet());
     Assert.assertFalse(
-        commands.containsKey(decommissioningReplica.getDatanodeDetails()));
+        datanodes.contains(decommissioningReplica.getDatanodeDetails()));
     Assert.assertFalse(
-        commands.containsKey(maintenanceReplica.getDatanodeDetails()));
+        datanodes.contains(maintenanceReplica.getDatanodeDetails()));
   }
 
   @Test
@@ -256,14 +260,14 @@ public class TestRatisOverReplicationHandler {
    *                          the handler
    * @return map of commands
    */
-  private Map<DatanodeDetails, SCMCommand<?>> testProcessing(
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> testProcessing(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult healthResult,
       int expectNumCommands) throws IOException {
     RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(policy);
+        new RatisOverReplicationHandler(policy, nodeManager);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
         handler.processAndCreateCommands(replicas, pendingOps,
             healthResult, 2);
     Assert.assertEquals(expectNumCommands, commands.size());

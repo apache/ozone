@@ -26,6 +26,7 @@ public enum OMAction implements AuditAction {
   ALLOCATE_BLOCK,
   ALLOCATE_KEY,
   COMMIT_KEY,
+  HSYNC,
   CREATE_VOLUME,
   CREATE_BUCKET,
   DELETE_VOLUME,
@@ -89,7 +90,11 @@ public enum OMAction implements AuditAction {
 
   TENANT_ASSIGN_ADMIN,
   TENANT_REVOKE_ADMIN,
-  TENANT_LIST_USER;
+  TENANT_LIST_USER,
+
+  CREATE_SNAPSHOT,
+  DELETE_SNAPSHOT,
+  LIST_SNAPSHOT;
 
   @Override
   public String getAction() {
