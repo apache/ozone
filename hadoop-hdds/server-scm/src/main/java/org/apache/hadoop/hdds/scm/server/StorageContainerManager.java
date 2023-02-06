@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
@@ -289,6 +290,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final SecretKeyManagerService secretKeyManagerService;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -365,6 +367,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager = new SCMServiceManager();
 
     initializeSystemManagers(conf, configurator);
+
+    if (isSecretKeyEnable(securityConfig)) {
+      secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
+              scmHAManager.getRatisServer());
+      serviceManager.register(secretKeyManagerService);
+    } else {
+      secretKeyManagerService = null;
+    }
 
     // Authenticate SCM if security is enabled, this initialization can only
     // be done after the metadata store is initialized.
@@ -713,13 +723,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     serviceManager.register(expiredContainerReplicaOpScrubber);
 
-    if (isSecretKeyEnable(securityConfig)) {
-      SecretKeyManagerService secretKeyManagerService =
-          new SecretKeyManagerService(scmContext, conf,
-              scmHAManager.getRatisServer());
-      serviceManager.register(secretKeyManagerService);
-    }
-
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
@@ -849,12 +852,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               certificateStore, scmStorageConfig, new DefaultProfile());
     }
 
+    SecretKeyManager secretKeyManager = secretKeyManagerService != null ?
+        secretKeyManagerService.getSecretKeyManager() : null;
+
     // We need to pass getCACertificate as rootCA certificate,
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, scmCertificateServer,
         scmCertificateClient != null ?
-            scmCertificateClient.getCACertificate() : null, this);
+            scmCertificateClient.getCACertificate() : null, this,
+        secretKeyManager);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
