@@ -29,10 +29,11 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 
 /**
  * Helper to check scheduling efficiency.
@@ -73,47 +74,44 @@ public class ReplicationSupervisorScheduling {
       destinationLocks.put(i, new Object());
     }
 
-    ContainerSet cs = new ContainerSet(1000);
+    //simplified executor emulating the current sequential download +
+    //import.
+    ContainerReplicator replicator = task -> {
+      //download, limited by the number of source datanodes
+      final DatanodeDetails sourceDatanode =
+          task.getSources().get(random.nextInt(task.getSources().size()));
 
-    ReplicationSupervisor rs = new ReplicationSupervisor(cs, null,
+      final Map<Integer, Object> volumes =
+          volumeLocks.get(sourceDatanode.getUuid());
+      Object volumeLock = volumes.get(random.nextInt(volumes.size()));
+      synchronized (volumeLock) {
+        System.out.println("Downloading " + task.getContainerId() + " from "
+            + sourceDatanode.getUuid());
+        try {
+          volumeLock.wait(1000);
+        } catch (InterruptedException ex) {
+          ex.printStackTrace();
+        }
+      }
 
-        //simplified executor emulating the current sequential download +
-        //import.
-        task -> {
+      //import, limited by the destination datanode
+      final int volumeIndex = random.nextInt(destinationLocks.size());
+      Object destinationLock = destinationLocks.get(volumeIndex);
+      synchronized (destinationLock) {
+        System.out.println(
+            "Importing " + task.getContainerId() + " to disk "
+                + volumeIndex);
 
-          //download, limited by the number of source datanodes
-          final DatanodeDetails sourceDatanode =
-              task.getSources().get(random.nextInt(task.getSources().size()));
+        try {
+          destinationLock.wait(1000);
+        } catch (InterruptedException ex) {
+          ex.printStackTrace();
+        }
+      }
+    };
 
-          final Map<Integer, Object> volumes =
-              volumeLocks.get(sourceDatanode.getUuid());
-          Object volumeLock = volumes.get(random.nextInt(volumes.size()));
-          synchronized (volumeLock) {
-            System.out.println("Downloading " + task.getContainerId() + " from "
-                + sourceDatanode.getUuid());
-            try {
-              volumeLock.wait(1000);
-            } catch (InterruptedException ex) {
-              ex.printStackTrace();
-            }
-          }
-
-          //import, limited by the destination datanode
-          final int volumeIndex = random.nextInt(destinationLocks.size());
-          Object destinationLock = destinationLocks.get(volumeIndex);
-          synchronized (destinationLock) {
-            System.out.println(
-                "Importing " + task.getContainerId() + " to disk "
-                    + volumeIndex);
-
-            try {
-              destinationLock.wait(1000);
-            } catch (InterruptedException ex) {
-              ex.printStackTrace();
-            }
-          }
-
-        }, replicationConfig, Clock.system(ZoneId.systemDefault()));
+    ReplicationSupervisor rs = new ReplicationSupervisor(null,
+        replicationConfig, Clock.system(ZoneId.systemDefault()));
 
     final long start = System.currentTimeMillis();
 
@@ -121,7 +119,8 @@ public class ReplicationSupervisorScheduling {
     for (int i = 0; i < 100; i++) {
       List<DatanodeDetails> sources = new ArrayList<>();
       sources.add(datanodes.get(random.nextInt(datanodes.size())));
-      rs.addTask(new ReplicationTask(i, sources));
+
+      rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
     }
     rs.shutdownAfterFinish();
     final long executionTime = System.currentTimeMillis() - start;

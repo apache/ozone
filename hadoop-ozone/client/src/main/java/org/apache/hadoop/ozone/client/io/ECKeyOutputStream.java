@@ -217,6 +217,10 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void logStreamError(List<ECBlockOutputStream> failedStreams,
                               String operation) {
+    if (!LOG.isWarnEnabled()) {
+      return;
+    }
+
     Set<Integer> failedStreamIndexSet =
             failedStreams.stream().map(ECBlockOutputStream::getReplicationIndex)
                     .collect(Collectors.toSet());
@@ -242,9 +246,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     List<ECBlockOutputStream> failedStreams =
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        logStreamError(failedStreams, "EC stripe write");
-      }
+      logStreamError(failedStreams, "EC stripe write");
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
@@ -259,9 +261,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        logStreamError(failedStreams, "Put block");
-      }
+      logStreamError(failedStreams, "Put block");
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }

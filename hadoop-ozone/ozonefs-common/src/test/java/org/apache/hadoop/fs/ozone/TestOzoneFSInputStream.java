@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -123,7 +124,7 @@ public class TestOzoneFSInputStream {
           new FileSystem.Statistics("test"));
 
       assertTrue(capableOzoneFSInputStream.
-          hasCapability(OzoneStreamCapabilities.READBYTEBUFFER));
+          hasCapability(StreamCapabilities.READBYTEBUFFER));
     } finally {
       if (capableOzoneFSInputStream != null) {
         capableOzoneFSInputStream.close();

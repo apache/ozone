@@ -283,10 +283,10 @@ public final class OMFileRequest {
    * the directory search result code.
    */
   public static class OMPathInfoWithFSO extends OMPathInfo {
-    private String leafNodeName;
+    private final String leafNodeName;
+    private final String fileExistsInPath;
     private long lastKnownParentId;
     private long leafNodeObjectId;
-    private String fileExistsInPath;
 
     public OMPathInfoWithFSO(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
@@ -335,9 +335,9 @@ public final class OMFileRequest {
    * the directory search result code.
    */
   public static class OMPathInfo {
-    private OMDirectoryResult directoryResult;
-    private List<String> missingParents;
-    private List<OzoneAcl> acls;
+    private final OMDirectoryResult directoryResult;
+    private final List<String> missingParents;
+    private final List<OzoneAcl> acls;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
         List<OzoneAcl> aclList) {
@@ -346,7 +346,7 @@ public final class OMFileRequest {
       this.acls = aclList;
     }
 
-    public List getMissingParents() {
+    public List<String> getMissingParents() {
       return missingParents;
     }
 
@@ -567,7 +567,8 @@ public final class OMFileRequest {
    * @return multipartFileKey
    * @throws IOException DB failure
    */
-  public static String addToOpenFileTable(OMMetadataManager omMetadataMgr,
+  public static String addToOpenFileTableForMultipart(
+      OMMetadataManager omMetadataMgr,
       BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID,
       long volumeId, long bucketId) throws IOException {
 
@@ -803,7 +804,7 @@ public final class OMFileRequest {
 
   /**
    * Verify parent exists for the destination path and return destination
-   * path parent Id.
+   * path parent.
    * <p>
    * Check whether dst parent dir exists or not. If the parent exists, then the
    * source can be renamed to dst path.
@@ -811,39 +812,33 @@ public final class OMFileRequest {
    * @param volumeName  volume name
    * @param bucketName  bucket name
    * @param toKeyName   destination path
-   * @param fromKeyName source path
    * @param metaMgr     metadata manager
-   * @throws IOException if the destination parent dir doesn't exists.
+   * @return omDirectoryInfo object of destination path's parent
+   * or null if parent is bucket
+   * @throws IOException if the destination parent is not a directory.
    */
-  public static long getToKeyNameParentId(String volumeName,
-      String bucketName, String toKeyName, String fromKeyName,
-      OMMetadataManager metaMgr) throws IOException {
-
+  public static OmKeyInfo getKeyParentDir(String volumeName, String bucketName,
+      String toKeyName, OMMetadataManager metaMgr) throws IOException {
     int totalDirsCount = OzoneFSUtils.getFileCount(toKeyName);
     // skip parent is root '/'
     if (totalDirsCount <= 1) {
-      String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo =
-              metaMgr.getBucketTable().get(bucketKey);
-      return omBucketInfo.getObjectID();
+      return null;
     }
-
     String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
-
     OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
             volumeName, bucketName, toKeyParentDir, 0);
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null) {
       throw new OMException(String.format(
-              "Failed to rename %s to %s, %s doesn't exist", fromKeyName,
+              "Failed to get parent dir %s, %s doesn't exist",
               toKeyName, toKeyParentDir),
               OMException.ResultCodes.KEY_RENAME_ERROR);
     } else if (toKeyParentDirStatus.isFile()) {
       throw new OMException(String.format(
-              "Failed to rename %s to %s, %s is a file", fromKeyName, toKeyName,
+              "Failed to get parent dir %s, %s is a file", toKeyName,
               toKeyParentDir), OMException.ResultCodes.KEY_RENAME_ERROR);
     }
-    return toKeyParentDirStatus.getKeyInfo().getObjectID();
+    return toKeyParentDirStatus.getKeyInfo();
   }
 
   /**
