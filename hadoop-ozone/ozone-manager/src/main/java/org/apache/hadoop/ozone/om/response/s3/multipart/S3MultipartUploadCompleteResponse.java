@@ -136,20 +136,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     return ozoneKey;
   }
 
-  protected String getMultipartKey() {
-    return multipartKey;
-  }
-
   protected OmKeyInfo getOmKeyInfo() {
     return omKeyInfo;
-  }
-
-  protected List<OmKeyInfo> getPartsUnusedList() {
-    return partsUnusedList;
-  }
-
-  @CheckForNull
-  public OmBucketInfo getOmBucketInfo() {
-    return omBucketInfo;
   }
 }
