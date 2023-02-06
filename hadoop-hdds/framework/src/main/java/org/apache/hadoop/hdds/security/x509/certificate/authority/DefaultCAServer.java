@@ -52,7 +52,6 @@ import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -250,7 +249,6 @@ public class DefaultCAServer implements CertificateServer {
       xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
           "verify the CSR."));
     }
-    List<Certificate> allCerts;
     try {
       switch (approverType) {
       case MANUAL:

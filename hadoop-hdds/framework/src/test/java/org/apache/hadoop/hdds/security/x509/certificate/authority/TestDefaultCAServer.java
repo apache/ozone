@@ -19,12 +19,14 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
@@ -39,6 +41,7 @@ import org.apache.ozone.test.LambdaTestUtils;
 
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -170,9 +173,9 @@ public class TestDefaultCAServer {
   @Test
   public void testRequestCertificate() throws IOException,
       ExecutionException, InterruptedException,
-      NoSuchProviderException, NoSuchAlgorithmException {
-    String scmId =  RandomStringUtils.randomAlphabetic(4);
-    String clusterId =  RandomStringUtils.randomAlphabetic(4);
+      NoSuchProviderException, NoSuchAlgorithmException, CertificateException {
+    String scmId = RandomStringUtils.randomAlphabetic(4);
+    String clusterId = RandomStringUtils.randomAlphabetic(4);
     KeyPair keyPair =
         new HDDSKeyGenerator(conf).generateKey();
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
@@ -201,7 +204,10 @@ public class TestDefaultCAServer {
         csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get().getCertificates().get(0));
+    //Test that the cert path returned contains the CA certificate in proper
+    // place
+    assertEquals(holder.get().getCertificates().get(1),
+        CertificateCodec.getX509Certificate(testCA.getCACertificate()));
   }
 
   /**
@@ -383,7 +389,7 @@ public class TestDefaultCAServer {
   }
 
   private void setExternalPathsInConfig(Path tempDir,
-                                        String externalCaCertFileName) {
+      String externalCaCertFileName) {
     String externalCaCertPart = Paths.get(tempDir.toString(),
         externalCaCertFileName).toString();
     String privateKeyPath = Paths.get(tempDir.toString(),
@@ -397,6 +403,62 @@ public class TestDefaultCAServer {
         privateKeyPath);
     conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
         publicKeyPath);
+  }
+
+  @Test
+  public void testInitWithCertChain(@TempDir Path tempDir) throws Exception {
+    String externalCaCertFileName = "CaCert.pem";
+    setExternalPathsInConfig(tempDir, externalCaCertFileName);
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    CertificateApprover approver = new DefaultApprover(new DefaultCAProfile(),
+        securityConfig);
+    SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf));
+    String scmId = RandomStringUtils.randomAlphabetic(4);
+    String clusterId = RandomStringUtils.randomAlphabetic(4);
+    KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
+    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    keyPEMWriter.writeKey(tempDir, keyPair, true);
+    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
+    LocalDate endDate =
+        LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .addIpAddress("8.8.8.8")
+        .addServiceName("OzoneMarketingCluster002")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("Ozone Cluster")
+        .setConfiguration(conf)
+        .setKey(keyPair)
+        .build();
+    X509CertificateHolder externalCert = generateExternalCert(keyPair);
+    X509CertificateHolder signedCert = approver.sign(securityConfig,
+        keyPair.getPrivate(), externalCert,
+        java.sql.Date.valueOf(beginDate), java.sql.Date.valueOf(endDate), csr,
+        scmId, clusterId);
+    CertificateFactory certFactory = new CertificateFactory();
+    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    CertPath certPath = certFactory.engineGenerateCertPath(
+        ImmutableList.of(CertificateCodec.getX509Certificate(signedCert),
+            CertificateCodec.getX509Certificate(externalCert)));
+    certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
+        CertificateCodec.getPEMEncodedString(certPath));
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        RandomStringUtils.randomAlphabetic(4),
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    //When initializing a CA server with external cert
+    testCA.init(securityConfig, SELF_SIGNED_CA);
+    //Then the external cert is set as CA cert for the server.
+    assertEquals(signedCert, testCA.getCACertificate());
   }
 
   @Test

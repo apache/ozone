@@ -105,6 +105,9 @@ public class CertificateCodec {
     return CERTIFICATE_CONVERTER.getCertificate(holder);
   }
 
+  /**
+   * Get a valid pem encoded string for the certification path.
+   */
   public static String getPEMEncodedString(CertPath certPath)
       throws SCMSecurityException {
     List<? extends Certificate> certsInPath = certPath.getCertificates();
@@ -155,7 +158,9 @@ public class CertificateCodec {
   }
 
   /**
-   * Gets the X.509 Certificate from PEM encoded String.
+   * Get the leading X.509 Certificate from PEM encoded String possibly
+   * containing multiple certificates. To get all certificates, use
+   * {@link #getCertPathFromPemEncodedString(String)}.
    *
    * @param pemEncodedString - PEM encoded String.
    * @return X509Certificate  - Certificate.
@@ -197,17 +202,19 @@ public class CertificateCodec {
    * Write the Certificate to the specific file.
    *
    * @param xCertificate - Certificate to write.
-   * @param fileName - file name to write to.
+   * @param fileName     - file name to write to.
    * @throws SCMSecurityException - On Error.
    * @throws IOException          - On Error.
    */
   public void writeCertificate(X509CertificateHolder xCertificate,
-      String fileName)
-      throws SCMSecurityException, IOException {
+      String fileName) throws IOException {
     String pem = getPEMEncodedString(xCertificate);
     writeCertificate(location.toAbsolutePath(), fileName, pem);
   }
 
+  /**
+   * Write the pem encoded string to the specified file.
+   */
   public void writeCertificate(String fileName, String pemEncodedCert)
       throws IOException {
     writeCertificate(location.toAbsolutePath(), fileName, pemEncodedCert);
@@ -236,6 +243,9 @@ public class CertificateCodec {
     Files.setPosixFilePermissions(certificateFile.toPath(), permissionSet);
   }
 
+  /**
+   * Gets a certificate path from the specified pem encoded String.
+   */
   public static CertPath getCertPathFromPemEncodedString(
       String pemString) throws CertificateException, IOException {
     try (InputStream is =
@@ -258,11 +268,17 @@ public class CertificateCodec {
     }
   }
 
+  /**
+   * Get the certificate path stored under the specified filename.
+   */
   public CertPath getCertPath(String fileName)
       throws IOException, CertificateException {
     return getCertPath(location, fileName);
   }
 
+  /**
+   * Get the default certificate path for this cert codec.
+   */
   public CertPath getCertPath() throws CertificateException, IOException {
     return getCertPath(this.securityConfig.getCertificateFileName());
   }
@@ -281,6 +297,11 @@ public class CertificateCodec {
     return new X509CertificateHolder(x509cert.getEncoded());
   }
 
+  /**
+   * Helper method that takes in a certificate path and a certificate and
+   * generates a new certificate path starting with the new certificate
+   * followed by all certificates in the specified path.
+   */
   public CertPath prependCertToCertPath(X509CertificateHolder certHolder,
       CertPath path) throws CertificateException {
     List<? extends Certificate> certificates = path.getCertificates();
@@ -293,6 +314,10 @@ public class CertificateCodec {
     return factory.engineGenerateCertPath(updatedList);
   }
 
+  /**
+   * Helper method that gets one certificate from the specified location.
+   * The remaining certificates are ignored.
+   */
   public X509CertificateHolder getTargetCertHolder(Path path,
       String fileName) throws CertificateException, IOException {
     CertPath certPath = getCertPath(path, fileName);
@@ -301,6 +326,10 @@ public class CertificateCodec {
     return getCertificateHolder(certificate);
   }
 
+  /**
+   * Helper method that gets one certificate from the default location.
+   * The remaining certificates are ignored.
+   */
   public X509CertificateHolder getTargetCertHolder()
       throws CertificateException, IOException {
     return getTargetCertHolder(
