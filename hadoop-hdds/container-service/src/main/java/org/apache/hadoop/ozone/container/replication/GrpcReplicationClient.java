@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -58,17 +61,19 @@ public class GrpcReplicationClient implements AutoCloseable {
 
   private final IntraDatanodeProtocolServiceStub client;
 
-  private final Path workingDirectory;
+  private final CopyContainerCompression compression;
 
-  public GrpcReplicationClient(String host, int port, Path workingDir,
-      SecurityConfig secConfig, CertificateClient certClient)
+  public GrpcReplicationClient(
+      String host, int port,
+      SecurityConfig secConfig, CertificateClient certClient,
+      CopyContainerCompression compression)
       throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    if (secConfig.isSecurityEnabled()) {
+    if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
@@ -86,21 +91,22 @@ public class GrpcReplicationClient implements AutoCloseable {
     }
     channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
-    workingDirectory = workingDir;
+    this.compression = compression;
   }
 
-  public CompletableFuture<Path> download(long containerId) {
+  public CompletableFuture<Path> download(long containerId, Path dir) {
     CopyContainerRequestProto request =
         CopyContainerRequestProto.newBuilder()
             .setContainerID(containerId)
             .setLen(-1)
             .setReadOffset(0)
+            .setCompression(compression.toProto())
             .build();
 
     CompletableFuture<Path> response = new CompletableFuture<>();
 
-    Path destinationPath =
-        getWorkingDirectory().resolve("container-" + containerId + ".tar.gz");
+    Path destinationPath = dir
+        .resolve(ContainerUtils.getContainerTarName(containerId));
 
     client.download(request,
         new StreamDownloader(containerId, response, destinationPath));
@@ -108,8 +114,9 @@ public class GrpcReplicationClient implements AutoCloseable {
     return response;
   }
 
-  private Path getWorkingDirectory() {
-    return workingDirectory;
+  public StreamObserver<SendContainerRequest> upload(
+      StreamObserver<SendContainerResponse> responseObserver) {
+    return client.upload(responseObserver);
   }
 
   public void shutdown() {

@@ -477,11 +477,20 @@ message GetSmallFileResponseProto {
   required ReadChunkResponseProto data = 1;
 }
 
+enum CopyContainerCompressProto {
+  NO_COMPRESSION = 1;
+  GZIP = 2;
+  LZ4 = 3;
+  SNAPPY = 4;
+  ZSTD = 5;
+}
+
 message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
   optional uint64 len = 3;
   optional uint32 version = 4;
+  optional CopyContainerCompressProto compression = 5;
 }
 
 message CopyContainerResponseProto {
@@ -491,6 +500,17 @@ message CopyContainerResponseProto {
   required bool eof = 4;
   required bytes data = 5;
   optional int64 checksum = 6;
+}
+
+message SendContainerRequest {
+  required int64 containerID = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
+  optional int64 checksum = 4;
+  optional CopyContainerCompressProto compression = 5;
+}
+
+message SendContainerResponse {
 }
 
 service XceiverClientProtocolService {
@@ -503,4 +523,5 @@ service XceiverClientProtocolService {
 service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+  rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
 }

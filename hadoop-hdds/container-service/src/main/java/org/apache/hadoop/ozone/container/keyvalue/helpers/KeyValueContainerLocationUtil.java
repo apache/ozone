@@ -45,14 +45,21 @@ public final class KeyValueContainerLocationUtil {
   public static File getContainerMetaDataPath(String hddsVolumeDir,
                                               String clusterId,
                                               long containerId) {
-    String containerMetaDataPath =
-        getBaseContainerLocation(hddsVolumeDir, clusterId,
-            containerId);
-    containerMetaDataPath = containerMetaDataPath + File.separator +
+    return getContainerMetaDataPath(
+        getBaseContainerLocation(hddsVolumeDir, clusterId, containerId));
+  }
+
+  /**
+   * Returns Container Metadata Location.
+   * @param containerBaseDir Base container dir
+   * @return containerMetadata Path to container metadata location where
+   * .container file will be stored.
+   */
+  public static File getContainerMetaDataPath(String containerBaseDir) {
+    String containerMetaDataPath = containerBaseDir + File.separator +
         OzoneConsts.CONTAINER_META_PATH;
     return new File(containerMetaDataPath);
   }
-
 
   /**
    * Returns Container Chunks Location.
@@ -63,8 +70,17 @@ public final class KeyValueContainerLocationUtil {
    */
   public static File getChunksLocationPath(String baseDir, String clusterId,
                                            long containerId) {
-    String chunksPath =
-        getBaseContainerLocation(baseDir, clusterId, containerId)
+    return getChunksLocationPath(
+        getBaseContainerLocation(baseDir, clusterId, containerId));
+  }
+
+  /**
+   * Returns Container Chunks Location.
+   * @param containerBaseDir
+   * @return chunksPath
+   */
+  public static File getChunksLocationPath(String containerBaseDir) {
+    String chunksPath = containerBaseDir
             + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
     return new File(chunksPath);
   }
@@ -76,7 +92,7 @@ public final class KeyValueContainerLocationUtil {
    * @param containerId
    * @return base directory for container.
    */
-  private static String getBaseContainerLocation(String hddsVolumeDir,
+  public static String getBaseContainerLocation(String hddsVolumeDir,
                                                  String clusterId,
                                                  long containerId) {
     Preconditions.checkNotNull(hddsVolumeDir, "Base Directory cannot be null");
@@ -111,7 +127,12 @@ public final class KeyValueContainerLocationUtil {
       return new File(containerData.getVolume().getDbParentDir(),
           OzoneConsts.CONTAINER_DB_NAME);
     }
-    return new File(containerData.getMetadataPath(),
-        containerData.getContainerID() + OzoneConsts.DN_CONTAINER_DB);
+    return getContainerDBFile(containerData.getMetadataPath(), containerData);
+  }
+
+  public static File getContainerDBFile(String baseDir,
+      KeyValueContainerData containerData) {
+    return new File(baseDir, containerData.getContainerID() +
+        OzoneConsts.DN_CONTAINER_DB);
   }
 }

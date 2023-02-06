@@ -24,6 +24,7 @@ import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
 import {showDataFetchError} from 'utils/common';
 import './diskUsage.less';
+import moment from 'moment';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -261,7 +262,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
-      if (summaryResponse.type === 'KEY') {
+      if (summaryResponse.countStats.type === 'KEY') {
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
         axios.get(keyEndpoint).then(response => {
           keys.push('File Size');
@@ -285,29 +286,139 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return;
       }
 
-      if (summaryResponse.status === 'PATH_NOT_FOUND') {
+      if (summaryResponse.countStats.status === 'PATH_NOT_FOUND') {
         showDataFetchError(`Invalid Path: ${path}`);
         return;
       }
 
-      if (summaryResponse.numVolume !== -1) {
+      if (summaryResponse.countStats.numVolume !== -1) {
         keys.push('Volumes');
-        values.push(summaryResponse.numVolume);
+        values.push(summaryResponse.countStats.numVolume);
       }
 
-      if (summaryResponse.numBucket !== -1) {
+      if (summaryResponse.countStats.numBucket !== -1) {
         keys.push('Buckets');
-        values.push(summaryResponse.numBucket);
+        values.push(summaryResponse.countStats.numBucket);
       }
 
-      if (summaryResponse.numDir !== -1) {
+      if (summaryResponse.countStats.numDir !== -1) {
         keys.push('Total Directories');
-        values.push(summaryResponse.numDir);
+        values.push(summaryResponse.countStats.numDir);
       }
 
-      if (summaryResponse.numKey !== -1) {
+      if (summaryResponse.countStats.numKey !== -1) {
         keys.push('Total Keys');
-        values.push(summaryResponse.numKey);
+        values.push(summaryResponse.countStats.numKey);
+      }
+
+      if (summaryResponse.objectInfo.bucketName && summaryResponse.objectInfo.bucketName !== -1) {
+        keys.push('Bucket Name');
+        values.push(summaryResponse.objectInfo.bucketName);
+      }
+
+      if (summaryResponse.objectInfo.bucketLayout && summaryResponse.objectInfo.bucketLayout !== -1) {
+        keys.push('Bucket Layout');
+        values.push(summaryResponse.objectInfo.bucketLayout);
+      }
+
+      if (summaryResponse.objectInfo.creationTime && summaryResponse.objectInfo.creationTime !== -1) {
+        keys.push('Creation Time');
+        values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
+      }
+
+      if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
+        keys.push('Data Size');
+        values.push(this.byteToSize(summaryResponse.objectInfo.dataSize, 3));
+      }
+
+      if (summaryResponse.objectInfo.encInfo && summaryResponse.objectInfo.encInfo !== -1) {
+        keys.push('ENC Info');
+        values.push(summaryResponse.objectInfo.encInfo);
+      }
+
+      if (summaryResponse.objectInfo.fileName && summaryResponse.objectInfo.fileName !== -1) {
+        keys.push('File Name');
+        values.push(summaryResponse.objectInfo.fileName);
+      }
+
+      if (summaryResponse.objectInfo.keyName && summaryResponse.objectInfo.keyName !== -1) {
+        keys.push('Key Name');
+        values.push(summaryResponse.objectInfo.keyName);
+      }
+
+      if (summaryResponse.objectInfo.modificationTime && summaryResponse.objectInfo.modificationTime !== -1) {
+        keys.push('Modification Time');
+        values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
+      }
+
+      if (summaryResponse.objectInfo.name && summaryResponse.objectInfo.name !== -1) {
+        keys.push('Name');
+        values.push(summaryResponse.objectInfo.name);
+      }
+
+      if (summaryResponse.objectInfo.owner && summaryResponse.objectInfo.owner !== -1) {
+        keys.push('Owner');
+        values.push(summaryResponse.objectInfo.owner);
+      }
+
+      if (summaryResponse.objectInfo.quotaInBytes && summaryResponse.objectInfo.quotaInBytes !== -1) {
+        keys.push('Quota In Bytes');
+        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
+      }
+
+      if (summaryResponse.objectInfo.quotaInNamespace && summaryResponse.objectInfo.quotaInNamespace !== -1) {
+        keys.push('Quota In Namespace');
+        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
+      }
+
+      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationFactor && summaryResponse.objectInfo.replicationConfig.replicationFactor !== -1) {
+        keys.push('Replication Factor');
+        values.push(summaryResponse.objectInfo.replicationConfig.replicationFactor);
+      }
+
+      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationType && summaryResponse.objectInfo.replicationConfig.replicationType !== -1) {
+        keys.push('Replication Type');
+        values.push(summaryResponse.objectInfo.replicationConfig.replicationType);
+      }
+
+      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.requiredNodes && summaryResponse.objectInfo.replicationConfig.requiredNodes !== -1) {
+        keys.push('Replication Required Nodes');
+        values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
+      }
+      
+      if (summaryResponse.objectInfo.sourceBucket && summaryResponse.objectInfo.sourceBucket !== -1) {
+        keys.push('Source Bucket');
+        values.push(summaryResponse.objectInfo.sourceBucket);
+      }
+
+      if (summaryResponse.objectInfo.sourceVolume && summaryResponse.objectInfo.sourceVolume !== -1) {
+        keys.push('Source Volume');
+        values.push(summaryResponse.objectInfo.sourceVolume);
+      }
+
+      if (summaryResponse.objectInfo.storageType && summaryResponse.objectInfo.storageType !== -1) {
+        keys.push('Storage Type');
+        values.push(summaryResponse.objectInfo.storageType);
+      }
+
+      if (summaryResponse.objectInfo.usedBytes && summaryResponse.objectInfo.usedBytes !== -1) {
+        keys.push('Used Bytes');
+        values.push(summaryResponse.objectInfo.usedBytes);
+      }
+
+      if (summaryResponse.objectInfo.usedNamespace && summaryResponse.objectInfo.usedNamespace !== -1) {
+        keys.push('Used NameSpaces');
+        values.push(summaryResponse.objectInfo.usedNamespace);
+      }
+
+      if (summaryResponse.objectInfo.volumeName && summaryResponse.objectInfo.volumeName !== -1) {
+        keys.push('Volume Name');
+        values.push(summaryResponse.objectInfo.volumeName);
+      }
+
+      if (summaryResponse.objectInfo.volume && summaryResponse.objectInfo.volume !== -1) {
+        keys.push('Volume');
+        values.push(summaryResponse.objectInfo.volume);
       }
 
       // Show the right drawer

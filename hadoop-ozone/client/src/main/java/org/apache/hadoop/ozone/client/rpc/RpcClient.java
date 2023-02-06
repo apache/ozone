@@ -88,6 +88,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -150,6 +151,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
@@ -687,13 +689,21 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
+    String replicationType = defaultReplicationConfig == null 
+        ? "server-side default replication type"
+        : defaultReplicationConfig.getType().toString();
+
     String layoutMsg = bucketLayout != null
         ? "with bucket layout " + bucketLayout
         : "with server-side default bucket layout";
     LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
-            "Storage Type set to {} and Encryption set to {} ",
+            "Storage Type set to {} and Encryption set to {}, " +
+            "Replication Type set to {}, Namespace Quota set to {}, " + 
+            "Space Quota set to {} ",
         volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
-        storageType, bek != null);
+        storageType, bek != null, replicationType,
+        bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes());
+
     ozoneManagerClient.createBucket(builder.build());
   }
 
@@ -929,6 +939,75 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(Strings.isNotBlank(accessId),
         "accessId can't be null or empty.");
     ozoneManagerClient.tenantRevokeUserAccessId(accessId);
+  }
+
+  /**
+   * Create Snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
+   * @return name used
+   * @throws IOException
+   */
+  @Override
+  public String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    return ozoneManagerClient.createSnapshot(volumeName,
+        bucketName, snapshotName);
+  }
+
+  /**
+   * Delete Snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  @Override
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(snapshotName),
+        "snapshot name can't be null or empty.");
+    ozoneManagerClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+  }
+
+  @Override
+  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
+                                         String fromSnapshot, String toSnapshot)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
+        fromSnapshot, toSnapshot);
+  }
+
+  /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return list of snapshots for volume/bucket snapshotpath.
+   * @throws IOException
+   */
+  @Override
+  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    return ozoneManagerClient.listSnapshot(volumeName, bucketName).stream()
+        .map(snapshotInfo -> OzoneSnapshot.fromSnapshotInfo(snapshotInfo))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -2140,7 +2219,8 @@ public class RpcClient implements ClientProtocol {
           );
           gk.getCipher().init(Cipher.ENCRYPT_MODE, gk.getSecretKey());
           return new OzoneOutputStream(
-              new CipherOutputStream(keyOutputStream, gk.getCipher()));
+              new CipherOutputStream(keyOutputStream, gk.getCipher()),
+              keyOutputStream);
         }
       }  catch (Exception ex) {
         throw new IOException(ex);

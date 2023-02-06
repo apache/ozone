@@ -384,7 +384,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Native authorizer requires client id as part of key name to check
     // write ACL on key. Add client id to key name if ozone native
     // authorizer is configured.
-    if (ozoneManager.isNativeAuthorizerEnabled()) {
+    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
       keyNameForAclCheck = key + "/" + clientId;
     }
 
@@ -520,11 +520,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
+   * @paran metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException
    */
-  protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
+  protected void checkBucketQuotaInBytes(
+      OMMetadataManager metadataManager, OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
       long usedBytes = omBucketInfo.getUsedBytes();

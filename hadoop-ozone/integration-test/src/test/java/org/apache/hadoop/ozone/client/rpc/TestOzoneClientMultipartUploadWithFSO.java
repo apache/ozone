@@ -330,7 +330,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
       throws IOException {
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 1024)));
 
@@ -411,6 +411,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
     String parentDir = "a/b/c/d/";
     keyName = parentDir + UUID.randomUUID().toString();
     String uploadID = initiateMultipartUpload(bucket, keyName, RATIS, ONE);
+
+    Assert.assertEquals(volume.getBucket(bucketName).getUsedNamespace(), 4);
 
     // upload part 1.
     byte[] data = generateData(5 * 1024 * 1024,

@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -381,13 +380,11 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void populateContainerPathFields(KeyValueContainer container)
-      throws IOException {
+  private void populateContainerPathFields(KeyValueContainer container,
+      HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
+    HddsVolume containerVolume = hddsVolume;
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          container.getContainerData().getMaxSize());
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
       container.populatePathFields(idDir, containerVolume);
@@ -1014,8 +1011,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
+      final TarContainerPacker packer) throws IOException {
     Preconditions.checkState(originalContainerData instanceof
         KeyValueContainerData, "Should be KeyValueContainerData instance");
 
@@ -1025,7 +1021,8 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
 
-    populateContainerPathFields(container);
+    HddsVolume targetVolume = originalContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;
