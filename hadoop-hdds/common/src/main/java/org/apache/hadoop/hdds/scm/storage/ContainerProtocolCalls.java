@@ -440,7 +440,7 @@ public final class ContainerProtocolCalls  {
   public static void createRecoveringContainer(XceiverClientSpi client,
       long containerID, String encodedToken, int replicaIndex)
       throws IOException {
-    createContainerInternal(client, containerID, encodedToken,
+    createContainer(client, containerID, encodedToken,
         ContainerProtos.ContainerDataProto.State.RECOVERING, replicaIndex);
   }
 
@@ -453,7 +453,7 @@ public final class ContainerProtocolCalls  {
    */
   public static void createContainer(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException {
-    createContainerInternal(client, containerID, encodedToken, null, 0);
+    createContainer(client, containerID, encodedToken, null, 0);
   }
   /**
    * createContainer call that creates a container on the datanode.
@@ -464,7 +464,7 @@ public final class ContainerProtocolCalls  {
    * @param replicaIndex - index position of the container replica
    * @throws IOException
    */
-  private static void createContainerInternal(XceiverClientSpi client,
+  public static void createContainer(XceiverClientSpi client,
       long containerID, String encodedToken,
       ContainerProtos.ContainerDataProto.State state, int replicaIndex)
       throws IOException {
