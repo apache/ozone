@@ -18,13 +18,18 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -60,6 +65,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
@@ -92,6 +98,18 @@ public class BaseFreonGenerator {
       defaultValue = "10")
   private int threadNo;
 
+  @Option(names = {"--timebase"},
+      description = "If set, freon will run for the duration of the --runtime"
+          + " specified even if the --number-of-tests operation"
+          + " has been completed.",
+      defaultValue = "false")
+  private boolean timebase;
+
+  @Option(names = {"--runtime"},
+      description = "Tell freon to terminate processing after"
+          + "the specified period of time in seconds.")
+  private long runtime;
+
   @Option(names = {"-f", "--fail-at-end"},
       description = "If turned on, all the tasks will be executed even if "
           + "there are failures.")
@@ -103,6 +121,9 @@ public class BaseFreonGenerator {
           + " will be generated",
       defaultValue = "")
   private String prefix = "";
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   private MetricRegistry metrics = new MetricRegistry();
 
@@ -116,6 +137,11 @@ public class BaseFreonGenerator {
   private String spanName;
   private ExecutorService executor;
   private ProgressBar progressBar;
+
+  private final ThreadLocal<Long> threadSequenceId = new ThreadLocal<>();
+  private final AtomicLong id = new AtomicLong(0);
+
+  private final AtomicBoolean completion = new AtomicBoolean(false);
 
   /**
    * The main logic to execute a test generator.
@@ -153,15 +179,24 @@ public class BaseFreonGenerator {
    * concurrently in {@code executor}.
    */
   private void taskLoop(TaskProvider provider) {
-    while (true) {
+    threadSequenceId.set(id.getAndIncrement());
+    while (!completion.get()) {
       long counter = attemptCounter.getAndIncrement();
-
-      //in case of an other failed test, we shouldn't execute more tasks.
-      if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
-        break;
+      if (timebase) {
+        if (System.currentTimeMillis()
+            > startTime + TimeUnit.SECONDS.toMillis(runtime)) {
+          completion.set(true);
+          break;
+        }
+      } else {
+        //in case of an other failed test, we shouldn't execute more tasks.
+        if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
+          completion.set(true);
+          break;
+        }
       }
 
-      tryNextTask(provider, counter);
+      tryNextTask(provider, counter % testNo);
     }
 
     taskLoopCompleted();
@@ -198,8 +233,7 @@ public class BaseFreonGenerator {
    * thread.
    */
   private void waitForCompletion() {
-    while (successCounter.get() + failureCounter.get() < testNo && (
-        failureCounter.get() == 0 || failAtEnd)) {
+    while (!completion.get() && (failureCounter.get() == 0 || failAtEnd)) {
       try {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       } catch (InterruptedException e) {
@@ -215,6 +249,7 @@ public class BaseFreonGenerator {
     } else {
       progressBar.shutdown();
     }
+    threadSequenceId.remove();
     executor.shutdown();
     try {
       executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -250,6 +285,16 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
+    if (timebase && runtime <= 0) {
+      throw new IllegalArgumentException(
+              "Incomplete command, "
+                      + "the runtime must be given, and must not be negative");
+    }
+    if (testNo <= 0) {
+      throw new IllegalArgumentException(
+              "Invalid command, "
+                      + "the testNo must be a positive integer");
+    }
     LOG.info("Executing test with prefix {} " +
         "and number-of-tests {}", prefix, testNo);
 
@@ -266,12 +311,25 @@ public class BaseFreonGenerator {
         }, 10);
 
     executor = Executors.newFixedThreadPool(threadNo);
-
-    progressBar = new ProgressBar(System.out, testNo, successCounter::get,
-        freonCommand.isInteractive());
+    long maxValue;
+    LongSupplier supplier;
+    if (timebase) {
+      maxValue = runtime;
+      supplier = () -> Duration.between(
+          Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
+    } else {
+      maxValue = testNo;
+      supplier = successCounter::get;
+    }
+    progressBar = new ProgressBar(System.out, maxValue, supplier,
+        true, realTimeStatusSupplier());
     progressBar.start();
 
     startTime = System.currentTimeMillis();
+  }
+
+  public Supplier<String> realTimeStatusSupplier() {
+    return () -> "";
   }
 
   /**
@@ -311,6 +369,12 @@ public class BaseFreonGenerator {
     Consumer<String> print = freonCommand.isInteractive()
         ? System.out::println
         : LOG::info;
+
+    messages.add("\nOption:");
+    for (CommandLine.Model.OptionSpec option : spec.options()) {
+      String name = option.longestName();
+      messages.add(name + "=" + option.getValue());
+    }
     messages.forEach(print);
   }
 
@@ -482,6 +546,10 @@ public class BaseFreonGenerator {
 
   public void setThreadNo(int threadNo) {
     this.threadNo = threadNo;
+  }
+
+  public long getThreadSequenceId() {
+    return threadSequenceId.get();
   }
 
   protected OzoneClient createOzoneClient(String omServiceID,
