@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
@@ -105,116 +104,6 @@ public class BucketManagerImpl implements BucketManager {
     return metadataManager.listBuckets(
         volumeName, startBucket, bucketPrefix, maxNumOfBuckets);
 
-  }
-
-  @Override
-  public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    Objects.requireNonNull(obj);
-    Objects.requireNonNull(acl);
-    if (!obj.getResourceType().equals(OzoneObj.ResourceType.BUCKET)) {
-      throw new IllegalArgumentException("Unexpected argument passed to " +
-          "BucketManager. OzoneObj type:" + obj.getResourceType());
-    }
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
-    boolean changed = false;
-    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
-    try {
-      String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
-      OmBucketInfo bucketInfo =
-          metadataManager.getBucketTable().get(dbBucketKey);
-      if (bucketInfo == null) {
-        LOG.debug("Bucket:{}/{} does not exist", volume, bucket);
-        throw new OMException("Bucket " + bucket + " is not found",
-            BUCKET_NOT_FOUND);
-      }
-
-      changed = bucketInfo.addAcl(acl);
-      if (changed) {
-        metadataManager.getBucketTable().put(dbBucketKey, bucketInfo);
-      }
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Add acl operation failed for bucket:{}/{} acl:{}",
-            volume, bucket, acl, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
-    }
-
-    return changed;
-  }
-
-  @Override
-  public boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    Objects.requireNonNull(obj);
-    Objects.requireNonNull(acl);
-    if (!obj.getResourceType().equals(OzoneObj.ResourceType.BUCKET)) {
-      throw new IllegalArgumentException("Unexpected argument passed to " +
-          "BucketManager. OzoneObj type:" + obj.getResourceType());
-    }
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
-    boolean removed = false;
-    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
-    try {
-      String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
-      OmBucketInfo bucketInfo =
-          metadataManager.getBucketTable().get(dbBucketKey);
-      if (bucketInfo == null) {
-        LOG.debug("Bucket:{}/{} does not exist", volume, bucket);
-        throw new OMException("Bucket " + bucket + " is not found",
-            BUCKET_NOT_FOUND);
-      }
-      removed = bucketInfo.removeAcl(acl);
-      if (removed) {
-        metadataManager.getBucketTable().put(dbBucketKey, bucketInfo);
-      }
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Remove acl operation failed for bucket:{}/{} acl:{}",
-            volume, bucket, acl, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
-    }
-    return removed;
-  }
-
-  @Override
-  public boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
-    Objects.requireNonNull(obj);
-    Objects.requireNonNull(acls);
-    if (!obj.getResourceType().equals(OzoneObj.ResourceType.BUCKET)) {
-      throw new IllegalArgumentException("Unexpected argument passed to " +
-          "BucketManager. OzoneObj type:" + obj.getResourceType());
-    }
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
-    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
-    try {
-      String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
-      OmBucketInfo bucketInfo =
-          metadataManager.getBucketTable().get(dbBucketKey);
-      if (bucketInfo == null) {
-        LOG.debug("Bucket:{}/{} does not exist", volume, bucket);
-        throw new OMException("Bucket " + bucket + " is not found",
-            BUCKET_NOT_FOUND);
-      }
-      bucketInfo.setAcls(acls);
-      metadataManager.getBucketTable().put(dbBucketKey, bucketInfo);
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Set acl operation failed for bucket:{}/{} acl:{}",
-            volume, bucket, StringUtils.join(",", acls), ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
-    }
-    return true;
   }
 
   @Override

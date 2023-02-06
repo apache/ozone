@@ -38,7 +38,7 @@ public class OzoneAdmins {
   /**
    * Ozone super user / admin username list.
    */
-  private final Set<String> adminUsernames;
+  private volatile Set<String> adminUsernames;
   /**
    * Ozone super user / admin group list.
    */
@@ -50,9 +50,7 @@ public class OzoneAdmins {
 
   public OzoneAdmins(Collection<String> adminUsernames,
       Collection<String> adminGroups) {
-    this.adminUsernames = adminUsernames != null ?
-        Collections.unmodifiableSet(new LinkedHashSet<>(adminUsernames)) :
-        Collections.emptySet();
+    setAdminUsernames(adminUsernames);
     this.adminGroups = adminGroups != null ?
         Collections.unmodifiableSet(new LinkedHashSet<>(adminGroups)) :
         Collections.emptySet();
@@ -84,4 +82,11 @@ public class OzoneAdmins {
   public Set<String> getAdminUsernames() {
     return adminUsernames;
   }
+
+  public void setAdminUsernames(Collection<String> adminUsernames) {
+    this.adminUsernames = adminUsernames != null ?
+        Collections.unmodifiableSet(new LinkedHashSet<>(adminUsernames)) :
+        Collections.emptySet();
+  }
+
 }

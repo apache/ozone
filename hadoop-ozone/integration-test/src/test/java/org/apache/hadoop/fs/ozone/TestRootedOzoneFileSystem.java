@@ -39,8 +39,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -2022,8 +2022,8 @@ public class TestRootedOzoneFileSystem {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE));
+        new DefaultReplicationConfig(StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE)));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
@@ -2053,7 +2053,7 @@ public class TestRootedOzoneFileSystem {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig("RS-3-2-1024")));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();

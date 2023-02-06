@@ -130,17 +130,15 @@ public class TestSecureContainerServer {
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     caClient = new CertificateClientTestImpl(CONF);
 
-    String certSerialId =
-        caClient.getCertificate().getSerialNumber().toString();
     SecurityConfig secConf = new SecurityConfig(CONF);
     long tokenLifetime = TimeUnit.HOURS.toMillis(1);
 
     blockTokenSecretManager = new OzoneBlockTokenSecretManager(
-        secConf, tokenLifetime, certSerialId);
+        secConf, tokenLifetime);
     blockTokenSecretManager.start(caClient);
 
     containerTokenSecretManager = new ContainerTokenSecretManager(
-        secConf, tokenLifetime, certSerialId);
+        secConf, tokenLifetime);
     containerTokenSecretManager.start(caClient);
   }
 

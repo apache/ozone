@@ -59,12 +59,12 @@ public class TestContainerUtils {
   }
 
   @Test
-  public void testTarGzName() throws IOException {
+  public void testTarName() throws IOException {
     long containerId = 100;
-    String tarGzName = "container-100.tar.gz";
-    assertEquals(tarGzName, ContainerUtils.getContainerTarGzName(containerId));
+    String tarName = "container-100.tar";
+    assertEquals(tarName, ContainerUtils.getContainerTarName(containerId));
 
     assertEquals(containerId,
-        ContainerUtils.retrieveContainerIdFromTarGzName(tarGzName));
+        ContainerUtils.retrieveContainerIdFromTarName(tarName));
   }
 }

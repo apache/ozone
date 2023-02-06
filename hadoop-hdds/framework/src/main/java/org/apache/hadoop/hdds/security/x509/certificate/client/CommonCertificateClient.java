@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.slf4j.Logger;
 
 import java.util.function.Consumer;

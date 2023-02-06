@@ -161,25 +161,22 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
 
     Pipeline pipeline = keyLocationInfo.getPipeline();
 
-    List<DatanodeDetails> nodes = pipeline.getNodes();
-    List<DatanodeDetails> newNodes = new ArrayList<>();
+    List<DatanodeDetails> nodes = new ArrayList<>();
     ECReplicationConfig repConfig = (ECReplicationConfig)
         pipeline.getReplicationConfig();
-    int totalNodes = repConfig.getRequiredNodes();
-    int parity = repConfig.getParity();
 
-    // Filtering the nodes that has the checksumBytes
-    for (int i = 0; i < nodes.size(); i++) {
-      if (i > 0 && i < totalNodes - parity) {
-        continue;
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      int replicaIndex = pipeline.getReplicaIndex(dn);
+      if (replicaIndex == 1 || replicaIndex > repConfig.getData()) {
+        // The stripe checksum we need to calculate checksums is only stored on
+        // replica_index = 1 and all the parity nodes.
+        nodes.add(dn);
       }
-      newNodes.add(nodes.get(i));
     }
-
     pipeline = Pipeline.newBuilder(pipeline)
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE))
-        .setNodes(newNodes)
+        .setNodes(nodes)
         .build();
 
     boolean success = false;

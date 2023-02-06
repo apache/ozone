@@ -59,13 +59,15 @@ public class ReplicationServer {
   private ContainerController controller;
 
   private int port;
+  private final ContainerImporter importer;
 
   public ReplicationServer(ContainerController controller,
       ReplicationConfig replicationConfig, SecurityConfig secConf,
-      CertificateClient caClient) {
+      CertificateClient caClient, ContainerImporter importer) {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
+    this.importer = importer;
     this.port = replicationConfig.getPort();
     init();
   }
@@ -74,7 +76,8 @@ public class ReplicationServer {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
-            new OnDemandContainerReplicationSource(controller)
+            new OnDemandContainerReplicationSource(controller),
+            importer
         ), new GrpcServerInterceptor()));
 
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
