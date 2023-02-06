@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -45,18 +46,22 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
+
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
 
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
+    String buckDBKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(buckDBKey);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
         getS3InitiateMultipartUploadResponse(volumeName, bucketName, keyName,
-            multipartUploadID);
+            multipartUploadID, volumeId, omBucketInfo.getObjectID());
 
     s3InitiateMultipartUploadResponse.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -95,7 +100,8 @@ public class TestS3MultipartUploadAbortResponse
   protected S3InitiateMultipartUploadResponse
         getS3InitiateMultipartUploadResponse(
       String volumeName, String bucketName, String keyName,
-      String multipartUploadID) {
+      String multipartUploadID, long volumeId, long bucketId)
+      throws IOException {
     return createS3InitiateMPUResponse(volumeName, bucketName, keyName,
         multipartUploadID);
   }
@@ -107,6 +113,8 @@ public class TestS3MultipartUploadAbortResponse
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
     String multipartUploadID = UUID.randomUUID().toString();
+    addVolumeToDB(volumeName);
+    addBucketToDB(volumeName, bucketName);
     String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
         keyName, multipartUploadID);
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
@@ -185,7 +193,7 @@ public class TestS3MultipartUploadAbortResponse
   }
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
   }

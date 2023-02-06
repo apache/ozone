@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -99,7 +100,7 @@ public class TestReconPipelineManager {
   }
 
   @Test
-  public void testInitialize() throws IOException {
+  public void testInitialize() throws IOException, TimeoutException {
 
     // Get 3 OPEN pipelines from SCM.
     List<Pipeline> pipelinesFromScm = getPipelines(3);
@@ -173,7 +174,7 @@ public class TestReconPipelineManager {
   }
 
   @Test
-  public void testAddPipeline() throws IOException {
+  public void testAddPipeline() throws IOException, TimeoutException {
 
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);

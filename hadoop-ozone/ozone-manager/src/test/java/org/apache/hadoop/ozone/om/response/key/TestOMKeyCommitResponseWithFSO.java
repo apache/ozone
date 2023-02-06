@@ -29,6 +29,8 @@ import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
+import java.io.IOException;
+
 /**
  * Tests OMKeyCommitResponse - prefix layout.
  */
@@ -38,10 +40,12 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @Override
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-      String ozoneKey, RepeatedOmKeyInfo deleteKeys) {
+      String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+          throws IOException {
     Assert.assertNotNull(omBucketInfo);
+    long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeys);
+        openKey, omBucketInfo, deleteKeys, volumeId, isHSync);
   }
 
   @NotNull
@@ -75,18 +79,24 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
 
   @NotNull
   @Override
-  protected String getOpenKeyName() {
+  protected String getOpenKeyName() throws IOException  {
     Assert.assertNotNull(omBucketInfo);
-    return omMetadataManager.getOpenFileName(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
   @NotNull
   @Override
-  protected String getOzoneKey() {
+  protected String getOzoneKey()  throws IOException {
     Assert.assertNotNull(omBucketInfo);
-    return omMetadataManager.getOzonePathKey(omBucketInfo.getObjectID(),
-            keyName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            omBucketInfo.getObjectID(), keyName);
   }
 
   @Override

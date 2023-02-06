@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+
 /**
  * Tests OMAllocateBlockResponse - prefix layout.
  */
@@ -57,17 +59,21 @@ public class TestOMAllocateBlockResponseWithFSO
 
   @Override
   protected String getOpenKey() throws Exception {
-    return omMetadataManager.getOpenFileName(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientID);
   }
 
   @NotNull
   @Override
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
-          OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
-          OMResponse omResponse) {
+      OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
+      OMResponse omResponse) throws IOException {
     return new OMAllocateBlockResponseWithFSO(omResponse, omKeyInfo, clientID,
-            omBucketInfo, getBucketLayout());
+        getBucketLayout(), omMetadataManager.getVolumeId(volumeName),
+        omBucketInfo.getObjectID());
   }
 
   @Override

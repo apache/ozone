@@ -21,6 +21,9 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
@@ -84,6 +87,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -112,6 +116,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -259,8 +265,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<HddsProtos.SCMContainerReplicaProto>
-      getContainerReplicas(long containerID) throws IOException {
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerID, int clientVersion) throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative");
 
@@ -280,7 +286,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException {
+      Iterable<? extends Long> containerIDs) throws IOException {
     for (Long containerID: containerIDs) {
       Preconditions.checkState(containerID >= 0,
           "Container ID cannot be negative");
@@ -357,18 +363,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count)
       throws IOException {
-    return listContainer(startContainerID, count, null, null);
+    return listContainer(startContainerID, count, null, null, null);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state) throws IOException {
-    return listContainer(startContainerID, count, state, null);
+    return listContainer(startContainerID, count, state, null, null);
   }
 
   @Override
   public List<ContainerInfo> listContainer(long startContainerID, int count,
-      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig)
       throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
@@ -382,8 +390,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (state != null) {
       builder.setState(state);
     }
-    if (factor != null) {
-      builder.setFactor(factor);
+    if (replicationConfig != null) {
+      if (replicationConfig.getReplicationType() == EC) {
+        builder.setType(EC);
+        builder.setEcReplicationConfig(
+            ((ECReplicationConfig)replicationConfig).toProto());
+      } else {
+        builder.setType(replicationConfig.getReplicationType());
+        builder.setFactor(((ReplicatedReplicationConfig)replicationConfig)
+            .getReplicationFactor());
+      }
+    } else if (replicationType != null) {
+      builder.setType(replicationType);
     }
 
     SCMListContainerRequestProto request = builder.build();
@@ -398,6 +416,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       containerList.add(ContainerInfo.fromProtobuf(containerInfoProto));
     }
     return containerList;
+  }
+
+  @Deprecated
+  @Override
+  public List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state, HddsProtos.ReplicationFactor factor)
+      throws IOException {
+    throw new UnsupportedOperationException("Should no longer be called from " +
+        "the client side");
   }
 
   /**
@@ -675,6 +702,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   }
 
+  @Override
+  public int resetDeletedBlockRetryCount(List<Long> txIDs)
+      throws IOException {
+    ResetDeletedBlockRetryCountRequestProto request =
+        ResetDeletedBlockRetryCountRequestProto.newBuilder()
+            .addAllTransactionId(txIDs)
+            .build();
+    return submitRequest(Type.ResetDeletedBlockRetryCount,
+        builder -> builder.setResetDeletedBlockRetryCountRequest(request)).
+        getResetDeletedBlockRetryCountResponse().getResetCount();
+  }
+
   /**
    * Check if SCM is in safe mode.
    *
@@ -775,7 +814,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean startContainerBalancer(
+  public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
       Optional<Long> maxSizeToMovePerIterationInGB,
@@ -830,13 +869,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       builder.setMaxSizeLeavingSourceInGB(msls);
     }
 
-
     StartContainerBalancerRequestProto request = builder.build();
-    StartContainerBalancerResponseProto response =
-        submitRequest(Type.StartContainerBalancer,
-            builder1 -> builder1.setStartContainerBalancerRequest(request))
-            .getStartContainerBalancerResponse();
-    return response.getStart();
+    return submitRequest(Type.StartContainerBalancer,
+        builder1 -> builder1.setStartContainerBalancerRequest(request))
+        .getStartContainerBalancerResponse();
   }
 
   @Override
@@ -983,6 +1019,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    GetContainerCountRequestProto request =
+        GetContainerCountRequestProto.newBuilder().build();
+
+    GetContainerCountResponseProto response =
+        submitRequest(Type.GetClosedContainerCount,
+            builder -> builder.setGetContainerCountRequest(request))
+            .getGetContainerCountResponse();
+    return response.getContainerCount();
+  }
+
+  @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
   }
@@ -990,5 +1039,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public void close() {
     RPC.stopProxy(rpcProxy);
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return listContainer(startContainerID, count, state);
   }
 }

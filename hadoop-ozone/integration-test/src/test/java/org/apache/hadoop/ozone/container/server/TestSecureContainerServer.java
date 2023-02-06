@@ -67,7 +67,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -130,17 +130,15 @@ public class TestSecureContainerServer {
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     caClient = new CertificateClientTestImpl(CONF);
 
-    String certSerialId =
-        caClient.getCertificate().getSerialNumber().toString();
     SecurityConfig secConf = new SecurityConfig(CONF);
     long tokenLifetime = TimeUnit.HOURS.toMillis(1);
 
     blockTokenSecretManager = new OzoneBlockTokenSecretManager(
-        secConf, tokenLifetime, certSerialId);
+        secConf, tokenLifetime);
     blockTokenSecretManager.start(caClient);
 
     containerTokenSecretManager = new ContainerTokenSecretManager(
-        secConf, tokenLifetime, certSerialId);
+        secConf, tokenLifetime);
     containerTokenSecretManager.start(caClient);
   }
 
@@ -172,7 +170,7 @@ public class TestSecureContainerServer {
 
   private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
@@ -216,12 +214,16 @@ public class TestSecureContainerServer {
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        true);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     final String dir = TEST_DIR + dn.getUuid();
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(), Maps.newHashMap()),
+        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
         caClient, null);
   }
 
@@ -277,7 +279,7 @@ public class TestSecureContainerServer {
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =
-          newWriteChunkRequestBuilder(pipeline, blockID, 1024, 0);
+          newWriteChunkRequestBuilder(pipeline, blockID, 1024);
       assertRequiresToken(client, encodedToken, writeChunk);
 
       ContainerCommandRequestProto.Builder putBlock =

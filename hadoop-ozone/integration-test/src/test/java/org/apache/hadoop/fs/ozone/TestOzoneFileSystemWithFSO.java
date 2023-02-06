@@ -49,6 +49,7 @@ import java.util.Collection;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -348,6 +349,108 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
+  @Test
+  public void testRenameParentDirModificationTime() throws IOException {
+    Path dir1 = new Path(getFs().getUri().toString(), "/dir1");
+    Path file1 = new Path(dir1, "file1");
+    Path dir2 = new Path(getFs().getUri().toString(), "/dir2");
+    // mv "/dir1/file1" to "/dir2/file1"
+    Path renamedFile1 = new Path(dir2, "file1");
+    getFs().mkdirs(dir1);
+    getFs().create(file1, false).close();
+    getFs().mkdirs(dir2);
+
+    long dir1BeforeMTime = getFs().getFileStatus(dir1).getModificationTime();
+    long dir2BeforeMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long file1BeforeMTime = getFs().getFileStatus(file1).getModificationTime();
+    getFs().rename(file1, renamedFile1);
+    long dir1AfterMTime = getFs().getFileStatus(dir1).getModificationTime();
+    long dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long file1AfterMTime = getFs().getFileStatus(renamedFile1)
+        .getModificationTime();
+    // rename should change the parent directory of source and object files
+    // modification time but not change modification time of the renamed file
+    assertTrue(dir1BeforeMTime < dir1AfterMTime);
+    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertEquals(file1BeforeMTime, file1AfterMTime);
+
+    // mv "/dir1/subdir1/" to "/dir2/subdir1/"
+    Path subdir1 = new Path(dir1, "subdir1");
+    Path renamedSubdir1 = new Path(dir2, "subdir1");
+    getFs().mkdirs(subdir1);
+
+    dir1BeforeMTime = getFs().getFileStatus(dir1).getModificationTime();
+    dir2BeforeMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long subdir1BeforeMTime = getFs().getFileStatus(subdir1)
+        .getModificationTime();
+    getFs().rename(subdir1, renamedSubdir1);
+    dir1AfterMTime = getFs().getFileStatus(dir1).getModificationTime();
+    dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long subdir1AfterMTime = getFs().getFileStatus(renamedSubdir1)
+        .getModificationTime();
+    assertTrue(dir1BeforeMTime < dir1AfterMTime);
+    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertEquals(subdir1BeforeMTime, subdir1AfterMTime);
+  }
+
+  @Test
+  public void testRenameParentBucketModificationTime() throws IOException {
+    OMMetadataManager omMgr =
+        getCluster().getOzoneManager().getMetadataManager();
+
+    // mv /file1 -> /renamedFile1, the bucket mtime should be changed
+    Path file1 = new Path("/file1");
+    Path renamedFile1 = new Path("/renamedFile1");
+    getFs().create(file1, false).close();
+    renameAndAssert(omMgr, file1, renamedFile1, true);
+
+    // mv /dir1/subFile2 -> /dir2/renamedSubFile2,
+    // the bucket mtime should not be changed
+    Path dir1 = new Path(getFs().getUri().toString(), "/dir1");
+    Path subFile2 = new Path(dir1, "subFile2");
+    Path dir2 = new Path(getFs().getUri().toString(), "/dir2");
+    Path renamedSubFile2 = new Path(dir2, "renamedSubFile2");
+    getFs().mkdirs(dir1);
+    getFs().mkdirs(dir2);
+    getFs().create(subFile2, false).close();
+    renameAndAssert(omMgr, subFile2, renamedSubFile2, false);
+
+    // mv /dir3/subFile3 -> "/renamedFile3"  the bucket mtime should be changed
+    Path dir3 = new Path(getFs().getUri().toString(), "/dir3");
+    Path subFile3 = new Path(dir3, "subFile3");
+    Path renamedFile3 = new Path("/renamedFile3");
+    getFs().mkdirs(dir3);
+    getFs().create(subFile3, false).close();
+    renameAndAssert(omMgr, subFile3, renamedFile3, true);
+
+    // mv /file4 -> "/dir4/renamedFile4"  the bucket mtime should be changed
+    Path file4 = new Path("/file4");
+    Path dir4 = new Path(getFs().getUri().toString(), "/dir4");
+    Path renamedSubFile4 = new Path(dir4, "subFile3");
+    getFs().mkdirs(dir4);
+    getFs().create(file4, false).close();
+    renameAndAssert(omMgr, file4, renamedSubFile4, true);
+  }
+
+  private void renameAndAssert(OMMetadataManager omMgr,
+      Path from, Path to, boolean exceptChangeMtime) throws IOException {
+    OmBucketInfo omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    long bucketBeforeMTime = omBucketInfo.getModificationTime();
+    long fileBeforeMTime = getFs().getFileStatus(from).getModificationTime();
+    getFs().rename(from, to);
+    omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    long bucketAfterMTime = omBucketInfo.getModificationTime();
+    long fileAfterMTime = getFs().getFileStatus(to).getModificationTime();
+    if (exceptChangeMtime) {
+      assertTrue(bucketBeforeMTime < bucketAfterMTime);
+    } else {
+      assertEquals(bucketBeforeMTime, bucketAfterMTime);
+    }
+    assertEquals(fileBeforeMTime, fileAfterMTime);
+  }
+
   @Override
   @Test
   @Ignore("TODO:HDDS-2939")
@@ -380,14 +483,21 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
     Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
 
+    final long volumeId = omMgr.getVolumeId(getVolumeName());
+    final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
+
     ArrayList<String> dirKeys = new ArrayList<>();
     long d1ObjectID =
-        verifyDirKey(omBucketInfo.getObjectID(), "d1", "/d1", dirKeys, omMgr);
-    long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, omBucketInfo.getObjectID(),
+                "d1", "/d1", dirKeys, omMgr);
+    long d2ObjectID = verifyDirKey(volumeId, bucketId, d1ObjectID,
+            "d2", "/d1/d2", dirKeys, omMgr);
     long d3ObjectID =
-        verifyDirKey(d2ObjectID, "d3", "/d1/d2/d3", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d2ObjectID,
+                "d3", "/d1/d2/d3", dirKeys, omMgr);
     long d4ObjectID =
-        verifyDirKey(d3ObjectID, "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d3ObjectID,
+                "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
 
     Assert.assertEquals("Wrong OM numKeys metrics", 4,
         getCluster().getOzoneManager().getMetrics().getNumKeys());
@@ -398,9 +508,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Path subDir6 = new Path("/d1/d2/d3/d4/d6");
     getFs().mkdirs(subDir6);
     long d5ObjectID =
-        verifyDirKey(d4ObjectID, "d5", "/d1/d2/d3/d4/d5", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d4ObjectID,
+                "d5", "/d1/d2/d3/d4/d5", dirKeys, omMgr);
     long d6ObjectID =
-        verifyDirKey(d4ObjectID, "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
+        verifyDirKey(volumeId, bucketId, d4ObjectID,
+                "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
     Assert.assertTrue(
         "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
             + "/d6] of same parent!", d5ObjectID != d6ObjectID);
@@ -424,10 +536,18 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
 
     ArrayList<String> dirKeys = new ArrayList<>();
+
+    final long volumeId = omMgr.getVolumeId(getVolumeName());
+    final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
     long d1ObjectID =
-        verifyDirKey(omBucketInfo.getObjectID(), "d1", "/d1", dirKeys, omMgr);
-    long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys, omMgr);
-    openFileKey = d2ObjectID + OzoneConsts.OM_KEY_PREFIX + file.getName();
+        verifyDirKey(volumeId, bucketId, omBucketInfo.getObjectID(),
+                "d1", "/d1", dirKeys, omMgr);
+    long d2ObjectID = verifyDirKey(volumeId, bucketId, d1ObjectID,
+            "d2", "/d1/d2", dirKeys, omMgr);
+    openFileKey = OzoneConsts.OM_KEY_PREFIX + volumeId +
+            OzoneConsts.OM_KEY_PREFIX + bucketId +
+            OzoneConsts.OM_KEY_PREFIX + d2ObjectID +
+            OzoneConsts.OM_KEY_PREFIX + file.getName();
 
     // trigger CommitKeyRequest
     outputStream.close();
@@ -457,10 +577,12 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertEquals("Wrong path format", dbKey, omKeyInfo.getPath());
   }
 
-  long verifyDirKey(long parentId, String dirKey, String absolutePath,
-      ArrayList<String> dirKeys, OMMetadataManager omMgr)
+  long verifyDirKey(long volumeId, long bucketId, long parentId,
+                    String dirKey, String absolutePath,
+                    ArrayList<String> dirKeys, OMMetadataManager omMgr)
       throws Exception {
-    String dbKey = parentId + "/" + dirKey;
+    String dbKey = "/" + volumeId + "/" + bucketId + "/" +
+            parentId + "/" + dirKey;
     dirKeys.add(dbKey);
     OmDirectoryInfo dirInfo = omMgr.getDirectoryTable().get(dbKey);
     Assert.assertNotNull("Failed to find " + absolutePath +
@@ -473,8 +595,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         dirInfo.getCreationTime() > 0);
     Assert.assertEquals("Mismatches directory modification time param",
         dirInfo.getCreationTime(), dirInfo.getModificationTime());
-    Assert.assertEquals("Wrong representation!",
-        dbKey + ":" + dirInfo.getObjectID(), dirInfo.toString());
     return dirInfo.getObjectID();
   }
 

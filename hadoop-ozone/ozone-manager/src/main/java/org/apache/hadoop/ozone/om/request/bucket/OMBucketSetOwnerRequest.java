@@ -132,9 +132,10 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 
+      // oldOwner can be null before HDDS-6171
       oldOwner = omBucketInfo.getOwner();
 
-      if (oldOwner.equals(newOwner)) {
+      if (newOwner.equals(oldOwner)) {
         LOG.warn("Bucket '{}/{}' owner is already user '{}'.",
             volumeName, bucketName, oldOwner);
         omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)

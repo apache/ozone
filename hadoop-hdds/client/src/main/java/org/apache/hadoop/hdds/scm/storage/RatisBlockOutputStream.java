@@ -18,8 +18,10 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -53,7 +55,8 @@ import java.util.concurrent.ExecutionException;
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public class RatisBlockOutputStream extends BlockOutputStream {
+public class RatisBlockOutputStream extends BlockOutputStream
+    implements Syncable {
   public static final Logger LOG = LoggerFactory.getLogger(
       RatisBlockOutputStream.class);
 
@@ -74,9 +77,11 @@ public class RatisBlockOutputStream extends BlockOutputStream {
       Pipeline pipeline,
       BufferPool bufferPool,
       OzoneClientConfig config,
-      Token<? extends TokenIdentifier> token
+      Token<? extends TokenIdentifier> token,
+      ContainerClientMetrics clientMetrics
   ) throws IOException {
-    super(blockID, xceiverClientManager, pipeline, bufferPool, config, token);
+    super(blockID, xceiverClientManager, pipeline,
+        bufferPool, config, token, clientMetrics);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 
@@ -122,5 +127,20 @@ public class RatisBlockOutputStream extends BlockOutputStream {
   @Override
   void cleanup() {
     commitWatcher.cleanup();
+  }
+
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    if (!isClosed()) {
+      if (getBufferPool() != null && getBufferPool().getSize() > 0) {
+        handleFlush(false);
+      }
+      waitForFlushAndCommit(false);
+    }
   }
 }

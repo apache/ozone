@@ -81,6 +81,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     implements
     Callable<Void> {
@@ -265,7 +266,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
             .build());
     RaftClient client = RaftClient.newBuilder()
         .setClientId(clientId)
-        .setProperties(new RaftProperties(true))
+        .setProperties(new RaftProperties())
         .setRaftGroup(group)
         .build();
 

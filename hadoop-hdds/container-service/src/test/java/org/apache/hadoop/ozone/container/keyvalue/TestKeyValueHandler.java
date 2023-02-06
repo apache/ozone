@@ -119,6 +119,7 @@ public class TestKeyValueHandler {
   /**
    * Test that Handler handles different command types correctly.
    */
+  @Test
   public void testHandlerCommandHandling() throws Exception {
     Mockito.reset(handler);
     // Test Create Container Request handling
@@ -136,7 +137,7 @@ public class TestKeyValueHandler {
     DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, context);
-    Mockito.verify(handler, times(1)).handleCreateContainer(
+    Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
@@ -202,7 +203,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
         .dispatchRequest(handler, listBlockRequest, container, context);
-    Mockito.verify(handler, times(2)).handleUnsupportedOp(
+    Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
@@ -229,7 +230,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
         .dispatchRequest(handler, listChunkRequest, container, context);
-    Mockito.verify(handler, times(3)).handleUnsupportedOp(
+    Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Put Small File Request handling
@@ -259,7 +260,7 @@ public class TestKeyValueHandler {
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
-      ContainerSet cset = new ContainerSet();
+      ContainerSet cset = new ContainerSet(1000);
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
@@ -349,12 +350,18 @@ public class TestKeyValueHandler {
     try {
       final long containerID = 1L;
       final ConfigurationSource conf = new OzoneConfiguration();
-      final ContainerSet containerSet = new ContainerSet();
+      final ContainerSet containerSet = new ContainerSet(1000);
       final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
 
+      String clusterId = UUID.randomUUID().toString();
+      HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
+          .clusterID(clusterId).datanodeUuid(UUID.randomUUID().toString())
+          .build();
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, null);
+
       Mockito.when(volumeSet.getVolumesList())
-          .thenReturn(Collections.singletonList(
-              new HddsVolume.Builder(testDir).conf(conf).build()));
+          .thenReturn(Collections.singletonList(hddsVolume));
 
       final int[] interval = new int[1];
       interval[0] = 2;

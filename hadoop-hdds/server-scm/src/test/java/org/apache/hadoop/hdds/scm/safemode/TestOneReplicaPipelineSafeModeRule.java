@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,10 +52,10 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.ozone.test.TestClock;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -60,8 +63,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TestOneReplicaPipelineSafeModeRule {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path tempDir;
   private OneReplicaPipelineSafeModeRule rule;
   private PipelineManagerImpl pipelineManager;
   private EventQueue eventQueue;
@@ -75,7 +78,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     ozoneConfiguration.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     ozoneConfiguration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        folder.newFolder().toString());
+        tempDir.toString());
     ozoneConfiguration.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
@@ -97,9 +100,10 @@ public class TestOneReplicaPipelineSafeModeRule {
         scmMetadataStore.getPipelineTable(),
         eventQueue,
         scmContext,
-        serviceManager);
+        serviceManager,
+        new TestClock(Instant.now(), ZoneOffset.UTC));
 
-    PipelineProvider mockRatisProvider =
+    PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), ozoneConfiguration);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
@@ -141,7 +145,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 6"), 1000, 5000);
 
-    Assert.assertFalse(rule.validate());
+    Assertions.assertFalse(rule.validate());
 
     //Fire last pipeline event from datanode.
     firePipelineEvent(pipelines.subList(pipelineFactorThreeCount - 1,
@@ -175,7 +179,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         "reported count is 0"), 1000, 5000);
 
     // fired events for one node ratis pipeline, so we will be still false.
-    Assert.assertFalse(rule.validate());
+    Assertions.assertFalse(rule.validate());
 
     pipelines =
         pipelineManager.getPipelines(

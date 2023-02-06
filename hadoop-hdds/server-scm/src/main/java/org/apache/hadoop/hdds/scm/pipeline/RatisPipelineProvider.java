@@ -19,7 +19,11 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -27,12 +31,15 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.scm.pipeline.PipelinePlacementPolicy.DnWithPipelines;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -55,7 +62,7 @@ public class RatisPipelineProvider
 
   private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
-  private final PipelinePlacementPolicy placementPolicy;
+  private final PlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
   private final LeaderChoosePolicy leaderChoosePolicy;
@@ -73,8 +80,8 @@ public class RatisPipelineProvider
     this.conf = conf;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
-    this.placementPolicy =
-        new PipelinePlacementPolicy(nodeManager, stateManager, conf);
+    this.placementPolicy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
@@ -134,6 +141,14 @@ public class RatisPipelineProvider
   @Override
   public synchronized Pipeline create(RatisReplicationConfig replicationConfig)
       throws IOException {
+    return create(replicationConfig, Collections.emptyList(),
+        Collections.emptyList());
+  }
+
+  @Override
+  public synchronized Pipeline create(RatisReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
       throw new SCMException("Ratis pipeline number meets the limit: " +
           pipelineNumberLimit + " replicationConfig : " +
@@ -151,8 +166,16 @@ public class RatisPipelineProvider
           containerSizeBytes);
       break;
     case THREE:
-      dns = placementPolicy.chooseDatanodes(null,
-          null, factor.getNumber(), minRatisVolumeSizeBytes,
+      List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
+      if (excludeDueToEngagement.size() > 0) {
+        if (excludedNodes.size() == 0) {
+          excludedNodes = excludeDueToEngagement;
+        } else {
+          excludedNodes.addAll(excludeDueToEngagement);
+        }
+      }
+      dns = placementPolicy.chooseDatanodes(excludedNodes,
+          favoredNodes, factor.getNumber(), minRatisVolumeSizeBytes,
           containerSizeBytes);
       break;
     default:
@@ -198,6 +221,33 @@ public class RatisPipelineProvider
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .build();
+  }
+
+  @Override
+  public Pipeline createForRead(
+      RatisReplicationConfig replicationConfig,
+      Set<ContainerReplica> replicas) {
+    return create(replicationConfig, replicas
+        .stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList()));
+  }
+
+  private List<DatanodeDetails> filterPipelineEngagement() {
+    List<DatanodeDetails> healthyNodes =
+        getNodeManager().getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> excluded = healthyNodes.stream()
+        .map(d ->
+            new DnWithPipelines(d,
+                PipelinePlacementPolicy
+                    .currentRatisThreePipelineCount(getNodeManager(),
+                    getPipelineStateManager(), d)))
+        .filter(d ->
+            (d.getPipelines() >= getNodeManager().pipelineLimit(d.getDn())))
+        .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
+        .map(d -> d.getDn())
+        .collect(Collectors.toList());
+    return excluded;
   }
 
   @Override

@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.base.CaseFormat;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -53,13 +52,32 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "InflightReplication",
       "Tracked inflight container replication requests.");
 
+  private static final MetricsInfo INFLIGHT_REPLICATION_SKIPPED = Interns.info(
+      "InflightReplicationSkipped",
+      "Tracked inflight container replication requests skipped" +
+          " due to the configured limit.");
+
   private static final MetricsInfo INFLIGHT_DELETION = Interns.info(
       "InflightDeletion",
       "Tracked inflight container deletion requests.");
 
+  private static final MetricsInfo INFLIGHT_DELETION_SKIPPED = Interns.info(
+      "InflightDeletionSkipped",
+      "Tracked inflight container deletion requests skipped" +
+          " due to the configured limit.");
+
+
   private static final MetricsInfo INFLIGHT_MOVE = Interns.info(
       "InflightMove",
       "Tracked inflight container move requests.");
+
+  private static final MetricsInfo INFLIGHT_EC_REPLICATION = Interns.info(
+      "InflightEcReplication",
+      "Tracked inflight EC container replication requests.");
+
+  private static final MetricsInfo INFLIGHT_EC_DELETION = Interns.info(
+      "InflightEcDeletion",
+      "Tracked inflight EC container deletion requests.");
 
   // Setup metric names and descriptions for Container Lifecycle states
   private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
@@ -119,9 +137,39 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Time elapsed for deletion")
   private MutableRate deletionTime;
 
+  @Metric("Number of inflight replication skipped" +
+      " due to the configured limit.")
+  private MutableCounterLong numInflightReplicationSkipped;
+
+  @Metric("Number of inflight replication skipped" +
+      " due to the configured limit.")
+  private MutableCounterLong numInflightDeletionSkipped;
+
   private MetricsRegistry registry;
 
   private ReplicationManager replicationManager;
+
+  //EC Metrics
+  @Metric("Number of EC Replication commands sent.")
+  private MutableCounterLong ecReplicationCmdsSentTotal;
+
+  @Metric("Number of EC Replica Deletion commands sent.")
+  private MutableCounterLong ecDeletionCmdsSentTotal;
+
+  @Metric("Number of EC Reconstruction commands sent.")
+  private MutableCounterLong ecReconstructionCmdsSentTotal;
+
+  @Metric("Number of EC replicas successfully created by Replication Manager.")
+  private MutableCounterLong ecReplicasCreatedTotal;
+
+  @Metric("Number of EC replicas successfully deleted by Replication Manager.")
+  private MutableCounterLong ecReplicasDeletedTotal;
+
+  @Metric("Number of EC replicas scheduled to be created which timed out.")
+  private MutableCounterLong ecReplicaCreateTimeoutTotal;
+
+  @Metric("Number of EC replicas scheduled for delete which timed out.")
+  private MutableCounterLong ecReplicaDeleteTimeoutTotal;
 
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -139,8 +187,12 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME)
         .addGauge(INFLIGHT_REPLICATION, getInflightReplication())
+        .addGauge(INFLIGHT_REPLICATION_SKIPPED, getInflightReplicationSkipped())
         .addGauge(INFLIGHT_DELETION, getInflightDeletion())
-        .addGauge(INFLIGHT_MOVE, getInflightMove());
+        .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
+        .addGauge(INFLIGHT_MOVE, getInflightMove())
+        .addGauge(INFLIGHT_EC_REPLICATION, getEcReplication())
+        .addGauge(INFLIGHT_EC_DELETION, getEcDeletion());
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
@@ -164,6 +216,13 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     numDeletionBytesCompleted.snapshot(builder, all);
     replicationTime.snapshot(builder, all);
     deletionTime.snapshot(builder, all);
+    ecReplicationCmdsSentTotal.snapshot(builder, all);
+    ecDeletionCmdsSentTotal.snapshot(builder, all);
+    ecReplicasCreatedTotal.snapshot(builder, all);
+    ecReplicasDeletedTotal.snapshot(builder, all);
+    ecReconstructionCmdsSentTotal.snapshot(builder, all);
+    ecReplicaCreateTimeoutTotal.snapshot(builder, all);
+    ecReplicasDeletedTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -218,12 +277,35 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.deletionTime.add(millis);
   }
 
+  public void incrInflightSkipped(InflightType type) {
+    switch (type) {
+    case REPLICATION:
+      this.numInflightReplicationSkipped.incr();
+      return;
+    case DELETION:
+      this.numInflightDeletionSkipped.incr();
+      return;
+    default:
+      throw new IllegalArgumentException("Unexpected type " + type);
+    }
+  }
+
   public long getInflightReplication() {
-    return replicationManager.getInflightReplication().size();
+    return replicationManager.getLegacyReplicationManager()
+        .getInflightCount(InflightType.REPLICATION);
+  }
+
+  public long getInflightReplicationSkipped() {
+    return this.numInflightReplicationSkipped.value();
   }
 
   public long getInflightDeletion() {
-    return replicationManager.getInflightDeletion().size();
+    return replicationManager.getLegacyReplicationManager()
+        .getInflightCount(InflightType.DELETION);
+  }
+
+  public long getInflightDeletionSkipped() {
+    return this.numInflightDeletionSkipped.value();
   }
 
   public long getInflightMove() {
@@ -268,5 +350,71 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getNumReplicationBytesCompleted() {
     return this.numReplicationBytesCompleted.value();
+  }
+
+  public void incrEcReplicationCmdsSentTotal() {
+    this.ecReplicationCmdsSentTotal.incr();
+  }
+
+  public void incrEcDeletionCmdsSentTotal() {
+    this.ecDeletionCmdsSentTotal.incr();
+  }
+
+  public void incrEcReplicasCreatedTotal() {
+    this.ecReplicasCreatedTotal.incr();
+  }
+
+  public void incrEcReplicasDeletedTotal() {
+    this.ecReplicasDeletedTotal.incr();
+  }
+
+  public void incrEcReconstructionCmdsSentTotal() {
+    this.ecReconstructionCmdsSentTotal.incr();
+  }
+
+  public long getEcReplication() {
+    return replicationManager.getContainerReplicaPendingOps()
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
+  }
+
+  public long getEcDeletion() {
+    return replicationManager.getContainerReplicaPendingOps()
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE);
+  }
+
+  public void incrEcReplicaCreateTimeoutTotal() {
+    this.ecReplicaCreateTimeoutTotal.incr();
+  }
+
+  public long getEcDeletionCmdsSentTotal() {
+    return ecDeletionCmdsSentTotal.value();
+  }
+
+  public long getEcReconstructionCmdsSentTotal() {
+    return ecReconstructionCmdsSentTotal.value();
+  }
+
+  public long getEcReplicationCmdsSentTotal() {
+    return ecReplicationCmdsSentTotal.value();
+  }
+
+  public void incrEcReplicaDeleteTimeoutTotal() {
+    this.ecReplicaDeleteTimeoutTotal.incr();
+  }
+
+  public long getEcReplicaCreateTimeoutTotal() {
+    return ecReplicaCreateTimeoutTotal.value();
+  }
+
+  public long getEcReplicaDeleteTimeoutTotal() {
+    return ecReplicaDeleteTimeoutTotal.value();
+  }
+
+  public long getEcReplicasCreatedTotal() {
+    return ecReplicasCreatedTotal.value();
+  }
+
+  public long getEcReplicasDeletedTotal() {
+    return ecReplicasDeletedTotal.value();
   }
 }

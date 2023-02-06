@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -35,6 +36,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
 
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
@@ -63,16 +66,22 @@ public class OFSPath {
   private String bucketName = "";
   private String mountName = "";
   private String keyName = "";
+  private OzoneConfiguration conf;
   private static final String OFS_MOUNT_NAME_TMP = "tmp";
   // Hard-code the volume name to tmp for the first implementation
   @VisibleForTesting
   public static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
+  private static final String OFS_SHARED_TMP_BUCKETNAME = "tmp";
+  // Hard-coded bucket name to use when OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR
+  // enabled;  HDDS-7746 to make this name configurable.
 
-  public OFSPath(Path path) {
+  public OFSPath(Path path, OzoneConfiguration conf) {
+    this.conf = conf;
     initOFSPath(path.toUri(), false);
   }
 
-  public OFSPath(String pathStr) {
+  public OFSPath(String pathStr, OzoneConfiguration conf) {
+    this.conf = conf;
     if (StringUtils.isEmpty(pathStr)) {
       return;
     }
@@ -102,7 +111,12 @@ public class OFSPath {
         // TODO: Make this configurable in the future.
         volumeName = OFS_MOUNT_TMP_VOLUMENAME;
         try {
-          bucketName = getTempMountBucketNameOfCurrentUser();
+          if (conf.getBoolean(OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR,
+              OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT)) {
+            bucketName = OFS_SHARED_TMP_BUCKETNAME;
+          } else {
+            bucketName = getTempMountBucketNameOfCurrentUser();
+          }
         } catch (IOException ex) {
           throw new ParseException(
               "Failed to get temp bucket name for current user.");

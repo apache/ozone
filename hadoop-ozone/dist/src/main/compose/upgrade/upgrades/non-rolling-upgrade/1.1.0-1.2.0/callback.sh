@@ -70,7 +70,7 @@ with_old_version_downgraded() {
 
 with_new_version_finalized() {
   _check_hdds_mlvs 2
-  # OM currently only has one layout version.
+  # In Ozone 1.2.0, OM has only one layout version.
   _check_om_mlvs 0
 
   validate old1

@@ -52,6 +52,11 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
       tags = ConfigTag.OZONE)
   private Class<?> myClass = Object.class;
 
+  @Config(key = "threshold", type = ConfigType.DOUBLE,
+      defaultValue = "10", description = "Threshold (To test DOUBLE config" +
+      " type)", tags = ConfigTag.MANAGEMENT)
+  private double threshold;
+
   @PostConstruct
   public void validate() {
     if (port < 0) {
@@ -105,5 +110,13 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
 
   public void setMyClass(Class<?> aClass) {
     this.myClass = aClass;
+  }
+
+  public double getThreshold() {
+    return threshold;
+  }
+
+  public void setThreshold(double threshold) {
+    this.threshold = threshold;
   }
 }

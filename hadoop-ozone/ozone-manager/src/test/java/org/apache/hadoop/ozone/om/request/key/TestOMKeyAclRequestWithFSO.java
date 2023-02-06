@@ -51,7 +51,13 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
     OMRequestTestUtils
         .addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50,
             omMetadataManager);
-    return omKeyInfo.getPath();
+    final long volumeId = omMetadataManager.getVolumeId(
+            omKeyInfo.getVolumeName());
+    final long bucketId = omMetadataManager.getBucketId(
+            omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+    return omMetadataManager.getOzonePathKey(
+            volumeId, bucketId, omKeyInfo.getParentObjectID(),
+            fileName);
   }
 
   @Override

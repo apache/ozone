@@ -19,13 +19,22 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +51,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -54,6 +64,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -129,6 +140,19 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         throw new OMException("Bucket is not empty",
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
       }
+
+      // appending '/' to end to eliminate cases where 2 buckets start with same
+      // characters.
+      String snapshotBucketKey = bucketKey + OzoneConsts.OM_KEY_PREFIX;
+
+      if (bucketContainsSnapshot(omMetadataManager, snapshotBucketKey)) {
+        LOG.debug("Bucket '{}' can't be deleted when it has snapshots",
+            bucketName);
+        throw new OMException(
+            "Bucket " + bucketName + " can't be deleted when it has snapshots",
+            CONTAINS_SNAPSHOT);
+      }
+
       if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
         omMetrics.incNumFSOBucketDeletes();
       }
@@ -192,4 +216,70 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     }
   }
 
+  private boolean bucketContainsSnapshot(OMMetadataManager omMetadataManager,
+      String snapshotBucketKey) throws IOException {
+    return bucketContainsSnapshotInCache(omMetadataManager, snapshotBucketKey)
+        || bucketContainsSnapshotInTable(omMetadataManager, snapshotBucketKey);
+  }
+
+  private boolean bucketContainsSnapshotInTable(
+      OMMetadataManager omMetadataManager, String snapshotBucketKey)
+      throws IOException {
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+            snapshotIterator = omMetadataManager
+            .getSnapshotInfoTable().iterator()) {
+      snapshotIterator.seek(snapshotBucketKey);
+      if (snapshotIterator.hasNext()) {
+        return snapshotIterator.next().getKey().startsWith(snapshotBucketKey);
+      }
+    }
+    return false;
+  }
+
+  private boolean bucketContainsSnapshotInCache(
+      OMMetadataManager omMetadataManager, String snapshotBucketKey) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> cacheIter =
+        omMetadataManager.getSnapshotInfoTable().cacheIterator();
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =
+          cacheIter.next();
+      String key = cacheKeyValue.getKey().getCacheKey();
+      // TODO: Revisit when delete snapshot gets implemented as entry
+      //  in cache/table could be null.
+      if (key.startsWith(snapshotBucketKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Validates bucket delete requests.
+   * Handles the cases where an older client attempts to delete a bucket
+   * a new bucket layout.
+   * We do not want to allow this to happen, since this would cause the client
+   * to be able to delete buckets it cannot understand.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.DeleteBucket
+  )
+  public static OMRequest blockBucketDeleteWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    DeleteBucketRequest request = req.getDeleteBucketRequest();
+
+    if (request.hasBucketName() && request.hasVolumeName()) {
+      BucketLayout bucketLayout = ctx.getBucketLayout(
+          request.getVolumeName(), request.getBucketName());
+      bucketLayout.validateSupportedOperation();
+    }
+    return req;
+  }
 }

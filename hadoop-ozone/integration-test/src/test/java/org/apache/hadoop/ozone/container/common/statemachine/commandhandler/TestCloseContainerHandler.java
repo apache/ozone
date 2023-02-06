@@ -109,7 +109,6 @@ public class TestCloseContainerHandler {
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("test")
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =

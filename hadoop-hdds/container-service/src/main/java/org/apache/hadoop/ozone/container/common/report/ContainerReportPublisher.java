@@ -74,6 +74,7 @@ public class ContainerReportPublisher extends
     return containerReportInterval + getRandomReportDelay();
   }
 
+  @SuppressWarnings("java:S2245") // no need for secure random
   private long getRandomReportDelay() {
     return RandomUtils.nextLong(0, containerReportInterval);
   }

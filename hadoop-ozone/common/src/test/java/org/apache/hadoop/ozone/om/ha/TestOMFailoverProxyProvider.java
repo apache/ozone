@@ -48,7 +48,7 @@ public class TestOMFailoverProxyProvider {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
   private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
-  private OMFailoverProxyProvider provider;
+  private HadoopRpcOMFailoverProxyProvider provider;
   private long waitBetweenRetries;
   private int numNodes = 3;
   private OzoneConfiguration config;
@@ -68,7 +68,7 @@ public class TestOMFailoverProxyProvider {
     }
     config.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    provider = new OMFailoverProxyProvider(config,
+    provider = new HadoopRpcOMFailoverProxyProvider(config,
         UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
         OzoneManagerProtocolPB.class);
   }
@@ -187,9 +187,11 @@ public class TestOMFailoverProxyProvider {
     }
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    OMFailoverProxyProvider prov = new OMFailoverProxyProvider(ozoneConf,
-        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
-        OzoneManagerProtocolPB.class);
+    HadoopRpcOMFailoverProxyProvider prov =
+            new HadoopRpcOMFailoverProxyProvider(ozoneConf,
+                    UserGroupInformation.getCurrentUser(),
+                    OM_SERVICE_ID,
+                    OzoneManagerProtocolPB.class);
 
     Text dtService = prov.getCurrentProxyDelegationToken();
 

@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -55,6 +57,7 @@ public final class Pipeline {
 
   private PipelineState state;
   private Map<DatanodeDetails, Long> nodeStatus;
+  private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
@@ -78,6 +81,7 @@ public final class Pipeline {
     this.nodeStatus = nodeStatus;
     this.creationTimestamp = Instant.now();
     this.suggestedLeaderId = suggestedLeaderId;
+    this.replicaIndexes = new HashMap<>();
   }
 
   /**
@@ -178,6 +182,21 @@ public final class Pipeline {
 
 
   /**
+   * Return the replica index of the specific datanode in the datanode set.
+   * <p>
+   * For non-EC case all the replication should be exactly the same,
+   * therefore the replication index can always be zero. In case of EC
+   * different Datanodes can have different data for one specific block
+   * (parity and/or data parts) therefore the replicaIndex should be
+   * different for each of the pipeline members.
+   *
+   * @param dn datanode details
+   */
+  public int getReplicaIndex(DatanodeDetails dn) {
+    return replicaIndexes.getOrDefault(dn, 0);
+  }
+
+  /**
    * Returns the leader if found else defaults to closest node.
    *
    * @return {@link DatanodeDetails}
@@ -245,6 +264,12 @@ public final class Pipeline {
   }
 
   public boolean isHealthy() {
+    // EC pipelines are not reported by the DN and do not have a leader. If a
+    // node goes stale or dead, EC pipelines will by closed like RATIS pipelines
+    // but at the current time there are not other health metrics for EC.
+    if (replicationConfig.getReplicationType() == ReplicationType.EC) {
+      return true;
+    }
     for (Long reportedTime : nodeStatus.values()) {
       if (reportedTime < 0) {
         return false;
@@ -263,20 +288,30 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
+
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
+    List<Integer> memberReplicaIndexes = new ArrayList<>();
+
     for (DatanodeDetails dn : nodeStatus.keySet()) {
       members.add(dn.toProto(clientVersion));
+      memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()
         .setId(id.getProtobuf())
         .setType(replicationConfig.getReplicationType())
-        .setFactor(ReplicationConfig.getLegacyFactor(replicationConfig))
         .setState(PipelineState.getProtobuf(state))
         .setLeaderID(leaderId != null ? leaderId.toString() : "")
         .setCreationTimeStamp(creationTimestamp.toEpochMilli())
-        .addAllMembers(members);
+        .addAllMembers(members)
+        .addAllMemberReplicaIndexes(memberReplicaIndexes);
 
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
+          .toProto());
+    } else {
+      builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
     if (leaderId != null) {
       HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
           .setMostSigBits(leaderId.getMostSignificantBits())
@@ -317,9 +352,16 @@ public final class Pipeline {
       throws UnknownPipelineStateException {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
 
-    List<DatanodeDetails> nodes = new ArrayList<>();
+    Map<DatanodeDetails, Integer> nodes = new LinkedHashMap<>();
+    int index = 0;
+    int repIndexListLength = pipeline.getMemberReplicaIndexesCount();
     for (DatanodeDetailsProto member : pipeline.getMembersList()) {
-      nodes.add(DatanodeDetails.getFromProtoBuf(member));
+      int repIndex = 0;
+      if (index < repIndexListLength) {
+        repIndex = pipeline.getMemberReplicaIndexes(index);
+      }
+      nodes.put(DatanodeDetails.getFromProtoBuf(member), repIndex);
+      index++;
     }
     UUID leaderId = null;
     if (pipeline.hasLeaderID128()) {
@@ -338,11 +380,13 @@ public final class Pipeline {
     }
 
     final ReplicationConfig config = ReplicationConfig
-        .fromProtoTypeAndFactor(pipeline.getType(), pipeline.getFactor());
+        .fromProto(pipeline.getType(), pipeline.getFactor(),
+            pipeline.getEcReplicationConfig());
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setReplicationConfig(config)
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
-        .setNodes(nodes)
+        .setNodes(new ArrayList<>(nodes.keySet()))
+        .setReplicaIndexes(nodes)
         .setLeaderId(leaderId)
         .setSuggestedLeaderId(suggestedLeaderId)
         .setNodesInOrder(pipeline.getMemberOrdersList())
@@ -401,6 +445,10 @@ public final class Pipeline {
     return new Builder(pipeline);
   }
 
+  private void setReplicaIndexes(Map<DatanodeDetails, Integer> replicaIndexes) {
+    this.replicaIndexes = replicaIndexes;
+  }
+
   /**
    * Builder class for Pipeline.
    */
@@ -414,6 +462,7 @@ public final class Pipeline {
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
     private UUID suggestedLeaderId = null;
+    private Map<DatanodeDetails, Integer> replicaIndexes = new HashMap<>();
 
     public Builder() { }
 
@@ -426,6 +475,15 @@ public final class Pipeline {
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
+      this.replicaIndexes = new HashMap<>();
+      if (nodeStatus != null) {
+        for (DatanodeDetails dn : nodeStatus.keySet()) {
+          int index = pipeline.getReplicaIndex(dn);
+          if (index > 0) {
+            replicaIndexes.put(dn, index);
+          }
+        }
+      }
     }
 
     public Builder setId(PipelineID id1) {
@@ -447,7 +505,6 @@ public final class Pipeline {
       this.leaderId = leaderId1;
       return this;
     }
-
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -469,6 +526,12 @@ public final class Pipeline {
       return this;
     }
 
+
+    public Builder setReplicaIndexes(Map<DatanodeDetails, Integer> indexes) {
+      this.replicaIndexes = indexes;
+      return this;
+    }
+
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(replicationConfig);
@@ -482,6 +545,8 @@ public final class Pipeline {
       if (creationTimestamp != null) {
         pipeline.setCreationTimestamp(creationTimestamp);
       }
+
+      pipeline.setReplicaIndexes(replicaIndexes);
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf

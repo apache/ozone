@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.junit.After;
@@ -83,6 +84,8 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+    when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
+        ReplicationConfig.getDefault(ozoneConfiguration));
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))

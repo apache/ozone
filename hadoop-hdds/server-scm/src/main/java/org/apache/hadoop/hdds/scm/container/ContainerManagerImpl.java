@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -42,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -55,34 +58,20 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
 
 /**
- * TODO: Add javadoc.
+ * {@link ContainerManager} implementation in SCM server.
  */
 public class ContainerManagerImpl implements ContainerManager {
 
-  /*
-   * TODO: Introduce container level locks.
-   */
-
-  /**
-   *
-   */
   private static final Logger LOG = LoggerFactory.getLogger(
       ContainerManagerImpl.class);
 
   /**
-   *
+   * Limit the number of on-going ratis operations.
    */
-  // Limit the number of on-going ratis operations.
   private final Lock lock;
 
-  /**
-   *
-   */
   private final PipelineManager pipelineManager;
 
-  /**
-   *
-   */
   private final ContainerStateManager containerStateManager;
 
   private final SCMHAManager haManager;
@@ -93,7 +82,13 @@ public class ContainerManagerImpl implements ContainerManager {
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
   private final int numContainerPerVolume;
+
+  @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
+  // Used to track pending replication and delete for container replicas. In
+  // ContainerManager, we try to remove any replicas we see added or deleted
+  // in case they have been created by replication / delete command
+  private final ContainerReplicaPendingOps containerReplicaPendingOps;
 
   /**
    *
@@ -103,7 +98,8 @@ public class ContainerManagerImpl implements ContainerManager {
       final SCMHAManager scmHaManager,
       final SequenceIdGenerator sequenceIdGen,
       final PipelineManager pipelineManager,
-      final Table<ContainerID, ContainerInfo> containerStore)
+      final Table<ContainerID, ContainerInfo> containerStore,
+      final ContainerReplicaPendingOps containerReplicaPendingOps)
       throws IOException {
     // Introduce builder for this class?
     this.lock = new ReentrantLock();
@@ -123,6 +119,7 @@ public class ContainerManagerImpl implements ContainerManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+    this.containerReplicaPendingOps = containerReplicaPendingOps;
   }
 
   @Override
@@ -151,9 +148,6 @@ public class ContainerManagerImpl implements ContainerManager {
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    // TODO: Remove the null check, startID should not be null. Fix the unit
-    //  test before removing the check.
-    final long start = startID == null ? 0 : startID.getId();
     final List<ContainerID> containersIds =
         new ArrayList<>(containerStateManager.getContainerIDs());
     Collections.sort(containersIds);
@@ -161,7 +155,7 @@ public class ContainerManagerImpl implements ContainerManager {
     lock.lock();
     try {
       containers = containersIds.stream()
-          .filter(id -> id.getId() >= start).limit(count)
+          .filter(id -> id.compareTo(startID) >= 0).limit(count)
           .map(containerStateManager::getContainer)
           .collect(Collectors.toList());
     } finally {
@@ -185,6 +179,27 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public List<ContainerInfo> getContainers(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    final List<ContainerID> containersIds =
+        new ArrayList<>(containerStateManager.getContainerIDs(state));
+    Collections.sort(containersIds);
+    List<ContainerInfo> containers;
+    lock.lock();
+    try {
+      containers = containersIds.stream()
+          .filter(id -> id.compareTo(startID) >= 0).limit(count)
+          .map(containerStateManager::getContainer)
+          .collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    return containers;
+  }
+
+  @Override
   public int getContainerStateCount(final LifeCycleState state) {
     return containerStateManager.getContainerIDs(state).size();
   }
@@ -192,7 +207,7 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public ContainerInfo allocateContainer(
       final ReplicationConfig replicationConfig, final String owner)
-      throws IOException {
+      throws IOException, TimeoutException {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
@@ -245,7 +260,7 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   private ContainerInfo createContainer(Pipeline pipeline, String owner)
-      throws IOException {
+      throws IOException, TimeoutException {
     final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
     if (LOG.isTraceEnabled()) {
       LOG.trace("New container allocated: {}", containerInfo);
@@ -255,13 +270,14 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
-      throws IOException {
+      throws IOException, TimeoutException {
     final long uniqueId = sequenceIdGen.getNextId(CONTAINER_ID);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
     final ContainerID containerID = ContainerID.valueOf(uniqueId);
-    final ContainerInfoProto containerInfo = ContainerInfoProto.newBuilder()
+    final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
+        .newBuilder()
         .setState(LifeCycleState.OPEN)
         .setPipelineID(pipeline.getId().getProtobuf())
         .setUsedBytes(0)
@@ -270,11 +286,17 @@ public class ContainerManagerImpl implements ContainerManager {
         .setOwner(owner)
         .setContainerID(containerID.getId())
         .setDeleteTransactionId(0)
-        .setReplicationFactor(
-            ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()))
-        .setReplicationType(pipeline.getType())
-        .build();
-    containerStateManager.addContainer(containerInfo);
+        .setReplicationType(pipeline.getType());
+
+    if (pipeline.getReplicationConfig() instanceof ECReplicationConfig) {
+      containerInfoBuilder.setEcReplicationConfig(
+          ((ECReplicationConfig) pipeline.getReplicationConfig()).toProto());
+    } else {
+      containerInfoBuilder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+    }
+
+    containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID);
   }
@@ -282,7 +304,7 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public void updateContainerState(final ContainerID cid,
                                    final LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
@@ -310,6 +332,9 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(cid, replica);
+      // Clear any pending additions for this replica as we have now seen it.
+      containerReplicaPendingOps.completeAddReplica(cid,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -321,6 +346,10 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(cid, replica);
+      // Remove any pending delete replication operations for the deleted
+      // replica.
+      containerReplicaPendingOps.completeDeleteReplica(cid,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -411,7 +440,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void deleteContainer(final ContainerID cid)
-      throws IOException {
+      throws IOException, TimeoutException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
     try {
@@ -452,9 +481,5 @@ public class ContainerManagerImpl implements ContainerManager {
   @VisibleForTesting
   public SCMHAManager getSCMHAManager() {
     return haManager;
-  }
-
-  public Set<ContainerID> getContainerIDs() {
-    return containerStateManager.getContainerIDs();
   }
 }

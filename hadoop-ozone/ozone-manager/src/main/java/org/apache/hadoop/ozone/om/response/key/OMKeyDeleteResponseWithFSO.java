@@ -45,14 +45,17 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
   private boolean isDeleteDirectory;
   private String keyName;
+  private long volumeId;
 
+  @SuppressWarnings("parameternumber")
   public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull String keyName, @Nonnull OmKeyInfo omKeyInfo,
       boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull boolean isDeleteDirectory) {
+      @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo);
     this.keyName = keyName;
     this.isDeleteDirectory = isDeleteDirectory;
+    this.volumeId = volumeId;
   }
 
   /**
@@ -70,8 +73,9 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
-    String ozoneDbKey = omMetadataManager.getOzonePathKey(
-            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName());
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
+        getOmBucketInfo().getObjectID(), getOmKeyInfo().getParentObjectID(),
+        getOmKeyInfo().getFileName());
 
     if (isDeleteDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
@@ -80,8 +84,10 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
       // Sets full absolute key name to OmKeyInfo, which is
       // required for moving the sub-files to KeyDeletionService.
       omKeyInfo.setKeyName(keyName);
+      String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+          omKeyInfo.getObjectID(), ozoneDbKey);
       omMetadataManager.getDeletedDirTable().putWithBatch(
-          batchOperation, ozoneDbKey, omKeyInfo);
+          batchOperation, ozoneDeleteKey, omKeyInfo);
     } else {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(getBucketLayout());

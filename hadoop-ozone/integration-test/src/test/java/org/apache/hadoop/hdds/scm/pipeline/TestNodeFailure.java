@@ -27,27 +27,19 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 /**
  * Test Node failure detection and handling in Ratis.
  */
 public class TestNodeFailure {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static List<Pipeline> ratisPipelines;
@@ -59,7 +51,7 @@ public class TestNodeFailure {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
@@ -90,7 +82,7 @@ public class TestNodeFailure {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -112,7 +104,7 @@ public class TestNodeFailure {
           }
         }, timeForFailure / 2, timeForFailure * 3);
       } catch (Exception e) {
-        Assert.fail("Test Failed: " + e.getMessage());
+        Assertions.fail("Test Failed: " + e.getMessage());
       }
     });
   }

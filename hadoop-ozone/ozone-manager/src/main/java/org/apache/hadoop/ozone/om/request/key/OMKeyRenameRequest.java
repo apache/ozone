@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -30,6 +29,10 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -40,12 +43,12 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -90,12 +93,21 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
 
-    // Set modification time.
+    String srcKey = renameKeyArgs.getKeyName();
+    String dstKey = renameKeyRequest.getToKeyName();
+    if (getBucketLayout().isFileSystemOptimized()) {
+      srcKey = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+          srcKey, getBucketLayout());
+      dstKey = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+          dstKey, getBucketLayout());
+    }
+
+    // Set modification time & srcKeyName.
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
-            .setModificationTime(Time.now());
+        .setModificationTime(Time.now()).setKeyName(srcKey);
 
     return getOmRequest().toBuilder()
-        .setRenameKeyRequest(renameKeyRequest.toBuilder()
+        .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
             .setKeyArgs(newKeyArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
 
@@ -244,16 +256,33 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     return auditMap;
   }
 
-  public static OMKeyRenameRequest getInstance(
-      OzoneManagerProtocolProtos.KeyArgs keyArgs, OMRequest omRequest,
-      OzoneManager ozoneManager) throws IOException {
 
-    BucketLayout bucketLayout =
-        OzoneManagerUtils.getBucketLayout(keyArgs.getVolumeName(),
-            keyArgs.getBucketName(), ozoneManager, new HashSet<>());
-    if (bucketLayout.isFileSystemOptimized()) {
-      return new OMKeyRenameRequestWithFSO(omRequest, bucketLayout);
+  /**
+   * Validates rename key requests.
+   * We do not want to allow older clients to rename keys in buckets which use
+   * non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.RenameKey
+  )
+  public static OMRequest blockRenameKeyWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getRenameKeyRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
     }
-    return new OMKeyRenameRequest(omRequest, bucketLayout);
+    return req;
   }
 }

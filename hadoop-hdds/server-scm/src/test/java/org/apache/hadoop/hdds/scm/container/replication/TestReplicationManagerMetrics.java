@@ -18,12 +18,11 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
@@ -37,7 +36,7 @@ public class TestReplicationManagerMetrics {
   private ReplicationManager replicationManager;
   private ReplicationManagerMetrics metrics;
 
-  @Before
+  @BeforeEach
   public void setup() {
     ReplicationManagerReport report = new ReplicationManagerReport();
 
@@ -55,29 +54,37 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
+    final LegacyReplicationManager lrm = Mockito.mock(
+        LegacyReplicationManager.class);
+    Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
+        .thenReturn(0);
     replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getLegacyReplicationManager())
+        .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
+    Mockito.when(replicationManager.getContainerReplicaPendingOps())
+        .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }
 
-  @After
+  @AfterEach
   public void after() {
     metrics.unRegister();
   }
 
   @Test
   public void testLifeCycleStateMetricsPresent() {
-    Assert.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
+    Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
         getGauge("NumOpenContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
+    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
         getGauge("NumClosingContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
+    Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
         getGauge("NumQuasiClosedContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
+    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
         getGauge("NumClosedContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
+    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
         getGauge("NumDeletingContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
+    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
         getGauge("NumDeletedContainers"));
   }
 
@@ -85,7 +92,7 @@ public class TestReplicationManagerMetrics {
   public void testHealthStateMetricsPresent() {
     for (ReplicationManagerReport.HealthState s :
         ReplicationManagerReport.HealthState.values()) {
-      Assert.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
+      Assertions.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
     }
   }
 

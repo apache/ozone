@@ -20,7 +20,6 @@
 package org.apache.hadoop.hdds.security.x509.keys;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
-import static org.junit.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,29 +42,26 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for HDDS pem writer.
  */
 public class TestKeyCodec {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private OzoneConfiguration configuration;
   private SecurityConfig securityConfig;
   private String component;
   private HDDSKeyGenerator keyGenerator;
   private String prefix;
 
-  @Before
-  public void init() throws IOException {
+  @BeforeEach
+  public void init(@TempDir Path tempDir) throws IOException {
     configuration = new OzoneConfiguration();
-    prefix = temporaryFolder.newFolder().toString();
+    prefix = tempDir.toString();
     configuration.set(HDDS_METADATA_DIR_NAME, prefix);
     keyGenerator = new HDDSKeyGenerator(configuration);
     securityConfig = new SecurityConfig(configuration);
@@ -92,29 +88,29 @@ public class TestKeyCodec {
 
     // Assert that locations have been created.
     Path keyLocation = pemWriter.getSecurityConfig().getKeyLocation(component);
-    Assert.assertTrue(keyLocation.toFile().exists());
+    Assertions.assertTrue(keyLocation.toFile().exists());
 
     // Assert that locations are created in the locations that we specified
     // using the Config.
-    Assert.assertTrue(keyLocation.toString().startsWith(prefix));
+    Assertions.assertTrue(keyLocation.toString().startsWith(prefix));
     Path privateKeyPath = Paths.get(keyLocation.toString(),
         pemWriter.getSecurityConfig().getPrivateKeyFileName());
-    Assert.assertTrue(privateKeyPath.toFile().exists());
+    Assertions.assertTrue(privateKeyPath.toFile().exists());
     Path publicKeyPath = Paths.get(keyLocation.toString(),
         pemWriter.getSecurityConfig().getPublicKeyFileName());
-    Assert.assertTrue(publicKeyPath.toFile().exists());
+    Assertions.assertTrue(publicKeyPath.toFile().exists());
 
     // Read the private key and test if the expected String in the PEM file
     // format exists.
     byte[] privateKey = Files.readAllBytes(privateKeyPath);
     String privateKeydata = new String(privateKey, StandardCharsets.UTF_8);
-    Assert.assertTrue(privateKeydata.contains("PRIVATE KEY"));
+    Assertions.assertTrue(privateKeydata.contains("PRIVATE KEY"));
 
     // Read the public key and test if the expected String in the PEM file
     // format exists.
     byte[] publicKey = Files.readAllBytes(publicKeyPath);
     String publicKeydata = new String(publicKey, StandardCharsets.UTF_8);
-    Assert.assertTrue(publicKeydata.contains("PUBLIC KEY"));
+    Assertions.assertTrue(publicKeydata.contains("PUBLIC KEY"));
 
     // Let us decode the PEM file and parse it back into binary.
     KeyFactory kf = KeyFactory.getInstance(
@@ -132,8 +128,8 @@ public class TestKeyCodec {
     byte[] keyBytes = Base64.decodeBase64(privateKeydata);
     PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
     PrivateKey privateKeyDecoded = kf.generatePrivate(spec);
-    assertNotNull("Private Key should not be null",
-        privateKeyDecoded);
+    Assertions.assertNotNull(privateKeyDecoded,
+        "Private Key should not be null");
 
     // Let us decode the public key and veriy that we can parse it back into
     // binary.
@@ -145,29 +141,28 @@ public class TestKeyCodec {
     keyBytes = Base64.decodeBase64(publicKeydata);
     X509EncodedKeySpec pubKeyspec = new X509EncodedKeySpec(keyBytes);
     PublicKey publicKeyDecoded = kf.generatePublic(pubKeyspec);
-    assertNotNull("Public Key should not be null",
-        publicKeyDecoded);
+    Assertions.assertNotNull(publicKeyDecoded, "Public Key should not be null");
 
     // Now let us assert the permissions on the Directories and files are as
     // expected.
     Set<PosixFilePermission> expectedSet = pemWriter.getFilePermissionSet();
     Set<PosixFilePermission> currentSet =
         Files.getPosixFilePermissions(privateKeyPath);
-    Assert.assertEquals(expectedSet.size(), currentSet.size());
+    Assertions.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
-    Assert.assertEquals(0, currentSet.size());
+    Assertions.assertEquals(0, currentSet.size());
 
     currentSet =
         Files.getPosixFilePermissions(publicKeyPath);
     currentSet.removeAll(expectedSet);
-    Assert.assertEquals(0, currentSet.size());
+    Assertions.assertEquals(0, currentSet.size());
 
     expectedSet = pemWriter.getDirPermissionSet();
     currentSet =
         Files.getPosixFilePermissions(keyLocation);
-    Assert.assertEquals(expectedSet.size(), currentSet.size());
+    Assertions.assertEquals(expectedSet.size(), currentSet.size());
     currentSet.removeAll(expectedSet);
-    Assert.assertEquals(0, currentSet.size());
+    Assertions.assertEquals(0, currentSet.size());
   }
 
   /**
@@ -232,7 +227,7 @@ public class TestKeyCodec {
     keycodec.writeKey(kp);
 
     PublicKey pubKey = keycodec.readPublicKey();
-    assertNotNull(pubKey);
+    Assertions.assertNotNull(pubKey);
 
   }
 }

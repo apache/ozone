@@ -28,7 +28,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -40,15 +39,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.Matchers;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -58,6 +54,7 @@ import static org.mockito.Mockito.when;
 /**
  * Class used for testing the SCM DB Checkpoint provider servlet.
  */
+@Timeout(240)
 public class TestSCMDbCheckpointServlet {
   private MiniOzoneCluster cluster = null;
   private StorageContainerManager scm;
@@ -67,11 +64,6 @@ public class TestSCMDbCheckpointServlet {
   private String scmId;
   private String omId;
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(240);
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -79,15 +71,13 @@ public class TestSCMDbCheckpointServlet {
    *
    * @throws Exception
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
-        2, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -101,7 +91,7 @@ public class TestSCMDbCheckpointServlet {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -122,6 +112,7 @@ public class TestSCMDbCheckpointServlet {
           scmMetrics.getDBCheckpointMetrics(),
           false,
           Collections.emptyList(),
+          Collections.emptyList(),
           false);
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
@@ -140,7 +131,7 @@ public class TestSCMDbCheckpointServlet {
           Matchers.anyString());
 
       tempFile = File.createTempFile("testDoGet_" + System
-          .currentTimeMillis(), ".tar.gz");
+          .currentTimeMillis(), ".tar");
 
       FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
       when(responseMock.getOutputStream()).thenReturn(
@@ -169,14 +160,14 @@ public class TestSCMDbCheckpointServlet {
 
       scmDbCheckpointServletMock.doGet(requestMock, responseMock);
 
-      Assert.assertTrue(tempFile.length() > 0);
-      Assert.assertTrue(
+      Assertions.assertTrue(tempFile.length() > 0);
+      Assertions.assertTrue(
           scmMetrics.getDBCheckpointMetrics().
               getLastCheckpointCreationTimeTaken() > 0);
-      Assert.assertTrue(
+      Assertions.assertTrue(
           scmMetrics.getDBCheckpointMetrics().
               getLastCheckpointStreamingTimeTaken() > 0);
-      Assert.assertTrue(scmMetrics.getDBCheckpointMetrics().
+      Assertions.assertTrue(scmMetrics.getDBCheckpointMetrics().
           getNumCheckpoints() > initialCheckpointCount);
     } finally {
       FileUtils.deleteQuietly(tempFile);

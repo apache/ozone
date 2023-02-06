@@ -39,27 +39,21 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link HddsServerUtil}.
  */
+@Timeout(300)
 public class TestHddsServerUtils {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestHddsServerUtils.class);
-
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   /**
    * Test getting OZONE_SCM_DATANODE_ADDRESS_KEY with port.
@@ -199,8 +193,8 @@ public class TestHddsServerUtils {
 
   @Test
   public void testNoScmDbDirConfigured() {
-    thrown.expect(IllegalArgumentException.class);
-    ServerUtils.getScmDbDir(new OzoneConfiguration());
+    assertThrows(IllegalArgumentException.class,
+        () -> ServerUtils.getScmDbDir(new OzoneConfiguration()));
   }
 
   @Test

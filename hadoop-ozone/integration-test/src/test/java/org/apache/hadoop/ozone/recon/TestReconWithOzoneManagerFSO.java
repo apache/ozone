@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
@@ -67,7 +66,7 @@ public class TestReconWithOzoneManagerFSO {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     cluster =
             MiniOzoneCluster.newBuilder(conf)
                     .setNumDatanodes(1)
@@ -129,8 +128,10 @@ public class TestReconWithOzoneManagerFSO {
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();
     Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
-    Assert.assertEquals(1, entity.getNumTotalKey());
-    Assert.assertEquals(0, entity.getNumTotalDir());
+    Assert.assertEquals(1, entity.getCountStats().getNumTotalKey());
+    Assert.assertEquals(0, entity.getCountStats().getNumTotalDir());
+    Assert.assertEquals(-1, entity.getCountStats().getNumVolume());
+    Assert.assertEquals(-1, entity.getCountStats().getNumBucket());
     for (int i = 0; i < 10; i++) {
       Assert.assertNotNull(impl.getOMMetadataManagerInstance()
               .getVolumeTable().get("/vol" + i));
@@ -150,10 +151,10 @@ public class TestReconWithOzoneManagerFSO {
             (NamespaceSummaryResponse) rootBasicRes.getEntity();
     Assert.assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
     // one additional dummy volume at creation
-    Assert.assertEquals(13, rootBasicEntity.getNumVolume());
-    Assert.assertEquals(12, rootBasicEntity.getNumBucket());
-    Assert.assertEquals(12, rootBasicEntity.getNumTotalDir());
-    Assert.assertEquals(12, rootBasicEntity.getNumTotalKey());
+    Assert.assertEquals(13, rootBasicEntity.getCountStats().getNumVolume());
+    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumBucket());
+    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumTotalDir());
+    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumTotalKey());
   }
 
   /**

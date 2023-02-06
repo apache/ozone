@@ -38,6 +38,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","bats","checkstyle"]'
   assert_output -p needs-build=false
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -49,6 +50,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -60,6 +62,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","bats"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -71,6 +74,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=true
   assert_output -p needs-integration-tests=false
@@ -82,6 +86,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","bats"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -92,7 +97,8 @@ load bats-assert/load.bash
   run dev-support/ci/selective_ci_checks.sh 9aebf6e25
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
-  assert_output -p needs-build=false
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -104,6 +110,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","bats","unit"]'
   assert_output -p needs-build=false
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -114,7 +121,8 @@ load bats-assert/load.bash
   run dev-support/ci/selective_ci_checks.sh 1dd1d0ba3
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
-  assert_output -p needs-build=false
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -125,7 +133,8 @@ load bats-assert/load.bash
   run dev-support/ci/selective_ci_checks.sh 88383d1d5
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
-  assert_output -p needs-build=false
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -136,7 +145,8 @@ load bats-assert/load.bash
   run dev-support/ci/selective_ci_checks.sh 61396ba9f
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs"]'
-  assert_output -p needs-build=false
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -148,6 +158,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","bats"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -159,6 +170,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","docs"]'
   assert_output -p needs-build=false
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -170,6 +182,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -181,6 +194,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -192,6 +206,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -203,6 +218,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","author","checkstyle","docs","findbugs","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=true
@@ -214,6 +230,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["rat","checkstyle","findbugs","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=true
   assert_output -p needs-integration-tests=true
@@ -225,6 +242,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=true
   assert_output -p needs-integration-tests=true
@@ -236,6 +254,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
   assert_output -p needs-build=true
+  assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
   assert_output -p needs-dependency-check=true
   assert_output -p needs-integration-tests=true
@@ -247,6 +266,7 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=[]'
   assert_output -p needs-build=false
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -258,6 +278,19 @@ load bats-assert/load.bash
 
   assert_output -p 'basic-checks=[]'
   assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "PR-title workflow" {
+  run dev-support/ci/selective_ci_checks.sh 4f0bd4ae3
+
+  assert_output -p 'basic-checks=["rat","bats"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false
@@ -267,8 +300,9 @@ load bats-assert/load.bash
 @test "other README" {
   run dev-support/ci/selective_ci_checks.sh 5532981a7
 
-  assert_output -p 'basic-checks=[]'
+  assert_output -p 'basic-checks=["rat"]'
   assert_output -p needs-build=false
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-dependency-check=false
   assert_output -p needs-integration-tests=false

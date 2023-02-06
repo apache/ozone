@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocol.OMAdminProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
@@ -128,8 +128,8 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OMAdminProtocolPB.class, ProtobufRpcEngine.class);
 
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        new OMFailoverProxyProvider(conf, ugi, omServiceId,
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
+        new HadoopRpcOMFailoverProxyProvider(conf, ugi, omServiceId,
             OMAdminProtocolPB.class);
 
     // Multiple the max number of retries with number of OMs to calculate the
@@ -192,13 +192,13 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
       response = rpcProxy.decommission(NULL_RPC_CONTROLLER, decommOMRequest);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
-          OMFailoverProxyProvider.getNotLeaderException(e);
+          HadoopRpcOMFailoverProxyProvider.getNotLeaderException(e);
       if (notLeaderException != null) {
         throwException(notLeaderException.getMessage());
       }
 
       OMLeaderNotReadyException leaderNotReadyException =
-          OMFailoverProxyProvider.getLeaderNotReadyException(e);
+          HadoopRpcOMFailoverProxyProvider.getLeaderNotReadyException(e);
       if (leaderNotReadyException != null) {
         throwException(leaderNotReadyException.getMessage());
       }

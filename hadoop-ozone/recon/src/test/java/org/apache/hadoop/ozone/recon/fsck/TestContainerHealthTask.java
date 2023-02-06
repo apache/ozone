@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
-import static junit.framework.TestCase.assertEquals;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,8 +58,8 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test a single run of the Container Health Task.
@@ -128,7 +129,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             State.CLOSED, State.CLOSED, State.CLOSED));
 
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
-    Assert.assertTrue(all.isEmpty());
+    Assertions.assertTrue(all.isEmpty());
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -177,7 +178,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
-    Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
+    Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
         currentTime);
 
     // Now run the job again, to check that relevant records are updated or
@@ -272,7 +273,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         .thenReturn(new ContainerWithPipeline(mockDeletedContainer, null));
 
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
-    Assert.assertTrue(all.isEmpty());
+    Assertions.assertTrue(all.isEmpty());
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -293,7 +294,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
-    Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
+    Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
         currentTime);
   }
 
@@ -343,7 +344,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
    * of a datanode via setMisRepWhenDnPresent. If a DN with that UUID is passed
    * to validateContainerPlacement, then it will return an invalid placement.
    */
-  private static class MockPlacementPolicy implements PlacementPolicy {
+  private static class MockPlacementPolicy implements
+          PlacementPolicy<ContainerReplica> {
 
     private UUID misRepWhenDnPresent = null;
 
@@ -353,7 +355,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     @Override
     public List<DatanodeDetails> chooseDatanodes(
-        List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+        List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+        List<DatanodeDetails> favoredNodes,
         int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
         throws IOException {
       return null;
@@ -367,6 +370,19 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       } else {
         return new ContainerPlacementStatusDefault(1, 1, 1);
       }
+    }
+
+    @Override
+    public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+            Map<ContainerReplica, Boolean> replicas) {
+      return Collections.emptySet();
+    }
+
+
+    @Override
+    public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+      return null;
     }
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {

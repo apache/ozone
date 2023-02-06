@@ -133,15 +133,6 @@ public final class OzoneQuota {
   }
 
   /**
-   * Constructor for Ozone NameSpace Quota.
-   *
-   * @param quotaInNamespace long value
-   */
-  private OzoneQuota(long quotaInNamespace) {
-    this.quotaInNamespace = quotaInNamespace;
-  }
-
-  /**
    * Constructor for Ozone Quota.
    *
    * @param quotaInNamespace ozone quota in counts

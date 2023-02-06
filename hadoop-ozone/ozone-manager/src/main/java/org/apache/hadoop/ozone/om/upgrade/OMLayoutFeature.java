@@ -29,8 +29,16 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
  */
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
-  INITIAL_VERSION(0, "Initial Layout Version");
+  INITIAL_VERSION(0, "Initial Layout Version"),
 
+  ERASURE_CODED_STORAGE_SUPPORT(1, "Ozone version with built in support for"
+      + " Erasure Coded block data storage."),
+
+  BUCKET_LAYOUT_SUPPORT(2, "Ozone version supporting bucket " +
+      "layouts and introducing the FILE_SYSTEM_OPTIMIZED and OBJECT_STORE " +
+      "bucket layout types."),
+
+  MULTITENANCY_SCHEMA(3, "Multi-Tenancy Schema");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions

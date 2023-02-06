@@ -16,20 +16,7 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
+import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,18 +33,34 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-
-import com.codahale.metrics.Timer;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.jetbrains.annotations.NotNull;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Utility to replicated closed container with datanode code.
@@ -77,6 +80,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private String datanode;
 
   private ReplicationSupervisor supervisor;
+
+  private ContainerReplicator replicator;
 
   private Timer timer;
 
@@ -124,8 +129,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         //if datanode is specified, replicate only container if it has a
         //replica.
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
-          replicationTasks.add(new ReplicationTask(container.getContainerID(),
-              datanodesWithContainer));
+          replicationTasks.add(new ReplicationTask(
+              ReplicateContainerCommand.fromSources(container.getContainerID(),
+                  datanodesWithContainer), replicator));
         }
       }
 
@@ -171,7 +177,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
 
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
@@ -198,13 +204,15 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     ContainerController controller =
         new ContainerController(containerSet, handlers);
 
-    ContainerReplicator replicator =
-        new DownloadAndImportReplicator(containerSet,
-            controller,
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+    ContainerImporter importer = new ContainerImporter(conf, containerSet,
+        controller, null);
+    replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
+        new SimpleContainerDownloader(conf, null));
 
-    supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
+    ReplicationServer.ReplicationConfig replicationConfig
+        = conf.getObject(ReplicationServer.ReplicationConfig.class);
+    supervisor = new ReplicationSupervisor(null, replicationConfig,
+        Clock.system(ZoneId.systemDefault()));
   }
 
   private void replicateContainer(long counter) throws Exception {

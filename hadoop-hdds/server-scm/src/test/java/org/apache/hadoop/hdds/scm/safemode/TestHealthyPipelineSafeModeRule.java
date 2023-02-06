@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -45,8 +47,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -85,7 +87,8 @@ public class TestHealthyPipelineSafeModeRule {
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              Clock.system(ZoneOffset.UTC));
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -99,7 +102,7 @@ public class TestHealthyPipelineSafeModeRule {
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
 
       // This should be immediately satisfied, as no pipelines are there yet.
-      Assert.assertTrue(healthyPipelineSafeModeRule.validate());
+      Assertions.assertTrue(healthyPipelineSafeModeRule.validate());
     } finally {
       scmMetadataStore.getStore().close();
       FileUtil.fullyDelete(new File(storageDir));
@@ -139,7 +142,8 @@ public class TestHealthyPipelineSafeModeRule {
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -179,7 +183,7 @@ public class TestHealthyPipelineSafeModeRule {
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
 
       // No datanodes have sent pipelinereport from datanode
-      Assert.assertFalse(healthyPipelineSafeModeRule.validate());
+      Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
 
       // Fire pipeline report from all datanodes in first pipeline, as here we
       // have 3 pipelines, 10% is 0.3, when doing ceil it is 1. So, we should
@@ -237,7 +241,8 @@ public class TestHealthyPipelineSafeModeRule {
               scmMetadataStore.getPipelineTable(),
               eventQueue,
               scmContext,
-              serviceManager);
+              serviceManager,
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -278,7 +283,7 @@ public class TestHealthyPipelineSafeModeRule {
 
 
       // No pipeline event have sent to SCMSafemodeManager
-      Assert.assertFalse(healthyPipelineSafeModeRule.validate());
+      Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
 
 
       GenericTestUtils.LogCapturer logCapturer =
@@ -292,7 +297,7 @@ public class TestHealthyPipelineSafeModeRule {
       GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
           "reported count is 1"),
           1000, 5000);
-      Assert.assertFalse(healthyPipelineSafeModeRule.validate());
+      Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
 
       firePipelineEvent(pipeline2, eventQueue);
       firePipelineEvent(pipeline3, eventQueue);

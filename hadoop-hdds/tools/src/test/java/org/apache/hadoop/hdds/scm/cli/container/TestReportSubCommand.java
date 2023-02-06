@@ -17,14 +17,17 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,7 +37,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -50,14 +54,14 @@ public class TestReportSubCommand {
   private final PrintStream originalErr = System.err;
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new ReportSubcommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -85,6 +89,26 @@ public class TestReportSubCommand {
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
+  }
+
+  @Test
+  public void testValidJsonOutput() throws IOException {
+    // More complete testing of the Report JSON output is in
+    // TestReplicationManagerReport.
+    ScmClient scmClient = mock(ScmClient.class);
+    Mockito.when(scmClient.getReplicationManagerReport())
+        .thenAnswer(invocation -> new ReplicationManagerReport());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+    cmd.execute(scmClient);
+
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
+
+    assertNotNull(json.get("reportTimeStamp"));
+    assertNotNull(json.get("stats"));
+    assertNotNull(json.get("samples"));
   }
 
   @Test

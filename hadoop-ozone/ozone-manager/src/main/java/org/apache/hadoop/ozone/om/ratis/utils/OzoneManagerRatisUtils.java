@@ -35,8 +35,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
-import org.apache.hadoop.ozone.om.request.OMKeyRequestFactory;
+import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetOwnerRequest;
@@ -45,6 +44,9 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
+import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
@@ -55,11 +57,21 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMSetRangerServiceVersionRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignAdminRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantDeleteRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRevokeAdminRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
@@ -75,7 +87,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.ratis.protocol.RaftPeerId;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -118,6 +129,9 @@ public final class OzoneManagerRatisUtils {
     Type cmdType = omRequest.getCmdType();
     OzoneManagerProtocolProtos.KeyArgs keyArgs;
     BucketLayout bucketLayout = BucketLayout.DEFAULT;
+    String volumeName = "";
+    String bucketName = "";
+
     switch (cmdType) {
     case CreateVolume:
       return new OMVolumeCreateRequest(omRequest);
@@ -169,32 +183,124 @@ public final class OzoneManagerRatisUtils {
       return new OMPrepareRequest(omRequest);
     case CancelPrepare:
       return new OMCancelPrepareRequest(omRequest);
+    case SetS3Secret:
+      return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
-
-    /**
-     * Following key requests will be created in {@link OMKeyRequestFactory}.
+    case PurgeKeys:
+      return new OMKeyPurgeRequest(omRequest);
+    case PurgeDirectories:
+      return new OMDirectoriesPurgeRequestWithFSO(omRequest);
+    case CreateTenant:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantCreateRequest(omRequest);
+    case DeleteTenant:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantDeleteRequest(omRequest);
+    case TenantAssignUserAccessId:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantAssignUserAccessIdRequest(omRequest);
+    case TenantRevokeUserAccessId:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantRevokeUserAccessIdRequest(omRequest);
+    case TenantAssignAdmin:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantAssignAdminRequest(omRequest);
+    case TenantRevokeAdmin:
+      ozoneManager.checkS3MultiTenancyEnabled();
+      return new OMTenantRevokeAdminRequest(omRequest);
+    case SetRangerServiceVersion:
+      return new OMSetRangerServiceVersionRequest(omRequest);
+    case CreateSnapshot:
+      return new OMSnapshotCreateRequest(omRequest);
+    case DeleteSnapshot:
+      return new OMSnapshotDeleteRequest(omRequest);
+    case DeleteOpenKeys:
+      BucketLayout bktLayout = BucketLayout.DEFAULT;
+      if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {
+        bktLayout = BucketLayout.fromProto(
+            omRequest.getDeleteOpenKeysRequest().getBucketLayout());
+      }
+      return new OMOpenKeysDeleteRequest(omRequest, bktLayout);
+    /*
+     * Key requests that can have multiple variants based on the bucket layout
+     * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
      */
     case CreateDirectory:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CreateFile:
+      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CreateKey:
+      keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case AllocateBlock:
+      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CommitKey:
+      keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case DeleteKey:
+      keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case DeleteKeys:
+      OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
+          omRequest.getDeleteKeysRequest()
+              .getDeleteKeys();
+      volumeName = deleteKeyArgs.getVolumeName();
+      bucketName = deleteKeyArgs.getBucketName();
+      break;
     case RenameKey:
+      keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case RenameKeys:
-    case PurgeKeys:
-    case PurgePaths:
+      OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs =
+          omRequest.getRenameKeysRequest().getRenameKeysArgs();
+      volumeName = renameKeysArgs.getVolumeName();
+      bucketName = renameKeysArgs.getBucketName();
+      break;
     case InitiateMultiPartUpload:
+      keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CommitMultiPartUpload:
+      keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case AbortMultiPartUpload:
+      keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     case CompleteMultiPartUpload:
-      return OMKeyRequestFactory.createRequest(omRequest, ozoneManager);
+      keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);
     }
+
+    return BucketLayoutAwareOMKeyRequestFactory.createRequest(
+        volumeName, bucketName, omRequest, ozoneManager.getMetadataManager());
   }
 
   private static OMClientRequest getOMAclRequest(OMRequest omRequest,
@@ -336,43 +442,13 @@ public final class OzoneManagerRatisUtils {
     return snapshotDir;
   }
 
-  public static void checkLeaderStatus(RaftServerStatus raftServerStatus,
-      RaftPeerId raftPeerId) throws ServiceException {
-    switch (raftServerStatus) {
-    case LEADER_AND_READY: return;
-
-    case LEADER_AND_NOT_READY: throw createLeaderNotReadyException(raftPeerId);
-
-    case NOT_LEADER: throw createNotLeaderException(raftPeerId);
-
-    default: throw new IllegalStateException(
-        "Unknown Ratis Server state: " + raftServerStatus);
+  public static void checkLeaderStatus(OzoneManager ozoneManager)
+      throws ServiceException {
+    try {
+      ozoneManager.checkLeaderStatus();
+    } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+      LOG.debug(e.getMessage());
+      throw new ServiceException(e);
     }
-  }
-
-  private static ServiceException createNotLeaderException(
-      RaftPeerId raftPeerId) {
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
-
-    OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
-
-    LOG.debug(notLeaderException.getMessage());
-
-    return new ServiceException(notLeaderException);
-  }
-
-  private static ServiceException createLeaderNotReadyException(
-      RaftPeerId raftPeerId) {
-
-    OMLeaderNotReadyException leaderNotReadyException =
-        new OMLeaderNotReadyException(raftPeerId.toString() + " is Leader " +
-            "but not ready to process request yet.");
-
-    LOG.debug(leaderNotReadyException.getMessage());
-
-    return new ServiceException(leaderNotReadyException);
   }
 }

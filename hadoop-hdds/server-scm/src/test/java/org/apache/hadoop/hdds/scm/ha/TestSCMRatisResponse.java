@@ -27,9 +27,9 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.RaftException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for SCMRatisResponse.
@@ -37,7 +37,7 @@ import org.junit.Test;
 public class TestSCMRatisResponse {
   private RaftGroupMemberId raftId;
 
-  @Before
+  @BeforeEach
   public void init() {
     raftId = RaftGroupMemberId.valueOf(
         RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
@@ -56,8 +56,8 @@ public class TestSCMRatisResponse {
         .setLogIndex(1L)
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
-    Assert.assertTrue(response.isSuccess());
-    Assert.assertEquals(Message.EMPTY,
+    Assertions.assertTrue(response.isSuccess());
+    Assertions.assertEquals(Message.EMPTY,
         SCMRatisResponse.encode(response.getResult()));
   }
 
@@ -74,16 +74,17 @@ public class TestSCMRatisResponse {
         .setLogIndex(1L)
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
-    Assert.assertFalse(response.isSuccess());
-    Assert.assertTrue(response.getException() instanceof RaftException);
-    Assert.assertNull(response.getResult());
+    Assertions.assertFalse(response.isSuccess());
+    Assertions.assertTrue(response.getException() instanceof RaftException);
+    Assertions.assertNull(response.getResult());
   }
 
-  @Test(expected =  InvalidProtocolBufferException.class)
-  public void testEncodeFailureWithNonProto() throws Exception {
+  @Test
+  public void testEncodeFailureWithNonProto() {
     // Non proto input
     Message message = Message.valueOf("test");
     // Should fail with exception.
-    SCMRatisResponse.encode(message);
+    Assertions.assertThrows(InvalidProtocolBufferException.class,
+        () -> SCMRatisResponse.encode(message));
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
@@ -35,7 +37,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
  *
  */
 @InterfaceStability.Evolving
-public interface DBStore extends AutoCloseable, BatchOperationHandler {
+public interface DBStore extends Closeable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore.
@@ -94,6 +96,11 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    * @param sync if true will sync the outstanding I/Os to the disk.
    */
   void flushLog(boolean sync) throws IOException;
+
+  /**
+   * Returns the RocksDB checkpoint differ.
+   */
+  RocksDBCheckpointDiffer getRocksDBCheckpointDiffer();
 
   /**
    * Compact the entire database.
@@ -197,4 +204,10 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
       throws SequenceNumberNotFoundException;
+
+  /**
+   * Return if the underlying DB is closed. This call is thread safe.
+   * @return true if the DB is closed.
+   */
+  boolean isClosed();
 }

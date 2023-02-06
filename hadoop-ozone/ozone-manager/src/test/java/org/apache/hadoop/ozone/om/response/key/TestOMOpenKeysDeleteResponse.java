@@ -18,25 +18,52 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addBucketToDB;
+
 /**
  * Tests OMOpenKeysDeleteResponse.
  */
+@RunWith(Parameterized.class)
 public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   private static final long KEY_LENGTH = 100;
+  private final BucketLayout bucketLayout;
+
+  public TestOMOpenKeysDeleteResponse(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  @Override
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
+
+  @Parameters
+  public static Collection<BucketLayout> bucketLayouts() {
+    return Arrays.asList(
+        BucketLayout.DEFAULT,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED
+    );
+  }
 
   /**
    * Tests deleting a subset of keys from the open key table DB when the keys
@@ -44,11 +71,12 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
-    Map<String, OmBucketInfo> bucketsToUpdate = updateBuckets(keysToDelete);
 
-    createAndCommitResponse(keysToDelete, bucketsToUpdate, Status.OK);
+    createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
       // open keys with no associated block data should have been removed
@@ -64,14 +92,6 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
-
-    for (OmBucketInfo omBucketInfo : bucketsToUpdate.values()) {
-      String bucketKey = omMetadataManager.getBucketKey(
-          omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-      OmBucketInfo dbBucketInfo =
-          omMetadataManager.getBucketTable().get(bucketKey);
-      Assert.assertEquals(omBucketInfo, dbBucketInfo);
-    }
   }
 
   /**
@@ -80,13 +100,14 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
-    Map<String, OmBucketInfo> bucketsToUpdate = updateBuckets(keysToDelete);
 
-    createAndCommitResponse(keysToDelete, bucketsToUpdate, Status.OK);
+    createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
       // These keys should have been moved from the open key table to the
@@ -102,14 +123,6 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
-
-    for (OmBucketInfo omBucketInfo : bucketsToUpdate.values()) {
-      String bucketKey = omMetadataManager.getBucketKey(
-          omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-      OmBucketInfo dbBucketInfo =
-          omMetadataManager.getBucketTable().get(bucketKey);
-      Assert.assertEquals(omBucketInfo, dbBucketInfo);
-    }
   }
 
   /**
@@ -119,11 +132,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    */
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
-    Map<String, OmBucketInfo> bucketsToUpdate = new HashMap<>();
 
-    createAndCommitResponse(keysToDelete, bucketsToUpdate,
-        Status.INTERNAL_ERROR);
+    createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
       // If an error occurs in the response, the batch operation moving keys
@@ -142,8 +155,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * @throws Exception
    */
   private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
-      Map<String, OmBucketInfo> bucketsToUpdate, Status status)
-      throws Exception {
+      Status status) throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setStatus(status)
@@ -151,7 +163,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
         .build();
 
     OMOpenKeysDeleteResponse response = new OMOpenKeysDeleteResponse(omResponse,
-        keysToDelete, bucketsToUpdate, true);
+        keysToDelete, true, getBucketLayout());
 
     // Operations are only added to the batch by this method when status is OK.
     response.checkAndUpdateDB(omMetadataManager, batchOperation);
@@ -186,33 +198,37 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     for (int i = 0; i < numKeys; i++) {
       String bucket = UUID.randomUUID().toString();
       String key = UUID.randomUUID().toString();
+      addBucketToDB(volume, bucket, omMetadataManager, getBucketLayout());
       long clientID = random.nextLong();
-
-      OmBucketInfo omBucketInfo = OMRequestTestUtils.getBucketFromDB(volume,
-          bucket, omMetadataManager);
-      if (omBucketInfo == null) {
-        OMRequestTestUtils.addBucketToDB(volume, bucket, omMetadataManager);
-        omBucketInfo = OMRequestTestUtils.getBucketFromDB(volume,
-            bucket, omMetadataManager);
-      }
+      long parentID = random.nextLong();
 
       OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
           bucket, key, replicationType, replicationFactor);
 
-      omBucketInfo.incrUsedNamespace(1);
       if (keyLength > 0) {
         OMRequestTestUtils.addKeyLocationInfo(omKeyInfo, 0, keyLength);
-        omBucketInfo.incrUsedBytes(keyLength);
       }
 
-      String openKey = omMetadataManager.getOpenKey(volume, bucket,
-          key, clientID);
+      final String openKey;
 
       // Add to the open key table DB, not cache.
       // In a real execution, the open key would have been removed from the
       // cache by the request, and it would only remain in the DB.
-      OMRequestTestUtils.addKeyToTable(true, false, omKeyInfo,
-          clientID, 0L, omMetadataManager);
+      if (getBucketLayout().isFileSystemOptimized()) {
+        String file = OzoneFSUtils.getFileName(key);
+        final long volumeId = omMetadataManager.getVolumeId(volume);
+        final long bucketId = omMetadataManager.getBucketId(volume, bucket);
+        omKeyInfo.setFileName(file);
+        omKeyInfo.setParentObjectID(parentID);
+        OMRequestTestUtils.addFileToKeyTable(true, false, file, omKeyInfo,
+            clientID, 0L, omMetadataManager);
+        openKey = omMetadataManager.getOpenFileName(
+                volumeId, bucketId, parentID, file, clientID);
+      } else {
+        OMRequestTestUtils.addKeyToTable(true, false, omKeyInfo,
+            clientID, 0L, omMetadataManager);
+        openKey = omMetadataManager.getOpenKey(volume, bucket, key, clientID);
+      }
       Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(openKey));
 
@@ -220,22 +236,5 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     }
 
     return newOpenKeys;
-  }
-
-  private Map<String, OmBucketInfo> updateBuckets(
-      Map<String, OmKeyInfo> keysToDelete) {
-    Map<String, OmBucketInfo> bucketsToUpdate = new HashMap<>();
-
-    for (OmKeyInfo omKeyInfo : keysToDelete.values()) {
-      OmBucketInfo omBucketInfo = OMRequestTestUtils.getBucketFromDB(
-          omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-          omMetadataManager);
-      String bucketKey = omMetadataManager.getBucketKey(
-          omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
-      omBucketInfo.incrUsedNamespace(-1);
-      omBucketInfo.incrUsedBytes(-omKeyInfo.getDataSize());
-      bucketsToUpdate.put(bucketKey, omBucketInfo);
-    }
-    return bucketsToUpdate;
   }
 }

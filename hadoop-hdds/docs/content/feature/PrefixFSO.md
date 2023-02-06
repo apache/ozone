@@ -66,14 +66,14 @@ Following picture describes the OM metadata changes while performing a rename
 
 The following configuration can be configured in `ozone-site.xml` to define the default value for bucket layout during bucket creation
 if the client has not specified the bucket layout argument.
-Supported values are `OBJECT_STORE` and `FILE_SYSTEM_OPTIMIZED`.
+Supported values are `OBJECT_STORE`, `FILE_SYSTEM_OPTIMIZED` and `LEGACY`.
 
-By default, the buckets will default to `OBJECT_STORE` behaviour.
+By default, this config value is empty. Ozone will default to `FILE_SYSTEM_OPTIMIZED` bucket layout if it finds an empty config value.
 
 ```XML
 
 <property>
     <name>ozone.default.bucket.layout</name>
-    <value>OBJECT_STORE</value>
+    <value/>
 </property>
 ```

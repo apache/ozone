@@ -20,10 +20,7 @@ import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.net.NetUtils;
 import org.slf4j.Logger;
-
-import java.net.InetSocketAddress;
 
 /**
  * Utilities related to configuration.
@@ -62,14 +59,6 @@ public final class ConfUtils {
       return null;
     }
     return Joiner.on(".").skipNulls().join(suffixes);
-  }
-
-  /**
-   * Match input address to local address.
-   * Return true if it matches, false otherwsie.
-   */
-  public static boolean isAddressLocal(InetSocketAddress addr) {
-    return NetUtils.isLocalAddress(addr.getAddress());
   }
 
   /**

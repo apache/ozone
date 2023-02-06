@@ -125,7 +125,10 @@ Returns all the KeyMetadata objects for the given ContainerID.
 
 **Parameters**
 
-No parameters.  
+* limit (optional)
+
+  Only returns the limited number of results. The default limit is 1000.
+
 
 **Returns**
 

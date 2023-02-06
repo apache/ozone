@@ -15,8 +15,8 @@
 ## Blockade Tests
 Following python packages need to be installed before running the tests :
 
-1. blockade
-2. pytest==3.2.0
+1. [blockade](https://pypi.org/project/blockade/)
+2. [pytest==3.2.0](https://pypi.org/project/pytest/3.2.0/)
 
 Running test as part of the maven build:
 

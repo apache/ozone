@@ -19,12 +19,15 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ozone-shell-lib.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-Test Timeout        5 minute
+Test Timeout        10 minutes
 Suite Setup         Generate prefix
 
 *** Test Cases ***
 RpcClient with port
    Test ozone shell       o3://            om:9862     ${prefix}-with-host
+
+RpcClient with execution errors
+   Test ozone shell errors    o3://        om:9862     ${prefix}-with-errors
 
 RpcClient volume acls
    Test Volume Acls       o3://            om:9862     ${prefix}-acls

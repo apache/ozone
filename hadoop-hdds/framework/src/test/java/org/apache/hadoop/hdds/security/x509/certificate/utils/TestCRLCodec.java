@@ -21,9 +21,9 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -42,14 +43,12 @@ import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.crl.CRLCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -60,12 +59,9 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for the CRLCodec.
@@ -79,8 +75,6 @@ public class TestCRLCodec {
   private KeyPair keyPair;
   private static final String TMP_CERT_FILE_NAME = "pemcertificate.crt";
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private File basePath;
   private static final String TMP_CRL_ENTRY =
       "-----BEGIN X509 CRL-----\n" +
@@ -95,12 +89,12 @@ public class TestCRLCodec {
       "tPiRCAUQLW9BACm17xc=\n" +
       "-----END X509 CRL-----\n";
 
-  @Before
-  public void init() throws NoSuchProviderException,
+  @BeforeEach
+  public void init(@TempDir Path tempDir) throws NoSuchProviderException,
       NoSuchAlgorithmException, IOException,
       CertificateException, OperatorCreationException {
 
-    conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
     writeTempCert();
     x509CertificateHolder = readTempCert();
@@ -251,13 +245,15 @@ public class TestCRLCodec {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
     keyPair = keyGenerator.generateKey();
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                                   .getConfiguration())
             .setKey(keyPair)
@@ -272,7 +268,7 @@ public class TestCRLCodec {
             securityConfig.getCertificateLocation("scm")));
 
     if (!basePath.exists()) {
-      Assert.assertTrue(basePath.mkdirs());
+      assertTrue(basePath.mkdirs());
     }
     codec.writeCertificate(basePath.toPath(), TMP_CERT_FILE_NAME,
                            pemString, false);

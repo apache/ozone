@@ -35,15 +35,24 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -64,6 +73,8 @@ import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -99,10 +110,10 @@ public class TestOzoneShellHA {
   private static File baseDir;
   private static File testFile;
   private static String testFilePathString;
-  private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
-  private static OzoneShell ozoneShell = null;
-  private static OzoneAdmin ozoneAdminShell = null;
+  private OzoneShell ozoneShell = null;
+  private OzoneAdmin ozoneAdminShell = null;
+  private S3Shell s3Shell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -122,8 +133,11 @@ public class TestOzoneShellHA {
    */
   @BeforeClass
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    startCluster(conf);
+  }
 
+  protected static void startCluster(OzoneConfiguration conf) throws Exception {
     String path = GenericTestUtils.getTempPath(
         TestOzoneShellHA.class.getSimpleName());
     baseDir = new File(path);
@@ -134,19 +148,18 @@ public class TestOzoneShellHA {
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
 
-    ozoneShell = new OzoneShell();
-    ozoneAdminShell = new OzoneAdmin();
-
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+    final int numDNs = 5;
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
+        .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();
   }
@@ -167,6 +180,9 @@ public class TestOzoneShellHA {
 
   @Before
   public void setup() throws UnsupportedEncodingException {
+    ozoneShell = new OzoneShell();
+    ozoneAdminShell = new OzoneAdmin();
+    s3Shell = new S3Shell();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
@@ -250,7 +266,7 @@ public class TestOzoneShellHA {
   }
 
   private String getSetConfStringFromConf(String key) {
-    return String.format("--set=%s=%s", key, conf.get(key));
+    return String.format("--set=%s=%s", key, cluster.getConf().get(key));
   }
 
   private String generateSetConfString(String key, String value) {
@@ -276,7 +292,7 @@ public class TestOzoneShellHA {
 
     String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
-    String omNodesVal = conf.get(omNodesKey);
+    String omNodesVal = cluster.getConf().get(omNodesKey);
     res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
 
     String[] omNodesArr = omNodesVal.split(",");
@@ -370,6 +386,18 @@ public class TestOzoneShellHA {
     return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
   }
 
+  @Test
+  public void testRATISTypeECReplication() {
+    String[] args = new String[]{"bucket", "create", "/vol/bucket",
+        "--type=" + ReplicationType.RATIS, "--replication=rs-3-2-1024k"};
+    Throwable t = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args));
+    Throwable c = t.getCause();
+    assertTrue(c instanceof IllegalArgumentException);
+    assertEquals("rs-3-2-1024k is not supported for " +
+            ReplicationType.RATIS + " replication type", c.getMessage());
+  }
+
   /**
    * Tests ozone sh command URI parsing with volume and bucket create commands.
    */
@@ -381,7 +409,7 @@ public class TestOzoneShellHA {
     String omLeaderNodeId = getLeaderOMNodeId();
     String omLeaderNodeAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omLeaderNodeId);
-    String omLeaderNodeAddr = conf.get(omLeaderNodeAddrKey);
+    String omLeaderNodeAddr = cluster.getConf().get(omLeaderNodeAddrKey);
     String omLeaderNodeAddrWithoutPort = omLeaderNodeAddr.split(":")[0];
 
     // Test case 2: ozone sh volume create o3://om1/volume2
@@ -499,17 +527,17 @@ public class TestOzoneShellHA {
     execute(ozoneAdminShell, args);
 
     // Test case 3: list THREE replica container
-    String factor = "--factor=THREE";
+    String factor = "--replication=THREE";
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
-        factor};
+        factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
 
     // Test case 4: list ONE replica container
-    factor = "--factor=ONE";
+    factor = "--replication=ONE";
     args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
-        factor};
+        factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
   }
 
@@ -549,22 +577,27 @@ public class TestOzoneShellHA {
   @Test
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    OzoneConfiguration clientConf =
+        getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     FileSystem fs = FileSystem.get(clientConf);
-    final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    String ofsPrefix = hostPrefix + "/volumed2t/bucket1";
+    String dir1 = "/dir1";
+    final String strDir1 = ofsPrefix + dir1;
     // Note: CURRENT is also privately defined in TrashPolicyDefault
     final Path trashCurrent = new Path("Current");
 
     final String strKey1 = strDir1 + "/key1";
     final Path pathKey1 = new Path(strKey1);
-    final Path trashPathKey1 = Path.mergePaths(new Path(
-        new OFSPath(strKey1).getTrashRoot(), trashCurrent), pathKey1);
+    final Path trashPathKey1 = Path.mergePaths(
+        new Path(new OFSPath(strKey1, clientConf).getTrashRoot(),
+            trashCurrent), new Path(dir1, "key1"));
 
     final String strKey2 = strDir1 + "/key2";
     final Path pathKey2 = new Path(strKey2);
-    final Path trashPathKey2 = Path.mergePaths(new Path(
-        new OFSPath(strKey2).getTrashRoot(), trashCurrent), pathKey2);
+    final Path trashPathKey2 = Path.mergePaths(
+        new Path(new OFSPath(strKey2, clientConf).getTrashRoot(),
+            trashCurrent), new Path(dir1, "key2"));
 
     int res;
     try {
@@ -623,14 +656,15 @@ public class TestOzoneShellHA {
     // (default is TrashPolicyDefault)
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =
-            getClientConfForOzoneTrashPolicy(hostPrefix, conf);
+            getClientConfForOzoneTrashPolicy(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
     int res;
 
     // create volume: vol1 with bucket: bucket1
     final String testVolBucket = "/vol1/bucket1";
-    final String testKey = testVolBucket + "/key1";
+    String keyName = "/key1";
+    final String testKey = testVolBucket + keyName;
 
     final String[] volBucketArgs = new String[] {"-mkdir", "-p", testVolBucket};
     final String[] keyArgs = new String[] {"-touch", testKey};
@@ -660,8 +694,8 @@ public class TestOzoneShellHA {
     final String[] rmTrashArgs = new String[] {"-rm", "-R",
                                                testVolBucket + "/.Trash"};
     final Path trashPathKey1 = Path.mergePaths(new Path(
-            new OFSPath(testKey).getTrashRoot(), new Path("Current")),
-            new Path(testKey));
+            new OFSPath(testKey, clientConf).getTrashRoot(),
+            new Path("Current")), new Path(keyName));
     FileSystem fs = FileSystem.get(clientConf);
 
     try {
@@ -786,12 +820,22 @@ public class TestOzoneShellHA {
             .getQuotaInNamespace());
 
     // Test clrquota option.
+    args = new String[]{"volume", "clrquota", "vol4"};
+    executeWithError(ozoneShell, args, "At least one of the quota clear" +
+        " flag is required");
+    out.reset();
+    
     args = new String[]{"volume", "clrquota", "vol4", "--space-quota",
         "--namespace-quota"};
     execute(ozoneShell, args);
     assertEquals(-1, objectStore.getVolume("vol4").getQuotaInBytes());
     assertEquals(-1,
         objectStore.getVolume("vol4").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "clrquota", "vol4/buck4"};
+    executeWithError(ozoneShell, args, "At least one of the quota clear" +
+        " flag is required");
     out.reset();
 
     args = new String[]{"bucket", "clrquota", "vol4/buck4",
@@ -818,23 +862,6 @@ public class TestOzoneShellHA {
         "Invalid values for namespace quota",
         () -> execute(ozoneShell, volumeArgs2));
     out.reset();
-
-    // Test set volume spaceQuota or nameSpaceQuota to normal value.
-    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
-        "--space-quota", "1000B"};
-    execute(ozoneShell, volumeArgs3);
-    out.reset();
-    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
-    assertEquals(-1,
-        objectStore.getVolume("vol4").getQuotaInNamespace());
-
-    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
-        "--namespace-quota", "100"};
-    execute(ozoneShell, volumeArgs4);
-    out.reset();
-    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
-    assertEquals(100,
-        objectStore.getVolume("vol4").getQuotaInNamespace());
 
     // Test set bucket quota to 0.
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -880,6 +907,35 @@ public class TestOzoneShellHA {
     assertEquals(100, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInNamespace());
 
+    // Test set volume quota without quota flag
+    String[] bucketArgs6 = new String[]{"bucket", "setquota", "vol4/buck4"};
+    executeWithError(ozoneShell, bucketArgs6,
+        "At least one of the quota set flag is required");
+    out.reset();
+
+    // Test set volume spaceQuota or nameSpaceQuota to normal value.
+    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "1000B"};
+    execute(ozoneShell, volumeArgs3);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+
+    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota", "100"};
+    execute(ozoneShell, volumeArgs4);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(100,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+
+    // Test set volume quota without quota flag
+    String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4"};
+    executeWithError(ozoneShell, volumeArgs5,
+        "At least one of the quota set flag is required");
+    out.reset();
+    
     objectStore.getVolume("vol").deleteBucket("buck");
     objectStore.deleteVolume("vol");
     objectStore.getVolume("vol1").deleteBucket("buck1");
@@ -893,6 +949,120 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testCreateBucketWithECReplicationConfig() throws Exception {
+    final String volumeName = "volume100";
+    getVolume(volumeName);
+    String[] args =
+        new String[] {"bucket", "create", "/volume100/bucket0", "-t", "EC",
+            "-r", "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
+      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+    }
+  }
+
+  @Test
+  public void testPutKeyOnBucketWithECReplicationConfig() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+    getVolume(volumeName);
+    String bucketPath =
+        Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String[] args =
+        new String[] {"bucket", "create", bucketPath, "-t", "EC", "-r",
+            "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "put", bucketPath + Path.SEPARATOR + keyName,
+        testFilePathString};
+    execute(ozoneShell, args);
+
+    OzoneKeyDetails key =
+        cluster.getClient().getObjectStore().getVolume(volumeName)
+            .getBucket(bucketName).getKey(keyName);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+  }
+
+  @Test
+  public void testCreateBucketWithRatisReplicationConfig() throws Exception {
+    final String volumeName = "volume101";
+    getVolume(volumeName);
+    String[] args =
+        new String[] {"bucket", "create", "/volume101/bucket1", "-t", "RATIS",
+            "-r", "3"};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket1");
+    try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
+      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      Assert.assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
+    }
+  }
+
+  @Test
+  public void testSetECReplicationConfigOnBucket() throws Exception {
+    final String volumeName = "volume110";
+    getVolume(volumeName);
+    String bucketPath = "/volume110/bucket0";
+    String[] args = new String[] {"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        cluster.getClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("myNonECKey", 1024)) {
+      Assert.assertFalse(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "EC", "-r", "rs-3-2-1024k"};
+    execute(ozoneShell, args);
+    bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("newECKey", 1024)) {
+      Assert.assertTrue(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+
+    args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
+        "RATIS", "-r", "THREE"};
+    execute(ozoneShell, args);
+    bucket = volume.getBucket("bucket0");
+    try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
+      Assert.assertFalse(out.getOutputStream().getClass().getName()
+          .equals(ECKeyOutputStream.class.getName()));
+    }
+  }
+
+  @Test
+  public void testCreateBucketWithECReplicationConfigWithoutReplicationParam() {
+    getVolume("volume102");
+    String[] args =
+        new String[] {"bucket", "create", "/volume102/bucket2", "-t", "EC"};
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Must throw Exception when missing replication param");
+    } catch (Exception e) {
+      Assert.assertEquals(
+          "Replication can't be null. Replication type passed was : EC",
+          e.getCause().getMessage());
+    }
+  }
+
+  private void getVolume(String volumeName) {
+    String[] args = new String[] {"volume", "create",
+        "o3://" + omServiceId + "/" + volumeName};
+    execute(ozoneShell, args);
+  }
+
   public void testListVolumeBucketKeyShouldPrintValidJsonArray()
       throws UnsupportedEncodingException {
 
@@ -965,17 +1135,35 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testClientBucketLayoutValidation() throws Exception {
-    String[] args = new String[]{
-        "bucket", "create", "o3://" + omServiceId + "/volume7" + "/bucketTest1",
-        "--layout", "LEGACY"
+  public void testClientBucketLayoutValidation() {
+    String volName = "/vol-" + UUID.randomUUID();
+    String[] args =
+        new String[]{"volume", "create", "o3://" + omServiceId + volName};
+    execute(ozoneShell, args);
+
+    args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + volName + "/buck-1",
+        "--layout", ""
     };
     try {
       execute(ozoneShell, args);
       Assert.fail("Should throw exception on unsupported bucket layouts!");
     } catch (Exception e) {
       GenericTestUtils.assertExceptionContains(
-          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE] ",
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
+          e);
+    }
+
+    args = new String[]{
+        "bucket", "create", "o3://" + omServiceId + volName + "/buck-2",
+        "--layout", "INVALID"
+    };
+    try {
+      execute(ozoneShell, args);
+      Assert.fail("Should throw exception on unsupported bucket layouts!");
+    } catch (Exception e) {
+      GenericTestUtils.assertExceptionContains(
+          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
           e);
     }
   }

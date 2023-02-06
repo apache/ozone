@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -104,8 +105,9 @@ public class InfoSubcommand extends ScmSubcommand {
 
       // Print the replica details if available
       if (replicas != null) {
-        String replicaStr = replicas.stream().map(
-            InfoSubcommand::buildReplicaDetails)
+        String replicaStr = replicas.stream()
+            .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
+            .map(InfoSubcommand::buildReplicaDetails)
             .collect(Collectors.joining(",\n"));
         LOG.info("Replicas: [{}]", replicaStr);
       }
@@ -119,6 +121,9 @@ public class InfoSubcommand extends ScmSubcommand {
   private static String buildReplicaDetails(ContainerReplicaInfo replica) {
     StringBuilder sb = new StringBuilder();
     sb.append("State: " + replica.getState() + ";");
+    if (replica.getReplicaIndex() != -1) {
+      sb.append(" ReplicaIndex: " + replica.getReplicaIndex() + ";");
+    }
     sb.append(" Origin: " + replica.getPlaceOfBirth().toString() + ";");
     sb.append(" Location: "
         + buildDatanodeDetails(replica.getDatanodeDetails()));

@@ -20,14 +20,16 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
-
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -45,10 +47,10 @@ public class FindTargetGreedyByNetworkTopology
 
   public FindTargetGreedyByNetworkTopology(
       ContainerManager containerManager,
-      PlacementPolicy placementPolicy,
+      PlacementPolicyValidateProxy placementPolicyValidateProxy,
       NodeManager nodeManager,
       NetworkTopology networkTopology) {
-    super(containerManager, placementPolicy, nodeManager);
+    super(containerManager, placementPolicyValidateProxy, nodeManager);
     setLogger(LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class));
     potentialTargets = new LinkedList<>();
     setPotentialTargets(potentialTargets);
@@ -76,4 +78,22 @@ public class FindTargetGreedyByNetworkTopology
         return compareByUsage(da, db);
       });
   }
+
+  /**
+   * Resets the collection of target datanode usage info that will be
+   * considered for balancing. Gets the latest usage info from node manager.
+   * @param targets collection of target {@link DatanodeDetails} that
+   *                containers can move to
+   */
+  @Override
+  public void resetPotentialTargets(
+      @NotNull Collection<DatanodeDetails> targets) {
+    // create DatanodeUsageInfo from DatanodeDetails
+    List<DatanodeUsageInfo> usageInfos = new ArrayList<>(targets.size());
+    targets.forEach(datanodeDetails -> usageInfos.add(
+        getNodeManager().getUsageInfo(datanodeDetails)));
+
+    super.resetTargets(usageInfos);
+  }
+
 }

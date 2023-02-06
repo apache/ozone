@@ -19,31 +19,28 @@
 package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
-import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
- * Reprocess() will take a snapshots on OMDB, and iterate the keyTable and
- * dirTable to write all information to RocksDB.
+ * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,
+ * the fileTable and the dirTable to write all information to RocksDB.
  *
  * For FSO-enabled keyTable (fileTable), we need to fetch the parent object
  * (bucket or directory), increment its numOfKeys by 1, increase its sizeOfKeys
@@ -52,19 +49,41 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
  * For dirTable, we need to fetch the parent object (bucket or directory),
  * add the current directory's objectID to the parent object's childDir field.
  *
+ * For keyTable, the parent object is not available. Get the parent object,
+ * add it to the current object and reuse the existing methods for FSO.
+ * Only processing entries that belong to Legacy buckets. If the entry
+ * refers to a directory then build directory info object from it.
+ *
  * Process() will write all OMDB updates to RocksDB.
- * The write logic is the same as above. For update action, we will treat it as
+ * Write logic is the same as above. For update action, we will treat it as
  * delete old value first, and write updated value then.
  */
 public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
           LoggerFactory.getLogger(NSSummaryTask.class);
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconOMMetadataManager reconOMMetadataManager;
+  private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
+  private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
+  private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
-                                 reconNamespaceSummaryManager) {
+                       reconNamespaceSummaryManager,
+                       ReconOMMetadataManager
+                       reconOMMetadataManager,
+                       OzoneConfiguration
+                       ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconOMMetadataManager = reconOMMetadataManager;
+    this.ozoneConfiguration = ozoneConfiguration;
+    this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
+    this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
   }
 
   @Override
@@ -72,231 +91,58 @@ public class NSSummaryTask implements ReconOmTask {
     return "NSSummaryTask";
   }
 
-  // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
-  public Collection<String> getTaskTables() {
-    return Arrays.asList(new String[]{FILE_TABLE, DIRECTORY_TABLE});
-  }
-
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
-    final Collection<String> taskTables = getTaskTables();
-
-    while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends
-              WithParentObjectId> omdbUpdateEvent = eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
-
-      // we only process updates on OM's KeyTable and Dirtable
-      String table = omdbUpdateEvent.getTable();
-      boolean updateOnFileTable = table.equals(FILE_TABLE);
-      if (!taskTables.contains(table)) {
-        continue;
-      }
-
-      String updatedKey = omdbUpdateEvent.getKey();
-
-      try {
-        if (updateOnFileTable) {
-          // key update on fileTable
-          OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
-          OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
-          OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
-
-          switch (action) {
-          case PUT:
-            writeOmKeyInfoOnNamespaceDB(updatedKeyInfo);
-            break;
-
-          case DELETE:
-            deleteOmKeyInfoOnNamespaceDB(updatedKeyInfo);
-            break;
-
-          case UPDATE:
-            if (oldKeyInfo != null) {
-              // delete first, then put
-              deleteOmKeyInfoOnNamespaceDB(oldKeyInfo);
-            } else {
-              LOG.warn("Update event does not have the old keyInfo for {}.",
-                      updatedKey);
-            }
-            writeOmKeyInfoOnNamespaceDB(updatedKeyInfo);
-            break;
-
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
-          }
-        } else {
-          // directory update on DirTable
-          OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
-          OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
-          OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
-
-          switch (action) {
-          case PUT:
-            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
-            break;
-
-          case DELETE:
-            deleteOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
-            break;
-
-          case UPDATE:
-            if (oldDirectoryInfo != null) {
-              // delete first, then put
-              deleteOmDirectoryInfoOnNamespaceDB(oldDirectoryInfo);
-            } else {
-              LOG.warn("Update event does not have the old dirInfo for {}.",
-                      updatedKey);
-            }
-            writeOmDirectoryInfoOnNamespaceDB(updatedDirectoryInfo);
-            break;
-
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
-          }
-        }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-                ioEx);
-        return new ImmutablePair<>(getTaskName(), false);
-      }
+    boolean success;
+    success = nsSummaryTaskWithFSO.processWithFSO(events);
+    if (success) {
+      success = nsSummaryTaskWithLegacy.processWithLegacy(events);
+    } else {
+      LOG.error("processWithFSO failed.");
     }
-    LOG.info("Completed a process run of NSSummaryTask");
-    return new ImmutablePair<>(getTaskName(), true);
+    return new ImmutablePair<>(getTaskName(), success);
   }
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
-
-      Table dirTable = omMetadataManager.getDirectoryTable();
-      TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-              dirTableIter = dirTable.iterator();
-
-      while (dirTableIter.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
-        OmDirectoryInfo directoryInfo = kv.getValue();
-        writeOmDirectoryInfoOnNamespaceDB(directoryInfo);
-      }
-
-      // Get fileTable used by FSO
-      Table keyTable = omMetadataManager.getFileTable();
-
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-              keyTableIter = keyTable.iterator();
-
-      while (keyTableIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-        OmKeyInfo keyInfo = kv.getValue();
-        writeOmKeyInfoOnNamespaceDB(keyInfo);
-      }
-
     } catch (IOException ioEx) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-              ioEx);
+      LOG.error("Unable to clear NSSummary table in Recon DB. ",
+          ioEx);
       return new ImmutablePair<>(getTaskName(), false);
     }
 
-    LOG.info("Completed a reprocess run of NSSummaryTask");
+    tasks.add(() -> nsSummaryTaskWithFSO
+        .reprocessWithFSO(omMetadataManager));
+    tasks.add(() -> nsSummaryTaskWithLegacy
+        .reprocessWithLegacy(reconOMMetadataManager));
+
+    List<Future<Boolean>> results;
+    ExecutorService executorService = Executors
+        .newFixedThreadPool(2);
+    try {
+      results = executorService.invokeAll(tasks);
+      for (int i = 0; i < results.size(); i++) {
+        if (results.get(i).get().equals(false)) {
+          return new ImmutablePair<>(getTaskName(), false);
+        }
+      }
+    } catch (InterruptedException ex) {
+      LOG.error("Error while reprocessing NSSummary " +
+          "table in Recon DB. ", ex);
+      return new ImmutablePair<>(getTaskName(), false);
+    } catch (ExecutionException ex2) {
+      LOG.error("Error while reprocessing NSSummary " +
+          "table in Recon DB. ", ex2);
+      return new ImmutablePair<>(getTaskName(), false);
+    } finally {
+      executorService.shutdown();
+    }
     return new ImmutablePair<>(getTaskName(), true);
-  }
-
-  private void writeOmKeyInfoOnNamespaceDB(OmKeyInfo keyInfo)
-          throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
-    if (nsSummary == null) {
-      nsSummary = new NSSummary();
-    }
-    int numOfFile = nsSummary.getNumOfFiles();
-    long sizeOfFile = nsSummary.getSizeOfFiles();
-    int[] fileBucket = nsSummary.getFileSizeBucket();
-    nsSummary.setNumOfFiles(numOfFile + 1);
-    long dataSize = keyInfo.getDataSize();
-    nsSummary.setSizeOfFiles(sizeOfFile + dataSize);
-    int binIndex = ReconUtils.getBinIndex(dataSize);
-
-    ++fileBucket[binIndex];
-    nsSummary.setFileSizeBucket(fileBucket);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
-  }
-
-  private void writeOmDirectoryInfoOnNamespaceDB(OmDirectoryInfo directoryInfo)
-          throws IOException {
-    long parentObjectId = directoryInfo.getParentObjectID();
-    long objectId = directoryInfo.getObjectID();
-    // write the dir name to the current directory
-    String dirName = directoryInfo.getName();
-    NSSummary curNSSummary =
-            reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (curNSSummary == null) {
-      curNSSummary = new NSSummary();
-    }
-    curNSSummary.setDirName(dirName);
-    reconNamespaceSummaryManager.storeNSSummary(objectId, curNSSummary);
-
-    // write the child dir list to the parent directory
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
-    if (nsSummary == null) {
-      nsSummary = new NSSummary();
-    }
-    nsSummary.addChildDir(objectId);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
-  }
-
-  private void deleteOmKeyInfoOnNamespaceDB(OmKeyInfo keyInfo)
-          throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
-
-    // Just in case the OmKeyInfo isn't correctly written.
-    if (nsSummary == null) {
-      LOG.error("The namespace table is not correctly populated.");
-      return;
-    }
-    int numOfFile = nsSummary.getNumOfFiles();
-    long sizeOfFile = nsSummary.getSizeOfFiles();
-    int[] fileBucket = nsSummary.getFileSizeBucket();
-
-    long dataSize = keyInfo.getDataSize();
-    int binIndex = ReconUtils.getBinIndex(dataSize);
-
-    // decrement count, data size, and bucket count
-    // even if there's no direct key, we still keep the entry because
-    // we still need children dir IDs info
-    nsSummary.setNumOfFiles(numOfFile - 1);
-    nsSummary.setSizeOfFiles(sizeOfFile - dataSize);
-    --fileBucket[binIndex];
-    nsSummary.setFileSizeBucket(fileBucket);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
-  }
-
-  private void deleteOmDirectoryInfoOnNamespaceDB(OmDirectoryInfo directoryInfo)
-          throws IOException {
-    long parentObjectId = directoryInfo.getParentObjectID();
-    long objectId = directoryInfo.getObjectID();
-    NSSummary nsSummary = reconNamespaceSummaryManager
-            .getNSSummary(parentObjectId);
-
-    // Just in case the OmDirectoryInfo isn't correctly written.
-    if (nsSummary == null) {
-      LOG.error("The namespace table is not correctly populated.");
-      return;
-    }
-
-    nsSummary.removeChildDir(objectId);
-    reconNamespaceSummaryManager.storeNSSummary(parentObjectId, nsSummary);
   }
 }
 

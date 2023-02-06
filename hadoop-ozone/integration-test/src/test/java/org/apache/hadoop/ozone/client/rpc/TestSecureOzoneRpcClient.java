@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -60,7 +61,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -119,15 +120,19 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
+    // These tests manually insert keys into RocksDB. This is easier to do
+    // with object store layout so keys with path IDs do not need to be
+    // constructed.
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+        .setNumDatanodes(14)
         .setScmId(SCM_ID)
         .setClusterId(CLUSTER_ID)
         .setCertificateClient(certificateClientTest)
         .build();
     secretManager = new OzoneBlockTokenSecretManager(new SecurityConfig(conf),
-        60 * 60, certificateClientTest.getCertificate().
-        getSerialNumber().toString());
+        60 * 60);
     secretManager.start(certificateClientTest);
     cluster.getOzoneManager().startSecretManager();
     cluster.waitForClusterToBeReady();
@@ -364,7 +369,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     HddsProtos.ReplicationType replicationType =
         HddsProtos.ReplicationType.valueOf(type.toString());

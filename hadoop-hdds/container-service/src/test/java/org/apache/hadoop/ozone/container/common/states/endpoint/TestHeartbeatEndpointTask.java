@@ -18,14 +18,27 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static java.util.Collections.emptyList;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.mockito.ArgumentMatchers.any;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.OptionalLong;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -37,10 +50,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -53,7 +67,48 @@ public class TestHeartbeatEndpointTask {
       new InetSocketAddress("test-scm-1", 9861);
 
   @Test
+  public void handlesReconstructContainerCommand() throws Exception {
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        Mockito.mock(
+            StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+
+    List<DatanodeDetails> targetDns = new ArrayList<>();
+    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
+    targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1, emptyList(), targetDns, new byte[]{2, 5},
+        new ECReplicationConfig(3, 2));
+
+    Mockito.when(scm.sendHeartbeat(any()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .addCommands(SCMCommandProto.newBuilder()
+                    .setCommandType(reconstructECContainersCommand)
+                    .setReconstructECContainersCommandProto(cmd.getProto())
+                    .build())
+                .build());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine =
+        Mockito.mock(DatanodeStateMachine.class);
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine);
+
+    // WHEN
+    HeartbeatEndpointTask task = getHeartbeatEndpointTask(conf, context, scm);
+    task.call();
+
+    // THEN
+    Assertions.assertEquals(1, context.getCommandQueueSummary()
+        .get(reconstructECContainersCommand).intValue());
+  }
+
+  @Test
   public void testheartbeatWithoutReports() throws Exception {
+    final long termInSCM = 42;
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         Mockito.mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
@@ -65,16 +120,25 @@ public class TestHeartbeatEndpointTask {
                 .setDatanodeUUID(
                     ((SCMHeartbeatRequestProto)invocation.getArgument(0))
                         .getDatanodeDetails().getUuid())
+                .setTerm(termInSCM)
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(scm);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        Mockito.mock(DatanodeStateMachine.class));
+    context.setTermOfLeaderSCM(1);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
+    OptionalLong termInDatanode = context.getTermOfLeaderSCM();
+    Assertions.assertTrue(termInDatanode.isPresent());
+    Assertions.assertEquals(termInSCM, termInDatanode.getAsLong());
   }
 
   @Test
@@ -102,11 +166,11 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertTrue(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertTrue(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -134,11 +198,11 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertTrue(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertTrue(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -167,11 +231,11 @@ public class TestHeartbeatEndpointTask {
         CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
-    Assert.assertFalse(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
+    Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
@@ -199,18 +263,29 @@ public class TestHeartbeatEndpointTask {
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertFalse(heartbeat.hasNodeReport());
-    Assert.assertFalse(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
-    Assert.assertTrue(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertFalse(heartbeat.hasNodeReport());
+    Assertions.assertFalse(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertTrue(heartbeat.hasContainerActions());
   }
 
   @Test
   public void testheartbeatWithAllReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine =
+        Mockito.mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class));
+        datanodeStateMachine);
+
+    // Return a Map of command counts when the heartbeat logic requests it
+    final Map<SCMCommandProto.Type, Integer> commands = new HashMap<>();
+    int count = 1;
+    for (SCMCommandProto.Type cmd : SCMCommandProto.Type.values()) {
+      commands.put(cmd, count++);
+    }
+    Mockito.when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(commands);
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         Mockito.mock(
@@ -235,27 +310,19 @@ public class TestHeartbeatEndpointTask {
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assert.assertTrue(heartbeat.hasDatanodeDetails());
-    Assert.assertTrue(heartbeat.hasNodeReport());
-    Assert.assertTrue(heartbeat.hasContainerReport());
-    Assert.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
-    Assert.assertTrue(heartbeat.hasContainerActions());
-  }
-
-  /**
-   * Creates HeartbeatEndpointTask for the given StorageContainerManager proxy.
-   *
-   * @param proxy StorageContainerDatanodeProtocolClientSideTranslatorPB
-   *
-   * @return HeartbeatEndpointTask
-   */
-  private HeartbeatEndpointTask getHeartbeatEndpointTask(
-      StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class));
-    return getHeartbeatEndpointTask(conf, context, proxy);
-
+    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
+    Assertions.assertTrue(heartbeat.hasNodeReport());
+    Assertions.assertTrue(heartbeat.hasContainerReport());
+    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() != 0);
+    Assertions.assertTrue(heartbeat.hasContainerActions());
+    Assertions.assertTrue(heartbeat.hasCommandQueueReport());
+    CommandQueueReportProto queueCount = heartbeat.getCommandQueueReport();
+    Assertions.assertEquals(queueCount.getCommandCount(), commands.size());
+    Assertions.assertEquals(queueCount.getCountCount(), commands.size());
+    for (int i = 0; i < commands.size(); i++) {
+      Assertions.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
+          queueCount.getCount(i));
+    }
   }
 
   /**

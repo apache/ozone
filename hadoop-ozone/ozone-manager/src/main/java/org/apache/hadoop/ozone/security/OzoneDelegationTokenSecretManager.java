@@ -33,12 +33,15 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.OzoneSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.security.OzoneSecretStore.OzoneManagerSecretState;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier.TokenInfo;
 import org.apache.hadoop.security.AccessControlException;
@@ -71,6 +74,7 @@ public class OzoneDelegationTokenSecretManager
   private final long tokenRemoverScanInterval;
   private String omCertificateSerialId;
   private String omServiceId;
+  private final OzoneManager ozoneManager;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
@@ -94,6 +98,7 @@ public class OzoneDelegationTokenSecretManager
     this.s3SecretManager = (S3SecretManagerImpl) b.s3SecretManager;
     this.store = new OzoneSecretStore(b.ozoneConf,
         this.s3SecretManager.getOmMetadataManager());
+    this.ozoneManager = b.ozoneManager;
     isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
@@ -113,6 +118,7 @@ public class OzoneDelegationTokenSecretManager
     private S3SecretManager s3SecretManager;
     private CertificateClient certClient;
     private String omServiceId;
+    private OzoneManager ozoneManager;
 
     public OzoneDelegationTokenSecretManager build() throws IOException {
       return new OzoneDelegationTokenSecretManager(this);
@@ -155,6 +161,11 @@ public class OzoneDelegationTokenSecretManager
 
     public Builder setOmServiceId(String serviceId) {
       this.omServiceId = serviceId;
+      return this;
+    }
+
+    public Builder setOzoneManager(OzoneManager ozoneMgr) {
+      this.ozoneManager = ozoneMgr;
       return this;
     }
   }
@@ -253,19 +264,8 @@ public class OzoneDelegationTokenSecretManager
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
-    identifier.setOmCertSerialId(getOmCertificateSerialId());
+    identifier.setOmCertSerialId(getCertSerialId());
     identifier.setOmServiceId(getOmServiceId());
-  }
-
-  /**
-   * Get OM certificate serial id.
-   * */
-  private String getOmCertificateSerialId() {
-    if (omCertificateSerialId == null) {
-      omCertificateSerialId =
-          getCertClient().getCertificate().getSerialNumber().toString();
-    }
-    return omCertificateSerialId;
   }
 
   private String getOmServiceId() {
@@ -404,6 +404,18 @@ public class OzoneDelegationTokenSecretManager
   @Override
   public byte[] retrievePassword(OzoneTokenIdentifier identifier)
       throws InvalidToken {
+    // Tokens are a bit different in that a follower OM may be behind and
+    // thus not yet know of all tokens issued by the leader OM.  the
+    // following check does not allow ANY token auth. In optimistic, it should
+    // allow known tokens in.
+    try {
+      ozoneManager.checkLeaderStatus();
+    } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+      InvalidToken wrappedStandby = new InvalidToken("IOException");
+      wrappedStandby.initCause(e);
+      throw wrappedStandby;
+    }
+
     if (identifier.getTokenType().equals(S3AUTHINFO)) {
       return validateS3AuthInfo(identifier);
     }
@@ -457,6 +469,7 @@ public class OzoneDelegationTokenSecretManager
     try {
       signerCert.checkValidity();
     } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+      LOG.error("signerCert {} is invalid", signerCert, e);
       return false;
     }
 
@@ -464,6 +477,7 @@ public class OzoneDelegationTokenSecretManager
       return getCertClient().verifySignature(identifier.getBytes(), password,
           signerCert);
     } catch (CertificateException e) {
+      LOG.error("verifySignature with signerCert {} failed", signerCert, e);
       return false;
     }
   }

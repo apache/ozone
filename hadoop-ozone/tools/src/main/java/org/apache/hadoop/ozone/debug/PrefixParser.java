@@ -45,6 +45,8 @@ import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 /**
  * Tool that parses OM db file for prefix table.
  */
@@ -164,6 +166,8 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
       return;
     }
 
+    final long volumeObjectId = metadataManager.getVolumeId(
+            info.getVolumeName());
     long lastObjectId = info.getObjectID();
     WithParentObjectId objectBucketId = new WithParentObjectId();
     objectBucketId.setObjectID(lastObjectId);
@@ -173,7 +177,8 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     while (pathIterator.hasNext()) {
       Path elem = pathIterator.next();
       String path =
-          metadataManager.getOzonePathKey(lastObjectId, elem.toString());
+          metadataManager.getOzonePathKey(volumeObjectId, info.getObjectID(),
+                  lastObjectId, elem.toString());
       OmDirectoryInfo directoryInfo =
           metadataManager.getDirectoryTable().get(path);
 
@@ -198,10 +203,12 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
     // at the last level, now parse both file and dir table
     dumpTableInfo(Types.DIRECTORY, effectivePath,
-        metadataManager.getDirectoryTable(), lastObjectId);
+        metadataManager.getDirectoryTable(),
+            volumeObjectId, info.getObjectID(), lastObjectId);
 
     dumpTableInfo(Types.FILE, effectivePath,
-        metadataManager.getKeyTable(getBucketLayout()), lastObjectId);
+        metadataManager.getKeyTable(getBucketLayout()),
+            volumeObjectId, info.getObjectID(), lastObjectId);
     metadataManager.stop();
   }
 
@@ -211,13 +218,15 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
   private void dumpTableInfo(Types type,
       org.apache.hadoop.fs.Path effectivePath,
-      Table<String, ? extends WithParentObjectId> table, long lastObjectId)
+      Table<String, ? extends WithParentObjectId> table,
+      long volumeId, long bucketId, long lastObjectId)
       throws IOException {
-    MetadataKeyFilters.KeyPrefixFilter filter = getPrefixFilter(lastObjectId);
+    MetadataKeyFilters.KeyPrefixFilter filter = getPrefixFilter(
+            volumeId, bucketId, lastObjectId);
 
     List<? extends KeyValue
         <String, ? extends WithParentObjectId>> infoList =
-        table.getRangeKVs(null, 1000, filter);
+        table.getRangeKVs(null, 1000, null, filter);
 
     for (KeyValue<String, ? extends WithParentObjectId> info :infoList) {
       Path key = Paths.get(info.getKey());
@@ -243,9 +252,13 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
 
   }
 
-  private static MetadataKeyFilters.KeyPrefixFilter getPrefixFilter(long id) {
+  private static MetadataKeyFilters.KeyPrefixFilter getPrefixFilter(
+          long volumeId, long bucketId, long parentId) {
+    String key = OM_KEY_PREFIX + volumeId +
+            OM_KEY_PREFIX + bucketId +
+            OM_KEY_PREFIX + parentId;
     return (new MetadataKeyFilters.KeyPrefixFilter())
-        .addFilter(Long.toString(id));
+        .addFilter(key);
   }
 
   public int getParserStats(Types type) {

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
@@ -31,18 +30,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 
+import java.io.IOException;
+
 
 /**
  * Tests MKeyCreateResponse.
  */
 public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
+  protected long getVolumeId() throws IOException {
+    return omMetadataManager.getVolumeId(volumeName);
+  }
+
   @Test
   public void testAddToDBBatch() throws Exception {
-
-    omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 
@@ -71,10 +72,6 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-
-    omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OmKeyInfo omKeyInfo = getOmKeyInfo();
 
@@ -106,7 +103,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @NotNull
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-      OmBucketInfo bucketInfo, OMResponse response) {
+      OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMKeyCreateResponse(response, keyInfo, null, clientID,
             bucketInfo);

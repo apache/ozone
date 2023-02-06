@@ -35,6 +35,13 @@ public enum ClientVersion implements ComponentVersion {
   VERSION_HANDLES_UNKNOWN_DN_PORTS(1,
       "Client version that handles the REPLICATION port in DatanodeDetails."),
 
+  ERASURE_CODING_SUPPORT(2, "This client version has support for Erasure"
+      + " Coding."),
+
+  BUCKET_LAYOUT_SUPPORT(3,
+      "This client version has support for Object Store and File " +
+          "System Optimized Bucket Layouts."),
+
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
 

@@ -34,6 +34,7 @@ public final class ContainerReplicaInfo {
   private long sequenceId;
   private long keyCount;
   private long bytesUsed;
+  private int replicaIndex = -1;
 
   public static ContainerReplicaInfo fromProto(
       HddsProtos.SCMContainerReplicaProto proto) {
@@ -45,7 +46,9 @@ public final class ContainerReplicaInfo {
         .setPlaceOfBirth(UUID.fromString(proto.getPlaceOfBirth()))
         .setSequenceId(proto.getSequenceID())
         .setKeyCount(proto.getKeyCount())
-        .setBytesUsed(proto.getBytesUsed());
+        .setBytesUsed(proto.getBytesUsed())
+        .setReplicaIndex(
+            proto.hasReplicaIndex() ? (int)proto.getReplicaIndex() : -1);
     return builder.build();
   }
 
@@ -78,6 +81,10 @@ public final class ContainerReplicaInfo {
 
   public long getBytesUsed() {
     return bytesUsed;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
   }
 
   /**
@@ -119,6 +126,11 @@ public final class ContainerReplicaInfo {
 
     public Builder setBytesUsed(long bytesUsed) {
       subject.bytesUsed = bytesUsed;
+      return this;
+    }
+
+    public Builder setReplicaIndex(int replicaIndex) {
+      subject.replicaIndex = replicaIndex;
       return this;
     }
 

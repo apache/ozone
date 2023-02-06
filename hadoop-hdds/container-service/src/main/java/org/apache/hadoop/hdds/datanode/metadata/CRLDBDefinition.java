@@ -34,7 +34,6 @@ import java.io.File;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
 /**
  * Class defines the structure and types of the crl.db.
@@ -73,10 +72,8 @@ public class CRLDBDefinition implements DBDefinition {
   public File getDBLocation(ConfigurationSource conf) {
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
-    // TODO: We might want to fix this later.
     String metadataDir = conf.get(HDDS_METADATA_DIR_NAME,
-        conf.get(OZONE_METADATA_DIRS,
-            conf.get(HDDS_DATANODE_DIR_KEY)));
+        conf.get(OZONE_METADATA_DIRS));
     Preconditions.checkNotNull(metadataDir, "Metadata directory can't be"
         + " null. Please check configs.");
 

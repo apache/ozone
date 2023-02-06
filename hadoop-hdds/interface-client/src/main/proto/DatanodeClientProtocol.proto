@@ -100,6 +100,9 @@ enum Type {
   GetSmallFile = 16;
   CloseContainer = 17;
   GetCommittedBlockLength = 18;
+
+  StreamInit = 19;
+  StreamWrite = 20;
 }
 
 
@@ -146,6 +149,9 @@ enum Result {
   BLOCK_TOKEN_VERIFICATION_FAILED = 41;
   ERROR_IN_DB_SYNC = 42;
   CHUNK_FILE_INCONSISTENCY = 43;
+  DELETE_ON_NON_EMPTY_CONTAINER = 44;
+  EXPORT_CONTAINER_METADATA_FAILED = 45;
+  IMPORT_CONTAINER_METADATA_FAILED = 46;
 }
 
 /**
@@ -155,6 +161,8 @@ message DatanodeBlockID {
   required int64 containerID = 1;
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
+  optional int32 replicaIndex = 4;
+
 }
 
 message KeyValue {
@@ -241,6 +249,7 @@ message ContainerDataProto {
     UNHEALTHY = 5;
     INVALID = 6;
     DELETED = 7;
+    RECOVERING = 8;
   }
   required int64 containerID = 1;
   repeated KeyValue metadata = 2;
@@ -266,6 +275,8 @@ enum ContainerType {
 message  CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
+  optional int32 replicaIndex = 4;
+  optional ContainerDataProto.State state = 5;
 }
 
 message  CreateContainerResponseProto {
@@ -370,6 +381,7 @@ message ChunkInfo {
   required uint64 len = 3;
   repeated KeyValue metadata = 4;
   required ChecksumData checksumData =5;
+  optional bytes stripeChecksum = 6;
 }
 
 message ChunkInfoList {
@@ -392,7 +404,7 @@ enum ChecksumType {
 
 message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
-  required ChunkInfo chunkData = 2;
+  optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
 }
 
@@ -465,11 +477,20 @@ message GetSmallFileResponseProto {
   required ReadChunkResponseProto data = 1;
 }
 
+enum CopyContainerCompressProto {
+  NO_COMPRESSION = 1;
+  GZIP = 2;
+  LZ4 = 3;
+  SNAPPY = 4;
+  ZSTD = 5;
+}
+
 message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
   optional uint64 len = 3;
   optional uint32 version = 4;
+  optional CopyContainerCompressProto compression = 5;
 }
 
 message CopyContainerResponseProto {
@@ -479,6 +500,17 @@ message CopyContainerResponseProto {
   required bool eof = 4;
   required bytes data = 5;
   optional int64 checksum = 6;
+}
+
+message SendContainerRequest {
+  required int64 containerID = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
+  optional int64 checksum = 4;
+  optional CopyContainerCompressProto compression = 5;
+}
+
+message SendContainerResponse {
 }
 
 service XceiverClientProtocolService {
@@ -491,4 +523,5 @@ service XceiverClientProtocolService {
 service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+  rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
 }

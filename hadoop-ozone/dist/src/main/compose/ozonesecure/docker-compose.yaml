@@ -59,7 +59,7 @@ services:
       - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      OZONE_OPTS:
+      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]

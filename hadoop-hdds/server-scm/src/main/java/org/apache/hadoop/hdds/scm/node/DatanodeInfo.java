@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVer
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -29,9 +31,13 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -41,6 +47,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class DatanodeInfo extends DatanodeDetails {
 
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeInfo.class);
+
   private final ReadWriteLock lock;
 
   private volatile long lastHeartbeatTime;
@@ -49,6 +57,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
   private LayoutVersionProto lastKnownLayoutVersion;
+  private Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
 
@@ -69,6 +78,7 @@ public class DatanodeInfo extends DatanodeDetails {
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
+    this.commandCounts = new HashMap<>();
   }
 
   /**
@@ -269,6 +279,72 @@ public class DatanodeInfo extends DatanodeDetails {
       this.nodeStatus = newNodeStatus;
     } finally {
       lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Set the current command counts for this datanode, as reported in the last
+   * heartbeat.
+   * @param cmds Proto message containing a list of command count pairs.
+   * @param commandsToBeSent Summary of commands which will be sent to the DN
+   *                         as the heartbeat is processed and should be added
+   *                         to the command count.
+   */
+  public void setCommandCounts(CommandQueueReportProto cmds,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
+    try {
+      int count = cmds.getCommandCount();
+      Map<SCMCommandProto.Type, Integer> mutableCmds
+          = new HashMap<>(commandsToBeSent);
+      lock.writeLock().lock();
+      // Purge the existing counts, as each report should completely replace
+      // the existing counts.
+      commandCounts.clear();
+      for (int i = 0; i < count; i++) {
+        SCMCommandProto.Type command = cmds.getCommand(i);
+        if (command == SCMCommandProto.Type.unknownScmCommand) {
+          LOG.warn("Unknown SCM Command received from {} in the "
+              + "heartbeat. SCM and the DN may not be at the same version.",
+              this);
+          continue;
+        }
+        int cmdCount = cmds.getCount(i);
+        if (cmdCount < 0) {
+          LOG.warn("Command count of {} from {} should be greater than zero. " +
+              "Setting it to zero", cmdCount, this);
+          cmdCount = 0;
+        }
+        cmdCount += mutableCmds.getOrDefault(command, 0);
+        // Each CommandType will be in the report once only. So we remove any
+        // we have seen, so we can add anything the DN has not reported but
+        // there is a command queued for. The DNs should return a count for all
+        // command types even if they have a zero count, so this is really to
+        // handle something being wrong on the DN where it sends a spare report.
+        // It really should never happen.
+        mutableCmds.remove(command);
+        commandCounts.put(command, cmdCount);
+      }
+      // Add any counts which the DN did not report. See comment above. This
+      // should not happen.
+      commandCounts.putAll(mutableCmds);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Retrieve the number of queued commands of the given type, as reported by
+   * the datanode at the last heartbeat.
+   * @param cmd The command for which to receive the queued command count
+   * @return -1 if we have no information about the count, or an integer >= 0
+   *         indicating the command count at the last heartbeat.
+   */
+  public int getCommandCount(SCMCommandProto.Type cmd) {
+    try {
+      lock.readLock().lock();
+      return commandCounts.getOrDefault(cmd, -1);
+    } finally {
+      lock.readLock().unlock();
     }
   }
 

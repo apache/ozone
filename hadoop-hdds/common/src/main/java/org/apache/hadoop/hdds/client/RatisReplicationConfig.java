@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -28,7 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 
 /**
- * Replication configuration for EC replication.
+ * Replication configuration for Ratis replication.
  */
 public final class RatisReplicationConfig
     implements ReplicatedReplicationConfig {
@@ -92,6 +93,12 @@ public final class RatisReplicationConfig
   }
 
   @Override
+  @JsonIgnore
+  public String getReplication() {
+    return String.valueOf(replicationFactor);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -111,5 +118,10 @@ public final class RatisReplicationConfig
   @Override
   public String toString() {
     return REPLICATION_TYPE.name() + "/" + replicationFactor;
+  }
+
+  @Override
+  public String configFormat() {
+    return toString();
   }
 }

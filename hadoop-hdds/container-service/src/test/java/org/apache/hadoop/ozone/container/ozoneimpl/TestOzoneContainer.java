@@ -30,20 +30,20 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -60,6 +60,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Random;
 import java.util.UUID;
 import java.util.HashMap;
@@ -67,6 +68,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -92,31 +94,37 @@ public class TestOzoneContainer {
   private final int numTestContainers = 10;
 
   private final ContainerLayoutVersion layout;
+  private final String schemaVersion;
 
-  public TestOzoneContainer(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  public TestOzoneContainer(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
         .getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
     commitSpaceMap = new HashMap<String, Long>();
-    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
-        null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(),
+        clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
   @After
   public void cleanUp() throws Exception {
+    BlockUtils.shutdownCache(conf);
+
     if (volumeSet != null) {
       volumeSet.shutdown();
       volumeSet = null;
@@ -158,8 +166,8 @@ public class TestOzoneContainer {
       Preconditions.checkState(freeBytes >= 0);
       commitSpaceMap.put(getVolumeKey(myVolume),
           Long.valueOf(volCommitBytes + freeBytes));
-      BlockUtils.removeDB(keyValueContainerData, conf);
     }
+    BlockUtils.shutdownCache(conf);
 
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
@@ -185,6 +193,17 @@ public class TestOzoneContainer {
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             String.join(",",
             path + "/ratis1", path + "/ratis2", path + "ratis3"));
+
+    File[] dbPaths = new File[3];
+    StringBuilder dbDirString = new StringBuilder();
+    for (int i = 0; i < 3; i++) {
+      dbPaths[i] = folder.newFolder();
+      dbDirString.append(dbPaths[i]).append(",");
+    }
+    conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
+        dbDirString.toString());
+    ContainerTestUtils.enableSchemaV3(conf);
+
     DatanodeStateMachine stateMachine = Mockito.mock(
             DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);
@@ -200,7 +219,8 @@ public class TestOzoneContainer {
     Assert.assertEquals(3,
             ozoneContainer.getNodeReport().getMetadataStorageReportList()
                     .size());
-
+    Assert.assertEquals(3,
+            ozoneContainer.getNodeReport().getDbStorageReportList().size());
   }
 
   @Test
@@ -231,7 +251,7 @@ public class TestOzoneContainer {
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
     // Format the volumes
     for (HddsVolume volume : volumes) {
-      volume.format(UUID.randomUUID().toString());
+      volume.format(clusterId);
 
       // eat up all available space except size of 1 container
       volume.incCommittedBytes(volume.getAvailable() - containerSize);
@@ -277,36 +297,38 @@ public class TestOzoneContainer {
 
     long freeBytes = container.getContainerData().getMaxSize();
     long containerId = container.getContainerData().getContainerID();
-    ReferenceCountedDB db = BlockUtils.getDB(container
-        .getContainerData(), conf);
+    KeyValueContainerData cData = container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
 
-    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
-    Table<String, BlockData> blockDataTable = db.getStore().getBlockDataTable();
+      Table<String, Long> metadataTable =
+          db.getStore().getMetadataTable();
+      Table<String, BlockData> blockDataTable =
+          db.getStore().getBlockDataTable();
 
-    for (int bi = 0; bi < blocks; bi++) {
-      // Creating BlockData
-      BlockID blockID = new BlockID(containerId, bi);
-      BlockData blockData = new BlockData(blockID);
-      List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
+      for (int bi = 0; bi < blocks; bi++) {
+        // Creating BlockData
+        BlockID blockID = new BlockID(containerId, bi);
+        BlockData blockData = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
 
-      chunkList.clear();
-      for (int ci = 0; ci < chunksPerBlock; ci++) {
-        String chunkName = strBlock + bi + strChunk + ci;
-        long offset = ci * (long) datalen;
-        ChunkInfo info = new ChunkInfo(chunkName, offset, datalen);
-        usedBytes += datalen;
-        chunkList.add(info.getProtoBufMessage());
+        chunkList.clear();
+        for (int ci = 0; ci < chunksPerBlock; ci++) {
+          String chunkName = strBlock + bi + strChunk + ci;
+          long offset = ci * (long) datalen;
+          ChunkInfo info = new ChunkInfo(chunkName, offset, datalen);
+          usedBytes += datalen;
+          chunkList.add(info.getProtoBufMessage());
+        }
+        blockData.setChunks(chunkList);
+        blockDataTable.put(cData.getBlockKey(blockID.getLocalID()),
+            blockData);
       }
-      blockData.setChunks(chunkList);
-      blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
+
+      // Set Block count and used bytes.
+      metadataTable.put(cData.getBlockCountKey(), (long) blocks);
+      metadataTable.put(cData.getBytesUsedKey(), usedBytes);
     }
-
-    // Set Block count and used bytes.
-    metadataTable.put(OzoneConsts.BLOCK_COUNT, (long)blocks);
-    metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED, usedBytes);
-
     // remaining available capacity of the container
-    db.close();
     return (freeBytes - usedBytes);
   }
 

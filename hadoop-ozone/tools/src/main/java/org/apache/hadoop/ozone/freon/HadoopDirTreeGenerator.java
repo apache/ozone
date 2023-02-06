@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class HadoopDirTreeGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 

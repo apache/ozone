@@ -110,6 +110,9 @@ public class SCMBlockLocationFailoverProxyProvider implements
     SCMClientConfig config = conf.getObject(SCMClientConfig.class);
     this.maxRetryCount = config.getRetryCount();
     this.retryInterval = config.getRetryInterval();
+
+    LOG.info("Created block location fail-over proxy with {} nodes: {}",
+        scmNodeIds.size(), scmProxyInfoMap.values());
   }
 
   private synchronized void loadConfigs() {

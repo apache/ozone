@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -101,7 +102,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
    * Verifies container placement metric.
    */
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
-  public void test() throws IOException {
+  public void test() throws IOException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 

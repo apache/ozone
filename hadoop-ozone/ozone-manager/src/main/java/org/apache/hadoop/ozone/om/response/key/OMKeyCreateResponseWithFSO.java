@@ -41,12 +41,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 public class OMKeyCreateResponseWithFSO extends OMFileCreateResponseWithFSO {
 
   public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                               @Nonnull OmKeyInfo omKeyInfo,
-                               @Nonnull List<OmDirectoryInfo> parentDirInfos,
-                               long openKeySessionID,
-                               @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmDirectoryInfo> parentDirInfos,
+      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull long volumeId) {
     super(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
-            omBucketInfo);
+        omBucketInfo, volumeId);
   }
 
   /**

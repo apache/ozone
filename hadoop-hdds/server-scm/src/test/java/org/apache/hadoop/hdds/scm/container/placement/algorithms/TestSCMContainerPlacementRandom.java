@@ -34,12 +34,12 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.Assert;
-import org.junit.Test;
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertTrue;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
 
@@ -103,18 +103,18 @@ public class TestSCMContainerPlacementRandom {
           .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
-      Assert.assertEquals(1, datanodeDetails.size());
+      Assertions.assertEquals(1, datanodeDetails.size());
       DatanodeDetails datanode0Details = datanodeDetails.get(0);
 
-      Assert.assertNotEquals(
-          "Datanode 0 should not been selected: excluded by parameter",
-          datanodes.get(0), datanode0Details);
-      Assert.assertNotEquals(
-          "Datanode 1 should not been selected: excluded by parameter",
-          datanodes.get(1), datanode0Details);
-      Assert.assertNotEquals(
-          "Datanode 2 should not been selected: not enough space there",
-          datanodes.get(2), datanode0Details);
+      Assertions.assertNotEquals(
+          datanodes.get(0), datanode0Details,
+          "Datanode 0 should not been selected: excluded by parameter");
+      Assertions.assertNotEquals(
+          datanodes.get(1), datanode0Details,
+          "Datanode 1 should not been selected: excluded by parameter");
+      Assertions.assertNotEquals(
+          datanodes.get(2), datanode0Details,
+          "Datanode 2 should not been selected: not enough space there");
 
     }
   }
@@ -215,11 +215,11 @@ public class TestSCMContainerPlacementRandom {
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
             null);
 
-    Assert.assertTrue(
+    Assertions.assertTrue(
         scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
-    Assert.assertFalse(
+    Assertions.assertFalse(
         scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
-    Assert.assertFalse(
+    Assertions.assertFalse(
         scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
 
   }

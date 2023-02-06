@@ -22,8 +22,8 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -43,38 +43,34 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.PKCSException;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the default PKI Profile.
  */
 public class TestDefaultProfile {
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
   private OzoneConfiguration configuration;
   private SecurityConfig securityConfig;
   private DefaultProfile defaultProfile;
   private MockApprover testApprover;
   private KeyPair keyPair;
 
-  @Before
-  public void setUp() throws Exception {
+  @BeforeEach
+  public void setUp(@TempDir Path tempDir) throws Exception {
     configuration = new OzoneConfiguration();
-    configuration.set(OZONE_METADATA_DIRS,
-        temporaryFolder.newFolder().toString());
+    configuration.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(configuration);
     defaultProfile = new DefaultProfile();
     testApprover = new MockApprover(defaultProfile,

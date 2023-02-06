@@ -91,17 +91,19 @@ public class OMKeyCreateResponse extends OmKeyResponse {
         omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
+      
+      // namespace quota changes for parent directory
+      String bucketKey = omMetadataManager.getBucketKey(
+          getOmBucketInfo().getVolumeName(),
+          getOmBucketInfo().getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, getOmBucketInfo());
     }
 
     String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, openKey, omKeyInfo);
-
-    // update bucket usedBytes.
-    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName()), omBucketInfo);
   }
 
   protected long getOpenKeySessionID() {

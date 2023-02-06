@@ -147,6 +147,21 @@ services:
       networks:
          net:
             ipv4_address: 10.5.0.71
+   recon:
+     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+     privileged: true #required by the profiler
+     volumes:
+       - ../..:/opt/hadoop
+     ports:
+       - 9888:9888
+     env_file:
+       - ./docker-config
+     environment:
+       OZONE_OPTS:
+     command: [ "/opt/hadoop/bin/ozone","recon" ]
+     networks:
+       net:
+         ipv4_address: 10.5.0.72
 networks:
    net:
      driver: bridge

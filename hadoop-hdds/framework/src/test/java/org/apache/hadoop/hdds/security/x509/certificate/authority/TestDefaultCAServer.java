@@ -20,30 +20,34 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.LambdaTestUtils;
 
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -51,40 +55,43 @@ import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
-import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.INTERMEDIARY_CA;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.SELF_SIGNED_CA;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the Default CA Server.
  */
 public class TestDefaultCAServer {
-  private static OzoneConfiguration conf = new OzoneConfiguration();
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  private OzoneConfiguration conf;
   private MockCAStore caStore;
 
-  @Before
-  public void init() throws IOException {
-    conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
+  @BeforeEach
+  public void init(@TempDir Path tempDir) throws IOException {
+    conf = new OzoneConfiguration();
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     caStore = new MockCAStore();
   }
 
@@ -288,7 +295,6 @@ public class TestDefaultCAServer {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
               CRLReason.lookup(CRLReason.keyCompromise), now);
-          result.isDone();
           result.get();
         });
   }
@@ -326,21 +332,71 @@ public class TestDefaultCAServer {
           Future<X509CertificateHolder> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
-          holder.isDone();
           holder.get();
         });
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testIntermediaryCAWithEmpty()
-      throws Exception {
+  @Test
+  public void testIntermediaryCAWithEmpty() {
 
     CertificateServer scmCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
         RandomStringUtils.randomAlphabetic(4), caStore,
         new DefaultProfile(), Paths.get("scm").toString());
 
-    scmCA.init(new SecurityConfig(conf), INTERMEDIARY_CA);
+    assertThrows(IllegalStateException.class,
+        () -> scmCA.init(new SecurityConfig(conf), INTERMEDIARY_CA));
+  }
+
+  @Test
+  public void testExternalRootCA(@TempDir Path tempDir) throws Exception {
+    //Given an external certificate
+    String externalCaCertFileName = "CaCert.pem";
+    setExternalPathsInConfig(tempDir, externalCaCertFileName);
+
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf));
+
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
+    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    keyPEMWriter.writeKey(tempDir, keyPair, true);
+    X509CertificateHolder externalCert = generateExternalCert(keyPair);
+
+    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
+        CertificateCodec.getPEMEncodedString(externalCert), true);
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        RandomStringUtils.randomAlphabetic(4),
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    //When initializing a CA server with external cert
+    testCA.init(securityConfig, SELF_SIGNED_CA);
+    //Then the external cert is set as CA cert for the server.
+    assertEquals(externalCert, testCA.getCACertificate());
+  }
+
+  private void setExternalPathsInConfig(Path tempDir,
+                                        String externalCaCertFileName) {
+    String externalCaCertPart = Paths.get(tempDir.toString(),
+        externalCaCertFileName).toString();
+    String privateKeyPath = Paths.get(tempDir.toString(),
+        HddsConfigKeys.HDDS_PRIVATE_KEY_FILE_NAME_DEFAULT).toString();
+    String publicKeyPath = Paths.get(tempDir.toString(),
+        HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT).toString();
+
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE,
+        externalCaCertPart);
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
+        privateKeyPath);
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
+        publicKeyPath);
   }
 
   @Test
@@ -362,7 +418,7 @@ public class TestDefaultCAServer {
         new SCMCertificateClient(new SecurityConfig(conf));
 
     CertificateClient.InitResponse response = scmCertificateClient.init();
-    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, response);
+    assertEquals(CertificateClient.InitResponse.GETCERT, response);
 
     // Generate cert
     KeyPair keyPair =
@@ -378,12 +434,12 @@ public class TestDefaultCAServer {
 
     Future<X509CertificateHolder> holder = rootCA.requestCertificate(csr,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
-    Assert.assertTrue(holder.isDone());
+    assertTrue(holder.isDone());
 
     X509CertificateHolder certificateHolder = holder.get();
 
 
-    Assert.assertNotNull(certificateHolder);
+    assertNotNull(certificateHolder);
     LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
         .atZone(ZoneId.systemDefault())
         .toLocalDate();
@@ -418,4 +474,41 @@ public class TestDefaultCAServer {
 
   }
 
+  private X509CertificateHolder generateExternalCert(KeyPair keyPair)
+      throws Exception {
+    LocalDateTime notBefore = LocalDateTime.now();
+    LocalDateTime notAfter = notBefore.plusYears(1);
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    String subject = "testRootCert";
+
+    SelfSignedCertificate.Builder builder =
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(notBefore)
+            .setEndDate(notAfter)
+            .setClusterID(clusterID)
+            .setScmID(scmID)
+            .setSubject(subject)
+            .setKey(keyPair)
+            .setConfiguration(conf)
+            .makeCA();
+
+    try {
+      DomainValidator validator = DomainValidator.getInstance();
+      // Add all valid ips.
+      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
+          ip -> {
+            builder.addIpAddress(ip.getHostAddress());
+            if (validator.isValid(ip.getCanonicalHostName())) {
+              builder.addDnsName(ip.getCanonicalHostName());
+            }
+          });
+    } catch (IOException e) {
+      throw new org.apache.hadoop.hdds.security.x509
+          .exception.CertificateException(
+          "Error while adding ip to CA self signed certificate", e,
+          CSR_ERROR);
+    }
+    return builder.build();
+  }
 }

@@ -37,23 +37,18 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -86,8 +81,12 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
@@ -104,30 +103,34 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KMS_PROVIDER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -141,6 +144,7 @@ import org.slf4j.LoggerFactory;
 public class KeyManagerImpl implements KeyManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyManagerImpl.class);
+  public static final int DISABLE_VALUE = -1;
 
   /**
    * A SCM block client, used to talk to SCM to allocate block during putKey.
@@ -149,58 +153,35 @@ public class KeyManagerImpl implements KeyManager {
   private final ScmClient scmClient;
   private final OMMetadataManager metadataManager;
   private final long scmBlockSize;
-  private final boolean useRatis;
-
-  private final int preallocateBlocksMax;
   private final int listTrashKeysMax;
-  private final String omId;
   private final OzoneBlockTokenSecretManager secretManager;
   private final boolean grpcBlockTokenEnabled;
 
   private BackgroundService keyDeletingService;
 
-  private final KeyProviderCryptoExtension kmsProvider;
-  private final PrefixManager prefixManager;
+  private BackgroundService snapshotSstFilteringService;
 
+  private final KeyProviderCryptoExtension kmsProvider;
   private final boolean enableFileSystemPaths;
   private BackgroundService dirDeletingService;
+  private final OMPerformanceMetrics metrics;
 
-  @VisibleForTesting
-  public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
-      OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
-    this(null, new ScmClient(scmBlockClient, null), metadataManager,
-        conf, omId, secretManager, null, null);
-  }
+  private BackgroundService openKeyCleanupService;
 
-  @VisibleForTesting
-  public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
-      StorageContainerLocationProtocol scmContainerClient,
-      OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
-      OzoneBlockTokenSecretManager secretManager) {
-    this(null, new ScmClient(scmBlockClient, scmContainerClient),
-        metadataManager, conf, omId, secretManager, null, null);
+  public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
+      OzoneConfiguration conf, OMPerformanceMetrics metrics) {
+    this (om, scmClient, om.getMetadataManager(), conf,
+        om.getBlockTokenMgr(), om.getKmsProvider(), metrics);
   }
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
-      OzoneConfiguration conf, String omId) {
-    this (om, scmClient, om.getMetadataManager(), conf, omId,
-        om.getBlockTokenMgr(), om.getKmsProvider(), om.getPrefixManager());
-  }
-
-  @SuppressWarnings("parameternumber")
-  public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
-      OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
+      OMMetadataManager metadataManager, OzoneConfiguration conf,
       OzoneBlockTokenSecretManager secretManager,
-      KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager) {
+      KeyProviderCryptoExtension kmsProvider,
+      OMPerformanceMetrics metrics) {
     this.scmBlockSize = (long) conf
         .getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
             StorageUnit.BYTES);
-    this.useRatis = conf.getBoolean(DFS_CONTAINER_RATIS_ENABLED_KEY,
-        DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
-    this.preallocateBlocksMax = conf.getInt(
-        OZONE_KEY_PREALLOCATION_BLOCKS_MAX,
-        OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
     this.grpcBlockTokenEnabled = conf.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
@@ -212,13 +193,11 @@ public class KeyManagerImpl implements KeyManager {
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
 
     this.ozoneManager = om;
-    this.omId = omId;
     this.scmClient = scmClient;
     this.metadataManager = metadataManager;
-    this.prefixManager = prefixManager;
     this.secretManager = secretManager;
     this.kmsProvider = kmsProvider;
-
+    this.metrics = metrics;
   }
 
   @Override
@@ -249,8 +228,39 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
       dirDeletingService = new DirectoryDeletingService(dirDeleteInterval,
-          TimeUnit.SECONDS, serviceTimeout, ozoneManager, configuration);
+          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
       dirDeletingService.start();
+    }
+
+    if (openKeyCleanupService == null) {
+      long serviceInterval = configuration.getTimeDuration(
+          OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
+          OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT,
+          OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      openKeyCleanupService = new OpenKeyCleanupService(serviceInterval,
+          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
+      openKeyCleanupService.start();
+    }
+
+    if (snapshotSstFilteringService == null) {
+      long serviceInterval = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      if (serviceInterval != DISABLE_VALUE) {
+        snapshotSstFilteringService =
+            new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
+                serviceTimeout, ozoneManager, configuration);
+        snapshotSstFilteringService.start();
+      }
     }
   }
 
@@ -268,6 +278,14 @@ public class KeyManagerImpl implements KeyManager {
       dirDeletingService.shutdown();
       dirDeletingService = null;
     }
+    if (openKeyCleanupService != null) {
+      openKeyCleanupService.shutdown();
+      openKeyCleanupService = null;
+    }
+    if (snapshotSstFilteringService != null) {
+      snapshotSstFilteringService.shutdown();
+      snapshotSstFilteringService = null;
+    }
   }
 
   private OmBucketInfo getBucketInfo(String volumeName, String bucketName)
@@ -276,26 +294,6 @@ public class KeyManagerImpl implements KeyManager {
     return metadataManager.getBucketTable().get(bucketKey);
   }
 
-  /**
-   * Check S3 bucket exists or not.
-   * @param volumeName
-   * @param bucketName
-   * @throws IOException
-   */
-  private OmBucketInfo validateS3Bucket(String volumeName, String bucketName)
-      throws IOException {
-
-    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().
-        get(bucketKey);
-    //Check if bucket already exists
-    if (omBucketInfo == null) {
-      LOG.error("bucket not found: {}/{} ", volumeName, bucketName);
-      throw new OMException("Bucket not found",
-          BUCKET_NOT_FOUND);
-    }
-    return omBucketInfo;
-  }
   /* Optimize ugi lookup for RPC operations to avoid a trip through
    * UGI.getCurrentUser which is synch'ed.
    */
@@ -330,26 +328,52 @@ public class KeyManagerImpl implements KeyManager {
   public OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress)
       throws IOException {
     Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getLookupGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
+      // value won't be null as the check is done inside try/catch block.
+      captureLatencyNs(metrics.getLookupRefreshLocationLatencyNs(),
+          () -> refresh(value));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
+    }
+
+    return value;
+  }
+
+  private OmKeyInfo readKeyInfo(OmKeyArgs args) throws IOException {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
+    OmKeyInfo value = null;
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
-
-    BucketLayout bucketLayout =
-        getBucketLayout(metadataManager, args.getVolumeName(),
-            args.getBucketName());
-    keyName = OMClientRequest
-        .validateAndNormalizeKey(enableFileSystemPaths, keyName,
-            bucketLayout);
-
-    OmKeyInfo value = null;
     try {
+      BucketLayout bucketLayout =
+          getBucketLayout(metadataManager, args.getVolumeName(),
+              args.getBucketName());
+      keyName = OMClientRequest
+          .validateAndNormalizeKey(enableFileSystemPaths, keyName,
+              bucketLayout);
+
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
-        value = getOmKeyInfo(volumeName, bucketName, keyName);
+        value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -368,43 +392,42 @@ public class KeyManagerImpl implements KeyManager {
     if (value == null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
-                bucketName, keyName);
+            bucketName, keyName);
       }
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
-
-
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
-
-    // If operation is head, do not perform any additional steps based on flags.
-    // As head operation does not need any of those details.
-    if (!args.isHeadOp()) {
-
-      // add block token for read.
-      addBlockToken4Read(value);
-
-      // Refresh container pipeline info from SCM
-      // based on OmKeyArgs.refreshPipeline flag
-      // value won't be null as the check is done inside try/catch block.
-      refresh(value);
-
-      if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
-      }
-
-    }
-
     return value;
   }
 
+  private OmKeyInfo getOmKeyInfoDirectoryAware(String volumeName,
+            String bucketName, String keyName) throws IOException {
+    OmKeyInfo keyInfo = getOmKeyInfo(volumeName, bucketName, keyName);
+
+    // Check if the key is a directory.
+    if (keyInfo != null) {
+      keyInfo.setFile(true);
+      return keyInfo;
+    }
+
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    OmKeyInfo dirKeyInfo = getOmKeyInfo(volumeName, bucketName, dirKey);
+    if (dirKeyInfo != null) {
+      dirKeyInfo.setFile(false);
+    }
+    return dirKeyInfo;
+  }
+
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-      String keyName) throws IOException {
+                                 String keyName) throws IOException {
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
+    BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
+        bucketName);
     return metadataManager
-        .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
+        .getKeyTable(bucketLayout)
         .get(keyBytes);
   }
 
@@ -426,6 +449,7 @@ public class KeyManagerImpl implements KeyManager {
           fileStatus.getKeyInfo().getKeyName());
       fileStatus.getKeyInfo().setKeyName(keyPath);
     }
+    fileStatus.getKeyInfo().setFile(fileStatus.isFile());
     return fileStatus.getKeyInfo();
   }
 
@@ -519,16 +543,6 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  private boolean isKeyEmpty(OmKeyInfo keyInfo) {
-    for (OmKeyLocationInfoGroup keyLocationList : keyInfo
-        .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationListCount() != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix,
@@ -579,9 +593,10 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(Duration expireThreshold,
-      int count) throws IOException {
-    return metadataManager.getExpiredOpenKeys(expireThreshold, count);
+  public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
+      int count, BucketLayout bucketLayout) throws IOException {
+    return metadataManager.getExpiredOpenKeys(expireThreshold, count,
+        bucketLayout);
   }
 
   @Override
@@ -597,6 +612,14 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public BackgroundService getDirDeletingService() {
     return dirDeletingService;
+  }
+
+  public BackgroundService getOpenKeyCleanupService() {
+    return openKeyCleanupService;
+  }
+
+  public BackgroundService getSnapshotSstFilteringService() {
+    return snapshotSstFilteringService;
   }
 
   @Override
@@ -660,13 +683,12 @@ public class KeyManagerImpl implements KeyManager {
     boolean isTruncated = false;
     int nextPartNumberMarker = 0;
     BucketLayout bucketLayout = BucketLayout.DEFAULT;
-    if (ozoneManager != null) {
-      String buckKey = ozoneManager.getMetadataManager()
-          .getBucketKey(volumeName, bucketName);
-      OmBucketInfo buckInfo =
-          ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
-      bucketLayout = buckInfo.getBucketLayout();
-    }
+
+    String buckKey = metadataManager.
+          getBucketKey(volumeName, bucketName);
+    OmBucketInfo buckInfo =
+          metadataManager.getBucketTable().get(buckKey);
+    bucketLayout = buckInfo.getBucketLayout();
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -708,9 +730,10 @@ public class KeyManagerImpl implements KeyManager {
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts
-            replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(
-                    partKeyInfo.getPartKeyInfo().getType(),
-                    partKeyInfo.getPartKeyInfo().getFactor());
+            replicationConfig = ReplicationConfig.fromProto(
+                partKeyInfo.getPartKeyInfo().getType(),
+                partKeyInfo.getPartKeyInfo().getFactor(),
+                partKeyInfo.getPartKeyInfo().getEcReplicationConfig());
             count++;
           }
         }
@@ -737,8 +760,6 @@ public class KeyManagerImpl implements KeyManager {
             "ReplicationConfig can't be identified");
 
         if (partKeyInfoMapIterator.hasNext()) {
-          Map.Entry<Integer, PartKeyInfo> partKeyInfoEntry =
-              partKeyInfoMapIterator.next();
           isTruncated = true;
         } else {
           isTruncated = false;
@@ -794,158 +815,19 @@ public class KeyManagerImpl implements KeyManager {
 
   private String getMultipartOpenKeyFSO(String volumeName, String bucketName,
       String keyName, String uploadID) throws IOException {
-    OMMetadataManager metaMgr = ozoneManager.getMetadataManager();
+    OMMetadataManager metaMgr = metadataManager;
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo = metaMgr.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
+    final long volumeId = metaMgr.getVolumeId(volumeName);
+    final long bucketId = metaMgr.getBucketId(volumeName, bucketName);
     long parentID =
-        OMFileRequest.getParentID(bucketId, pathComponents, keyName, metaMgr);
+        OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
+                keyName, metaMgr);
 
-    String multipartKey = metaMgr.getMultipartKey(parentID, fileName, uploadID);
+    String multipartKey = metaMgr.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, uploadID);
 
     return multipartKey;
-  }
-
-  /**
-   * Add acl for Ozone object. Return true if acl is added successfully else
-   * false.
-   *
-   * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl to be added.
-   * @throws IOException if there is error.
-   */
-  @Override
-  public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    validateOzoneObj(obj);
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
-    String keyName = obj.getKeyName();
-    boolean changed = false;
-
-
-    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
-    try {
-      OMFileRequest.validateBucket(metadataManager, volume, bucket);
-      String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
-      OmKeyInfo keyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
-          .get(objectKey);
-      if (keyInfo == null) {
-        throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
-      }
-
-      if (keyInfo.getAcls() == null) {
-        keyInfo.setAcls(new ArrayList<>());
-      }
-      changed = keyInfo.addAcl(acl);
-      if (changed) {
-        metadataManager
-            .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
-            .put(objectKey, keyInfo);
-      }
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Add acl operation failed for key:{}/{}/{}", volume,
-            bucket, keyName, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
-    }
-    return changed;
-  }
-
-  /**
-   * Remove acl for Ozone object. Return true if acl is removed successfully
-   * else false.
-   *
-   * @param obj Ozone object.
-   * @param acl Ozone acl to be removed.
-   * @throws IOException if there is error.
-   */
-  @Override
-  public boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    validateOzoneObj(obj);
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
-    String keyName = obj.getKeyName();
-    boolean changed = false;
-
-    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
-    try {
-      OMFileRequest.validateBucket(metadataManager, volume, bucket);
-      String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
-      OmKeyInfo keyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
-          .get(objectKey);
-      if (keyInfo == null) {
-        throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
-      }
-
-      changed = keyInfo.removeAcl(acl);
-      if (changed) {
-        metadataManager
-            .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
-            .put(objectKey, keyInfo);
-      }
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Remove acl operation failed for key:{}/{}/{}", volume,
-            bucket, keyName, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
-    }
-    return changed;
-  }
-
-  /**
-   * Acls to be set for given Ozone object. This operations reset ACL for given
-   * object to list of ACLs provided in argument.
-   *
-   * @param obj Ozone object.
-   * @param acls List of acls.
-   * @throws IOException if there is error.
-   */
-  @Override
-  public boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
-    validateOzoneObj(obj);
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
-    String keyName = obj.getKeyName();
-    boolean changed = false;
-
-    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume, bucket);
-    try {
-      OMFileRequest.validateBucket(metadataManager, volume, bucket);
-      String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
-      OmKeyInfo keyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
-          .get(objectKey);
-      if (keyInfo == null) {
-        throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
-      }
-
-      changed = keyInfo.setAcls(acls);
-
-      if (changed) {
-        metadataManager
-            .getKeyTable(getBucketLayout(metadataManager, volume, bucket))
-            .put(objectKey, keyInfo);
-      }
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Set acl operation failed for key:{}/{}/{}", volume,
-            bucket, keyName, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume, bucket);
-    }
-    return changed;
   }
 
   /**
@@ -1012,17 +894,15 @@ public class KeyManagerImpl implements KeyManager {
         .build();
 
     BucketLayout bucketLayout = BucketLayout.DEFAULT;
-    if (ozoneManager != null) {
-      String buckKey =
-          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
-      OmBucketInfo buckInfo = null;
-      try {
-        buckInfo =
-            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
-        bucketLayout = buckInfo.getBucketLayout();
-      } catch (IOException e) {
-        LOG.error("Failed to get bucket for the key: " + buckKey, e);
-      }
+    String buckKey =
+        metadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo buckInfo = null;
+    try {
+      buckInfo =
+          metadataManager.getBucketTable().get(buckKey);
+      bucketLayout = buckInfo.getBucketLayout();
+    } catch (IOException e) {
+      LOG.error("Failed to get bucket for the key: " + buckKey, e);
     }
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
@@ -1209,6 +1089,8 @@ public class KeyManagerImpl implements KeyManager {
     final String keyName = args.getKeyName();
 
     OmKeyInfo fileKeyInfo = null;
+    OmKeyInfo dirKeyInfo = null;
+    OmKeyInfo fakeDirKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1221,28 +1103,27 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      fileKeyInfo = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName))
-          .get(fileKeyBytes);
+      BucketLayout layout =
+          getBucketLayout(metadataManager, volumeName, bucketName);
+      fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
+      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
       // Check if the key is a directory.
       if (fileKeyInfo == null) {
-        String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         String dirKeyBytes = metadataManager.getOzoneKey(
                 volumeName, bucketName, dirKey);
-        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable(
-            getBucketLayout(metadataManager, volumeName, bucketName))
-            .get(dirKeyBytes);
-        if (dirKeyInfo != null) {
-          return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+        dirKeyInfo = metadataManager.getKeyTable(layout).get(dirKeyBytes);
+        if (dirKeyInfo == null) {
+          fakeDirKeyInfo =
+              createFakeDirIfShould(volumeName, bucketName, keyName, layout);
         }
       }
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
-
-      // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
+        // if the key is a file
+        // then do refresh pipeline info in OM by asking SCM
         if (args.getLatestVersionLocation()) {
           slimLocationVersion(fileKeyInfo);
         }
@@ -1257,8 +1138,19 @@ public class KeyManagerImpl implements KeyManager {
             sortDatanodes(clientAddress, fileKeyInfo);
           }
         }
-        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
+    }
+
+    if (fileKeyInfo != null) {
+      return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+    }
+
+    if (dirKeyInfo != null) {
+      return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+    }
+
+    if (fakeDirKeyInfo != null) {
+      return new OzoneFileStatus(fakeDirKeyInfo, scmBlockSize, true);
     }
 
     // Key is not found, throws exception
@@ -1270,6 +1162,41 @@ public class KeyManagerImpl implements KeyManager {
     throw new OMException("Unable to get file status: volume: " +
             volumeName + " bucket: " + bucketName + " key: " + keyName,
             FILE_NOT_FOUND);
+  }
+
+  /**
+   * Create a fake directory if the key is a path prefix,
+   * otherwise returns null.
+   * Some keys may contain '/' Ozone will treat '/' as directory separator
+   * such as : key name is 'a/b/c', 'a' and 'b' may not really exist,
+   * but Ozone treats 'a' and 'b' as a directory.
+   * we need create a fake directory 'a' or 'a/b'
+   *
+   * @return OmKeyInfo if the key is a path prefix, otherwise returns null.
+   */
+  private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
+      String keyName, BucketLayout layout) throws IOException {
+    OmKeyInfo fakeDirKeyInfo = null;
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
+      Table.KeyValue<String, OmKeyInfo> keyValue =
+          keyTblItr
+              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+
+      if (keyValue != null) {
+        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
+        Path subPath = Paths.get(dirKey);
+        OmKeyInfo omKeyInfo = keyValue.getValue();
+        if (fullPath.startsWith(subPath)) {
+          // create fake directory
+          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+        }
+      }
+    }
+
+    return fakeDirKeyInfo;
   }
 
 
@@ -1337,26 +1264,27 @@ public class KeyManagerImpl implements KeyManager {
             FILE_NOT_FOUND);
   }
 
-  private OmKeyInfo createDirectoryKey(String volumeName, String bucketName,
-      String keyName, List<OzoneAcl> acls) throws IOException {
+  private OmKeyInfo createDirectoryKey(OmKeyInfo keyInfo, String keyName)
+          throws IOException {
     // verify bucket exists
-    OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
+    OmBucketInfo bucketInfo = getBucketInfo(keyInfo.getVolumeName(),
+            keyInfo.getBucketName());
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
     return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
         .setKeyName(dir)
+        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(ReplicationFactor.ONE))
+        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(acls)
+        .setAcls(keyInfo.getAcls())
         .build();
   }
   /**
@@ -1403,7 +1331,7 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  private boolean isKeyDeleted(String key, Table keyTable) {
+  public static boolean isKeyDeleted(String key, Table keyTable) {
     CacheValue<OmKeyInfo> omKeyInfoCacheValue
         = keyTable.getCacheValue(new CacheKey(key));
     return omKeyInfoCacheValue != null
@@ -1463,6 +1391,14 @@ public class KeyManagerImpl implements KeyManager {
     return listStatus(args, recursive, startKey, numEntries, null);
   }
 
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+                                          String startKey, long numEntries,
+                                          String clientAddress)
+      throws IOException {
+    return listStatus(args, recursive, startKey, numEntries,
+        clientAddress, false);
+  }
+
   /**
    * List the status for a file or a directory and its contents.
    *
@@ -1479,8 +1415,8 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   @SuppressWarnings("methodlength")
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries, String clientAddress)
-          throws IOException {
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     String volName = args.getVolumeName();
     String buckName = args.getBucketName();
@@ -1488,9 +1424,16 @@ public class KeyManagerImpl implements KeyManager {
     if (numEntries <= 0) {
       return fileStatusList;
     }
+
     if (isBucketFSOptimized(volName, buckName)) {
-      return listStatusFSO(args, recursive, startKey, numEntries,
-          clientAddress);
+      Preconditions.checkArgument(!recursive);
+      OzoneListStatusHelper statusHelper =
+          new OzoneListStatusHelper(metadataManager, scmBlockSize,
+              this::getOzoneFileStatusFSO);
+      Collection<OzoneFileStatus> statuses =
+          statusHelper.listStatusFSO(args, startKey, numEntries,
+          clientAddress, allowPartialPrefixes);
+      return buildFinalStatusList(statuses, args, clientAddress);
     }
 
     String volumeName = args.getVolumeName();
@@ -1512,28 +1455,83 @@ public class KeyManagerImpl implements KeyManager {
     String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
+    Table<String, OmKeyInfo> keyTable;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
-    Table keyTable = metadataManager
-        .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator;
     try {
-      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
-          cacheIter = keyTable.cacheIterator();
-      String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-          OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-          ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
-
-      // First, find key in TableCache
-      listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
-          recursive, cacheKeyMap);
-      iterator = keyTable.iterator();
+      keyTable = metadataManager
+          .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
+      iterator = getIteratorForKeyInTableCache(recursive, startKey,
+          volumeName, bucketName, cacheKeyMap, keyArgs, keyTable);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
 
+    try {
+      findKeyInDbWithIterator(recursive, startKey, numEntries, volumeName,
+          bucketName, keyName, cacheKeyMap, keyArgs, keyTable, iterator);
+    } finally {
+      iterator.close();
+    }
+
+    int countEntries;
+
+    countEntries = 0;
+    // Convert results in cacheKeyMap to List
+    for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
+      // No need to check if a key is deleted or not here, this is handled
+      // when adding entries to cacheKeyMap from DB.
+      fileStatusList.add(fileStatus);
+      countEntries++;
+      if (countEntries >= numEntries) {
+        break;
+      }
+    }
+    // Clean up temp map and set
+    cacheKeyMap.clear();
+
+    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
+    fileStatusList.stream().map(s -> s.getKeyInfo()).forEach(keyInfoList::add);
+    if (args.getLatestVersionLocation()) {
+      slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
+    }
+    refreshPipeline(keyInfoList);
+
+    if (args.getSortDatanodes()) {
+      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
+    }
+    return fileStatusList;
+  }
+
+  private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+      getIteratorForKeyInTableCache(
+      boolean recursive, String startKey, String volumeName, String bucketName,
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+      Table<String, OmKeyInfo> keyTable) throws IOException {
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
+        cacheIter = keyTable.cacheIterator();
+    String startCacheKey = OZONE_URI_DELIMITER + volumeName +
+        OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
+        ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+
+    // First, find key in TableCache
+    listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
+        recursive, cacheKeyMap);
+    iterator = keyTable.iterator();
+    return iterator;
+  }
+
+  @SuppressWarnings("parameternumber")
+  private void findKeyInDbWithIterator(boolean recursive, String startKey,
+      long numEntries, String volumeName, String bucketName, String keyName,
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+      Table<String, OmKeyInfo> keyTable,
+      TableIterator<String,
+          ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
+      throws IOException {
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -1578,8 +1576,7 @@ public class KeyManagerImpl implements KeyManager {
               if (!isKeyDeleted(entryInDb, keyTable)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
-                      omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-                      immediateChild, omKeyInfo.getAcls());
+                      omKeyInfo, immediateChild);
                   cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
@@ -1600,281 +1597,31 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
-
-    countEntries = 0;
-    // Convert results in cacheKeyMap to List
-    for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
-      // No need to check if a key is deleted or not here, this is handled
-      // when adding entries to cacheKeyMap from DB.
-      fileStatusList.add(fileStatus);
-      countEntries++;
-      if (countEntries >= numEntries) {
-        break;
-      }
-    }
-    // Clean up temp map and set
-    cacheKeyMap.clear();
-
-    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
-    fileStatusList.stream().map(s -> s.getKeyInfo()).forEach(keyInfoList::add);
-    if (args.getLatestVersionLocation()) {
-      slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
-    }
-    refreshPipeline(keyInfoList);
-
-    if (args.getSortDatanodes()) {
-      sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
-    }
-    return fileStatusList;
   }
 
-  @SuppressWarnings("methodlength")
-  public List<OzoneFileStatus> listStatusFSO(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries, String clientAddress)
-          throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
-
-    // unsorted OMKeyInfo list contains combine results from TableCache and DB.
-
-    if (numEntries <= 0) {
-      return new ArrayList<>();
-    }
-
-    /**
-     * A map sorted by OmKey to combine results from TableCache and DB for
-     * each entity - Dir & File.
-     *
-     * Two separate maps are required because the order of seek -> (1)Seek
-     * files in fileTable (2)Seek dirs in dirTable.
-     *
-     * StartKey should be added to the final listStatuses, so if we combine
-     * files and dirs into a single map then directory with lower precedence
-     * will appear at the top of the list even if the startKey is given as
-     * fileName.
-     *
-     * For example, startKey="a/file1". As per the seek order, first fetches
-     * all the files and then it will start seeking all the directories.
-     * Assume a directory name exists "a/b". With one map, the sorted list will
-     * be ["a/b", "a/file1"]. But the expected list is: ["a/file1", "a/b"],
-     * startKey element should always be at the top of the listStatuses.
-     */
-    TreeMap<String, OzoneFileStatus> cacheFileMap = new TreeMap<>();
-    TreeMap<String, OzoneFileStatus> cacheDirMap = new TreeMap<>();
-
-    final String volumeName = args.getVolumeName();
-    final String bucketName = args.getBucketName();
-    final String keyName = args.getKeyName();
-    String seekFileInDB;
-    String seekDirInDB;
-    long prefixKeyInDB;
-    String prefixPath = keyName;
-    int countEntries = 0;
-
-    // TODO: recursive flag=true will be handled in HDDS-4360 jira.
-
-
-    Set<String> deletedKeySet = new TreeSet<>();
-    TreeMap<String, OzoneFileStatus> tempCacheDirMap = new TreeMap<>();
-
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator;
-
-    if (Strings.isNullOrEmpty(startKey)) {
-      OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
-      if (fileStatus.isFile()) {
-        return Collections.singletonList(fileStatus);
-      }
-
-      // Not required to search in DeletedTable because all the deleted
-      // keys will be marked directly in dirTable or in keyTable by
-      // breaking the pointer to its sub-dirs and sub-files. So, there is no
-      // issue of inconsistency.
-
-      /*
-       * keyName is a directory.
-       * Say, "/a" is the dir name and its objectID is 1024, then seek
-       * will be doing with "1024/" to get all immediate descendants.
-       */
-      if (fileStatus.getKeyInfo() != null) {
-        prefixKeyInDB = fileStatus.getKeyInfo().getObjectID();
-      } else {
-        // list root directory.
-        String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-        OmBucketInfo omBucketInfo =
-            metadataManager.getBucketTable().get(bucketKey);
-        prefixKeyInDB = omBucketInfo.getObjectID();
-      }
-      seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
-      seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
-
-      // Order of seek ->
-      // (1)Seek files in fileTable
-      // (2)Seek dirs in dirTable
-
-
-      // First under lock obtain both entries from dir/file cache and generate
-      // entries marked for delete.
-      metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
-      try {
-        iterator = metadataManager.getKeyTable(
-            getBucketLayout(metadataManager, volumeName, bucketName))
-            .iterator();
-        countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
-            bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
-            prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-            countEntries, numEntries);
-
-      } finally {
-        metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-            bucketName);
-      }
-      countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-          prefixPath, prefixKeyInDB, countEntries, numEntries, deletedKeySet,
-          iterator);
-
-    } else {
-      /*
-       * startKey will be used in iterator seek and sets the beginning point
-       * for key traversal.
-       * keyName will be used as parentID where the user has requested to
-       * list the keys from.
-       *
-       * When recursive flag=false, parentID won't change between two pages.
-       * For example: OM has a namespace like,
-       *    /a/1...1M files and /a/b/1...1M files.
-       *    /a/1...1M directories and /a/b/1...1M directories.
-       * Listing "/a", will always have the parentID as "a" irrespective of
-       * the startKey value.
-       */
-
-      // Check startKey is an immediate child of keyName. For example,
-      // keyName=/a/ and expected startKey=/a/b. startKey can't be /xyz/b.
-      if (StringUtils.isNotBlank(keyName) &&
-          !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
-              "Returns empty list", startKey, keyName);
-        }
-        return Collections.emptyList();
-      }
-
-      // assign startKeyPath if prefixPath is empty string.
-      if (StringUtils.isBlank(prefixPath)) {
-        prefixPath = OzoneFSUtils.getParentDir(startKey);
-      }
-
-      OmKeyArgs startKeyArgs = args.toBuilder()
-          .setKeyName(startKey)
-          .setSortDatanodesInPipeline(false)
-          .build();
-      OzoneFileStatus fileStatusInfo = getOzoneFileStatusFSO(startKeyArgs,
-          null, true);
-
-      if (fileStatusInfo != null) {
-        prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
-
-        if (fileStatusInfo.isDirectory()) {
-          seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
-              fileStatusInfo.getKeyInfo().getFileName());
-
-          // Order of seek -> (1) Seek dirs only in dirTable. In OM, always
-          // the order of search is, first seek into fileTable and then
-          // dirTable. So, its not required to search again in the fileTable.
-
-          // Seek the given key in dirTable.
-          metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-                bucketName);
-          try {
-            listStatusFindDirsInTableCache(tempCacheDirMap,
-                metadataManager.getDirectoryTable(),
-                prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-                bucketName, countEntries, numEntries, deletedKeySet);
-          } finally {
-            metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-                bucketName);
-          }
-
-        } else {
-          seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
-              fileStatusInfo.getKeyInfo().getFileName());
-          // begins from the first sub-dir under the parent dir
-          seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
-
-          // First under lock obtain both entries from dir/file cache and
-          // generate entries marked for delete.
-          metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-              bucketName);
-          try {
-            iterator = metadataManager.getKeyTable(
-                getBucketLayout(metadataManager, volumeName, bucketName))
-                .iterator();
-            countEntries = getFilesAndDirsFromCacheWithBucket(volumeName,
-                bucketName, cacheFileMap, tempCacheDirMap, deletedKeySet,
-                prefixKeyInDB, seekFileInDB, seekDirInDB, prefixPath, startKey,
-                countEntries, numEntries);
-          } finally {
-            metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-                bucketName);
-          }
-
-          // 1. Seek the given key in key table.
-          countEntries = getFilesFromDirectory(cacheFileMap, seekFileInDB,
-              prefixPath, prefixKeyInDB, countEntries, numEntries,
-              deletedKeySet, iterator);
-        }
-      } else {
-        // TODO: HDDS-4364: startKey can be a non-existed key
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("StartKey {} is a non-existed key and returning empty " +
-                    "list", startKey);
-        }
-        return Collections.emptyList();
-      }
-    }
-
-    // Now first add all entries in the dir cache, if numEntries required
-    // is less than countEntries.
-    for (Map.Entry<String, OzoneFileStatus> dirEntry :
-        tempCacheDirMap.entrySet()) {
-      if (countEntries < numEntries) {
-        cacheDirMap.put(dirEntry.getKey(), dirEntry.getValue());
-        countEntries++;
-      }
-    }
-
-    // 2. Seek the given key in dir table.
-    if (countEntries < numEntries) {
-      getDirectories(cacheDirMap, seekDirInDB, prefixPath,
-          prefixKeyInDB, countEntries, numEntries, recursive,
-          volumeName, bucketName, deletedKeySet);
-    }
-
-
-    return buildFinalStatusList(cacheFileMap, cacheDirMap, args, clientAddress);
-
-  }
-
-  /**
-   * Build final OzoneFileStatus list to be returned to client.
-   * @throws IOException
-   */
   private List<OzoneFileStatus> buildFinalStatusList(
-      Map<String, OzoneFileStatus> cacheFileMap,
-      Map<String, OzoneFileStatus> cacheDirMap, OmKeyArgs omKeyArgs,
+      Collection<OzoneFileStatus> statusesCollection, OmKeyArgs omKeyArgs,
       String clientAddress)
       throws IOException {
-    List<OmKeyInfo> keyInfoList = new ArrayList<>();
     List<OzoneFileStatus> fileStatusFinalList = new ArrayList<>();
+    List<OmKeyInfo> keyInfoList = new ArrayList<>();
 
-    for (OzoneFileStatus fileStatus : cacheFileMap.values()) {
+    for (OzoneFileStatus fileStatus : statusesCollection) {
+      if (fileStatus.isFile()) {
+        keyInfoList.add(fileStatus.getKeyInfo());
+      }
       fileStatusFinalList.add(fileStatus);
-      keyInfoList.add(fileStatus.getKeyInfo());
     }
 
-    for (OzoneFileStatus fileStatus : cacheDirMap.values()) {
-      fileStatusFinalList.add(fileStatus);
-    }
+    return sortPipelineInfo(fileStatusFinalList, keyInfoList,
+        omKeyArgs, clientAddress);
+  }
+
+
+  private List<OzoneFileStatus> sortPipelineInfo(
+      List<OzoneFileStatus> fileStatusFinalList, List<OmKeyInfo> keyInfoList,
+      OmKeyArgs omKeyArgs, String clientAddress) throws IOException {
+
 
     if (omKeyArgs.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
@@ -1891,227 +1638,6 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusFinalList;
   }
 
-  /***
-   * Build files, directories and marked for deleted entries from dir/file
-   * cache.
-   */
-  @SuppressWarnings("parameternumber")
-  private int getFilesAndDirsFromCacheWithBucket(String volumeName,
-      String bucketName, Map<String, OzoneFileStatus> cacheFileMap,
-      Map<String, OzoneFileStatus> tempCacheDirMap,
-      Set<String> deletedKeySet, long prefixKeyInDB,
-      String seekFileInDB,  String seekDirInDB, String prefixPath,
-      String startKey, int countEntries, long numEntries) {
-
-
-    // First under lock obtain both entries from dir/file cache and generate
-    // entries marked for delete.
-    countEntries = listStatusFindFilesInTableCache(cacheFileMap, metadataManager
-        .getKeyTable(getBucketLayout(metadataManager, volumeName, bucketName)),
-        prefixKeyInDB, seekFileInDB, prefixPath, startKey, countEntries,
-        numEntries, deletedKeySet);
-
-    // Don't count entries from dir cache, as first we need to return all
-    // files and then directories.
-    listStatusFindDirsInTableCache(tempCacheDirMap,
-        metadataManager.getDirectoryTable(),
-        prefixKeyInDB, seekDirInDB, prefixPath, startKey, volumeName,
-        bucketName, countEntries, numEntries, deletedKeySet);
-
-    return countEntries;
-  }
-
-  @SuppressWarnings("parameternumber")
-  protected int getDirectories(
-      TreeMap<String, OzoneFileStatus> cacheKeyMap,
-      String seekDirInDB, String prefixPath, long prefixKeyInDB,
-      int countEntries, long numEntries, boolean recursive,
-      String volumeName, String bucketName, Set<String> deletedKeySet)
-      throws IOException {
-
-    Table dirTable = metadataManager.getDirectoryTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator();
-
-    iterator.seek(seekDirInDB);
-
-    while (iterator.hasNext() && numEntries - countEntries > 0) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
-      OmDirectoryInfo dirInfo = entry.getValue();
-      if (deletedKeySet.contains(dirInfo.getPath())) {
-        iterator.next(); // move to next entry in the table
-        // entry is actually deleted in cache and can exists in DB
-        continue;
-      }
-      if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
-              prefixKeyInDB)) {
-        break;
-      }
-
-      // TODO: recursive list will be handled in HDDS-4360 jira.
-      if (!recursive) {
-        String dirName = OMFileRequest.getAbsolutePath(prefixPath,
-                dirInfo.getName());
-        OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
-                bucketName, dirInfo, dirName);
-        cacheKeyMap.put(dirName, new OzoneFileStatus(omKeyInfo, scmBlockSize,
-                true));
-        countEntries++;
-      }
-    }
-
-    return countEntries;
-  }
-
-  @SuppressWarnings("parameternumber")
-  private int getFilesFromDirectory(
-      TreeMap<String, OzoneFileStatus> cacheKeyMap,
-      String seekKeyInDB, String prefixKeyPath, long prefixKeyInDB,
-      int countEntries, long numEntries, Set<String> deletedKeySet,
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          iterator)
-      throws IOException {
-    iterator.seek(seekKeyInDB);
-    while (iterator.hasNext() && numEntries - countEntries > 0) {
-      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-      OmKeyInfo keyInfo = entry.getValue();
-      if (deletedKeySet.contains(keyInfo.getPath())) {
-        iterator.next(); // move to next entry in the table
-        // entry is actually deleted in cache and can exists in DB
-        continue;
-      }
-      if (!OMFileRequest.isImmediateChild(keyInfo.getParentObjectID(),
-              prefixKeyInDB)) {
-        break;
-      }
-
-      keyInfo.setFileName(keyInfo.getKeyName());
-      String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
-              keyInfo.getKeyName());
-      keyInfo.setKeyName(fullKeyPath);
-      cacheKeyMap.put(fullKeyPath,
-              new OzoneFileStatus(keyInfo, scmBlockSize, false));
-      countEntries++;
-    }
-    return countEntries;
-  }
-
-  /**
-   * Helper function for listStatus to find key in FileTableCache.
-   */
-  @SuppressWarnings("parameternumber")
-  private int listStatusFindFilesInTableCache(
-          Map<String, OzoneFileStatus> cacheKeyMap, Table<String,
-          OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
-          String prefixKeyPath, String startKey, int countEntries,
-          long numEntries, Set<String> deletedKeySet) {
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
-            cacheIter = keyTable.cacheIterator();
-
-    // TODO: recursive list will be handled in HDDS-4360 jira.
-    while (cacheIter.hasNext() && numEntries - countEntries > 0) {
-      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
-              cacheIter.next();
-      String cacheKey = entry.getKey().getCacheKey();
-      OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
-      // cacheOmKeyInfo is null if an entry is deleted in cache
-      if (cacheOmKeyInfo == null) {
-        deletedKeySet.add(cacheKey);
-        continue;
-      }
-
-      // make OmKeyInfo local copy to reset keyname to "fullKeyPath".
-      // In DB keyName stores only the leaf node but the list
-      // returning to the user should have full path.
-      OmKeyInfo omKeyInfo = cacheOmKeyInfo.copyObject();
-
-      omKeyInfo.setFileName(omKeyInfo.getKeyName());
-      String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
-              omKeyInfo.getKeyName());
-      omKeyInfo.setKeyName(fullKeyPath);
-
-      countEntries = addKeyInfoToFileStatusList(cacheKeyMap, prefixKeyInDB,
-              seekKeyInDB, startKey, countEntries, cacheKey, omKeyInfo,
-              false);
-    }
-    return countEntries;
-  }
-
-  /**
-   * Helper function for listStatus to find key in DirTableCache.
-   */
-  @SuppressWarnings("parameternumber")
-  private int listStatusFindDirsInTableCache(
-          Map<String, OzoneFileStatus> cacheKeyMap, Table<String,
-          OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
-          String prefixKeyPath, String startKey, String volumeName,
-          String bucketName, int countEntries, long numEntries,
-          Set<String> deletedKeySet) {
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
-            cacheIter = dirTable.cacheIterator();
-    // seekKeyInDB will have two type of values.
-    // 1. "1024/"   -> startKey is null or empty
-    // 2. "1024/b"  -> startKey exists
-    // TODO: recursive list will be handled in HDDS-4360 jira.
-    while (cacheIter.hasNext() && numEntries - countEntries > 0) {
-      Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
-              cacheIter.next();
-      String cacheKey = entry.getKey().getCacheKey();
-      OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
-      // cacheOmKeyInfo is null if an entry is deleted in cache
-      if (cacheOmDirInfo == null) {
-        deletedKeySet.add(cacheKey);
-        continue;
-      }
-      String fullDirPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
-              cacheOmDirInfo.getName());
-      OmKeyInfo cacheDirKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
-              bucketName, cacheOmDirInfo, fullDirPath);
-
-      countEntries = addKeyInfoToFileStatusList(cacheKeyMap, prefixKeyInDB,
-              seekKeyInDB, startKey, countEntries, cacheKey, cacheDirKeyInfo,
-              true);
-    }
-    return countEntries;
-  }
-
-  @SuppressWarnings("parameternumber")
-  private int addKeyInfoToFileStatusList(
-      Map<String, OzoneFileStatus> cacheKeyMap,
-      long prefixKeyInDB, String seekKeyInDB, String startKey,
-      int countEntries, String cacheKey, OmKeyInfo cacheOmKeyInfo,
-      boolean isDirectory) {
-    // seekKeyInDB will have two type of values.
-    // 1. "1024/"   -> startKey is null or empty
-    // 2. "1024/b"  -> startKey exists
-    if (StringUtils.isBlank(startKey)) {
-      // startKey is null or empty, then the seekKeyInDB="1024/"
-      if (cacheKey.startsWith(seekKeyInDB)) {
-        OzoneFileStatus fileStatus = new OzoneFileStatus(cacheOmKeyInfo,
-                scmBlockSize, isDirectory);
-        cacheKeyMap.put(cacheOmKeyInfo.getKeyName(), fileStatus);
-        countEntries++;
-      }
-    } else {
-      // startKey not empty, then the seekKeyInDB="1024/b" and
-      // seekKeyInDBWithOnlyParentID = "1024/". This is to avoid case of
-      // parentID with "102444" cache entries.
-      // Here, it has to list all the keys after "1024/b" and requires >=0
-      // string comparison.
-      String seekKeyInDBWithOnlyParentID = prefixKeyInDB + OM_KEY_PREFIX;
-      if (cacheKey.startsWith(seekKeyInDBWithOnlyParentID) &&
-              cacheKey.compareTo(seekKeyInDB) >= 0) {
-        OzoneFileStatus fileStatus = new OzoneFileStatus(cacheOmKeyInfo,
-                scmBlockSize, isDirectory);
-        cacheKeyMap.put(cacheOmKeyInfo.getKeyName(), fileStatus);
-        countEntries++;
-      }
-    }
-    return countEntries;
-  }
-
   private String getNextGreaterString(String volumeName, String bucketName,
       String keyPrefix) throws IOException {
     // Increment the last character of the string and return the new ozone key.
@@ -2123,61 +1649,6 @@ public class KeyManagerImpl implements KeyManager {
     keyPrefixInBytes[keyPrefixInBytes.length - 1]++;
     String nextPrefix = codecRegistry.asObject(keyPrefixInBytes, String.class);
     return metadataManager.getOzoneKey(volumeName, bucketName, nextPrefix);
-  }
-
-  /**
-   * Verify that none of the parent path exists as file in the filesystem.
-   *
-   * @param volumeName         Volume name
-   * @param bucketName         Bucket name
-   * @param path               Directory path. This is the absolute path of the
-   *                           directory for the ozone filesystem.
-   * @param directoryMustExist throws exception if true and given path does not
-   *                           exist as directory
-   * @return OzoneFileStatus of the first directory found in path in reverse
-   * order
-   * @throws OMException if ancestor exists as file in the filesystem
-   *                     if directoryMustExist flag is true and parent does
-   *                     not exist
-   *                     if bucket does not exist
-   * @throws IOException if there is error in the db
-   *                     invalid arguments
-   */
-  private OzoneFileStatus verifyNoFilesInPath(String volumeName,
-      String bucketName, Path path, boolean directoryMustExist)
-      throws IOException {
-    OmKeyArgs.Builder argsBuilder = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName);
-    while (path != null) {
-      String keyName = path.toString();
-      try {
-        OzoneFileStatus fileStatus =
-            getFileStatus(argsBuilder.setKeyName(keyName).build());
-        if (fileStatus.isFile()) {
-          LOG.error("Unable to create directory (File already exists): "
-                  + "volume: {} bucket: {} key: {}", volumeName, bucketName,
-                  keyName);
-          throw new OMException(
-              "Unable to create directory at : volume: " + volumeName
-                  + "bucket: " + bucketName + "key: " + keyName,
-              ResultCodes.FILE_ALREADY_EXISTS);
-        } else if (fileStatus.isDirectory()) {
-          return fileStatus;
-        }
-      } catch (OMException ex) {
-        if (ex.getResult() != FILE_NOT_FOUND) {
-          throw ex;
-        } else if (ex.getResult() == FILE_NOT_FOUND) {
-          if (directoryMustExist) {
-            throw new OMException("Parent directory does not exist",
-                ex.getCause(), DIRECTORY_NOT_FOUND);
-          }
-        }
-      }
-      path = path.getParent();
-    }
-    return null;
   }
 
   private FileEncryptionInfo getFileEncryptionInfo(OmBucketInfo bucketInfo)
@@ -2283,32 +1754,46 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public OmKeyInfo getPendingDeletionDir() throws IOException {
-    OmKeyInfo omKeyInfo = null;
+  public Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir()
+          throws IOException {
+    // TODO: Make the return type as OmDirectoryInfo after adding
+    //  volumeId and bucketId to OmDirectoryInfo
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              deletedDirItr = metadataManager.getDeletedDirTable().iterator()) {
       if (deletedDirItr.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> keyValue = deletedDirItr.next();
         if (keyValue != null) {
-          omKeyInfo = keyValue.getValue();
+          return keyValue;
         }
       }
     }
-    return omKeyInfo;
+    return null;
   }
 
   @Override
-  public List<OmKeyInfo> getPendingDeletionSubDirs(OmKeyInfo parentInfo,
-      long numEntries) throws IOException {
-    List<OmKeyInfo> directories = new ArrayList<>();
-    String seekDirInDB = metadataManager.getOzonePathKey(
+  public List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, long numEntries) throws IOException {
+    String seekDirInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
     Table dirTable = metadataManager.getDirectoryTable();
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-        iterator = dirTable.iterator();
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, OmDirectoryInfo>>
+        iterator = dirTable.iterator()) {
+      return gatherSubDirsWithIterator(parentInfo, numEntries,
+          seekDirInDB, countEntries, iterator);
+    }
 
+  }
+
+  private List<OmKeyInfo> gatherSubDirsWithIterator(OmKeyInfo parentInfo,
+      long numEntries, String seekDirInDB,
+      long countEntries,
+      TableIterator<String,
+          ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator)
+      throws IOException {
+    List<OmKeyInfo> directories = new ArrayList<>();
     iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
@@ -2331,35 +1816,35 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<OmKeyInfo> getPendingDeletionSubFiles(OmKeyInfo parentInfo,
-      long numEntries) throws IOException {
+  public List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo, long numEntries)
+          throws IOException {
     List<OmKeyInfo> files = new ArrayList<>();
-    String seekFileInDB = metadataManager.getOzonePathKey(
+    String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
-    Table fileTable = metadataManager.getKeyTable(
-        getBucketLayout(metadataManager, parentInfo.getVolumeName(),
-            parentInfo.getBucketName()));
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = fileTable.iterator();
+    Table fileTable = metadataManager.getFileTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = fileTable.iterator()) {
 
-    iterator.seek(seekFileInDB);
+      iterator.seek(seekFileInDB);
 
-    while (iterator.hasNext() && numEntries - countEntries > 0) {
-      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-      OmKeyInfo fileInfo = entry.getValue();
-      if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
-          parentInfo.getObjectID())) {
-        break;
+      while (iterator.hasNext() && numEntries - countEntries > 0) {
+        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        OmKeyInfo fileInfo = entry.getValue();
+        if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
+            parentInfo.getObjectID())) {
+          break;
+        }
+        fileInfo.setFileName(fileInfo.getKeyName());
+        String fullKeyPath = OMFileRequest.getAbsolutePath(
+            parentInfo.getKeyName(), fileInfo.getKeyName());
+        fileInfo.setKeyName(fullKeyPath);
+
+        files.add(fileInfo);
+        countEntries++;
       }
-      fileInfo.setFileName(fileInfo.getKeyName());
-      String fullKeyPath = OMFileRequest.getAbsolutePath(
-          parentInfo.getKeyName(), fileInfo.getKeyName());
-      fileInfo.setKeyName(fullKeyPath);
-
-      files.add(fileInfo);
-      countEntries++;
     }
 
     return files;
@@ -2367,34 +1852,69 @@ public class KeyManagerImpl implements KeyManager {
 
   public boolean isBucketFSOptimized(String volName, String buckName)
       throws IOException {
-    // This will never be null in reality but can be null in unit test cases.
-    // Added safer check for unit testcases.
-    if (ozoneManager == null) {
-      return false;
-    }
     String buckKey =
-        ozoneManager.getMetadataManager().getBucketKey(volName, buckName);
+        metadataManager.getBucketKey(volName, buckName);
     OmBucketInfo buckInfo =
-        ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        metadataManager.getBucketTable().get(buckKey);
     if (buckInfo != null) {
       return buckInfo.getBucketLayout().isFileSystemOptimized();
     }
     return false;
   }
 
-  private BucketLayout getBucketLayout(OMMetadataManager omMetadataManager,
-      String volName, String buckName) {
-    if (omMetadataManager == null) {
-      return BucketLayout.DEFAULT;
+  @Override
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress)
+      throws IOException {
+    Preconditions.checkNotNull(args);
+
+    OmKeyInfo value = captureLatencyNs(
+        metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
+        () -> readKeyInfo(args));
+
+    // If operation is head, do not perform any additional steps based on flags.
+    // As head operation does not need any of those details.
+    if (!args.isHeadOp()) {
+
+      // add block token for read.
+      captureLatencyNs(metrics.getGetKeyInfoGenerateBlockTokenLatencyNs(),
+          () -> addBlockToken4Read(value));
+
+      // get container pipeline info from cache.
+      captureLatencyNs(metrics.getGetKeyInfoRefreshLocationLatencyNs(),
+          () -> refreshPipelineFromCache(value,
+              args.isForceUpdateContainerCacheFromSCM()));
+
+      if (args.getSortDatanodes()) {
+        sortDatanodes(clientAddress, value);
+      }
     }
-    String buckKey = omMetadataManager.getBucketKey(volName, buckName);
-    try {
-      OmBucketInfo buckInfo = omMetadataManager.getBucketTable().get(buckKey);
-      return buckInfo.getBucketLayout();
-    } catch (IOException e) {
-      LOG.error("Cannot find the key: " + buckKey);
-    }
-    return BucketLayout.DEFAULT;
+    return value;
   }
 
+  protected void refreshPipelineFromCache(OmKeyInfo keyInfo,
+                                          boolean forceRefresh)
+      throws IOException {
+    Set<Long> containerIds = keyInfo.getKeyLocationVersions().stream()
+        .flatMap(v -> v.getLocationList().stream())
+        .map(BlockLocationInfo::getContainerID)
+        .collect(Collectors.toSet());
+
+    metrics.setForceContainerCacheRefresh(forceRefresh);
+    Map<Long, Pipeline> containerLocations =
+        scmClient.getContainerLocations(containerIds, forceRefresh);
+
+    for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
+      for (List<OmKeyLocationInfo> omKeyLocationInfoList :
+          key.getLocationLists()) {
+        for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
+          Pipeline pipeline = containerLocations.get(
+              omKeyLocationInfo.getContainerID());
+          if (pipeline != null &&
+              !pipeline.equals(omKeyLocationInfo.getPipeline())) {
+            omKeyLocationInfo.setPipeline(pipeline);
+          }
+        }
+      }
+    }
+  }
 }

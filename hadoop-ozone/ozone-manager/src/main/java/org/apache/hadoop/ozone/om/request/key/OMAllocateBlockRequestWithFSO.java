@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -141,10 +143,17 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
               volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
-      long preAllocatedSpace = newLocationList.size()
-              * ozoneManager.getScmBlockSize()
-              * openKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      long preAllocatedKeySize = newLocationList.size()
+          * ozoneManager.getScmBlockSize();
+      long hadAllocatedKeySize =
+          openKeyInfo.getLatestVersionLocations().getLocationList().size()
+              * ozoneManager.getScmBlockSize();
+      ReplicationConfig repConfig = openKeyInfo.getReplicationConfig();
+      long totalAllocatedSpace = QuotaUtil.getReplicatedSize(
+          preAllocatedKeySize, repConfig) + QuotaUtil.getReplicatedSize(
+          hadAllocatedKeySize, repConfig);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          totalAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -157,12 +166,12 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       // Add to cache.
       addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName,
               openKeyInfo);
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
+      long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse = getOmClientResponse(clientID, omResponse,
-              openKeyInfo, omBucketInfo.copyObject());
+              openKeyInfo, omBucketInfo.copyObject(), volumeId);
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
               volumeName, bucketName, openKeyName);
     } catch (IOException ex) {
@@ -198,16 +207,15 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       String keyName, long clientID, OzoneManager ozoneManager)
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(
+            volumeName, bucketName);
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-            keyName, omMetadataManager);
-    return omMetadataManager.getOpenFileName(parentID, fileName,
-            clientID);
+    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
+            pathComponents, keyName, omMetadataManager);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId, parentID,
+            fileName, clientID);
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
@@ -221,8 +229,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   @NotNull
   private OMClientResponse getOmClientResponse(long clientID,
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
-      OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo, long volumeId) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, omBucketInfo, getBucketLayout());
+            clientID, getBucketLayout(), volumeId, omBucketInfo.getObjectID());
   }
 }

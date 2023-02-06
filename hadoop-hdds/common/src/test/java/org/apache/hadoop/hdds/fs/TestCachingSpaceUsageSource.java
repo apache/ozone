@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.fs;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.Builder;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 
 import java.io.File;

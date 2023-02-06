@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.node;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -296,6 +298,37 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   void processLayoutVersionReport(DatanodeDetails datanodeDetails,
                          LayoutVersionProto layoutReport);
 
+  /**
+   * Process the Command Queue Report sent from datanodes as part of the
+   * heartbeat message.
+   * @param datanodeDetails DatanodeDetails the report is from
+   * @param commandReport Command summary report from the DN when the heartbeat
+   *                      was created.
+   * @param commandsToBeSent Summary of command counts that will be sent to
+   *                         the Datanode as part of the current heartbeat
+   */
+  void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
+      CommandQueueReportProto commandReport,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent);
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException;
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.

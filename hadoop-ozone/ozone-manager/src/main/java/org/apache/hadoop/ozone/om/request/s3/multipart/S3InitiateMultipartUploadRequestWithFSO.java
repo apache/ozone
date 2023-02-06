@@ -24,8 +24,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -143,17 +145,28 @@ public class S3InitiateMultipartUploadRequestWithFSO
           volumeName, bucketName, keyName,
           keyArgs.getMultipartUploadID());
 
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager.getBucketId(volumeName,
+              bucketName);
+
       String multipartOpenKey = omMetadataManager
-          .getMultipartKey(pathInfoFSO.getLastKnownParentId(),
-              pathInfoFSO.getLeafNodeName(), keyArgs.getMultipartUploadID());
+          .getMultipartKey(volumeId, bucketId,
+                  pathInfoFSO.getLastKnownParentId(),
+                  pathInfoFSO.getLeafNodeName(),
+                  keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
-      final ReplicationConfig replicationConfig =
-              ReplicationConfig.fromProtoTypeAndFactor(
-                      keyArgs.getType(), keyArgs.getFactor());
+      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+          volumeName, bucketName);
+      final ReplicationConfig replicationConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo != null ?
+                  bucketInfo.getDefaultReplicationConfig() :
+                  null, ozoneManager.getDefaultReplicationConfig());
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
@@ -180,12 +193,18 @@ public class S3InitiateMultipartUploadRequestWithFSO
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .build();
+      
+      // validate and update namespace for missing parent directory
+      if (null != missingParentInfos) {
+        checkBucketQuotaInNamespace(bucketInfo, missingParentInfos.size());
+        bucketInfo.incrUsedNamespace(missingParentInfos.size());
+      }
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              Optional.absent(), Optional.of(missingParentInfos),
-              transactionLogIndex);
+              volumeId, bucketId, transactionLogIndex,
+              Optional.of(missingParentInfos), Optional.absent());
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
@@ -205,7 +224,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo, multipartKey,
-              missingParentInfos, getBucketLayout());
+              missingParentInfos, getBucketLayout(), volumeId, bucketId,
+              bucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

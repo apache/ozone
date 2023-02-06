@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -36,9 +36,9 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -52,7 +52,7 @@ public class TestStorageContainerServiceProviderImpl {
   private Injector injector;
   private HddsProtos.PipelineID pipelineID;
 
-  @Before
+  @BeforeEach
   public void setup() {
     injector = Guice.createInjector(new AbstractModule() {
       @Override
@@ -75,7 +75,7 @@ public class TestStorageContainerServiceProviderImpl {
               toInstance(conf);
           bind(ReconUtils.class).toInstance(reconUtils);
         } catch (Exception e) {
-          Assert.fail();
+          Assertions.fail();
         }
       }
     });

@@ -25,7 +25,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for DefaultUpgradeFinalizationExecutor.
@@ -49,7 +49,8 @@ public class TestDefaultUpgradeFinalizationExecutor {
       }
 
       @Override
-      public void finalizeUpgrade(Object service) {
+      public void finalizeLayoutFeature(LayoutFeature layoutFeatture,
+          Object service) {
       }
 
       @Override
@@ -82,7 +83,7 @@ public class TestDefaultUpgradeFinalizationExecutor {
           }
 
           @Override
-          public void finalizeUpgrade(Object service) {
+          public void finalizeLayoutFeature(LayoutFeature lf, Object service) {
           }
 
           @Override

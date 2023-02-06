@@ -28,6 +28,7 @@ data:
   OZONE-SITE.XML_ozone.scm.names: scm-0.scm
   OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "3"
   OZONE-SITE.XML_ozone.datanode.pipeline.limit: "1"
+  OZONE-SITE.XML_dfs.datanode.use.datanode.hostname: "true"
   LOG4J.PROPERTIES_log4j.rootLogger: INFO, stdout
   LOG4J.PROPERTIES_log4j.appender.stdout: org.apache.log4j.ConsoleAppender
   LOG4J.PROPERTIES_log4j.appender.stdout.layout: org.apache.log4j.PatternLayout

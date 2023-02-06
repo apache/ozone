@@ -76,6 +76,39 @@ public interface ReplicationConfig {
     return parse(null, replication, config);
   }
 
+  static ReplicationConfig resolve(ReplicationConfig replicationConfig,
+      ReplicationConfig bucketReplicationConfig, ConfigurationSource conf) {
+    if (replicationConfig == null) {
+      replicationConfig = bucketReplicationConfig;
+    }
+    if (replicationConfig == null) {
+      replicationConfig = getDefault(conf);
+    }
+    return replicationConfig;
+  }
+
+  /**
+   * Helper method to serialize from proto.
+   * <p>
+   * This uses either the old type/factor or the new ecConfig depends on the
+   * type.
+   */
+  static ReplicationConfig fromProto(
+      HddsProtos.ReplicationType type,
+      HddsProtos.ReplicationFactor factor,
+      HddsProtos.ECReplicationConfig ecConfig) {
+    switch (type) {
+    case EC:
+      return new ECReplicationConfig(ecConfig);
+    case RATIS:
+    case STAND_ALONE:
+      return fromProtoTypeAndFactor(type, factor);
+    default:
+      throw new UnsupportedOperationException(
+          "Not supported replication: " + type);
+    }
+  }
+
   static HddsProtos.ReplicationFactor getLegacyFactor(
       ReplicationConfig replicationConfig) {
     if (replicationConfig instanceof ReplicatedReplicationConfig) {
@@ -101,9 +134,12 @@ public interface ReplicationConfig {
    */
   static ReplicationConfig adjustReplication(
       ReplicationConfig config, short replication, ConfigurationSource conf) {
-    return parse(
-        ReplicationType.valueOf(config.getReplicationType().toString()),
-        Short.toString(replication), conf);
+    ReplicationType replicationType =
+        ReplicationType.valueOf(config.getReplicationType().toString());
+    if (replicationType.equals(ReplicationType.EC)) {
+      return config;
+    }
+    return parse(replicationType, Short.toString(replication), conf);
   }
 
   /**
@@ -134,6 +170,21 @@ public interface ReplicationConfig {
     replication = Objects.toString(replication,
         config.get(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
 
+    return parseWithoutFallback(type, replication, config);
+  }
+
+  static ReplicationConfig parseWithoutFallback(ReplicationType type,
+      String replication, ConfigurationSource config) {
+
+    if (replication == null) {
+      throw new IllegalArgumentException(
+          "Replication can't be null. Replication type passed was : " + type);
+    }
+    if (type == null) {
+      throw new IllegalArgumentException(
+          "Replication type must be specified for: " + replication);
+    }
+
     ReplicationConfig replicationConfig;
     switch (type) {
     case RATIS:
@@ -142,13 +193,21 @@ public interface ReplicationConfig {
       try {
         factor = ReplicationFactor.valueOf(Integer.parseInt(replication));
       } catch (NumberFormatException ex) {
-        factor = ReplicationFactor.valueOf(replication);
+        try {
+          factor = ReplicationFactor.valueOf(replication);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(replication +
+              " is not supported for " + type + " replication type", e);
+        }
       }
       replicationConfig = fromTypeAndFactor(type, factor);
       break;
+    case EC:
+      replicationConfig = new ECReplicationConfig(replication);
+      break;
     default:
-      throw new RuntimeException("Replication type" + type + " can not"
-          + "be parsed.");
+      throw new IllegalArgumentException("Replication type " + type +
+              " can not be parsed.");
     }
 
     ReplicationConfigValidator validator =
@@ -167,5 +226,12 @@ public interface ReplicationConfig {
    * Number of required nodes for this replication.
    */
   int getRequiredNodes();
+
+  /**
+   * Returns the replication option in string format.
+   */
+  String getReplication();
+
+  String configFormat();
 
 }

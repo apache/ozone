@@ -18,12 +18,15 @@
  */
 package org.apache.hadoop.ozone.upgrade;
 
+import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.common.StorageInfo;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Upgrade related test utility methods.
@@ -50,5 +53,61 @@ public final class UpgradeTestUtils {
     info.writeTo(versionFile);
 
     return versionFile;
+  }
+
+  /**
+   * @param haltingPoint Where to halt finalization in the returned
+   *     executor's {@code execute} method.
+   * @param pauseLatch The latch that will be counted down 1 by the
+   *     executor when the upgrade finalization has been paused.
+   * @param unpauseLatch The latch that the caller should count down to
+   *     resume upgrade finalization.
+   * @param log Where to log messages about pausing and resuming finalization.
+   * @return A new InjectedUpgradeFinalizationExecutor
+   */
+  public static <T> InjectedUpgradeFinalizationExecutor<T>
+      newPausingFinalizationExecutor(UpgradeTestInjectionPoints haltingPoint,
+      CountDownLatch pauseLatch, CountDownLatch unpauseLatch, Logger log) {
+    InjectedUpgradeFinalizationExecutor<T>
+        executor = new InjectedUpgradeFinalizationExecutor<>();
+    executor.configureTestInjectionFunction(haltingPoint, () -> {
+      log.info("Halting upgrade finalization at point: {}", haltingPoint);
+      try {
+        pauseLatch.countDown();
+        unpauseLatch.await();
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        throw new IOException("SCM test finalization interrupted.", ex);
+      }
+      log.info("Upgrade finalization resumed from point: {}", haltingPoint);
+      return false;
+    });
+
+    return executor;
+  }
+
+  /**
+   * @param haltingPoint Where to halt finalization in the returned
+   *     executor's {@code execute} method.
+   * @param terminateLatch The latch that will be counted down 1 by the
+   *    executor when the upgrade finalization has been terminated.
+   * @param log Where to log messages about pausing and resuming finalization.
+   * @return A new InjectedUpgradeFinalizationExecutor
+   */
+  public static <T> InjectedUpgradeFinalizationExecutor<T>
+      newTerminatingFinalizationExecutor(
+          UpgradeTestInjectionPoints haltingPoint,
+      CountDownLatch terminateLatch, Logger log) {
+    InjectedUpgradeFinalizationExecutor<T>
+        executor =
+        new InjectedUpgradeFinalizationExecutor<>();
+    executor.configureTestInjectionFunction(haltingPoint, () -> {
+      log.info("Terminating upgrade finalization at point: {}. This is " +
+          "expected test execution.", haltingPoint);
+      terminateLatch.countDown();
+      return true;
+    });
+
+    return executor;
   }
 }

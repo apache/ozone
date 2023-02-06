@@ -31,14 +31,16 @@ import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -55,12 +57,14 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 /**
  * Test class for {@link OzoneDelegationTokenSecretManager}.
  */
 public class TestOzoneDelegationTokenSecretManager {
 
+  private OzoneManager om;
   private OzoneDelegationTokenSecretManager secretManager;
   private SecurityConfig securityConfig;
   private CertificateClient certificateClient;
@@ -87,6 +91,7 @@ public class TestOzoneDelegationTokenSecretManager {
     final Map<String, String> s3Secrets = new HashMap<>();
     s3Secrets.put("testuser1", s3Secret);
     s3Secrets.put("abc", "djakjahkd");
+    om = Mockito.mock(OzoneManager.class);
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf);
     s3SecretManager = new S3SecretManagerImpl(conf, metadataManager) {
       @Override
@@ -159,6 +164,39 @@ public class TestOzoneDelegationTokenSecretManager {
   @After
   public void tearDown() throws IOException {
     secretManager.stop();
+  }
+
+  @Test
+  public void testLeadershipCheckinRetrievePassword() throws Exception {
+    secretManager = createSecretManager(conf, tokenMaxLifetime,
+        expiryTime, tokenRemoverScanInterval);
+    Mockito.doThrow(new OMNotLeaderException("Not leader"))
+        .when(om).checkLeaderStatus();
+    OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
+    try {
+      secretManager.retrievePassword(identifier);
+    } catch (Exception e) {
+      Assert.assertEquals(SecretManager.InvalidToken.class, e.getClass());
+      Assert.assertEquals(OMNotLeaderException.class, e.getCause().getClass());
+    }
+
+    Mockito.doThrow(new OMLeaderNotReadyException("Leader not ready"))
+        .when(om).checkLeaderStatus();
+    try {
+      secretManager.retrievePassword(identifier);
+    } catch (Exception e) {
+      Assert.assertEquals(SecretManager.InvalidToken.class, e.getClass());
+      Assert.assertEquals(OMLeaderNotReadyException.class,
+          e.getCause().getClass());
+    }
+
+    Mockito.doNothing().when(om).checkLeaderStatus();
+    try {
+      secretManager.retrievePassword(identifier);
+    } catch (Exception e) {
+      Assert.assertEquals(SecretManager.InvalidToken.class, e.getClass());
+      Assert.assertNull(e.getCause());
+    }
   }
 
   @Test
@@ -413,6 +451,7 @@ public class TestOzoneDelegationTokenSecretManager {
         .setTokenRenewInterval(expiry)
         .setTokenRemoverScanInterval(tokenRemoverScanTime)
         .setService(serviceRpcAdd)
+        .setOzoneManager(om)
         .setS3SecretManager(s3SecretManager)
         .setCertificateClient(certificateClient)
         .setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT)

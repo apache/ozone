@@ -89,6 +89,7 @@ public class TestMiniOzoneCluster {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, TEST_ROOT.toString());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     WRITE_TMP.mkdirs();
     READ_TMP.mkdirs();
   }
@@ -215,6 +216,10 @@ public class TestMiniOzoneCluster {
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, true);
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        true);
+    ozoneConf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     List<DatanodeStateMachine> stateMachines = new ArrayList<>();
     try {
 
@@ -278,6 +283,22 @@ public class TestMiniOzoneCluster {
       assertEquals(ports.iterator().next().intValue(),
           conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
               OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT));
+    }
+  }
+
+  @Test
+  public void testKeepPortsWhenRestartDN() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+    DatanodeDetails before =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    cluster.restartHddsDatanode(0, true);
+    DatanodeDetails after =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    for (Port.Name name : Port.Name.ALL_PORTS) {
+      assertEquals(before.getPort(name), after.getPort(name));
     }
   }
 

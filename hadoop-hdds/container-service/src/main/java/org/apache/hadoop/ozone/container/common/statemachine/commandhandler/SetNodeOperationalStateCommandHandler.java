@@ -143,4 +143,9 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
     return invocations == 0 ?
         0 : totalTime.get() / invocations;
   }
+
+  @Override
+  public int getQueuedCount() {
+    return 0;
+  }
 }

@@ -48,7 +48,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = createRenameKeyRequest(false);
 
     OMKeysRenameRequest omKeysRenameRequest =
-        new OMKeysRenameRequest(modifiedOmRequest);
+        new OMKeysRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeysRenameResponse =
         omKeysRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -78,7 +78,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = createRenameKeyRequest(true);
 
     OMKeysRenameRequest omKeysRenameRequest =
-        new OMKeysRenameRequest(modifiedOmRequest);
+        new OMKeysRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeysRenameResponse =
         omKeysRenameRequest.validateAndUpdateCache(ozoneManager, 100L,

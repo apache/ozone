@@ -33,7 +33,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.failure.FailureManager;
@@ -104,7 +105,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       OMHAService omService, SCMHAService scmService,
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
-    super(conf, omService, scmService, hddsDatanodes, clusterPath, null);
+    super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
+        clusterPath, null);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
@@ -244,8 +246,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       conf.setStorageSize(
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
           0, org.apache.hadoop.hdds.conf.StorageUnit.MB);
-      conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
-          TimeUnit.MILLISECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 10,
           TimeUnit.SECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 20,
@@ -425,11 +425,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     failedScmSet.add(scm);
   }
 
-  public void restartStorageContainerManager(StorageContainerManager scm,
-      boolean waitForScm) throws IOException, TimeoutException,
-      InterruptedException, AuthenticationException {
-    super.restartStorageContainerManager(scm, waitForScm);
+  public StorageContainerManager restartStorageContainerManager(
+      StorageContainerManager scm, boolean waitForScm)
+      throws IOException, TimeoutException, InterruptedException,
+      AuthenticationException {
     failedScmSet.remove(scm);
+    return super.restartStorageContainerManager(scm, waitForScm);
   }
 
   // Should the selected node be stopped or started.

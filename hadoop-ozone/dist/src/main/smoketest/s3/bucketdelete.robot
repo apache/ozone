@@ -39,6 +39,7 @@ Delete existing bucket
     Execute AWSS3APICli        delete-bucket --bucket ${bucket}
 
 Delete non-existent bucket
+    [tags]    no-bucket-type
     ${randStr} =   Generate Ozone String
     ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket-${randStr}    255
                    Should contain                     ${result}                              NoSuchBucket

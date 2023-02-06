@@ -79,7 +79,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
         }
       }
     } catch (Exception e) {
-      LOG.debug("Unexpected Error: {} ", e);
+      LOG.error("Exception during finalization.", e);
     } finally {
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;
@@ -116,6 +116,11 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
     if (invocationCount.get() > 0) {
       return totalTime / invocationCount.get();
     }
+    return 0;
+  }
+
+  @Override
+  public int getQueuedCount() {
     return 0;
   }
 }

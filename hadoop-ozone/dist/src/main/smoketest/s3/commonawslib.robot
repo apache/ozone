@@ -36,12 +36,19 @@ Execute AWSS3APICli and checkrc
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}
     [return]          ${output}
 
+Execute AWSS3APICli and ignore error
+    [Arguments]       ${command}
+    ${output} =       Execute And Ignore Error   aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
+    [return]          ${output}
+
 Execute AWSS3Cli
     [Arguments]       ${command}
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
 Install aws cli
+    ${rc}              ${output} =                 Run And Return Rc And Output           which aws
+    Return From Keyword If    '${rc}' == '0'
     ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
     Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
     ${rc}              ${output} =                 Run And Return Rc And Output           yum --help
@@ -65,7 +72,8 @@ Setup v4 headers
 Setup secure v4 headers
     ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
-    ${accessKey} =      Get Variable Value         ${accessKey}  sdsdasaasdasd
+    # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
+    ${accessKey} =      Get Variable Value         ${accessKey}  testuser
     ${secret} =         Get Regexp Matches         ${result}     (?<=awsSecret=).*
     ${accessKey} =      Set Variable               ${accessKey[0]}
     ${secret} =         Set Variable               ${secret[0]}
@@ -105,6 +113,7 @@ Setup s3 tests
                        Set Suite Variable                        ${BUCKET}
                        Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
                        Run Keyword if                            '${BUCKET}' == 'encrypted'            Create encrypted bucket
+                       Run Keyword if                            '${BUCKET}' == 'erasure'              Create EC bucket
 
 Setup links for S3 tests
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
@@ -123,6 +132,11 @@ Create link
     [arguments]       ${bucket}
     Execute           ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/${bucket}
     [return]          ${bucket}
+
+Create EC bucket
+    ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/erasure
+    Return From Keyword If    ${exists}
+    Execute            ozone sh bucket create --replication rs-3-2-1024k --type EC o3://${OM_SERVICE_ID}/s3v/erasure
 
 Generate random prefix
     ${random} =          Generate Ozone String

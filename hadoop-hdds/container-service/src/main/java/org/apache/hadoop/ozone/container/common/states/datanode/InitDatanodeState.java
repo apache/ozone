@@ -125,7 +125,7 @@ public class InitDatanodeState implements DatanodeState,
     File idPath = new File(dataNodeIDPath);
     DatanodeDetails datanodeDetails = this.context.getParent()
         .getDatanodeDetails();
-    if (datanodeDetails != null && !idPath.exists()) {
+    if (datanodeDetails != null) {
       try {
         ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
       } catch (IOException ex) {

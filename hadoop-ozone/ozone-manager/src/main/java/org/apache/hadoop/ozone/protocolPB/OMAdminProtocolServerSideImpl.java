@@ -84,7 +84,7 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     }
 
     OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-    checkLeaderStatus(omRatisServer);
+    OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
 
     OMNodeDetails decommNode = ozoneManager.getPeerNode(request.getNodeId());
     if (decommNode == null) {
@@ -106,11 +106,5 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     return DecommissionOMResponse.newBuilder()
         .setSuccess(true)
         .build();
-  }
-
-  private void checkLeaderStatus(OzoneManagerRatisServer omRatisServer)
-      throws ServiceException {
-    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
-        omRatisServer.getRaftPeerId());
   }
 }

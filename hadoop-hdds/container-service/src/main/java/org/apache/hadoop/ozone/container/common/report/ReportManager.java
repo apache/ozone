@@ -28,7 +28,7 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,7 +129,7 @@ public final class ReportManager {
      *
      * @return ReportManager.Builder
      */
-    public Builder addPublisherFor(Class<? extends GeneratedMessage> report) {
+    public Builder addPublisherFor(Class<? extends Message> report) {
       reportPublishers.add(publisherFactory.getPublisherFor(report));
       return this;
     }

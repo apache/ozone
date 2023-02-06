@@ -29,7 +29,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMInterServiceProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
@@ -53,7 +53,7 @@ public class OMInterServiceProtocolClientSideImpl implements
   private static final Logger LOG =
       LoggerFactory.getLogger(OMInterServiceProtocolClientSideImpl.class);
 
-  private final OMFailoverProxyProvider omFailoverProxyProvider;
+  private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
 
   private final OMInterServiceProtocolPB rpcProxy;
 
@@ -63,8 +63,8 @@ public class OMInterServiceProtocolClientSideImpl implements
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OMInterServiceProtocolPB.class, ProtobufRpcEngine.class);
 
-    this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
-        omServiceId, OMInterServiceProtocolPB.class);
+    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider(
+            conf, ugi, omServiceId, OMInterServiceProtocolPB.class);
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -88,14 +88,14 @@ public class OMInterServiceProtocolClientSideImpl implements
       response = rpcProxy.bootstrap(NULL_RPC_CONTROLLER, bootstrapOMRequest);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
-          OMFailoverProxyProvider.getNotLeaderException(e);
+          HadoopRpcOMFailoverProxyProvider.getNotLeaderException(e);
       if (notLeaderException != null) {
         throwException(ErrorCode.LEADER_UNDETERMINED,
             notLeaderException.getMessage());
       }
 
       OMLeaderNotReadyException leaderNotReadyException =
-          OMFailoverProxyProvider.getLeaderNotReadyException(e);
+          HadoopRpcOMFailoverProxyProvider.getLeaderNotReadyException(e);
       if (leaderNotReadyException != null) {
         throwException(ErrorCode.LEADER_NOT_READY,
             leaderNotReadyException.getMessage());

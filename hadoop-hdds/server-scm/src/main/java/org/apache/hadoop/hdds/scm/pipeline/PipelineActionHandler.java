@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Handles pipeline actions from datanode.
@@ -102,7 +103,7 @@ public class PipelineActionHandler
       }
       publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(datanode.getUuid(), command));
-    } catch (IOException ioe) {
+    } catch (IOException | TimeoutException ioe) {
       LOG.error("Could not execute pipeline action={} pipeline={}",
           action, pid, ioe);
     }

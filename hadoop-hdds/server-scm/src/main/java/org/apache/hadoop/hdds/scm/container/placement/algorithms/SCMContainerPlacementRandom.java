@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -40,7 +41,7 @@ import java.util.List;
  * can be practically used.
  */
 public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
-    implements PlacementPolicy {
+    implements PlacementPolicy<ContainerReplica> {
   @VisibleForTesting
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
@@ -60,7 +61,8 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
   /**
    * Choose datanodes called by the SCM to choose the datanode.
    *
-   *
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
@@ -70,13 +72,15 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired,
-      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+  protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, final int nodesRequired,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
     List<DatanodeDetails> healthyNodes =
-        super.chooseDatanodes(excludedNodes, favoredNodes, nodesRequired,
-            metadataSizeRequired, dataSizeRequired);
+        super.chooseDatanodesInternal(usedNodes, excludedNodes, favoredNodes,
+                nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;

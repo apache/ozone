@@ -235,6 +235,17 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Checks if the OperationalState is Node is Decomissioned or Decomissioning.
+   * @return True if OperationalState is Decommissioned or Decomissioning.
+   */
+  public boolean isDecomissioned() {
+    return this.getPersistedOpState() ==
+            HddsProtos.NodeOperationalState.DECOMMISSIONED ||
+            this.getPersistedOpState() ==
+            HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  }
+
+  /**
    * Set the persistedOpState for this instance.
    *
    * @param state The new operational state.
@@ -273,8 +284,10 @@ public class DatanodeDetails extends NodeImpl implements
         return port;
       }
     }
-    // if no separate admin/server port, return single Ratis one for compat
-    if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER) {
+    // if no separate admin/server/datastream port, return single Ratis one for
+    // compat
+    if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER ||
+        name == Name.RATIS_DATASTREAM) {
       return getPort(Name.RATIS);
     }
     return null;
@@ -481,6 +494,10 @@ public class DatanodeDetails extends NodeImpl implements
 
   @Override
   public String toString() {
+    return uuidString + "(" + hostName + "/" + ipAddress + ")";
+  }
+
+  public String toDebugString() {
     return uuid.toString() + "{" +
         "ip: " +
         ipAddress +
@@ -784,7 +801,8 @@ public class DatanodeDetails extends NodeImpl implements
      * Ports that are supported in DataNode.
      */
     public enum Name {
-      STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER;
+      STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
+      RATIS_DATASTREAM;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());

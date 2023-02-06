@@ -30,6 +30,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -55,7 +56,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -117,7 +118,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
     createParentPath(volumeName, bucketName);
 
@@ -156,7 +157,7 @@ public class TestS3MultipartUploadCommitPartRequest
     String keyName = getKeyName();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+        omMetadataManager, getBucketLayout());
 
 
     long clientID = Time.now();
@@ -230,13 +231,13 @@ public class TestS3MultipartUploadCommitPartRequest
   }
 
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     return omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
   }
 
   protected String getOpenKey(String volumeName, String bucketName,
-      String keyName, long clientID) {
+      String keyName, long clientID) throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
   }
