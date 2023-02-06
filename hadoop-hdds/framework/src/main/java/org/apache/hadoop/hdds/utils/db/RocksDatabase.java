@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
@@ -443,6 +444,9 @@ public final class RocksDatabase {
       counter.incrementAndGet();
       options.setWaitForFlush(true);
       db.get().flush(options);
+      for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
+        db.get().flush(options, columnFamily.handle);
+      }
     } catch (RocksDBException e) {
       closeOnError(e, true);
       throw toIOException(this, "flush", e);
@@ -493,6 +497,50 @@ public final class RocksDatabase {
     } catch (RocksDBException e) {
       closeOnError(e, true);
       throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void compactRangeDefault(final ManagedCompactRangeOptions options)
+      throws IOException {
+    try {
+      counter.incrementAndGet();
+      db.get().compactRange(null, null, null, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void compactRange(ColumnFamily family, final byte[] begin,
+                           final byte[] end,
+                           final ManagedCompactRangeOptions options)
+      throws IOException {
+    try {
+      counter.incrementAndGet();
+      db.get().compactRange(family.getHandle(), begin, end, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void compactDB(ManagedCompactRangeOptions options) throws IOException {
+    compactRangeDefault(options);
+    for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
+      compactRange(columnFamily, null, null, options);
+    }
+  }
+
+  public int getLiveFilesMetaDataSize() {
+    try {
+      counter.incrementAndGet();
+      return db.get().getLiveFilesMetaData().size();
     } finally {
       counter.decrementAndGet();
     }
