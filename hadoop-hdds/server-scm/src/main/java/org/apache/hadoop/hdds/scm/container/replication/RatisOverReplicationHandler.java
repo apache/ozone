@@ -44,7 +44,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-
 /**
  * This class handles Ratis containers that are over replicated. It should
  * be used to obtain SCMCommands that can be sent to datanodes to solve
