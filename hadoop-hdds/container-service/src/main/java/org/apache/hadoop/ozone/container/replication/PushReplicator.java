@@ -36,15 +36,15 @@ public class PushReplicator implements ContainerReplicator {
   private static final Logger LOG =
       LoggerFactory.getLogger(PushReplicator.class);
 
+  private final ConfigurationSource conf;
   private final ContainerReplicationSource source;
   private final ContainerUploader uploader;
-  private final CopyContainerCompression compression;
 
   public PushReplicator(ConfigurationSource conf,
       ContainerReplicationSource source, ContainerUploader uploader) {
+    this.conf = conf;
     this.source = source;
     this.uploader = uploader;
-    compression = CopyContainerCompression.getConf(conf);
   }
 
   @Override
@@ -52,6 +52,11 @@ public class PushReplicator implements ContainerReplicator {
     long containerID = task.getContainerId();
     DatanodeDetails target = task.getTarget();
     CompletableFuture<Void> fut = new CompletableFuture<>();
+    CopyContainerCompression compression =
+        CopyContainerCompression.getConf(conf);
+
+    LOG.info("Starting replication of container {} to {} using {}",
+        containerID, target, compression);
 
     source.prepare(containerID);
 
