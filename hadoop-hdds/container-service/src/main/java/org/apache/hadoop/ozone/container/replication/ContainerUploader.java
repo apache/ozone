@@ -28,5 +28,6 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface ContainerUploader {
   OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback) throws IOException;
+      CompletableFuture<Void> callback, CopyContainerCompression compression)
+      throws IOException;
 }

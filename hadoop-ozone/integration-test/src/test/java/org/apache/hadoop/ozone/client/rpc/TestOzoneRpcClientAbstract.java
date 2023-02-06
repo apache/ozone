@@ -892,10 +892,11 @@ public abstract class TestOzoneRpcClientAbstract {
       out.close();
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
-      OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        is.read(fileContent);
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+      }
     } else {
       Assertions.assertThrows(IllegalArgumentException.class,
               () -> bucket.createKey(keyName, "dummy".getBytes(UTF_8).length,
@@ -925,15 +926,16 @@ public abstract class TestOzoneRpcClientAbstract {
       out.close();
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
-      OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
-      verifyReplication(volumeName, bucketName, keyName,
-          RatisReplicationConfig.getInstance(
-              HddsProtos.ReplicationFactor.ONE));
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        is.read(fileContent);
+        verifyReplication(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE));
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+        Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+        Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      }
     }
   }
 
@@ -1484,16 +1486,16 @@ public abstract class TestOzoneRpcClientAbstract {
       out.close();
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
-      OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
-      is.close();
-      verifyReplication(volumeName, bucketName, keyName,
-          RatisReplicationConfig.getInstance(
-              HddsProtos.ReplicationFactor.ONE));
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        is.read(fileContent);
+        verifyReplication(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE));
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+        Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+        Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      }
     }
   }
 
@@ -1519,16 +1521,16 @@ public abstract class TestOzoneRpcClientAbstract {
       out.close();
       OzoneKey key = bucket.getKey(keyName);
       Assert.assertEquals(keyName, key.getName());
-      OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
-      is.close();
-      verifyReplication(volumeName, bucketName, keyName,
-          RatisReplicationConfig.getInstance(
-              HddsProtos.ReplicationFactor.THREE));
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        is.read(fileContent);
+        verifyReplication(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE));
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+        Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+        Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      }
     }
   }
 
@@ -1560,14 +1562,14 @@ public abstract class TestOzoneRpcClientAbstract {
           out.close();
           OzoneKey key = bucket.getKey(keyName);
           Assert.assertEquals(keyName, key.getName());
-          OzoneInputStream is = bucket.readKey(keyName);
-          byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-          is.read(fileContent);
-          is.close();
-          verifyReplication(volumeName, bucketName, keyName,
-              RatisReplicationConfig.getInstance(
-                  HddsProtos.ReplicationFactor.THREE));
-          Assert.assertEquals(data, new String(fileContent, UTF_8));
+          try (OzoneInputStream is = bucket.readKey(keyName)) {
+            byte[] fileContent = new byte[data.getBytes(UTF_8).length];
+            is.read(fileContent);
+            verifyReplication(volumeName, bucketName, keyName,
+                RatisReplicationConfig.getInstance(
+                    HddsProtos.ReplicationFactor.THREE));
+            Assert.assertEquals(data, new String(fileContent, UTF_8));
+          }
           Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
           Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
         }
@@ -1670,9 +1672,9 @@ public abstract class TestOzoneRpcClientAbstract {
       configuration.setFromObject(clientConfig);
 
       RpcClient client = new RpcClient(configuration, null);
-      OzoneInputStream is = client.getKey(volumeName, bucketName, keyName);
-      is.read(new byte[100]);
-      is.close();
+      try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
+        is.read(new byte[100]);
+      }
       if (verifyChecksum) {
         fail("Reading corrupted data should fail, as verify checksum is " +
             "enabled");
@@ -1683,17 +1685,6 @@ public abstract class TestOzoneRpcClientAbstract {
             "disabled");
       }
     }
-  }
-
-
-  private void readKey(OzoneBucket bucket, String keyName, String data)
-      throws IOException {
-    OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
-    OzoneInputStream is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-    is.read(fileContent);
-    is.close();
   }
 
   @Test
@@ -1774,7 +1765,12 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
 
-    assertInputStreamContent(keyValue, keyDetails.getContent());
+    OzoneInputStream inputStream = keyDetails.getContent();
+    try {
+      assertInputStreamContent(keyValue, inputStream);
+    } finally {
+      inputStream.close();
+    }
   }
 
   private void assertInputStreamContent(String expected, InputStream is)
@@ -1829,8 +1825,9 @@ public abstract class TestOzoneRpcClientAbstract {
     // Try reading the key. Since the chunk file is corrupted, it should
     // throw a checksum mismatch exception.
     try {
-      OzoneInputStream is = bucket.readKey(keyName);
-      is.read(new byte[100]);
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        is.read(new byte[100]);
+      }
       fail("Reading corrupted data should fail.");
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("Checksum mismatch", e);
@@ -1925,11 +1922,12 @@ public abstract class TestOzoneRpcClientAbstract {
     // Try reading keyName2
     try {
       GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
-      OzoneInputStream is = bucket.readKey(keyName2);
-      byte[] content = new byte[100];
-      is.read(content);
-      String retValue = new String(content, UTF_8);
-      Assert.assertTrue(value.equals(retValue.trim()));
+      try (OzoneInputStream is = bucket.readKey(keyName2)) {
+        byte[] content = new byte[100];
+        is.read(content);
+        String retValue = new String(content, UTF_8);
+        Assert.assertTrue(value.equals(retValue.trim()));
+      }
     } catch (IOException e) {
       fail("Reading unhealthy replica should succeed.");
     }
@@ -1985,8 +1983,7 @@ public abstract class TestOzoneRpcClientAbstract {
     corruptData(containerList.get(0), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
-    try {
-      OzoneInputStream is = bucket.readKey(keyName);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
       is.read(b);
       Assert.assertTrue(Arrays.equals(b, data));
@@ -1996,8 +1993,7 @@ public abstract class TestOzoneRpcClientAbstract {
     corruptData(containerList.get(1), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
-    try {
-      OzoneInputStream is = bucket.readKey(keyName);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
       is.read(b);
       Assert.assertTrue(Arrays.equals(b, data));
@@ -2006,8 +2002,7 @@ public abstract class TestOzoneRpcClientAbstract {
     }
     corruptData(containerList.get(2), key);
     // Try reading the key. Read will fail here as all the replica are corrupt
-    try {
-      OzoneInputStream is = bucket.readKey(keyName);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[data.length];
       is.read(b);
       fail("Reading corrupted data should fail.");
@@ -2808,8 +2803,7 @@ public abstract class TestOzoneRpcClientAbstract {
     completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
 
     // User without permission cannot read multi-uploaded object
-    try {
-      OzoneInputStream inputStream = bucket2.readKey(keyName);
+    try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
       fail("User without permission should fail");
     } catch (Exception e) {
       assertTrue(e instanceof OMException);
@@ -3043,8 +3037,9 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertNotNull(omMultipartCommitUploadPartInfo);
 
     byte[] fileContent = new byte[data.length];
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    inputStream.read(fileContent);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      inputStream.read(fileContent);
+    }
     StringBuilder sb = new StringBuilder(data.length);
 
     // Combine all parts data, and check is it matching with get key data.
@@ -3668,8 +3663,9 @@ public abstract class TestOzoneRpcClientAbstract {
     //Now Read the key which has been completed multipart upload.
     byte[] fileContent = new byte[data.length + data.length + part3.getBytes(
         UTF_8).length];
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    inputStream.read(fileContent);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      inputStream.read(fileContent);
+    }
 
     verifyReplication(bucket.getVolumeName(), bucket.getName(), keyName,
         replication);
@@ -3821,10 +3817,11 @@ public abstract class TestOzoneRpcClientAbstract {
         key.getMetadata().get(OzoneConsts.GDPR_ALGORITHM));
     Assert.assertNotNull(key.getMetadata().get(OzoneConsts.GDPR_SECRET));
 
-    OzoneInputStream is = bucket.readKey(keyName);
-    assertInputStreamContent(text, is);
-    verifyReplication(volumeName, bucketName, keyName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      assertInputStreamContent(text, is);
+      verifyReplication(volumeName, bucketName, keyName,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+    }
 
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -3841,13 +3838,14 @@ public abstract class TestOzoneRpcClientAbstract {
     key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
     Assert.assertNull(key.getMetadata().get(OzoneConsts.GDPR_FLAG));
-    is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[text.getBytes(UTF_8).length];
-    is.read(fileContent);
 
-    //Step 6
-    Assert.assertNotEquals(text, new String(fileContent, UTF_8));
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[text.getBytes(UTF_8).length];
+      is.read(fileContent);
 
+      //Step 6
+      Assert.assertNotEquals(text, new String(fileContent, UTF_8));
+    }
   }
 
   /**
@@ -3898,8 +3896,9 @@ public abstract class TestOzoneRpcClientAbstract {
         key.getMetadata().get(OzoneConsts.GDPR_ALGORITHM));
     Assert.assertTrue(key.getMetadata().get(OzoneConsts.GDPR_SECRET) != null);
 
-    OzoneInputStream is = bucket.readKey(keyName);
-    assertInputStreamContent(text, is);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      assertInputStreamContent(text, is);
+    }
     verifyReplication(volumeName, bucketName, keyName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
 

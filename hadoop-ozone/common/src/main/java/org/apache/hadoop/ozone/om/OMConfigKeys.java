@@ -207,6 +207,10 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
 
+  public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
+      "ozone.om.fs.snapshot.max.limit";
+  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 1000;
+
   public static final String OZONE_OM_KERBEROS_KEYTAB_FILE_KEY = "ozone.om."
       + "kerberos.keytab.file";
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
@@ -315,6 +319,16 @@ public final class OMConfigKeys {
   public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
+
+  public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.filtering.limit.per.task";
+  public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
+
+  public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
+      "ozone.snapshot.filtering.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
+
 
   public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
       "ozone.om.grpc.maximum.response.length";

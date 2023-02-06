@@ -17,15 +17,17 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import com.google.common.collect.ImmutableMap;
+import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.ConfigurationTarget;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPLICATION_COMPRESSION;
 
@@ -34,45 +36,94 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPLICATION_C
  */
 public enum CopyContainerCompression {
 
-  NO_COMPRESSION,
-  GZIP,
-  LZ4,
-  SNAPPY,
-  ZSTD;
+  NO_COMPRESSION("no_compression") {
+    @Override
+    public InputStream wrap(InputStream input) {
+      return input;
+    }
+
+    @Override
+    public OutputStream wrap(OutputStream output) {
+      return output;
+    }
+  },
+  GZIP(CompressorStreamFactory.GZIP),
+  LZ4(CompressorStreamFactory.LZ4_FRAMED),
+  SNAPPY(CompressorStreamFactory.SNAPPY_FRAMED),
+  ZSTD(CompressorStreamFactory.ZSTANDARD);
+
+  private final String compressorFactoryName;
+
+  CopyContainerCompression(String compressorFactoryName) {
+    this.compressorFactoryName = compressorFactoryName;
+  }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CopyContainerCompression.class);
 
   private static final CopyContainerCompression DEFAULT_COMPRESSION =
       CopyContainerCompression.NO_COMPRESSION;
-  private static final Map<CopyContainerCompression, String>
-      COMPRESSION_MAPPING = ImmutableMap.copyOf(getMapping());
-
-  private static Map<CopyContainerCompression, String> getMapping() {
-    return new HashMap<CopyContainerCompression, String>() { {
-        put(NO_COMPRESSION, "no_compression");
-        put(GZIP, CompressorStreamFactory.GZIP);
-        put(LZ4, CompressorStreamFactory.LZ4_FRAMED);
-        put(SNAPPY, CompressorStreamFactory.SNAPPY_FRAMED);
-        put(ZSTD, CompressorStreamFactory.ZSTANDARD);
-      }};
-  }
-
-  public static Map<CopyContainerCompression, String> getCompressionMapping() {
-    return COMPRESSION_MAPPING;
-  }
 
   public static CopyContainerCompression getConf(ConfigurationSource conf) {
     try {
       return conf.getEnum(HDDS_CONTAINER_REPLICATION_COMPRESSION,
           DEFAULT_COMPRESSION);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Unsupported compression codec. Skip compression.");
+      LOG.warn("Unsupported compression codec {}, defaulting to {}",
+          conf.get(HDDS_CONTAINER_REPLICATION_COMPRESSION),
+          DEFAULT_COMPRESSION);
       return DEFAULT_COMPRESSION;
     }
   }
 
+  public void setOn(ConfigurationTarget conf) {
+    conf.setEnum(HDDS_CONTAINER_REPLICATION_COMPRESSION, this);
+  }
+
   public static CopyContainerCompression getDefaultCompression() {
     return NO_COMPRESSION;
+  }
+
+  public ContainerProtos.CopyContainerCompressProto toProto() {
+    return ContainerProtos.CopyContainerCompressProto.valueOf(name());
+  }
+
+  public static CopyContainerCompression fromProto(
+      ContainerProtos.CopyContainerCompressProto proto) {
+    if (proto == null) {
+      return getDefaultCompression();
+    }
+
+    try {
+      return valueOf(proto.name());
+    } catch (IllegalArgumentException e) {
+      return getDefaultCompression();
+    }
+  }
+
+  public InputStream wrap(InputStream input) throws IOException {
+    try {
+      return new CompressorStreamFactory().createCompressorInputStream(
+          compressorFactoryName, input);
+    } catch (CompressorException e) {
+      throw toIOException(e);
+    }
+  }
+
+  public OutputStream wrap(OutputStream output) throws IOException {
+    try {
+      return new CompressorStreamFactory().createCompressorOutputStream(
+          compressorFactoryName, output);
+    } catch (CompressorException e) {
+      throw toIOException(e);
+    }
+  }
+
+  private static IOException toIOException(CompressorException e) {
+    Throwable cause = e.getCause();
+    if (cause instanceof IOException) {
+      return (IOException) cause;
+    }
+    return new IOException(e);
   }
 }
