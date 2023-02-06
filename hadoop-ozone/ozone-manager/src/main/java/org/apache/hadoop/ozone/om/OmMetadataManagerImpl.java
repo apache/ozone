@@ -930,7 +930,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           iterator.next();
       String key = entry.getKey().getCacheKey();
       SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      // Making sure that entry is not for delete key request.
       if (key.startsWith(keyPrefix) && snapshotInfo != null) {
         return true;
       }
