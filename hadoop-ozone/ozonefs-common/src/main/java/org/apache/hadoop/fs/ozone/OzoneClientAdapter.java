@@ -27,6 +27,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.security.token.Token;
 
 /**
@@ -86,4 +87,7 @@ public interface OzoneClientAdapter {
   FileChecksum getFileChecksum(String keyName, long length) throws IOException;
 
   String createSnapshot(String pathStr, String snapshotName) throws IOException;
+
+  SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot) throws IOException;
 }

@@ -63,7 +63,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
   <properties>
     <hadoop2.version>2.7.3</hadoop2.version>
-    <hadoop.version>3.3.4</hadoop.version>
+    <!--<version>3.4.0-SNAPSHOT</version>-->
+    <hadoop.version>3.4.0-SNAPSHOT</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
@@ -177,6 +178,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <disruptor.version>3.4.2</disruptor.version>
     <reload4j.version>1.2.22</reload4j.version>
 
+    <kerby.version>2.0.2</kerby.version>
     <kotlin.version>1.6.21</kotlin.version>
     <metainf-services.version>1.8</metainf-services.version>
     <picocli.version>4.6.1</picocli.version>

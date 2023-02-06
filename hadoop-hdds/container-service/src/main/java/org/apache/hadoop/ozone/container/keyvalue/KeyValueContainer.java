@@ -671,6 +671,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     this.lock.writeLock().lock();
   }
 
+  @Override
+  public void readUnlock(String opName) {
+    // not used anywhere, implemented as part of interface.
+    this.lock.writeLock().lock();
+  }
+
+  @Override
+  public void writeUnlock(String opName) {
+    // not used anywhere, implemented as part of interface.
+    this.lock.writeLock().unlock();
+  }
+
   /**
    * Release write lock.
    */

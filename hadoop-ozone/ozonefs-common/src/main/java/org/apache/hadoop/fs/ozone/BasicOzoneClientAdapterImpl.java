@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -645,5 +646,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return objectStore.createSnapshot(ofsPath.getVolumeName(),
         ofsPath.getBucketName(),
         snapshotName);
+  }
+
+  @Override
+  public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot) throws IOException {
+    OFSPath ofsPath = new OFSPath(snapshotDir, config);
+    return objectStore.snapshotDiff(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(), fromSnapshot, toSnapshot);
   }
 }

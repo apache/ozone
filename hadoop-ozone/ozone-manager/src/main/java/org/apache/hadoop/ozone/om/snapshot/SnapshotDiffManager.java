@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import java.util.Iterator;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -35,9 +37,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.ozone.OFSPath;
 
+import org.apache.hadoop.ozone.util.PersistentList;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -60,6 +62,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Class to generate snapshot diff.
@@ -82,7 +85,8 @@ public class SnapshotDiffManager {
     this.codecRegistry.addCodec(Integer.class,
         new IntegerCodec());
     // Need for Diff Report
-    this.codecRegistry.addCodec(DiffReportEntry.class,
+    this.codecRegistry.addCodec(
+        org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
   }
 
@@ -191,11 +195,13 @@ public class SnapshotDiffManager {
               Long.class);
 
       // Final diff report.
-      final PersistentList<DiffReportEntry> diffReport =
+      final PersistentList<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                .DiffReportEntry> diffReport =
           new RocksDbPersistentList<>(db,
               diffReportColumnFamily,
               codecRegistry,
-              DiffReportEntry.class);
+              org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                  .DiffReportEntry.class);
 
       final Table<String, OmKeyInfo> fsKeyTable = fromSnapshot
           .getMetadataManager().getKeyTable(bucketLayout);
@@ -242,14 +248,16 @@ public class SnapshotDiffManager {
 
       // TODO: Need to change it to pagination.
       //  https://issues.apache.org/jira/browse/HDDS-7548
-      List<DiffReportEntry> diffReportList = new ArrayList<>();
+      List<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+          .DiffReportEntry> diffReportList = new ArrayList<>();
       diffReport.iterator().forEachRemaining(diffReportList::add);
 
-      return new SnapshotDiffReport(volume,
-          bucket,
-          fromSnapshot.getName(),
+      Path bucketPath = new Path(
+          OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
+      OFSPath path = new OFSPath(bucketPath, new OzoneConfiguration());
+      return new SnapshotDiffReport(path.toString(), fromSnapshot.getName(),
           toSnapshot.getName(),
-          diffReportList);
+          diffReport, volume, bucket);
 
     } finally {
       // Clean up: drop the intermediate column family and close them.
@@ -395,7 +403,8 @@ public class SnapshotDiffManager {
       final PersistentSet<Long> objectIDsToCheck,
       final PersistentMap<Long, String> oldObjIdToKeyMap,
       final PersistentMap<Long, String> newObjIdToKeyMap,
-      final PersistentList<DiffReportEntry> diffReport
+      final PersistentList<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+          .DiffReportEntry> diffReport
   ) throws RocksDBException, IOException {
 
     ColumnFamilyHandle deleteDiffColumnFamily = null;
@@ -423,13 +432,17 @@ public class SnapshotDiffManager {
               codecRegistry.asRawData(requestId + "-modifyDiff"),
               new ManagedColumnFamilyOptions()));
 
-      final PersistentList<DiffReportEntry> deleteDiffs =
+      final PersistentList<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+          .DiffReportEntry> deleteDiffs =
           createDiffReportPersistentList(deleteDiffColumnFamily);
-      final PersistentList<DiffReportEntry> renameDiffs =
+      final PersistentList<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+          .DiffReportEntry> renameDiffs =
           createDiffReportPersistentList(renameDiffColumnFamily);
-      final PersistentList<DiffReportEntry> createDiffs =
+      final PersistentList<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+          .DiffReportEntry> createDiffs =
           createDiffReportPersistentList(createDiffColumnFamily);
-      final PersistentList<DiffReportEntry> modifyDiffs =
+      final PersistentList<org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+          .DiffReportEntry> modifyDiffs =
           createDiffReportPersistentList(modifyDiffColumnFamily);
 
       Iterator<Long> objectIdsIterator = objectIDsToCheck.iterator();
@@ -456,14 +469,31 @@ public class SnapshotDiffManager {
           // This cannot happen.
           throw new IllegalStateException("Old and new key name both are null");
         } else if (oldKeyName == null) { // Key Created.
-          createDiffs.add(DiffReportEntry.of(DiffType.CREATE, newKeyName));
+          createDiffs.add(
+              new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                  .DiffReportEntry(org.apache.hadoop.hdfs.protocol
+                  .SnapshotDiffReport.DiffType.CREATE,
+                  newKeyName.getBytes()));
         } else if (newKeyName == null) { // Key Deleted.
-          deleteDiffs.add(DiffReportEntry.of(DiffType.DELETE, oldKeyName));
+          deleteDiffs.add(
+              new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                  .DiffReportEntry(org.apache.hadoop.hdfs.protocol
+                  .SnapshotDiffReport.DiffType.DELETE,
+                  oldKeyName.getBytes()));
         } else if (oldKeyName.equals(newKeyName)) { // Key modified.
-          modifyDiffs.add(DiffReportEntry.of(DiffType.MODIFY, newKeyName));
+          modifyDiffs.add(
+              new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                  .DiffReportEntry(
+                  org.apache.hadoop.hdfs.protocol
+                      .SnapshotDiffReport.DiffType.MODIFY,
+                  newKeyName.getBytes()));
         } else { // Key Renamed.
           renameDiffs.add(
-              DiffReportEntry.of(DiffType.RENAME, oldKeyName, newKeyName));
+              new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                  .DiffReportEntry(
+                  org.apache.hadoop.hdfs.protocol.SnapshotDiffReport
+                      .DiffType.RENAME,
+                  oldKeyName.getBytes(), newKeyName.getBytes()));
         }
       }
 
@@ -527,13 +557,12 @@ public class SnapshotDiffManager {
     }
   }
 
-  private PersistentList<DiffReportEntry> createDiffReportPersistentList(
-      ColumnFamilyHandle columnFamilyHandle
-  ) {
-    return new RocksDbPersistentList<>(db,
-        columnFamilyHandle,
-        codecRegistry,
-        DiffReportEntry.class);
+  private PersistentList<org.apache.hadoop.hdfs.protocol
+      .SnapshotDiffReport.DiffReportEntry> createDiffReportPersistentList(
+      ColumnFamilyHandle columnFamilyHandle) {
+    return new RocksDbPersistentList<>(db, columnFamilyHandle, codecRegistry,
+        org.apache.hadoop.hdfs.protocol
+            .SnapshotDiffReport.DiffReportEntry.class);
   }
 
   private BucketLayout getBucketLayout(final String volume,

@@ -465,12 +465,16 @@ public class TestOmSnapshot {
     // Diff should have 2 entries
     SnapshotDiffReport diff2 = store.snapshotDiff(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
-    Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.CREATE, key2)));
-    Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.DELETE, key1)));
+    org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry del =
+        new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry(
+            SnapshotDiffReport.DiffType.DELETE, key1.getBytes());
+    org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry creat =
+        new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, key2.getBytes());
+
+    Assert.assertTrue(diff2.getDiffList().contains(creat));
+
+    Assert.assertTrue(diff2.getDiffList().contains(del));
 
     // Rename Key2
     String key2Renamed = key2 + "_renamed";
@@ -480,8 +484,9 @@ public class TestOmSnapshot {
     SnapshotDiffReport diff3 = store.snapshotDiff(volume, bucket, snap3, snap4);
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.RENAME, key2, key2Renamed)));
+        new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, key2.getBytes(),
+            key2Renamed.getBytes())));
 
 
     // Create a directory
@@ -497,8 +502,8 @@ public class TestOmSnapshot {
       dir1 = dir1 + OM_KEY_PREFIX;
     }
     Assert.assertTrue(diff4.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.CREATE, dir1)));
+        new org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, dir1.getBytes())));
 
   }
 

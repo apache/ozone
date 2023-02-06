@@ -110,5 +110,10 @@
       <artifactId>powermock-api-mockito</artifactId>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-distcp</artifactId>
+        <scope>provided</scope>
+      </dependency>
   </dependencies>
 </project>

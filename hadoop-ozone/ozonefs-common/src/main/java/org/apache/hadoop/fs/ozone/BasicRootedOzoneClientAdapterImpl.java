@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
@@ -1281,5 +1282,13 @@ public class BasicRootedOzoneClientAdapterImpl
     return proxy.createSnapshot(ofsPath.getVolumeName(),
             ofsPath.getBucketName(),
             snapshotName);
+  }
+
+  @Override
+  public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot) throws IOException {
+    OFSPath ofsPath = new OFSPath(snapshotDir, config);
+    return proxy.snapshotDiff(ofsPath.getVolumeName(), ofsPath.getBucketName(),
+        fromSnapshot, toSnapshot);
   }
 }

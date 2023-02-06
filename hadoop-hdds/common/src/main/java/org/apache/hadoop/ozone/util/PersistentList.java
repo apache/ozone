@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.util;
 
 import java.util.Iterator;
 
