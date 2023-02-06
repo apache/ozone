@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+
 /**
  * This class handles Ratis containers that are over replicated. It should
  * be used to obtain SCMCommands that can be sent to datanodes to solve
@@ -166,8 +167,7 @@ public class RatisOverReplicationHandler
     // closed
     if (replicaCount.getContainer().getState() !=
         HddsProtos.LifeCycleState.CLOSED) {
-      saveReplicasWithUniqueOrigins(eligibleReplicas,
-          replicaCount.getContainer());
+      saveReplicasWithUniqueOrigins(eligibleReplicas);
     }
 
     Set<DatanodeDetails> pendingDeletion = new HashSet<>();
@@ -194,29 +194,23 @@ public class RatisOverReplicationHandler
    * Removes one replica per unique origin node UUID. Prefers saving healthy
    * replicas over UNHEALTHY ones. Maintains order of the specified replicas
    * list.
-   *
    * @param eligibleReplicas List of replicas that are eligible to be deleted
    * and from which replicas with unique origin node ID need to be saved
-   * @param container Container which should not be CLOSED. This method is
-   * irrelevant for CLOSED containers
    */
   private void saveReplicasWithUniqueOrigins(
-      List<ContainerReplica> eligibleReplicas,
-      ContainerInfo container) {
+      List<ContainerReplica> eligibleReplicas) {
     final Map<UUID, ContainerReplica> uniqueOrigins = new LinkedHashMap<>();
     eligibleReplicas.stream()
-        // get replicas with state that matches container state
-        .filter(r -> ReplicationManager.compareState(
-            container.getState(), r.getState()))
-        .forEach(r -> uniqueOrigins
-            .putIfAbsent(r.getOriginDatanodeId(), r));
+        // get unique origin nodes of healthy replicas
+        .filter(r -> r.getState() != ContainerReplicaProto.State.UNHEALTHY)
+        .forEach(r -> uniqueOrigins.putIfAbsent(r.getOriginDatanodeId(), r));
 
     /*
      Now that we've checked healthy replicas, see if some unhealthy replicas
      need to be saved. For example, in the case of {QUASI_CLOSED,
      QUASI_CLOSED, QUASI_CLOSED, UNHEALTHY}, if both the first and last
-     replicas have the same origin node ID (which is unique), we prefer
-     saving the QUASI_CLOSED replica and deleting the UNHEALTHY one.
+     replicas have the same origin node ID (and no other replicas have it), we
+     prefer saving the QUASI_CLOSED replica and deleting the UNHEALTHY one.
      */
     for (ContainerReplica replica : eligibleReplicas) {
       if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
