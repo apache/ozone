@@ -281,7 +281,8 @@ public class TestSstFilteringService {
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
-            .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = writeClient.openKey(keyArg);
