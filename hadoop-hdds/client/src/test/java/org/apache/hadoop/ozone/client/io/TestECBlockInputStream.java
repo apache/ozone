@@ -425,8 +425,13 @@ public class TestECBlockInputStream {
       read = ecb.read(buf);
       Assertions.assertEquals(3 * ONEMB, read);
 
-      // Now make the spare one error on the next read and we should get an
-      // error with two failed locations
+      // Now make the spare one error on the next read, and we should get an
+      // error with two failed locations. As each stream is created, a new
+      // stream will be created in the stream factory. Our read will read from
+      // DNs with EC indexes 1 - 3 first, creating streams 0 to 2. Then when
+      // stream(0) is failed for index=1 a new steam is created for the
+      // alternative index=1 at stream(3). Hence, to make it error we set
+      // stream(3) to throw as below.
       streamFactory.getBlockStreams().get(3).setThrowException(true);
       buf.clear();
       BadDataLocationException e =
