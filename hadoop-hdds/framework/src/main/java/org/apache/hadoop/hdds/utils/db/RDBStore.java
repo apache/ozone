@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -197,7 +198,10 @@ public class RDBStore implements DBStore {
 
   @Override
   public void compactDB() throws IOException {
-    db.compactRange();
+    try (ManagedCompactRangeOptions options =
+             new ManagedCompactRangeOptions()) {
+      db.compactDB(options);
+    }
   }
 
   @Override
