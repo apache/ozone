@@ -290,6 +290,11 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
+  public synchronized int read(byte[] b, int off, int len) throws IOException {
+    return read(ByteBuffer.wrap(b, off, len));
+  }
+
+  @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
     while (true) {
       int currentBufferPosition = byteBuffer.position();

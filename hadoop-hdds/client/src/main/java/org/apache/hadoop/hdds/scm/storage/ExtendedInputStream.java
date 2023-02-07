@@ -46,7 +46,12 @@ public abstract class ExtendedInputStream extends InputStream
 
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    return read(ByteBuffer.wrap(b, off, len));
+    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
+    int bufferLen = strategy.getTargetLength();
+    if (bufferLen == 0) {
+      return 0;
+    }
+    return readWithStrategy(strategy);
   }
 
   @Override
