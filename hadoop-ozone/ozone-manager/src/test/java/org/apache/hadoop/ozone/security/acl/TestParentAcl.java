@@ -119,10 +119,10 @@ public class TestParentAcl {
         new String[]{"test1"});
   }
 
-  // Refined the parent context, parent will be 'create' when op is 'create bucket'
+  // Refined the parent context
   // OP         |CHILD       |PARENT
 
-  // CREATE      NONE         WRITE/CREATE
+  // CREATE      NONE         WRITE     (parent:'CREATE' when 'create bucket')
   // DELETE      DELETE       WRITE
   // WRITE       WRITE        WRITE
   // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
