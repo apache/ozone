@@ -22,10 +22,12 @@ import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import com.google.common.graph.GraphBuilder;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -68,6 +70,7 @@ import org.slf4j.event.Level;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -456,10 +459,10 @@ public class TestRocksDBCheckpointDiffer {
     return rocksDB;
   }
 
-  static boolean deleteDirectory(java.io.File directoryToBeDeleted) {
+  private boolean deleteDirectory(File directoryToBeDeleted) {
     File[] allContents = directoryToBeDeleted.listFiles();
     if (allContents != null) {
-      for (java.io.File file : allContents) {
+      for (File file : allContents) {
         if (!deleteDirectory(file)) {
           return false;
         }
@@ -470,8 +473,10 @@ public class TestRocksDBCheckpointDiffer {
 
   // Read from a given RocksDB instance and optionally write all the
   // keys to a given file.
-  void readRocksDBInstance(String dbPathArg, RocksDB rocksDB, FileWriter file,
-      RocksDBCheckpointDiffer differ) {
+  private void readRocksDBInstance(String dbPathArg,
+                                   RocksDB rocksDB,
+                                   FileWriter file,
+                                   RocksDBCheckpointDiffer differ) {
 
     LOG.debug("Reading RocksDB: " + dbPathArg);
     boolean createdDB = false;
@@ -1080,11 +1085,20 @@ public class TestRocksDBCheckpointDiffer {
 
     differ.pruneOlderSnapshotsWithCompactionHistory();
 
-    Set<String> actualNodes = differ.getForwardCompactionDAG().nodes().stream()
+    Set<String> actualNodesInForwardDAG = differ.getForwardCompactionDAG()
+        .nodes()
+        .stream()
         .map(CompactionNode::getFileName)
         .collect(Collectors.toSet());
 
-    assertEquals(expectedNodes, actualNodes);
+    Set<String> actualNodesBackwardDAG = differ.getBackwardCompactionDAG()
+        .nodes()
+        .stream()
+        .map(CompactionNode::getFileName)
+        .collect(Collectors.toSet());
+
+    assertEquals(expectedNodes, actualNodesInForwardDAG);
+    assertEquals(expectedNodes, actualNodesBackwardDAG);
 
     for (int i = 0; i < expectedNumberOfLogFilesDeleted; i++) {
       File compactionFile = filesCreated.get(i);
@@ -1099,5 +1113,109 @@ public class TestRocksDBCheckpointDiffer {
 
     deleteDirectory(compactionLogDir);
     deleteDirectory(sstBackUpDir);
+  }
+
+  private static Stream<Arguments> sstFilePruningScenarios() {
+    return Stream.of(
+        Arguments.of("Case 1: No compaction.",
+            "",
+            Arrays.asList("000015", "000013", "000011", "000009"),
+            Arrays.asList("000015", "000013", "000011", "000009")
+        ),
+        Arguments.of("Case 2: One level compaction.",
+            "C 000015,000013,000011,000009:000018,000016,000017\n",
+            Arrays.asList("000015", "000013", "000011", "000009", "000018",
+                "000016", "000017", "000026", "000024", "000022", "000020"),
+            Arrays.asList("000015", "000013", "000011", "000009", "000026",
+                "000024", "000022", "000020")
+        ),
+        Arguments.of("Case 3: Multi-level compaction.",
+            "C 000015,000013,000011,000009:000018,000016,000017\n" +
+                "C 000018,000016,000017,000026,000024,000022,000020:000027," +
+                "000030,000028,000031,000029\n" +
+                "C 000027,000030,000028,000031,000029,000039,000037,000035," +
+                "000033:000040,000044,000042,000043,000046,000041,000045\n" +
+                "C 000040,000044,000042,000043,000046,000041,000045,000054," +
+                "000052,000050,000048:000059,000055,000056,000060,000057," +
+                "000058\n",
+            Arrays.asList("000015", "000013", "000011", "000009", "000018",
+                "000016", "000017", "000026", "000024", "000022", "000020",
+                "000027", "000030", "000028", "000031", "000029", "000039",
+                "000037", "000035", "000033", "000040", "000044", "000042",
+                "000043", "000046", "000041", "000045", "000054", "000052",
+                "000050", "000048", "000059", "000055", "000056", "000060",
+                "000057", "000058"),
+            Arrays.asList("000013", "000024", "000035", "000011", "000022",
+                "000033", "000039", "000015", "000026", "000037", "000048",
+                "000009", "000050", "000054", "000020", "000052")
+        )
+    );
+  }
+
+  /**
+   * End-to-end test for SST file pruning.
+   */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("sstFilePruningScenarios")
+  public void testSstFilePruning(
+      String description,
+      String compactionLog,
+      List<String> initialFiles,
+      List<String> expectedFiles
+  ) throws IOException {
+
+    String sstBackUpDirName = "./test-compaction-sst-backup";
+    File sstBackUpDir = new File(sstBackUpDirName);
+    if (!sstBackUpDir.exists() && !sstBackUpDir.mkdirs()) {
+      fail("Error creating SST backup directory: " + sstBackUpDirName);
+    }
+
+    String compactionLogDirName = "./test-compaction-log";
+    File compactionLogDir = new File(compactionLogDirName);
+    if (!compactionLogDir.exists() && !compactionLogDir.mkdirs()) {
+      fail("Error creating compaction log directory: " + compactionLogDirName);
+    }
+
+    createFileWithContext(compactionLogDirName + "/compaction_log" +
+            COMPACTION_LOG_FILE_NAME_SUFFIX,
+        compactionLog);
+
+    for (String fileName : initialFiles) {
+      createFileWithContext(sstBackUpDir + "/" + fileName + SST_FILE_EXTENSION,
+          fileName);
+    }
+
+    RocksDBCheckpointDiffer differ =
+        new RocksDBCheckpointDiffer(sstBackUpDirName,
+            compactionLogDirName,
+            null,
+            MINUTES.toMillis(10));
+
+    differ.loadAllCompactionLogs();
+    differ.pruneSstFiles();
+
+    Set<String> actualFileSetAfterPruning;
+    try (Stream<Path> pathStream = Files.list(Paths.get(sstBackUpDirName))
+        .filter(e -> e.toString().toLowerCase()
+            .endsWith(SST_FILE_EXTENSION))
+        .sorted()) {
+      actualFileSetAfterPruning =
+          pathStream.map(path -> path.getFileName().toString())
+              .map(name -> name.substring(0,
+                  name.length() - SST_FILE_EXTENSION.length()))
+              .collect(Collectors.toSet());
+    }
+
+    Set<String> expectedFileSet = new HashSet<>(expectedFiles);
+    assertEquals(expectedFileSet, actualFileSetAfterPruning);
+    deleteDirectory(compactionLogDir);
+    deleteDirectory(sstBackUpDir);
+  }
+
+  private void createFileWithContext(String fileName, String context)
+      throws IOException {
+    try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+      fileOutputStream.write(context.getBytes(UTF_8));
+    }
   }
 }

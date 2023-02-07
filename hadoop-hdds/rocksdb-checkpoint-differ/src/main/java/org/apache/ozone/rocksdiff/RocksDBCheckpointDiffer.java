@@ -72,8 +72,8 @@ import static java.util.Arrays.asList;
 //      rocksDB checkpoints.
 //      - This bootstrapping should also receive the compaction-DAG information
 //  9. Handle rebuilding the DAG for a lagging follower. There are two cases
-//      - recieve RATIS transactions to replay. Nothing needs to be done in
-//      thise case.
+//      - receive RATIS transactions to replay. Nothing needs to be done in
+//      these cases.
 //      - Getting the DB sync. This case needs to handle getting the
 //      compaction-DAG information as well.
 
@@ -145,7 +145,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * Used to trim the file extension when writing compaction entries to the log
    * to save space.
    */
-  private static final String SST_FILE_EXTENSION = ".sst";
+  static final String SST_FILE_EXTENSION = ".sst";
   private static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
 
@@ -202,6 +202,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS);
+
+      this.executor.scheduleWithFixedDelay(
+          this::pruneSstFiles,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          TimeUnit.MILLISECONDS
+      );
     }
   }
 
@@ -1058,7 +1065,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    */
   private void removeSstFile(Set<String> sstFileNodes) {
     for (String sstFileNode: sstFileNodes) {
-      File file = new File(sstBackupDir + sstFileNode + SST_FILE_EXTENSION);
+      File file =
+          new File(sstBackupDir + "/" + sstFileNode + SST_FILE_EXTENSION);
       try {
         Files.deleteIfExists(file.toPath());
       } catch (IOException exception) {
@@ -1326,6 +1334,30 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       this.snapshotId = snapshotId;
       this.snapshotCreatedAt = snapshotCreatedAt;
     }
+  }
+
+  /**
+   * Defines the task that removes SST files from backup directory which are
+   * not needed to generate snapshot diff using compaction DAG to clean
+   * the disk space.
+   * We can’t simply delete input files in the compaction completed listener
+   * because it is not known which of input files are from previous compaction
+   * and which were created after the compaction.
+   * We can remove SST files which were created from the compaction because
+   * those are not needed to generate snapshot diff. These files are basically
+   * non-leaf nodes of the DAG.
+   */
+  public void pruneSstFiles() {
+    Set<String> nonLeafSstFiles;
+
+    synchronized (compactionListenerWriteLock) {
+      nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
+          .filter(node -> !forwardCompactionDAG.successors(node).isEmpty())
+          .map(node -> node.getFileName())
+          .collect(Collectors.toSet());
+    }
+
+    removeSstFile(nonLeafSstFiles);
   }
 
   @VisibleForTesting
