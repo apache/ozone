@@ -39,12 +39,9 @@ public abstract class
 
   private static final Text SERVICE = new Text("HDDS_SERVICE");
 
-  private final String certSerialId;
-
   protected ShortLivedTokenSecretManager(SecurityConfig conf,
-      long tokenLifetime, String certSerialId, Logger logger) {
+      long tokenLifetime, Logger logger) {
     super(conf, tokenLifetime, tokenLifetime, SERVICE, logger);
-    this.certSerialId = certSerialId;
   }
 
   @Override
@@ -93,10 +90,6 @@ public abstract class
    */
   protected Instant getTokenExpiryTime() {
     return Instant.now().plusMillis(getTokenMaxLifetime());
-  }
-
-  protected String getCertSerialId() {
-    return certSerialId;
   }
 
   public Token<T> generateToken(T tokenIdentifier) {

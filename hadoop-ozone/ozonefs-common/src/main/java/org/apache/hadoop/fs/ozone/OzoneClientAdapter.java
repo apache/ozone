@@ -84,4 +84,6 @@ public interface OzoneClientAdapter {
   boolean isFSOptimizedBucket();
 
   FileChecksum getFileChecksum(String keyName, long length) throws IOException;
+
+  String createSnapshot(String pathStr, String snapshotName) throws IOException;
 }

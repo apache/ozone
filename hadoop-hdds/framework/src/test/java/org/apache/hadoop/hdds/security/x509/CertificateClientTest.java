@@ -30,9 +30,10 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -251,6 +252,10 @@ public class CertificateClientTest implements CertificateClient {
   public KeyStoresFactory getClientKeyStoresFactory()
       throws CertificateException {
     return null;
+  }
+
+  @Override
+  public void registerNotificationReceiver(CertificateNotification receiver) {
   }
 
   public void renewKey() throws Exception {

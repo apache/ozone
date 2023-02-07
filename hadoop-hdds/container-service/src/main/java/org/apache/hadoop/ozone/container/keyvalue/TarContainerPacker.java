@@ -30,7 +30,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.stream.Stream;
-import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -40,25 +39,23 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
-
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
- * Compress/uncompress KeyValueContainer data to a tar.gz archive.
+ * Compress/uncompress KeyValueContainer data to a tar archive.
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
@@ -67,17 +64,11 @@ public class TarContainerPacker
 
   static final String DB_DIR_NAME = "db";
 
-  private static final String CONTAINER_FILE_NAME = "container.yaml";
+  static final String CONTAINER_FILE_NAME = "container.yaml";
 
-  private final String compression;
+  private final CopyContainerCompression compression;
 
-  private static final String NO_COMPRESSION = "no_compression";
-
-  public TarContainerPacker() {
-    this.compression = NO_COMPRESSION;
-  }
-
-  public TarContainerPacker(String compression) {
+  public TarContainerPacker(CopyContainerCompression compression) {
     this.compression = compression;
   }
 
@@ -166,29 +157,22 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream compressed = compress(output);
-         ArchiveOutputStream archiveOutput = tar(compressed)) {
+    try (ArchiveOutputStream archiveOutput = tar(compress(output))) {
+      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
+          archiveOutput);
 
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
           archiveOutput);
-
-      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
-          archiveOutput);
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the container: " + containerData.getContainerID(),
-          e);
     }
   }
 
   @Override
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
-    try (InputStream decompressed = decompress(input);
-        ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = untar(decompress(input))) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -198,10 +182,6 @@ public class TarContainerPacker
         }
         entry = archiveInput.getNextEntry();
       }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't read the container descriptor from the container archive",
-          e);
     }
 
     throw new IOException(
@@ -266,6 +246,7 @@ public class TarContainerPacker
     // empty.
     ArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
+    archiveOutput.closeArchiveEntry();
 
     // Add files in the directory.
     try (Stream<Path> dirEntries = Files.list(dir)) {
@@ -295,26 +276,19 @@ public class TarContainerPacker
   }
 
   @VisibleForTesting
-  InputStream decompress(InputStream input)
-      throws CompressorException {
-    return Objects.equals(compression, NO_COMPRESSION) ?
-        input : new CompressorStreamFactory()
-        .createCompressorInputStream(compression, input);
+  InputStream decompress(InputStream input) throws IOException {
+    return compression.wrap(input);
   }
 
   @VisibleForTesting
-  OutputStream compress(OutputStream output)
-      throws CompressorException {
-    return Objects.equals(compression, NO_COMPRESSION) ?
-        output : new CompressorStreamFactory()
-        .createCompressorOutputStream(compression, output);
+  OutputStream compress(OutputStream output) throws IOException {
+    return compression.wrap(output);
   }
 
   private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)
       throws IOException {
     byte[] descriptorFileContent = null;
-    try (InputStream decompressed = decompress(input);
-         ArchiveInputStream archiveInput = untar(decompressed)) {
+    try (ArchiveInputStream archiveInput = untar(decompress(input))) {
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
@@ -340,10 +314,6 @@ public class TarContainerPacker
         entry = archiveInput.getNextEntry();
       }
       return descriptorFileContent;
-
-    } catch (CompressorException e) {
-      throw new IOException("Can't uncompress to dbRoot: " + dbRoot +
-              ", chunksRoot: " + chunksRoot, e);
     }
   }
 }

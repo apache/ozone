@@ -169,6 +169,7 @@ public class TestAddRemoveOzoneManager {
    * OM.
    */
   @Test
+  @Flaky("HDDS-7880")
   public void testBootstrap() throws Exception {
     setupCluster(1);
     OzoneManager oldOM = cluster.getOzoneManager();

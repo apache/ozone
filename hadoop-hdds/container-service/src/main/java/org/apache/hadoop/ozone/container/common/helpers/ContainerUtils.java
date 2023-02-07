@@ -280,22 +280,22 @@ public final class ContainerUtils {
     return Long.parseLong(containerBaseDir.getName());
   }
 
-  public static String getContainerTarGzName(long containerId) {
-    return "container-" + containerId + ".tar.gz";
+  public static String getContainerTarName(long containerId) {
+    return "container-" + containerId + ".tar";
   }
 
-  public static long retrieveContainerIdFromTarGzName(String tarGzName)
+  public static long retrieveContainerIdFromTarName(String tarName)
       throws IOException {
-    assert tarGzName != null;
-    Pattern pattern = Pattern.compile("container-(\\d+).tar.gz");
+    assert tarName != null;
+    Pattern pattern = Pattern.compile("container-(\\d+).tar");
     // Now create matcher object.
-    Matcher m = pattern.matcher(tarGzName);
+    Matcher m = pattern.matcher(tarName);
 
     if (m.find()) {
       return Long.parseLong(m.group(1));
     } else {
       throw new IOException("Illegal container tar gz file " +
-          tarGzName);
+          tarName);
     }
   }
 }
