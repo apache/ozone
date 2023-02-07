@@ -1424,10 +1424,7 @@ public class TestKeyManagerImpl {
       Stream<Pair<String, String>> keys,
       Stream<Pair<String, String>> positives,
       Stream<Pair<String, String>> negatives) {
-    keys.forEach(f -> {
-      createFile(f.getLeft(), f.getRight());
-      assertKeyExist(f.getLeft(), f.getRight());
-    });
+    keys.forEach(f -> createFile(f.getLeft(), f.getRight()));
     positives.forEach(f -> assertIsDirectory(f.getLeft(), f.getRight()));
     negatives.forEach(f -> assertFileNotFound(f.getLeft(), f.getRight()));
   }
@@ -1675,13 +1672,8 @@ public class TestKeyManagerImpl {
       keyArgs.setLocationInfoList(keySession.getKeyInfo()
           .getLatestVersionLocations().getLocationList());
       writeClient.commitKey(keyArgs, keySession.getId());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
 
-  private void assertKeyExist(String bucketName, String keyName) {
-    try {
+      // verify key exist in table
       OmKeyInfo keyInfo = metadataManager.getKeyTable(getDefaultBucketLayout())
           .get(metadataManager.getOzoneKey(VOLUME_NAME, bucketName, keyName));
       assertNotNull(keyInfo);
