@@ -27,11 +27,25 @@ import org.rocksdb.ColumnFamilyHandle;
  * collects multiple db operation.
  */
 public interface RWBatchOperation extends BatchOperation {
+  /**
+   * Creates the iterator object.
+   * @param handle the handler of table column family
+   * @param newIterator the iterator
+   * @return ManagedRocksIterator
+   * @throws IOException
+   */
   ManagedRocksIterator newIteratorWithBase(
       ColumnFamilyHandle handle, ManagedRocksIterator newIterator)
       throws IOException;
 
-  void lockOperation() throws IOException;
-  
-  void releaseOperation();
+  /**
+   * Increase refCount for object usages.
+   */
+  void incrementRefCount();
+
+  /**
+   * Decrement refCount. Once refCount is 0, it will release object.
+   * Ref Count increment and decrement needs managed by caller.
+   */
+  void decrementRefCount();
 }

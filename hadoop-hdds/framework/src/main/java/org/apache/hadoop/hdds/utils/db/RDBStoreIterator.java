@@ -37,18 +37,12 @@ public class RDBStoreIterator
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreIterator.class);
 
-  private ManagedRocksIterator rocksDBIterator;
+  private final ManagedRocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private byte[] prefix;
-
-  /**
-   * This constructor is used by derived class to initiate.
-   */
-  protected RDBStoreIterator() {
-  }
 
   public RDBStoreIterator(ManagedRocksIterator iterator) {
     this(iterator, null);
@@ -66,17 +60,6 @@ public class RDBStoreIterator
       this.prefix = Arrays.copyOf(prefix, prefix.length);
     }
     seekToFirst();
-  }
-
-  /**
-   * object is initialized with iterator and table and used
-   * by derived constructor.
-   * @param iterator the iterator
-   * @param table the table
-   */
-  protected void initIterator(ManagedRocksIterator iterator, RDBTable table) {
-    this.rocksDBIterator = iterator;
-    this.rocksDBTable = table;
   }
 
   @Override

@@ -54,6 +54,13 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     return currentBatchOperation;
   }
 
+  private RWBatchOperation getBatchOperationWithRefCount() {
+    synchronized (this) {
+      currentBatchOperation.incrementRefCount();
+      return currentBatchOperation;
+    }
+  }
+
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
@@ -69,7 +76,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   @Override
   public <KEY, VALUE> TableIterator<KEY, ? extends Table.KeyValue<KEY, VALUE>>
       getIterator(Table<KEY, VALUE> table) throws IOException {
-    return table.iterator(getCurrentBatchOperation());
+    return table.iterator(getBatchOperationWithRefCount());
   }
 
   @Override
@@ -106,10 +113,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
         TRANSACTION_INFO_KEY, latestTrxInfo);
 
     metadataStore.getStore().commitBatchOperation(currentBatchOperation);
-    currentBatchOperation.close();
     this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
-    // reset batch operation
-    currentBatchOperation = metadataStore.getStore().initRWBatchOperation();
+    resetBatchOperation();
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -137,6 +142,14 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
               .build();
     }
     latestSnapshot = latestTrxInfo.toSnapshotInfo();
+  }
+
+  private void resetBatchOperation() {
+    synchronized (this) {
+      currentBatchOperation.close();
+      currentBatchOperation = this.metadataStore.getStore()
+          .initRWBatchOperation();
+    }
   }
 
   @Override

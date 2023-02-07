@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadWriteBatch;
@@ -39,12 +38,8 @@ public class RDBRWBatchOperation implements RWBatchOperation {
       LoggerFactory.getLogger(RDBRWBatchOperation.class);
   private final ManagedReadWriteBatch writeBatch;
   
-  private final AtomicLong operationCount = new AtomicLong(0);
+  private final AtomicLong refCount = new AtomicLong(1);
   
-  private final AtomicBoolean isActive = new AtomicBoolean(true);
-
-  private final Object lock = new Object();
-
   public RDBRWBatchOperation() {
     writeBatch = new ManagedReadWriteBatch();
   }
@@ -62,23 +57,7 @@ public class RDBRWBatchOperation implements RWBatchOperation {
 
   @Override
   public void close() {
-    synchronized (lock) {
-      isActive.set(false);
-    }
-
-    waitForNoOperation();
-    writeBatch.close();
-  }
-
-  private void waitForNoOperation() {
-    while (operationCount.get() > 0) {
-      try {
-        Thread.sleep(1);
-      } catch (InterruptedException ex) {
-        LOG.error("RWBatch Interrupted exception while wait", ex);
-        return;
-      }
-    }
+    decrementRefCount();
   }
 
   @Override
@@ -96,26 +75,18 @@ public class RDBRWBatchOperation implements RWBatchOperation {
   public ManagedRocksIterator newIteratorWithBase(
       ColumnFamilyHandle handle, ManagedRocksIterator newIterator)
       throws IOException {
-    synchronized (lock) {
-      if (!isActive.get()) {
-        throw new IOException("RWBatch is closed, retry");
-      }
-      return managed(writeBatch.newIteratorWithBase(handle, newIterator.get()));
-    }
+    return managed(writeBatch.newIteratorWithBase(handle, newIterator.get()));
   }
 
   @Override
-  public void lockOperation() throws IOException {
-    synchronized (lock) {
-      if (!isActive.get()) {
-        throw new IOException("RWBatch is closed, retry");
-      }
-      operationCount.incrementAndGet();
-    }
+  public void incrementRefCount() {
+    refCount.getAndIncrement();
   }
 
   @Override
-  public void releaseOperation() {
-    operationCount.decrementAndGet();
+  public void decrementRefCount() {
+    if (refCount.decrementAndGet() == 0) {
+      writeBatch.close();
+    }
   }
 }

@@ -31,18 +31,15 @@ public class RDBRWStoreIterator extends RDBStoreIterator {
   public RDBRWStoreIterator(
       ManagedRocksIterator iterator, RWBatchOperation rwBatch,
       RDBTable table) throws IOException {
-    super();
-    initIterator(iterator, table);
+    super(iterator, table);
     this.rwBatch = rwBatch;
-    rwBatch.lockOperation();
-    seekToFirst();
   }
 
   @Override
   public void close() throws IOException {
     super.close();
     if (null != rwBatch) {
-      rwBatch.releaseOperation();
+      rwBatch.decrementRefCount();
     }
   }
 }
