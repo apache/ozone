@@ -1263,9 +1263,7 @@ public final class TestSecureOzoneCluster {
     assertTrue(cert.getIssuerDN().toString().contains(clusterId));
 
     // Verify that certificate matches the public key.
-    String encodedKey1 = cert.getPublicKey().toString();
-    String encodedKey2 = om.getCertificateClient().getPublicKey().toString();
-    assertEquals(encodedKey1, encodedKey2);
+    assertEquals(cert.getPublicKey(), om.getCertificateClient().getPublicKey());
   }
 
   private void initializeOmStorage(OMStorage omStorage) throws IOException {
