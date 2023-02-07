@@ -47,8 +47,7 @@ public class TenantAssignUserAccessIdHandler extends TenantHandler {
   @CommandLine.Option(names = {"-a", "--access-id", "--accessId"},
       description = "(Optional) Specify the accessId for user in this tenant. "
           + "If unspecified, accessId would be in the form of "
-          + "TenantName$Principal. " + "Command line option " +
-          "--accessId will be removed in later versions.",
+          + "TenantName$Principal.",
       hidden = true)
   // This option is intentionally hidden for now. Because if accessId isn't
   //  restricted in any way this might cause `ozone s3 getsecret` to

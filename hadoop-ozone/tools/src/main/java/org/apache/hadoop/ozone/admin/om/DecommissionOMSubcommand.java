@@ -66,22 +66,18 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(names = {"-id", "--id", "--service-id"},
-      description = "Ozone Manager Service ID." + "Command line option " +
-          "-id will be removed in later versions.",
+  @CommandLine.Option(names = {"-id", "--service-id"},
+      description = "OM Service ID",
       required = true)
   private String omServiceId;
 
   @CommandLine.Option(names = {"-nodeid", "--nodeid"},
-      description = "NodeID of the OM to be decommissioned." + "Command line " +
-          "option -nodeid will be removed in later versions.",
+      description = "NodeID of the OM to be decommissioned.",
       required = true)
   private String decommNodeId;
 
-  @CommandLine.Option(names = {"-hostname", "--hostname",
-      "--node-host-address"},
-      description = "Host name/address of the OM to be decommissioned." +
-          "Command line option -hostname will be removed in later versions.",
+  @CommandLine.Option(names = {"-hostname", "--node-host-address"},
+      description = "Host name/address of the OM to be decommissioned.",
       required = true)
   private String hostname;
 

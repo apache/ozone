@@ -46,19 +46,18 @@ public class UpdateRangerSubcommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--id", "--service-id"},
-      description = "Ozone Manager Service ID. Command line option -id will " +
-          "be removed in later versions."
+      names = {"-id", "--service-id"},
+      description = "Ozone Manager Service ID"
   )
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-host", "--host", "--service-host"},
-      description = "Ozone Manager Host. If OM HA is enabled, use -id " +
-          "instead. If insists on using -host with OM HA, this must point " +
-          "directly to the leader OM. This option is required when -id is " +
-          "not provided or when HA is not enabled." + "Command line option " +
-          "-host will be removed in later versions."
+      names = {"-host", "--service-host"},
+      description = "Ozone Manager Host. If OM HA is enabled, use -id instead. "
+          + "If insists on using -host with OM HA, this must point directly "
+          + "to the leader OM. "
+          + "This option is required when -id is not provided or "
+          + "when HA is not enabled."
   )
   private String omHost;
 

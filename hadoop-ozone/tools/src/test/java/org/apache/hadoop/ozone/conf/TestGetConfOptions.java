@@ -73,10 +73,6 @@ public class TestGetConfOptions {
     new OzoneGetConf(conf)
         .run(new String[] {"confKey", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
     Assert.assertEquals("1\n", bout.toString(DEFAULT_ENCODING));
-    bout.reset();
-    new OzoneGetConf(conf)
-        .run(new String[] {"--conf-key", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
-    Assert.assertEquals("1\n", bout.toString(DEFAULT_ENCODING));
   }
 
   @Test
@@ -87,10 +83,6 @@ public class TestGetConfOptions {
     bout.reset();
     new OzoneGetConf(conf).run(new String[] {"storagecontainermanagers"});
     Assert.assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
-    bout.reset();
-    new OzoneGetConf(conf).run(new String[] {"--storage-container-managers"});
-    Assert.assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
-
   }
 
   @Test
@@ -100,9 +92,6 @@ public class TestGetConfOptions {
     Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
     bout.reset();
     new OzoneGetConf(conf).run(new String[] {"ozonemanagers"});
-    Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
-    bout.reset();
-    new OzoneGetConf(conf).run(new String[] {"--ozone-managers"});
     Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
   }
 }

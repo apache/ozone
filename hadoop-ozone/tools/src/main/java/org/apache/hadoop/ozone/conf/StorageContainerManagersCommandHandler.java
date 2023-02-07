@@ -29,10 +29,9 @@ import picocli.CommandLine.ParentCommand;
  * Handler for ozone getconf storagecontainermanagers.
  */
 @Command(name = "storagecontainermanagers",
-    aliases = {"-storagecontainermanagers", "--storage-container-managers"},
-    description = "Gets list of ozone storage container manager nodes in the" +
-        " cluster. Command line option -storagecontainermanagers will be " +
-        "removed in later versions.",
+    aliases = {"-storagecontainermanagers"},
+    description = "gets list of ozone storage container "
+        + "manager nodes in the cluster",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class StorageContainerManagersCommandHandler implements Callable<Void> {

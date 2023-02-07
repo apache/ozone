@@ -72,8 +72,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--column_family", "--column-family"},
       required = true,
-      description = "Table name. " + "Command line option --column_family " +
-          "will be removed in later versions.")
+      description = "Table name")
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
@@ -84,35 +83,30 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--length", "-l"},
           description = "Maximum number of items to list. " +
-              "If -1 dumps the entire table data.")
+              "If -1 dumps the entire table data")
   private static int limit = 100;
 
   @CommandLine.Option(names = {"--out", "-o"},
-      description = "File to dump table scan data.")
+      description = "File to dump table scan data")
   private static String fileName;
 
-  @CommandLine.Option(names = {"--startkey", "-sk", "--start-key"},
-      description = "Key from which to iterate the DB." +
-          "Command line options --startkey and -sk will be removed in later " +
-          "versions.")
+  @CommandLine.Option(names = {"--startkey", "-sk"},
+      description = "Key from which to iterate the DB")
   private static String startKey;
 
-  @CommandLine.Option(names = {"--dn-schema", "--dnSchema", "-d"},
-      description = "Datanode DB Schema Version : V1/V2/V3." +
-          "Command line option --dnSchema will be removed in later versions.",
+  @CommandLine.Option(names = {"--dnSchema", "-d"},
+      description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
 
-  @CommandLine.Option(names = {"--container-id", "--cid", "-cid"},
-      description = "Container ID when datanode DB Schema is V3." +
-          "Command line option -cid will be removed in later versions.",
+  @CommandLine.Option(names = {"--container-id", "-cid"},
+      description = "Container ID when datanode DB Schema is V3",
       defaultValue = "-1")
   private static long containerId;
 
-  @CommandLine.Option(names = {"--show-count", "-count"},
-      description = "Get estimated key count for a given column " +
-          "family in the db." + " Command line option -count will be" +
-          " removed in later versions.",
+  @CommandLine.Option(names = { "--show-count",
+      "-count" }, description = "Get estimated key count for a"
+      + " given column family in the db",
       defaultValue = "false",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private static boolean showCount;

@@ -29,10 +29,8 @@ import java.util.function.Function;
  * Base Ratis Log Parser used by generic, datanode etc.
  */
 public abstract class BaseLogParser {
-  @CommandLine.Option(names = {"-s", "--segmentPath", "--segment-path"},
-      required = true,
-      description = "Path of the segment file. " + "Command line option " +
-          "--segmentPath will be removed in later versions.")
+  @CommandLine.Option(names = {"-s", "--segmentPath"}, required = true,
+      description = "Path of the segment file")
   private File segmentFile;
 
   public void parseRatisLogs(

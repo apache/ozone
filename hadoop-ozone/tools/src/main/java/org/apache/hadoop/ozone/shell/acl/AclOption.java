@@ -45,8 +45,7 @@ public class AclOption implements CommandLine.ITypeConverter<OzoneAcl> {
           "a = ALL, " +
           "n = NONE, " +
           "x = READ_ACL, " +
-          "y = WRITE_ACL.\n" + "Command line option -al will be removed in " +
-          "later versions.")
+          "y = WRITE_ACL.")
   private OzoneAcl[] values;
 
   private List<OzoneAcl> getAclList() {

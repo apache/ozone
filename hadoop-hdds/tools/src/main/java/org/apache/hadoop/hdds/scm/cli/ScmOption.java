@@ -49,8 +49,7 @@ public class ScmOption {
 
 
   @CommandLine.Option(names = {"--service-id", "-id"}, description =
-      "ServiceId of SCM HA Cluster. Command line option -id will be removed " +
-          "in later versions.")
+      "ServiceId of SCM HA Cluster")
   private String scmServiceId;
 
   public ScmClient createScmClient() {

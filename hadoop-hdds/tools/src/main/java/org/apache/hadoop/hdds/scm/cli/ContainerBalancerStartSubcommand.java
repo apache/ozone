@@ -47,39 +47,27 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           " balancer will run for.")
   private Optional<Integer> iterations;
 
-  @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration",
-      "--maxDatanodesPercentageToInvolvePerIteration"},
+  @Option(names = {"-d", "--maxDatanodesPercentageToInvolvePerIteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration (for example, " +
-          "'20' for 20%%)." + "Full name " +
-          "--maxDatanodesPercentageToInvolvePerIteration will be " +
-          "removed in later versions.")
+          "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
-  @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb",
-      "--maxSizeToMovePerIterationInGB"},
+  @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
       description = "Maximum size that can be moved per iteration of " +
-          "balancing (for example, '500' for 500GB)." + "Full name " +
-          "--maxSizeToMovePerIterationInGB will be " + "removed in later " +
-          "versions.")
+          "balancing (for example, '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
-  @Option(names = {"-e", "--max-size-entering-target-in-gb",
-      "--maxSizeEnteringTargetInGB"},
+  @Option(names = {"-e", "--maxSizeEnteringTargetInGB"},
       description = "Maximum size that can enter a target datanode while " +
           "balancing. This is the sum of data from multiple sources (for " +
-          "example, '26' for 26GB)." + "Full name " +
-          "--maxSizeEnteringTargetInGB will be " +
-          "removed in later versions.")
+          "example, '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
-  @Option(names = {"-l", "--max-size-leaving-source-in-gb",
-      "--maxSizeLeavingSourceInGB"},
+  @Option(names = {"-l", "--maxSizeLeavingSourceInGB"},
       description = "Maximum size that can leave a source datanode while " +
           "balancing. This is the sum of data moving to multiple targets " +
-          "(for example, '26' for 26GB)." + "Full name " +
-          "--maxSizeLeavingSourceInGB will be " +
-          "removed in later versions.")
+          "(for example, '26' for 26GB).")
   private Optional<Long> maxSizeLeavingSourceInGB;
 
   @Override
