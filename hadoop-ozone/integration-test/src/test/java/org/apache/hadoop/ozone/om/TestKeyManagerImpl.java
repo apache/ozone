@@ -33,7 +33,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -122,6 +124,12 @@ import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
@@ -170,6 +178,7 @@ public class TestKeyManagerImpl {
   public ExpectedException exception = ExpectedException.none();
 
   @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
@@ -229,6 +238,7 @@ public class TestKeyManagerImpl {
   }
 
   @AfterClass
+  @AfterAll
   public static void cleanup() throws Exception {
     scm.stop();
     scm.join();
@@ -237,6 +247,7 @@ public class TestKeyManagerImpl {
   }
 
   @After
+  @AfterEach
   public void cleanupTest() throws IOException {
     mockContainerClient();
     List<OzoneFileStatus> fileStatuses = keyManager
@@ -1353,71 +1364,69 @@ public class TestKeyManagerImpl {
     Assert.assertTrue(ozoneFileStatus.isFile());
   }
 
-  @Test
-  public void testGetFileStatusWithFakeDirFalsePositive() throws IOException {
-    String dir0 = "dir0";
-    String dir1 = "dir1";
-    String dir2 = "dir2";
-    String dir3 = "dir3";
-    String keyName1 = dir1 + OZONE_URI_DELIMITER + "file1";
-    String keyName2 = dir2 + OZONE_URI_DELIMITER + "file2";
+  private static Stream<Arguments> fakeDirScenarios() {
+    final String bucket1 = BUCKET_NAME;
+    final String bucket2 = BUCKET2_NAME;
 
-    // create a key "dir1/file1" in bucket1
-    createFile(BUCKET_NAME, keyName1);
-    // create a key "dir2/file2" in bucket2
-    createFile(BUCKET2_NAME, keyName2);
-
-    // Verify the following dbKeys in key table:
-    // 1. "volume1/bucket1/dir1/file1"
-    // 2. "volume1/bucket2/dir2/file2"
-    assertKeyExist(BUCKET_NAME, keyName1);
-    assertKeyExist(BUCKET2_NAME, keyName2);
-
-    assertFileNotFound(BUCKET_NAME, dir0);
-    // true positive: fake dir "volume1/bucket1/dir1" should be returned.
-    assertIsDirectory(BUCKET_NAME, dir1);
-    // RocksIterator#seek("volume1/bucket1/dir2/") will position at the
-    // 2nd dbKey "volume1/bucket2/dir2/file2", which is not belong to bucket1.
-    // This might be a false positive, see HDDS-7871.
-    assertFileNotFound(BUCKET_NAME, dir2);
-    assertFileNotFound(BUCKET_NAME, dir3);
-
-    assertFileNotFound(BUCKET2_NAME, dir0);
-    assertFileNotFound(BUCKET2_NAME, dir1);
-    // true positive: fake dir "volume1/bucket1/dir1" should be returned.
-    assertIsDirectory(BUCKET2_NAME, dir2);
-    assertFileNotFound(BUCKET2_NAME, dir3);
+    return Stream.of(
+        Arguments.of(
+            "false positive",
+            Stream.of(
+                Pair.of(bucket1, "dir1/file1"),
+                Pair.of(bucket2, "dir2/file2")
+            ),
+            // positives
+            Stream.of(
+                Pair.of(bucket1, "dir1"),
+                Pair.of(bucket2, "dir2")
+            ),
+            // negatives
+            Stream.of(
+                Pair.of(bucket1, "dir0"),
+                // RocksIterator#seek("volume1/bucket1/dir2/") will position
+                // at the 2nd dbKey "volume1/bucket2/dir2/file2", which is
+                // not belong to bucket1.
+                // This might be a false positive, see HDDS-7871.
+                Pair.of(bucket1, "dir2"),
+                Pair.of(bucket2, "dir0"),
+                Pair.of(bucket2, "dir1"),
+                Pair.of(bucket2, "dir3")
+            )
+        ),
+        Arguments.of(
+            "false negative",
+            Stream.of(
+                Pair.of(bucket1, "dir1/file1"),
+                Pair.of(bucket1, "dir1/file2"),
+                Pair.of(bucket1, "dir1/file3"),
+                Pair.of(bucket2, "dir1/file1"),
+                Pair.of(bucket2, "dir1/file2")
+            ),
+            // positives
+            Stream.of(
+                Pair.of(bucket1, "dir1"),
+                Pair.of(bucket2, "dir1")
+            ),
+            // negatives
+            Stream.empty()
+        )
+    );
   }
 
-  @Test
-  public void testGetFileStatusWithFakeDirFalseNegative() throws IOException {
-    String dir1 = "dir1";
-    String keyName1 = dir1 + OZONE_URI_DELIMITER + "file1";
-    String keyName2 = dir1 + OZONE_URI_DELIMITER + "file2";
-    String keyName3 = dir1 + OZONE_URI_DELIMITER + "file3";
-
-    createFile(BUCKET_NAME, keyName1);
-    createFile(BUCKET_NAME, keyName2);
-    createFile(BUCKET_NAME, keyName3);
-    createFile(BUCKET2_NAME, keyName1);
-    createFile(BUCKET2_NAME, keyName2);
-
-    // Verify the following dbKeys in key table:
-    // 1. "volume1/bucket1/dir1/file1"
-    // 2. "volume1/bucket1/dir1/file2"
-    // 3. "volume1/bucket1/dir1/file3"
-    // 4. "volume1/bucket2/dir1/file1"
-    // 5. "volume1/bucket2/dir1/file2"
-    assertKeyExist(BUCKET_NAME, keyName1);
-    assertKeyExist(BUCKET_NAME, keyName2);
-    assertKeyExist(BUCKET_NAME, keyName3);
-    assertKeyExist(BUCKET2_NAME, keyName1);
-    assertKeyExist(BUCKET2_NAME, keyName2);
-
-    // get "volume1/bucket1/dir1" should return a fake dir.
-    assertIsDirectory(BUCKET_NAME, dir1);
-    // get "volume1/bucket2/dir1" should return a fake dir.
-    assertIsDirectory(BUCKET2_NAME, dir1);
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("fakeDirScenarios")
+  public void testGetFileStatusWithFakeDirs(
+      String description,
+      Stream<Pair<String, String>> keys,
+      Stream<Pair<String, String>> positives,
+      Stream<Pair<String, String>> negatives) {
+    final OzoneManagerProtocol client = writeClient;
+    keys.forEach(f -> {
+      createFile(client, f.getLeft(), f.getRight());
+      assertKeyExist(f.getLeft(), f.getRight());
+    });
+    positives.forEach(f -> assertIsDirectory(f.getLeft(), f.getRight()));
+    negatives.forEach(f -> assertFileNotFound(f.getLeft(), f.getRight()));
   }
 
   @Test
@@ -1656,42 +1665,59 @@ public class TestKeyManagerImpl {
     return keyNames;
   }
 
-  private void createFile(String bucketName, String keyName)
-      throws IOException {
-    OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
-    OpenKeySession keySession = writeClient.openKey(keyArgs);
-    keyArgs.setLocationInfoList(
-        keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
-    writeClient.commitKey(keyArgs, keySession.getId());
+  private void createFile(String bucketName, String keyName) {
+    createFile(writeClient, bucketName, keyName);
   }
 
-  private void assertKeyExist(String bucketName, String keyName)
-      throws IOException {
-    OmKeyInfo keyInfo = metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, bucketName, keyName));
-    Assert.assertNotNull(keyInfo);
-    Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
-    Assert.assertEquals(bucketName, keyInfo.getBucketName());
-    Assert.assertEquals(keyName, keyInfo.getKeyName());
+  private void createFile(OzoneManagerProtocol writeClient,
+      String bucketName, String keyName) {
+    try {
+      OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+      OpenKeySession keySession = writeClient.openKey(keyArgs);
+      keyArgs.setLocationInfoList(keySession.getKeyInfo()
+          .getLatestVersionLocations().getLocationList());
+      writeClient.commitKey(keyArgs, keySession.getId());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private void assertFileNotFound(String bucketName, String keyName)
-      throws IOException {
-    OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
-    OMException ex = Assert.assertThrows(OMException.class,
-        () -> keyManager.getFileStatus(keyArgs));
-    Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+  private void assertKeyExist(String bucketName, String keyName) {
+    try {
+      OmKeyInfo keyInfo = metadataManager.getKeyTable(getDefaultBucketLayout())
+          .get(metadataManager.getOzoneKey(VOLUME_NAME, bucketName, keyName));
+      Assert.assertNotNull(keyInfo);
+      Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+      Assert.assertEquals(bucketName, keyInfo.getBucketName());
+      Assert.assertEquals(keyName, keyInfo.getKeyName());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private void assertIsDirectory(String bucketName, String keyName)
-      throws IOException {
-    OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
-    OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
-    OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
-    Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
-    Assert.assertEquals(bucketName, keyInfo.getBucketName());
-    Assert.assertEquals(keyName, keyInfo.getFileName());
-    Assert.assertTrue(ozoneFileStatus.isDirectory());
+  private void assertFileNotFound(String bucketName, String keyName) {
+    try {
+      OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+      OMException ex = Assert.assertThrows(OMException.class,
+          () -> keyManager.getFileStatus(keyArgs));
+      Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void assertIsDirectory(String bucketName, String keyName) {
+    try {
+      OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+      OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+      OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
+      Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+      Assert.assertEquals(bucketName, keyInfo.getBucketName());
+      Assert.assertEquals(keyName, keyInfo.getFileName());
+      Assert.assertTrue(ozoneFileStatus.isDirectory());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private OmKeyArgs.Builder createBuilder() throws IOException {
