@@ -33,7 +33,9 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,12 +80,16 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
  * If Kerberos is not enabled, simply append the login user name to
  * `ozone.administrator`, e.g. `scm`
  */
-public class OMDBCheckpointServlet extends DBCheckpointServlet {
+public class OMDBCheckpointServlet extends DBCheckpointServlet
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
   private static final String DURATION_TO_WAIT_FOR_DIRECTORY = "PT10S";
+  private BootstrapStateHandler keyDeletingService;
+  private BootstrapStateHandler sstFilteringService;
+  private BootstrapStateHandler rocksDbCheckpointDiffer;
 
   @Override
   public void init() throws ServletException {
@@ -115,6 +121,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+
+     keyDeletingService = om.getKeyManager().getDeletingService();
+     sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
   }
 
   @Override
@@ -278,4 +287,16 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .getConfiguration();
   }
+
+  @Override
+  public void lockBootstrapState() throws InterruptedException {
+    keyDeletingService.lockBootstrapState();
+  }
+
+  @Override
+  public void unlockBootstrapState() {
+    keyDeletingService.unlockBootstrapState();
+  }
+
+
 }

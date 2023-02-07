@@ -24,9 +24,11 @@ import com.google.common.graph.MutableGraph;
 import java.util.Collections;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -87,7 +89,8 @@ import static java.util.Arrays.asList;
  * It is important to note that compaction log is per-DB instance. Since
  * each OM DB instance might trigger compactions at different timings.
  */
-public class RocksDBCheckpointDiffer implements AutoCloseable {
+public class RocksDBCheckpointDiffer implements AutoCloseable,
+    BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
@@ -165,6 +168,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
   private final ScheduledExecutorService executor;
   private final long maxAllowedTimeInDag;
+  private final Semaphore bootstrapStateLock = new Semaphore(1);
+
 
   /**
    * Constructor.
@@ -1056,8 +1061,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
     Set<String> sstFileNodesRemoved =
         pruneSnapshotFileNodesFromDag(lastCompactionSstFiles);
+    lockBootstrapState();
     removeSstFile(sstFileNodesRemoved);
     deleteOlderSnapshotsCompactionFiles(olderSnapshotsLogFilePaths);
+    unlockBootstrapState();
   }
 
   /**
@@ -1356,8 +1363,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
           .map(node -> node.getFileName())
           .collect(Collectors.toSet());
     }
-
+    lockBootstrapState();
     removeSstFile(nonLeafSstFiles);
+    unlockBootstrapState();
   }
 
   @VisibleForTesting
@@ -1373,5 +1381,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
+  }
+
+  @Override
+  public void lockBootstrapState() {
+    try {
+      bootstrapStateLock.acquire();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void unlockBootstrapState() {
+    bootstrapStateLock.release();
   }
 }

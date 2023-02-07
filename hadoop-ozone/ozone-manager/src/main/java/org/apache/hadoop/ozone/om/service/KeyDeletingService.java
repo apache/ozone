@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.lock.BootstrapStateLock;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * keys.
  */
 public class KeyDeletingService extends BackgroundService implements
-    BootstrapStateLock {
+    BootstrapStateHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
