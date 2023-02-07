@@ -135,6 +135,10 @@ import org.junit.rules.Timeout;
 
 import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -1680,10 +1684,10 @@ public class TestKeyManagerImpl {
     try {
       OmKeyInfo keyInfo = metadataManager.getKeyTable(getDefaultBucketLayout())
           .get(metadataManager.getOzoneKey(VOLUME_NAME, bucketName, keyName));
-      Assert.assertNotNull(keyInfo);
-      Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
-      Assert.assertEquals(bucketName, keyInfo.getBucketName());
-      Assert.assertEquals(keyName, keyInfo.getKeyName());
+      assertNotNull(keyInfo);
+      assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+      assertEquals(bucketName, keyInfo.getBucketName());
+      assertEquals(keyName, keyInfo.getKeyName());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -1692,9 +1696,9 @@ public class TestKeyManagerImpl {
   private void assertFileNotFound(String bucketName, String keyName) {
     try {
       OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
-      OMException ex = Assert.assertThrows(OMException.class,
+      OMException ex = assertThrows(OMException.class,
           () -> keyManager.getFileStatus(keyArgs));
-      Assert.assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -1705,10 +1709,10 @@ public class TestKeyManagerImpl {
       OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
       OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
       OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
-      Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
-      Assert.assertEquals(bucketName, keyInfo.getBucketName());
-      Assert.assertEquals(keyName, keyInfo.getFileName());
-      Assert.assertTrue(ozoneFileStatus.isDirectory());
+      assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+      assertEquals(bucketName, keyInfo.getBucketName());
+      assertEquals(keyName, keyInfo.getFileName());
+      assertTrue(ozoneFileStatus.isDirectory());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
