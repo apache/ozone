@@ -1370,10 +1370,8 @@ public class TestKeyManagerImpl {
     // Verify the following dbKeys in key table:
     // 1. "volume1/bucket1/dir1/file1"
     // 2. "volume1/bucket2/dir2/file2"
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName1)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
+    assertKeyExist(BUCKET_NAME, keyName1);
+    assertKeyExist(BUCKET2_NAME, keyName2);
 
     assertFileNotFound(BUCKET_NAME, dir0);
     // true positive: fake dir "volume1/bucket1/dir1" should be returned.
@@ -1410,16 +1408,11 @@ public class TestKeyManagerImpl {
     // 3. "volume1/bucket1/dir1/file3"
     // 4. "volume1/bucket2/dir1/file1"
     // 5. "volume1/bucket2/dir1/file2"
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName1)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName2)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName3)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName1)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
-        .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET2_NAME, keyName2)));
+    assertKeyExist(BUCKET_NAME, keyName1);
+    assertKeyExist(BUCKET_NAME, keyName2);
+    assertKeyExist(BUCKET_NAME, keyName3);
+    assertKeyExist(BUCKET2_NAME, keyName1);
+    assertKeyExist(BUCKET2_NAME, keyName2);
 
     // get "volume1/bucket1/dir1" should return a fake dir.
     assertIsDirectory(BUCKET_NAME, dir1);
@@ -1672,6 +1665,16 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
   }
 
+  private void assertKeyExist(String bucketName, String keyName)
+      throws IOException {
+    OmKeyInfo keyInfo = metadataManager.getKeyTable(getDefaultBucketLayout())
+        .get(metadataManager.getOzoneKey(VOLUME_NAME, bucketName, keyName));
+    Assert.assertNotNull(keyInfo);
+    Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+    Assert.assertEquals(bucketName, keyInfo.getBucketName());
+    Assert.assertEquals(keyName, keyInfo.getKeyName());
+  }
+
   private void assertFileNotFound(String bucketName, String keyName)
       throws IOException {
     OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
@@ -1684,7 +1687,10 @@ public class TestKeyManagerImpl {
       throws IOException {
     OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
     OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
-    Assert.assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
+    OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
+    Assert.assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+    Assert.assertEquals(bucketName, keyInfo.getBucketName());
+    Assert.assertEquals(keyName, keyInfo.getFileName());
     Assert.assertTrue(ozoneFileStatus.isDirectory());
   }
 
