@@ -152,7 +152,7 @@ public class TestContainerOperations {
             .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
             .ONE, OzoneConsts.OZONE);
 
-    int totalContainerCount[] = new int[4];
+    int[] totalContainerCount = new int[2];
     for (DatanodeDetails dn : dnList) {
       List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
               storageClient.getDatanodeUsageInfo(
@@ -160,12 +160,10 @@ public class TestContainerOperations {
 
       assertEquals(1, usageInfoList.size());
       assertTrue(usageInfoList.get(0).getContainerCount() >= 0 &&
-              usageInfoList.get(0).getContainerCount() <= 3);
+              usageInfoList.get(0).getContainerCount() <= 1);
       totalContainerCount[(int)usageInfoList.get(0).getContainerCount()]++;
     }
     assertEquals(2, totalContainerCount[0]);
     assertEquals(1, totalContainerCount[1]);
-    assertEquals(0, totalContainerCount[2]);
-    assertEquals(0, totalContainerCount[3]);
   }
 }
