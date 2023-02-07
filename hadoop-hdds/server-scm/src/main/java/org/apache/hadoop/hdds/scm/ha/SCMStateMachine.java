@@ -35,6 +35,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -141,8 +142,14 @@ public class SCMStateMachine extends BaseStateMachine {
       try {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
-        // SCMException is considered as logical rejection and is returned to
-        // Ratis client.
+        // For SCM exceptions while applying a transaction, if the error
+        // code indicate a FATAL issue, let it crash SCM.
+        if (ex.getResult() == ResultCodes.INTERNAL_ERROR
+            || ex.getResult() == ResultCodes.IO_EXCEPTION) {
+          throw ex;
+        }
+        // Otherwise, it's considered as a logical rejection and is returned to
+        // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
       }
 
