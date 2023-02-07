@@ -146,12 +146,8 @@ public class KeyDeletingService extends BackgroundService implements
   }
 
   @Override
-  public void lockBootstrapState() {
-    try {
-      bootstrapStateLock.acquire();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+  public void lockBootstrapState() throws InterruptedException {
+    bootstrapStateLock.acquire();
   }
 
   @Override
