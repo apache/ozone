@@ -95,8 +95,8 @@ public class GrpcOMFailoverProxyProvider<T> extends
             new ProxyInfo<>(createOMProxy(),
                 hostaddr.get() + ":" + port);
         omProxies.put(nodeId, proxyInfo);
-        omNodeAddressMap.put(nodeId, NetUtils.createSocketAddr(hostaddr.get() +
-            ":" + port));
+        omNodeAddressMap.put(nodeId,
+            NetUtils.createSocketAddr(proxyInfo.proxyInfo));
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
         throw new ConfigurationException(rpcAddrKey + "is not defined");

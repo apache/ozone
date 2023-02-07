@@ -177,19 +177,18 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           if (notLeaderException != null) {
             // Prepare the next OM to be tried. This will help with calculation
             // of the wait times needed get creating the retryAction.
-            if (notLeaderException.getSuggestedLeaderAddress() != null &&
-                notLeaderException.getSuggestedLeaderNodeId() != null) {
-              String suggestedLeaderAddress =
-                  notLeaderException.getSuggestedLeaderAddress();
-              String suggestedNodeId =
-                  notLeaderException.getSuggestedLeaderNodeId();
-              if (omNodeAddressMap.containsKey(suggestedNodeId) &&
-                  omNodeAddressMap.get(suggestedNodeId).toString()
-                      .equals(suggestedLeaderAddress)) {
-                setNextOmProxy(suggestedNodeId);
-                return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
-                    failovers);
-              }
+            String suggestedLeaderAddress =
+                notLeaderException.getSuggestedLeaderAddress();
+            String suggestedNodeId =
+                notLeaderException.getSuggestedLeaderNodeId();
+            if (suggestedLeaderAddress != null &&
+                suggestedNodeId != null &&
+                omNodeAddressMap.containsKey(suggestedNodeId) &&
+                omNodeAddressMap.get(suggestedNodeId).toString()
+                    .equals(suggestedLeaderAddress)) {
+              setNextOmProxy(suggestedNodeId);
+              return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
+                  failovers);
             }
 
             selectNextOmProxy();
