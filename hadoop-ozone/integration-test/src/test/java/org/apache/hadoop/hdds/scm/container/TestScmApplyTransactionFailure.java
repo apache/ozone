@@ -28,10 +28,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.InvalidPipelineStateException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.AfterEach;
@@ -63,8 +63,7 @@ public class TestScmApplyTransactionFailure {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setSCMServiceId("test")
+    cluster = MiniOzoneCluster.newHABuilder(conf).setSCMServiceId("test")
         .setNumDatanodes(3).build();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
@@ -88,11 +87,9 @@ public class TestScmApplyTransactionFailure {
   }
 
   @Test
-  public void testAddContainerToClosedPipeline()
-      throws Exception {
-
-    RatisReplicationConfig replication = RatisReplicationConfig.getInstance(
-        ReplicationFactor.THREE);
+  public void testAddContainerToClosedPipeline() throws Exception {
+    RatisReplicationConfig replication =
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
     List<Pipeline> pipelines =
         pipelineManager.getPipelines(replication, PipelineState.OPEN);
     Pipeline pipeline = pipelines.get(0);
@@ -101,37 +98,27 @@ public class TestScmApplyTransactionFailure {
     pipelineManager.closePipeline(pipeline, true);
 
     // adding container to a closed pipeline should yield an error.
-    ContainerInfoProto containerInfo = createContainer(pipeline.getId(),
-        pipeline.getType(), pipeline.getReplicationConfig());
-    StateMachineException ex =
-        assertThrows(StateMachineException.class,
-            () -> containerManager.getContainerStateManager()
-                .addContainer(containerInfo));
+    ContainerInfoProto containerInfo = createContainer(pipeline);
+    StateMachineException ex = assertThrows(StateMachineException.class,
+        () -> containerManager.getContainerStateManager()
+            .addContainer(containerInfo));
     assertTrue(ex.getCause() instanceof InvalidPipelineStateException);
 
     // verify that SCMStateMachine is still functioning after the rejected
     // transaction.
-    assertNotNull(
-        containerManager.allocateContainer(replication, "test"));
+    assertNotNull(containerManager.allocateContainer(replication, "test"));
   }
 
-  private ContainerInfoProto createContainer(PipelineID pipelineId,
-                                             HddsProtos.ReplicationType type,
-                                             ReplicationConfig replicationConfig) {
-    final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
-        .newBuilder()
-        .setState(HddsProtos.LifeCycleState.OPEN)
-        .setPipelineID(pipelineId.getProtobuf())
-        .setUsedBytes(0)
-        .setNumberOfKeys(0)
-        .setStateEnterTime(Time.now())
-        .setOwner("test")
-        .setContainerID(1)
-        .setDeleteTransactionId(0)
-        .setReplicationType(type);
+  private ContainerInfoProto createContainer(Pipeline pipeline) {
+    final ContainerInfoProto.Builder containerInfoBuilder =
+        ContainerInfoProto.newBuilder().setState(HddsProtos.LifeCycleState.OPEN)
+            .setPipelineID(pipeline.getId().getProtobuf()).setUsedBytes(0)
+            .setNumberOfKeys(0).setStateEnterTime(Time.now()).setOwner("test")
+            .setContainerID(1).setDeleteTransactionId(0)
+            .setReplicationType(pipeline.getType());
 
-      containerInfoBuilder.setReplicationFactor(
-          ReplicationConfig.getLegacyFactor(replicationConfig));
-      return containerInfoBuilder.build();
+    containerInfoBuilder.setReplicationFactor(
+        ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+    return containerInfoBuilder.build();
   }
 }
