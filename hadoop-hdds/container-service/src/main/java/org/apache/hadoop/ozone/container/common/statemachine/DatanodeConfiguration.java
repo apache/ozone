@@ -317,9 +317,6 @@ public class DatanodeConfiguration {
   )
   private String containerSchemaV3KeySeparator = "|";
 
-  /**
-   * Following RocksDB related configuration applies to Schema V3 only.
-   */
   @Config(key = "rocksdb.log.level",
       defaultValue = "INFO",
       type = ConfigType.STRING,
@@ -336,7 +333,7 @@ public class DatanodeConfiguration {
       description = "The max size of each user log file of RocksDB. " +
           "O means no size limit."
   )
-  private long rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+  private long rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
   @Config(key = "rocksdb.log.max-file-num",
       defaultValue = "64",
@@ -344,8 +341,11 @@ public class DatanodeConfiguration {
       tags = { DATANODE },
       description = "The max user log file number to keep for each RocksDB"
   )
-  private int rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+  private int rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
 
+  /**
+   * Following RocksDB related configuration applies to Schema V3 only.
+   */
   @Config(key = "rocksdb.delete-obsolete-files-period",
       defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
@@ -417,18 +417,18 @@ public class DatanodeConfiguration {
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
-    if (rocksdbMaxFileSize < 0) {
+    if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
-          rocksdbMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
-      rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+          rocksdbLogMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
+      rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
     }
 
-    if (rocksdbMaxFileNum <= 0) {
+    if (rocksdbLogMaxFileNum <= 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_NUM_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
-          rocksdbMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
-      rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+          rocksdbLogMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
+      rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
     }
 
     if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
@@ -555,20 +555,20 @@ public class DatanodeConfiguration {
     this.rocksdbLogLevel = level;
   }
 
-  public void setRocksdbMaxFileNum(int count) {
-    this.rocksdbMaxFileNum = count;
+  public void setRocksdbLogMaxFileNum(int count) {
+    this.rocksdbLogMaxFileNum = count;
   }
 
-  public int getRocksdbMaxFileNum() {
-    return rocksdbMaxFileNum;
+  public int getRocksdbLogMaxFileNum() {
+    return rocksdbLogMaxFileNum;
   }
 
-  public void setRocksdbMaxFileSize(long size) {
-    this.rocksdbMaxFileSize = size;
+  public void setRocksdbLogMaxFileSize(long size) {
+    this.rocksdbLogMaxFileSize = size;
   }
 
-  public long getRocksdbMaxFileSize() {
-    return rocksdbMaxFileSize;
+  public long getRocksdbLogMaxFileSize() {
+    return rocksdbLogMaxFileSize;
   }
 
   public long getRocksdbDeleteObsoleteFilesPeriod() {
