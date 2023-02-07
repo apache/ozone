@@ -306,7 +306,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // metadata constructor for snapshots
-  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
+  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
       boolean isSnapshotInCache) throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
@@ -320,22 +320,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     setStore(loadDB(conf, metaDir, dbName, true));
     initializeOmTables(false);
-  }
-
-  /**
-   * Factory method for creating snapshot metadata manager.
-   *
-   * @param conf - ozone configuration
-   * @param snapshotDirName - the UUID that identifies the snapshot
-   * @return the metadata manager representing the snapshot
-   * @throws IOException
-   */
-  public static OmMetadataManagerImpl createSnapshotMetadataManager(
-      OzoneConfiguration conf, String snapshotDirName,
-      boolean isSnapshotInCache) throws IOException {
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf, snapshotDirName,
-        isSnapshotInCache);
-    return smm;
   }
 
   @Override
@@ -920,23 +904,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     return false;
   }
-
-
-  static boolean isSnapshotPresentInTableCache(String keyPrefix, Table table) {
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
-        table.cacheIterator();
-    while (iterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry =
-          iterator.next();
-      String key = entry.getKey().getCacheKey();
-      SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      if (key.startsWith(keyPrefix) && snapshotInfo != null) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /**
    * Checks if a key starts with the given prefix is present in the table.
    *

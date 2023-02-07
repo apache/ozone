@@ -2251,8 +2251,5 @@ public class TestRootedOzoneFileSystem {
     } catch (Exception e) {
       Assert.fail("Failed to read/list on snapshotPath, exception: " + e);
     }
-
   }
-
-
 }
