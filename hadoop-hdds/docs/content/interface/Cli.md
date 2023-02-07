@@ -207,3 +207,65 @@ $ ozone sh key info /vol1/bucket1/README.md
 ```shell
 $ ozone sh key get /vol1/bucket1/README.md /tmp/
 ```
+
+## Querying CLI Results
+
+Ozone CLI returns JSON responses. [jq](https://stedolan.github.io/jq/manual/) is a command line JSON processor that can be used to filter CLI output for desired information.
+
+For example:
+
+* List FSO buckets that are not links.
+```shell
+$ ozone sh bucket list /s3v | jq '.[] | select(.link==false and .bucketLayout=="FILE_SYSTEM_OPTIMIZED")'
+{
+  "metadata": {},
+  "volumeName": "s3v",
+  "name": "fso-bucket",
+  "storageType": "DISK",
+  "versioning": false,
+  "usedBytes": 0,
+  "usedNamespace": 0,
+  "creationTime": "2023-02-01T05:18:46.974Z",
+  "modificationTime": "2023-02-01T05:18:46.974Z",
+  "quotaInBytes": -1,
+  "quotaInNamespace": -1,
+  "bucketLayout": "FILE_SYSTEM_OPTIMIZED",
+  "owner": "om",
+  "link": false
+}
+```
+
+* List EC buckets with their replication config.
+```shell
+$ ozone sh bucket list /vol1 | jq -r '.[] | select(.replicationConfig.replicationType == "EC") | {"name": .name, "replicationConfig": .replicationConfig}'
+{
+  "name": "ec5",
+  "replicationConfig": {
+    "data": 3,
+    "parity": 2,
+    "ecChunkSize": 1048576,
+    "codec": "RS",
+    "replicationType": "EC",
+    "requiredNodes": 5
+  }
+}
+{
+  "name": "ec9",
+  "replicationConfig": {
+    "data": 6,
+    "parity": 3,
+    "ecChunkSize": 1048576,
+    "codec": "RS",
+    "replicationType": "EC",
+    "requiredNodes": 9
+  }
+}
+```
+
+* List names of encrypted buckets and their encryption key names in tab-separated-value format.
+```shell
+
+$ ozone sh bucket list /vol1 | jq -r '.[] | select(.encryptionKeyName != null) | [.name, .encryptionKeyName] | @tsv'
+ec5     key1
+encrypted-bucket        key1
+```

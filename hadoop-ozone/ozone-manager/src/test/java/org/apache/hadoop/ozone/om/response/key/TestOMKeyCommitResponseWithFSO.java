@@ -40,11 +40,12 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @Override
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-      String ozoneKey, RepeatedOmKeyInfo deleteKeys) throws IOException {
+      String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+          throws IOException {
     Assert.assertNotNull(omBucketInfo);
     long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeys, volumeId);
+        openKey, omBucketInfo, deleteKeys, volumeId, isHSync);
   }
 
   @NotNull

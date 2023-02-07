@@ -237,6 +237,7 @@ public final class RatisHelper {
           rpcType, leader, group);
     }
     final RaftProperties properties = newRaftProperties(rpcType);
+    enableNettyStreaming(properties);
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
@@ -305,6 +306,10 @@ public final class RatisHelper {
   public static RaftProperties setRpcType(RaftProperties properties,
       RpcType rpcType) {
     RaftConfigKeys.Rpc.setType(properties, rpcType);
+    return properties;
+  }
+
+  public static RaftProperties enableNettyStreaming(RaftProperties properties) {
     RaftConfigKeys.DataStream.setType(properties,
         SupportedDataStreamType.NETTY);
     return properties;

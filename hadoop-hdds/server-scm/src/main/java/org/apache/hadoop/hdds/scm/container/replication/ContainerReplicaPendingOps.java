@@ -121,7 +121,7 @@ public class ContainerReplicaPendingOps {
     boolean completed = completeOp(ADD, containerID, target, replicaIndex);
     if (isMetricsNotNull() && completed) {
       if (replicaIndex > 0) {
-        replicationMetrics.incrEcReplicationCmdsCompletedTotal();
+        replicationMetrics.incrEcReplicasCreatedTotal();
       } else if (replicaIndex == 0) {
         replicationMetrics.incrNumReplicationCmdsCompleted();
       }
@@ -143,7 +143,7 @@ public class ContainerReplicaPendingOps {
     boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
     if (isMetricsNotNull() && completed) {
       if (replicaIndex > 0) {
-        replicationMetrics.incrEcDeletionCmdsCompletedTotal();
+        replicationMetrics.incrEcReplicasDeletedTotal();
       } else if (replicaIndex == 0) {
         replicationMetrics.incrNumDeletionCmdsCompleted();
       }
@@ -214,13 +214,13 @@ public class ContainerReplicaPendingOps {
   private void updateTimeoutMetrics(ContainerReplicaOp op) {
     if (op.getOpType() == ADD && isMetricsNotNull()) {
       if (op.getReplicaIndex() > 0) {
-        replicationMetrics.incrEcReplicationCmdsTimeoutTotal();
+        replicationMetrics.incrEcReplicaCreateTimeoutTotal();
       } else if (op.getReplicaIndex() == 0) {
         replicationMetrics.incrNumReplicationCmdsTimeout();
       }
     } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
       if (op.getReplicaIndex() > 0) {
-        replicationMetrics.incrEcDeletionCmdsTimeoutTotal();
+        replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
       } else if (op.getReplicaIndex() == 0) {
         replicationMetrics.incrNumDeletionCmdsTimeout();
       }

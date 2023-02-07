@@ -29,6 +29,7 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 
 /**
@@ -97,5 +98,11 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   @Override
   protected InputStream createFSInputStream(InputStream inputStream) {
     return new CapableOzoneFSInputStream(inputStream, statistics);
+  }
+
+  @Override
+  protected OutputStream createFSOutputStream(
+          OzoneFSOutputStream outputStream) {
+    return new CapableOzoneFSOutputStream(outputStream);
   }
 }

@@ -193,6 +193,8 @@ public final class HddsConfigKeys {
       "hdds.x509.renew.grace.duration";
 
   public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
+  public static final String HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX = "-next";
+  public static final String HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX = "-previous";
 
   public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
       "hdds.container.replication.compression";

@@ -177,6 +177,8 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
+            .filter(e -> ((KeyValueContainerData) e.getValue()
+                .getContainerData()).getNumPendingDeletionBlocks() > 0)
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
                 deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
@@ -440,7 +442,8 @@ public class BlockDeletingService extends BackgroundService {
       Deleter schema3Deleter = (table, batch, tid) -> {
         Table<String, DeletedBlocksTransaction> delTxTable =
             (Table<String, DeletedBlocksTransaction>) table;
-        delTxTable.deleteWithBatch(batch, containerData.deleteTxnKey(tid));
+        delTxTable.deleteWithBatch(batch,
+            containerData.getDeleteTxnKey(tid));
       };
       Table<String, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<String>) meta.getStore())
@@ -502,7 +505,7 @@ public class BlockDeletingService extends BackgroundService {
             deleter.apply(deleteTxns, batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
               blockDataTable.deleteWithBatch(batch,
-                  containerData.blockKey(blk));
+                  containerData.getBlockKey(blk));
             }
           }
 
@@ -550,7 +553,7 @@ public class BlockDeletingService extends BackgroundService {
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
-          String blk = containerData.blockKey(blkLong);
+          String blk = containerData.getBlockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blkLong);
           if (blkInfo == null) {

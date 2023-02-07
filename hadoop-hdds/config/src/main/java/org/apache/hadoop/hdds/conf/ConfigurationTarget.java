@@ -44,6 +44,10 @@ public interface ConfigurationTarget {
     set(name, Boolean.toString(value));
   }
 
+  default <T extends Enum<T>> void setEnum(String name, T value) {
+    set(name, value.name());
+  }
+
   default void setTimeDuration(String name, long value, TimeUnit unit) {
     set(name, value + ParsedTimeDuration.unitFor(unit).suffix());
   }

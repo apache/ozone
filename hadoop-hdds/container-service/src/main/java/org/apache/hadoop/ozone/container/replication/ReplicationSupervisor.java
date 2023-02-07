@@ -18,21 +18,25 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -47,8 +51,10 @@ public class ReplicationSupervisor {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
 
-  private final ContainerSet containerSet;
-  private final ContainerReplicator replicator;
+  private static final Comparator<TaskRunner> TASK_RUNNER_COMPARATOR =
+      Comparator.comparing(TaskRunner::getTaskPriority)
+          .thenComparing(TaskRunner::getTaskQueueTime);
+
   private final ExecutorService executor;
   private final StateContext context;
   private final Clock clock;
@@ -57,46 +63,66 @@ public class ReplicationSupervisor {
   private final AtomicLong successCounter = new AtomicLong();
   private final AtomicLong failureCounter = new AtomicLong();
   private final AtomicLong timeoutCounter = new AtomicLong();
+  private final AtomicLong skippedCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
    * or queued for download. Tracked so we don't schedule > 1
-   * concurrent download for the same container.
+   * concurrent download for the same container. Note that the uniqueness of a
+   * task is defined by the tasks equals and hashCode methods.
    */
-  private final KeySetView<Object, Boolean> containersInFlight;
+  private final Set<AbstractReplicationTask> inFlight;
+
+  private final Map<Class, AtomicInteger> taskCounter =
+      new ConcurrentHashMap<>();
 
   @VisibleForTesting
   ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ExecutorService executor,
-      Clock clock) {
-    this.containerSet = containerSet;
-    this.replicator = replicator;
-    this.containersInFlight = ConcurrentHashMap.newKeySet();
+      StateContext context, ExecutorService executor, Clock clock) {
+    this.inFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
     this.clock = clock;
   }
 
   public ReplicationSupervisor(
-      ContainerSet containerSet, StateContext context,
-      ContainerReplicator replicator, ReplicationConfig replicationConfig,
-      Clock clock) {
-    this(containerSet, context, replicator, new ThreadPoolExecutor(
-        replicationConfig.getReplicationMaxStreams(),
-        replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("ContainerReplicationThread-%d")
-            .build()), clock);
+      StateContext context, ReplicationConfig replicationConfig, Clock clock) {
+    this(context,
+        new ThreadPoolExecutor(
+            replicationConfig.getReplicationMaxStreams(),
+            replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
+            new PriorityBlockingQueue<>(),
+            new ThreadFactoryBuilder().setDaemon(true)
+                .setNameFormat("ContainerReplicationThread-%d")
+                .build()),
+        clock);
   }
 
   /**
    * Queue an asynchronous download of the given container.
    */
-  public void addTask(ReplicationTask task) {
-    if (containersInFlight.add(task.getContainerId())) {
+  public void addTask(AbstractReplicationTask task) {
+    if (inFlight.add(task)) {
+      if (task.getPriority() != ReplicationCommandPriority.LOW) {
+        // Low priority tasks are not included in the replication queue sizes
+        // returned to SCM in the heartbeat, so we only update the count for
+        // priorities other than low.
+        taskCounter.computeIfAbsent(task.getClass(),
+            k -> new AtomicInteger()).incrementAndGet();
+      }
       executor.execute(new TaskRunner(task));
+    }
+  }
+
+  private void decrementTaskCounter(AbstractReplicationTask task) {
+    if (task.getPriority() == ReplicationCommandPriority.LOW) {
+      // LOW tasks are not included in the counter, so skip decrementing the
+      // counter.
+      return;
+    }
+    AtomicInteger counter = taskCounter.get(task.getClass());
+    if (counter != null) {
+      counter.decrementAndGet();
     }
   }
 
@@ -119,28 +145,40 @@ public class ReplicationSupervisor {
   }
 
   /**
-   * Get the number of containers currently being downloaded
-   * or scheduled for download.
+   * Given the Class of a AbstractReplicationTask, return the count of tasks
+   * currently inflight (queued or running) for that type of task.
    *
-   * @return Count of in-flight replications.
+   * @param taskClass The Class of the tasks to get a count for.
+   * @return Count of in-flight replications for the type of task.
    */
-  public int getInFlightReplications() {
-    return containersInFlight.size();
+  public int getInFlightReplications(
+      Class<? extends AbstractReplicationTask> taskClass) {
+    AtomicInteger counter = taskCounter.get(taskClass);
+    return counter == null ? 0 : counter.get();
+  }
+
+  /**
+   * Returns a count of all inflight replication tasks across all task types.
+   * Note that `getInFlightReplications(Class taskClass) allows for the .count
+   * of replications for a given class to be retrieved.
+   * @return Total replication tasks queued or running in the supervisor
+   */
+  public int getTotalInFlightReplications() {
+    return inFlight.size();
   }
 
   /**
    * An executable form of a replication task with status handling.
    */
-  public final class TaskRunner implements Runnable {
-    private final ReplicationTask task;
+  public final class TaskRunner implements Comparable, Runnable {
+    private final AbstractReplicationTask task;
 
-    public TaskRunner(ReplicationTask task) {
+    public TaskRunner(AbstractReplicationTask task) {
       this.task = task;
     }
 
     @Override
     public void run() {
-      final Long containerId = task.getContainerId();
       try {
         requestCounter.incrementAndGet();
 
@@ -170,37 +208,61 @@ public class ReplicationSupervisor {
           }
         }
 
-        if (containerSet.getContainer(task.getContainerId()) != null) {
-          LOG.debug("Container {} has already been downloaded.", containerId);
-          return;
-        }
-
-        task.setStatus(Status.DOWNLOADING);
-        replicator.replicate(task);
-
+        task.setStatus(Status.IN_PROGRESS);
+        task.runTask();
         if (task.getStatus() == Status.FAILED) {
-          LOG.error(
-              "Container {} can't be downloaded from any of the datanodes.",
-              containerId);
+          LOG.error("Failed {}", this);
           failureCounter.incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
-          LOG.info("Container {} is replicated.", containerId);
+          LOG.info("Successful {}", this);
           successCounter.incrementAndGet();
+        } else if (task.getStatus() == Status.SKIPPED) {
+          LOG.info("Skipped {}", this);
+          skippedCounter.incrementAndGet();
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
-        LOG.error("Encountered error while replicating container {}.",
-            containerId, e);
+        LOG.error("Failed {}", this, e);
         failureCounter.incrementAndGet();
       } finally {
-        containersInFlight.remove(containerId);
+        inFlight.remove(task);
+        decrementTaskCounter(task);
       }
     }
 
     @Override
     public String toString() {
-      return "replicate container command for container "
-          + task.getContainerId();
+      return task.toString();
+    }
+
+    public ReplicationCommandPriority getTaskPriority() {
+      return task.getPriority();
+    }
+
+    public long getTaskQueueTime() {
+      return task.getQueued().toEpochMilli();
+    }
+
+    @Override
+    public int compareTo(Object o) {
+      return TASK_RUNNER_COMPARATOR.compare(this, (TaskRunner) o);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(task);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      TaskRunner that = (TaskRunner) o;
+      return task.equals(that.task);
     }
   }
 
@@ -226,6 +288,10 @@ public class ReplicationSupervisor {
 
   public long getReplicationTimeoutCount() {
     return timeoutCounter.get();
+  }
+
+  public long getReplicationSkippedCount() {
+    return skippedCounter.get();
   }
 
 }

@@ -57,11 +57,12 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
   @Override
   protected String getOzonePathKey() throws IOException {
-    final long volumeId = getVolumeID();
+    final long volumeID = getVolumeID();
     final long bucketID = getBucketID();
     String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getOzonePathKey(volumeId, bucketID,
-            bucketID, fileName);
+
+    return omMetadataManager.getOzonePathKey(volumeID, bucketID,
+            parentID, fileName);
   }
 
   @Override
@@ -84,11 +85,9 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    OMRequestTestUtils.addFileToKeyTable(true, false,
+    return OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
-    return omMetadataManager.getOzonePathKey(getVolumeID(), getBucketID(),
-            parentID, fileName);
   }
 
   @NotNull
