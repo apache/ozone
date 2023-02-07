@@ -182,7 +182,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         }
 
         failoverToReconstructionRead(
-            ((BadDataLocationException) e).getFailedLocation(), lastPosition);
+            ((BadDataLocationException) e).getFailedLocations(), lastPosition);
         buf.reset();
         totalRead += read(buf);
       } else {
@@ -193,10 +193,9 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   private synchronized void failoverToReconstructionRead(
-      DatanodeDetails badLocation, long lastPosition) throws IOException {
-    if (badLocation != null) {
-      failedLocations.add(badLocation);
-    }
+      List<DatanodeDetails> badLocations, long lastPosition)
+      throws IOException {
+    failedLocations.addAll(badLocations);
     blockReader.close();
     reconstructionReader = true;
     createBlockReader();
