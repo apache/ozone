@@ -92,6 +92,8 @@ public class DeletedBlockLogImpl
   private final SequenceIdGenerator sequenceIdGen;
   private final ScmBlockDeletingServiceMetrics metrics;
 
+  private static final  int LIST_ALL_FAILED_TRANSACTIONS = -1;
+
   @SuppressWarnings("parameternumber")
   public DeletedBlockLogImpl(ConfigurationSource conf,
       ContainerManager containerManager,
@@ -134,7 +136,7 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        if (count < 0) {
+        if (count <= 0) {
           while (iter.hasNext()) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
             if (delTX.getCount() == -1) {
@@ -200,7 +202,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       if (txIDs == null || txIDs.isEmpty()) {
-        txIDs = getFailedTransactions(-1).stream()
+        txIDs = getFailedTransactions(LIST_ALL_FAILED_TRANSACTIONS).stream()
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
       }
