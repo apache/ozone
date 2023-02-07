@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -47,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -118,10 +116,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
-      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
-      }
+      List<OmKeyLocationInfo>
+          locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
       bucketLockAcquired =
               omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,

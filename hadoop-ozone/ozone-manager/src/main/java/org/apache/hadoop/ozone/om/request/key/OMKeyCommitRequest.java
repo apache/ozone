@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,19 +161,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, commitKeyRequest.getClientID());
 
-      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        OmKeyLocationInfo locationInfo =
-            OmKeyLocationInfo.getFromProtobuf(keyLocation);
-
-        // Strip out tokens before adding to cache.
-        // This way during listStatus token information does not pass on to
-        // client when returning from cache.
-        if (ozoneManager.isGrpcBlockTokenEnabled()) {
-          locationInfo.setToken(null);
-        }
-        locationInfoList.add(locationInfo);
-      }
+      List<OmKeyLocationInfo>
+          locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
       bucketLockAcquired =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -308,6 +298,25 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  @NotNull
+  protected List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      OzoneManager ozoneManager, KeyArgs commitKeyArgs) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
+      OmKeyLocationInfo locationInfo =
+          OmKeyLocationInfo.getFromProtobuf(keyLocation);
+
+      // Strip out tokens before adding to cache.
+      // This way during listStatus token information does not pass on to
+      // client when returning from cache.
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        locationInfo.setToken(null);
+      }
+      locationInfoList.add(locationInfo);
+    }
+    return locationInfoList;
   }
 
   /**
