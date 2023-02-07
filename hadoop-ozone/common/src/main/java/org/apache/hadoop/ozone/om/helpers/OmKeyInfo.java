@@ -783,7 +783,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentObjectID(parentObjectID)
-        .setFileName(fileName);
+        .setFileName(fileName)
+        .setFile(isFile);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(

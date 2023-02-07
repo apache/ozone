@@ -1073,12 +1073,141 @@
     "sizeDirectKey": 0
   },
   "metadata": {
-    "type": "DUMMY_TYPE",
+  "path": "",
+  "type": "DUMMY_TYPE",
+  "countStats": {
     "numVolume": 100,
     "numBucket": 200,
     "numDir": 400,
-    "numKey": 800,
-    "status": "OK"
+    "numKey": 80
+  },
+  "objectInfo": {
+    "versioningEnabled": false,
+    "metadata": {
+      
+    },
+    "name": "fso-bucket",
+    "fileName": "file1",
+    "file": false,
+    "quotaInBytes": 1000000000,
+    "quotaInNamespace": 2000000000,
+    "usedNamespace": 10,
+    "creationTime": 1673415921920,
+    "modificationTime": 1673415921920,
+    "acls": [
+      {
+        "type": "USER",
+        "name": "hadoop",
+        "aclScope": "ACCESS",
+        "aclList": [
+          "ALL"
+        ]
+      },
+      {
+        "type": "GROUP",
+        "name": "hadoop",
+        "aclScope": "ACCESS",
+        "aclList": [
+          "ALL"
+        ]
+      }
+    ],
+    "keyLocationVersions": [
+      {
+        "version": 0,
+        "locationList": [
+          {
+            "blockID": {
+              "containerBlockID": {
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "blockCommitSequenceId": 18,
+              "containerID": 1,
+              "localID": 111677748019200007
+            },
+            "length": 3879,
+            "offset": 0,
+            "token": null,
+            "createVersion": 0,
+            "pipeline": null,
+            "partNumber": 0,
+            "containerID": 1,
+            "localID": 111677748019200007,
+            "blockCommitSequenceId": 18
+          }
+        ],
+        "multipartKey": false,
+        "blocksLatestVersionOnly": [
+          {
+            "blockID": {
+              "containerBlockID": {
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "blockCommitSequenceId": 18,
+              "containerID": 1,
+              "localID": 111677748019200007
+            },
+            "length": 3879,
+            "offset": 0,
+            "token": null,
+            "createVersion": 0,
+            "pipeline": null,
+            "partNumber": 0,
+            "containerID": 1,
+            "localID": 111677748019200007,
+            "blockCommitSequenceId": 18
+          }
+        ],
+        "locationLists": [
+          [
+            {
+              "blockID": {
+                "containerBlockID": {
+                  "containerID": 1,
+                  "localID": 111677748019200007
+                },
+                "blockCommitSequenceId": 18,
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "length": 3879,
+              "offset": 0,
+              "token": null,
+              "createVersion": 0,
+              "pipeline": null,
+              "partNumber": 0,
+              "containerID": 1,
+              "localID": 111677748019200007,
+              "blockCommitSequenceId": 18
+            }
+          ]
+        ],
+        "locationListCount": 1
+      }
+    ],
+    "volumeName": "volume1",
+    "bucketName": "fso-bucket",
+    "keyName": "file1",
+    "dataSize": 18513,
+    "storageType": "DISK",
+    "versioning": false,
+    "usedBytes": null,
+    "encryptionInfo": null,
+    "replicationConfig": {
+      "replicationFactor": "THREE",
+      "requiredNodes": 3,
+      "replicationType": "RATIS"
+    },
+    "encInfo": null,
+    "sourceVolume": null,
+    "sourceBucket": null,
+    "bucketLayout": "FILE_SYSTEM_OPTIMIZED",
+    "owner": "hadoop",
+    "volume": "vol1"
+  },
+  "status": "OK"
   },
   "quota": {
     "allowed": 1000000000,

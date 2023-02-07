@@ -31,8 +31,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.concurrent.Callable;
 
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Handles {@code ozone debug container export} command.
@@ -73,10 +73,10 @@ public class ExportSubcommand implements Callable<Void> {
     for (int i = 0; i < containerCount; i++) {
       replicationSource.prepare(containerId);
       final File destinationFile =
-          new File(destination, "container-" + containerId + ".tar.gz");
+          new File(destination, "container-" + containerId + ".tar");
       try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
         try {
-          replicationSource.copyData(containerId, fos, GZIP);
+          replicationSource.copyData(containerId, fos, NO_COMPRESSION);
         } catch (StorageContainerException e) {
           if (e.getResult() == CONTAINER_NOT_FOUND) {
             continue;
