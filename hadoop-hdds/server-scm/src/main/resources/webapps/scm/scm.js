@@ -24,12 +24,46 @@
         require: {
             overview: "^overview"
         },
-        controller: function ($http) {
+        controller: function ($http,$scope) {
             var ctrl = this;
+            $scope.reverse=true;
+            $scope.columnName="";
+            let nodeStatusCopy=[];
+            $scope.RecordsToDisplay ="10";
+            $scope.currentPage=1;
+            $scope.lastIndex = 0;
+
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
                 .then(function (result) {
                     ctrl.nodemanagermetrics = result.data.beans[0];
-                });
+                $scope.nodeStatus = ctrl.nodemanagermetrics && ctrl.nodemanagermetrics.NodeStatus && ctrl.nodemanagermetrics.NodeStatus.map(({ key, value}) =>{
+                            return {
+                                hostname: key,
+                                opstate: value[0],
+                                comstate: value[1]
+                            }});
+                  nodeStatusCopy = [...$scope.nodeStatus];
+                  $scope.lastIndex= Math.ceil(nodeStatusCopy.length/$scope.RecordsToDisplay);
+                  $scope.nodeStatus =nodeStatusCopy.slice(0,$scope.RecordsToDisplay);
+                  });
+                    $scope.UpdateRecordsToShow= ()=>{
+                       $scope.lastIndex= Math.ceil(nodeStatusCopy.length/$scope.RecordsToDisplay);
+                       $scope.nodeStatus =nodeStatusCopy.slice(0,$scope.RecordsToDisplay);
+                       $scope.currentPage=1;
+                    }
+                 $scope.handlePagination= (pageIndex,isDisabled )=>{
+                                    if(!isDisabled){
+                                        let startIndex=0, endIndex=0;
+                                        $scope.currentPage =pageIndex;
+                                        startIndex= (pageIndex* $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
+                                        endIndex= startIndex + parseInt($scope.RecordsToDisplay);
+                                        $scope.nodeStatus= nodeStatusCopy.slice(startIndex, endIndex);
+                                    }
+                                  }
+                $scope.columnSort = (colName)=> {
+                    $scope.columnName=colName;
+                    $scope.reverse= !$scope.reverse;
+                }
 
             const nodeOpStateSortOrder = {
                 "IN_SERVICE": "a",
