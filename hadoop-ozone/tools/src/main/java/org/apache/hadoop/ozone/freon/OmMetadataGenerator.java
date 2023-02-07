@@ -253,7 +253,6 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    String ownerName = ugi.getShortUserName();
     return new Builder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
@@ -279,7 +278,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     final Map<String, Long> valueRecorder = new HashMap<>();
     final Map<String, Instant> instantsRecorder = new HashMap<>();
     return () -> {
-      String message = "";
+      StringBuilder sb = new StringBuilder();
       for (Map.Entry<String, Timer> entry
           : getMetrics().getTimers(MetricFilter.ALL).entrySet()) {
         String name = entry.getKey();
@@ -296,9 +295,15 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         maxValueRecorder.put(name, maxValue);
         valueRecorder.put(name, curValue);
         instantsRecorder.put(name, now);
-        message += " " + name + ": rate " + rate + " max " + maxValue;
+        sb.append(" ")
+            .append(name)
+            .append(": rate ")
+            .append(rate)
+            .append(" max ")
+            .append(maxValue);
       }
-      return message;
+      sb.append("  ");
+      return sb.toString();
     };
   }
 
