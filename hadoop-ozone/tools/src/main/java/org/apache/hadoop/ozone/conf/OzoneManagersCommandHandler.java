@@ -28,7 +28,7 @@ import picocli.CommandLine.ParentCommand;
  * Handler for ozone getconf ozonemanagers.
  */
 @Command(name = "ozonemanagers",
-    aliases = {"-ozonemanagers"},
+    aliases = {"-ozonemanagers", "--ozone-managers"},
     description = "gets list of ozone storage container "
         + "manager nodes in the cluster",
     mixinStandardHelpOptions = true,
