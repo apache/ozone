@@ -453,8 +453,8 @@ message ContainerBalancerConfigurationProto {
 }
 
 message DeletedBlocksTransactionInfo {
-    required int64 txID = 1;
-    required int64 containerID = 2;
+    optional int64 txID = 1;
+    optional int64 containerID = 2;
     repeated int64 localID = 3;
-    required int32 count = 4;
+    optional int32 count = 4;
 }

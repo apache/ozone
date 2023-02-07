@@ -41,11 +41,14 @@ public class DeletedBlocksTransactionInfoWrapper {
 
   public static DeletedBlocksTransactionInfoWrapper fromProtobuf(
       DeletedBlocksTransactionInfo txn) {
-    return new DeletedBlocksTransactionInfoWrapper(
-        txn.getTxID(),
-        txn.getContainerID(),
-        txn.getLocalIDList(),
-        txn.getCount());
+    if (txn.hasTxID() && txn.hasContainerID() && txn.hasCount()) {
+      return new DeletedBlocksTransactionInfoWrapper(
+          txn.getTxID(),
+          txn.getContainerID(),
+          txn.getLocalIDList(),
+          txn.getCount());
+    }
+    return null;
   }
 
   public static DeletedBlocksTransactionInfo toProtobuf(

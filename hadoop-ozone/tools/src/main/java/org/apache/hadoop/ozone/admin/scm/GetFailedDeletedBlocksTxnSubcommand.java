@@ -29,6 +29,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +70,7 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
     }
     List<DeletedBlocksTransactionInfoWrapper> txns = response.stream()
         .map(DeletedBlocksTransactionInfoWrapper::fromProtobuf)
+        .filter(Objects::nonNull)
         .collect(Collectors.toList());
 
     String result = JsonUtils.toJsonStringWithDefaultPrettyPrinter(txns);
