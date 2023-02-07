@@ -122,6 +122,11 @@ public class BaseFreonGenerator {
       defaultValue = "")
   private String prefix = "";
 
+  @Option(names = {"--verbose"},
+          description = "More verbose output. "
+              + "Show all the command line Option info.")
+  private boolean verbose;
+
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
@@ -138,10 +143,12 @@ public class BaseFreonGenerator {
   private ExecutorService executor;
   private ProgressBar progressBar;
 
+  // the `threadSequenceId` Starting from 0,
+  // each thread will be set a self-incrementing sequence number when it starts
   private final ThreadLocal<Long> threadSequenceId = new ThreadLocal<>();
   private final AtomicLong id = new AtomicLong(0);
 
-  private final AtomicBoolean completion = new AtomicBoolean(false);
+  private final AtomicBoolean completed = new AtomicBoolean(false);
 
   /**
    * The main logic to execute a test generator.
@@ -180,18 +187,18 @@ public class BaseFreonGenerator {
    */
   private void taskLoop(TaskProvider provider) {
     threadSequenceId.set(id.getAndIncrement());
-    while (!completion.get()) {
+    while (!completed.get()) {
       long counter = attemptCounter.getAndIncrement();
       if (timebase) {
         if (System.currentTimeMillis()
             > startTime + TimeUnit.SECONDS.toMillis(runtime)) {
-          completion.set(true);
+          completed.set(true);
           break;
         }
       } else {
         //in case of an other failed test, we shouldn't execute more tasks.
         if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
-          completion.set(true);
+          completed.set(true);
           break;
         }
       }
@@ -233,7 +240,7 @@ public class BaseFreonGenerator {
    * thread.
    */
   private void waitForCompletion() {
-    while (!completion.get() && (failureCounter.get() == 0 || failAtEnd)) {
+    while (!completed.get() && (failureCounter.get() == 0 || failAtEnd)) {
       try {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       } catch (InterruptedException e) {
@@ -308,6 +315,9 @@ public class BaseFreonGenerator {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
+          if (verbose) {
+            printOption();
+          }
         }, 10);
 
     executor = Executors.newFixedThreadPool(threadNo);
@@ -322,7 +332,7 @@ public class BaseFreonGenerator {
       supplier = successCounter::get;
     }
     progressBar = new ProgressBar(System.out, maxValue, supplier,
-        true, realTimeStatusSupplier());
+        freonCommand.isInteractive(), realTimeStatusSupplier());
     progressBar.start();
 
     startTime = System.currentTimeMillis();
@@ -369,12 +379,23 @@ public class BaseFreonGenerator {
     Consumer<String> print = freonCommand.isInteractive()
         ? System.out::println
         : LOG::info;
+    messages.forEach(print);
+  }
 
+  /**
+   * Print Option info about the executed tests.
+   */
+  public void printOption() {
+    List<String> messages = new LinkedList<>();
     messages.add("\nOption:");
     for (CommandLine.Model.OptionSpec option : spec.options()) {
       String name = option.longestName();
       messages.add(name + "=" + option.getValue());
     }
+
+    Consumer<String> print = freonCommand.isInteractive()
+            ? System.out::println
+            : LOG::info;
     messages.forEach(print);
   }
 
@@ -548,6 +569,10 @@ public class BaseFreonGenerator {
     this.threadNo = threadNo;
   }
 
+  /**
+   * Get current Thread sequence ID.
+   * @return Current Thread sequence ID
+   */
   public long getThreadSequenceId() {
     return threadSequenceId.get();
   }
