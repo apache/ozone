@@ -103,6 +103,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
     // Refined the parent context
     // OP         |CHILD       |PARENT
+
     // CREATE      NONE         WRITE     (parent:'CREATE' when 'create bucket')
     // DELETE      DELETE       WRITE
     // WRITE       WRITE        WRITE
