@@ -1420,9 +1420,8 @@ public class TestKeyManagerImpl {
       Stream<Pair<String, String>> keys,
       Stream<Pair<String, String>> positives,
       Stream<Pair<String, String>> negatives) {
-    final OzoneManagerProtocol client = writeClient;
     keys.forEach(f -> {
-      createFile(client, f.getLeft(), f.getRight());
+      createFile(f.getLeft(), f.getRight());
       assertKeyExist(f.getLeft(), f.getRight());
     });
     positives.forEach(f -> assertIsDirectory(f.getLeft(), f.getRight()));
@@ -1666,11 +1665,6 @@ public class TestKeyManagerImpl {
   }
 
   private void createFile(String bucketName, String keyName) {
-    createFile(writeClient, bucketName, keyName);
-  }
-
-  private void createFile(OzoneManagerProtocol writeClient,
-      String bucketName, String keyName) {
     try {
       OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
       OpenKeySession keySession = writeClient.openKey(keyArgs);
