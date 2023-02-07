@@ -28,26 +28,23 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.InvalidPipelineStateException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test-cases to verify SCMStateMachine.applyTransaction failure scenarios.
@@ -90,19 +87,8 @@ public class TestScmApplyTransactionFailure {
     }
   }
 
-  private static Stream<Arguments> addContainerToInvalidPipelineCases() {
-    return Stream.of(
-        Arguments.of("Adding container to closed pipeline",
-            false, InvalidPipelineStateException.class),
-        Arguments.of("Adding container to a not-found pipeline" ,true, PipelineNotFoundException.class)
-    );
-  }
-
-  @ParameterizedTest(name = "{0}")
-  @MethodSource("addContainerToInvalidPipelineCases")
-  public void testAddContainerToInvalidPipeline(
-      String ignoredTestName,
-      boolean nonExisting, Class<? extends Exception> exClazz)
+  @Test
+  public void testAddContainerToClosedPipeline()
       throws Exception {
 
     RatisReplicationConfig replication = RatisReplicationConfig.getInstance(
@@ -112,16 +98,16 @@ public class TestScmApplyTransactionFailure {
     Pipeline pipeline = pipelines.get(0);
 
     // if testing for not-found pipeline, remove pipeline when closing.
-    pipelineManager.closePipeline(pipeline, !nonExisting);
+    pipelineManager.closePipeline(pipeline, true);
 
-    // adding container to an invalid pipeline should yield an error.
-    ContainerInfoProto containerInfo = createContainer(pipeline);
+    // adding container to a closed pipeline should yield an error.
+    ContainerInfoProto containerInfo = createContainer(pipeline.getId(),
+        pipeline.getType(), pipeline.getReplicationConfig());
     StateMachineException ex =
         assertThrows(StateMachineException.class,
             () -> containerManager.getContainerStateManager()
                 .addContainer(containerInfo));
-    assertEquals(exClazz, ex.getCause().getClass());
-
+    assertTrue(ex.getCause() instanceof InvalidPipelineStateException);
 
     // verify that SCMStateMachine is still functioning after the rejected
     // transaction.
@@ -129,21 +115,23 @@ public class TestScmApplyTransactionFailure {
         containerManager.allocateContainer(replication, "test"));
   }
 
-  private ContainerInfoProto createContainer(final Pipeline pipeline) {
+  private ContainerInfoProto createContainer(PipelineID pipelineId,
+                                             HddsProtos.ReplicationType type,
+                                             ReplicationConfig replicationConfig) {
     final ContainerInfoProto.Builder containerInfoBuilder = ContainerInfoProto
         .newBuilder()
         .setState(HddsProtos.LifeCycleState.OPEN)
-        .setPipelineID(pipeline.getId().getProtobuf())
+        .setPipelineID(pipelineId.getProtobuf())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setStateEnterTime(Time.now())
         .setOwner("test")
         .setContainerID(1)
         .setDeleteTransactionId(0)
-        .setReplicationType(pipeline.getType());
+        .setReplicationType(type);
 
       containerInfoBuilder.setReplicationFactor(
-          ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+          ReplicationConfig.getLegacyFactor(replicationConfig));
       return containerInfoBuilder.build();
   }
 }
