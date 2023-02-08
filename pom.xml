@@ -102,7 +102,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <jetty.version>9.4.49.v20220914</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
-    <apache.curator>4.2.0</apache.curator>
+    <curator.version>4.2.0</curator.version>
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
 
@@ -1526,12 +1526,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-framework</artifactId>
-        <version>${apache.curator}</version>
+        <version>${curator.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-client</artifactId>
-        <version>${apache.curator}</version>
+        <version>${curator.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
