@@ -189,10 +189,6 @@ public class TestReconWithOzoneManager {
     OmKeyInfo keyInfo1 =
         metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        omKeyValueTableIterator =
-        metadataManager.getKeyTable(getBucketLayout()).iterator();
-
     // verify if OM has /vol0/bucket0/key0
     Assert.assertEquals("vol0", keyInfo1.getVolumeName());
     Assert.assertEquals("bucket0", keyInfo1.getBucketName());
