@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -328,15 +329,17 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetContainers() {
-    Response response = containerEndpoint.getContainers(-1, 0L);
+  public void testGetContainers() throws IOException, TimeoutException {
+    putContainerInfos(5);
+
+    Response response = containerEndpoint.getContainers(10, 0L);
 
     ContainersResponse responseObject =
         (ContainersResponse) response.getEntity();
 
     ContainersResponse.ContainersResponseData data =
         responseObject.getContainersResponseData();
-    assertEquals(2, data.getTotalCount());
+    assertEquals(5, data.getTotalCount());
 
     List<ContainerMetadata> containers = new ArrayList<>(data.getContainers());
 
@@ -344,34 +347,41 @@ public class TestContainerEndpoint {
 
     ContainerMetadata containerMetadata = iterator.next();
     assertEquals(1L, containerMetadata.getContainerID());
-    // Number of keys for CID:1 should be 3 because of two different versions
-    // of key_two stored in CID:1
-    assertEquals(3L, containerMetadata.getNumberOfKeys());
+    // Number of keys for CID:1
+    assertEquals(5L, containerMetadata.getNumberOfKeys());
 
     containerMetadata = iterator.next();
     assertEquals(2L, containerMetadata.getContainerID());
-    assertEquals(2L, containerMetadata.getNumberOfKeys());
+    assertEquals(5L, containerMetadata.getNumberOfKeys());
 
     // test if limit works as expected
-    response = containerEndpoint.getContainers(1, 0L);
+    response = containerEndpoint.getContainers(2, 0L);
     responseObject = (ContainersResponse) response.getEntity();
     data = responseObject.getContainersResponseData();
     containers = new ArrayList<>(data.getContainers());
-    assertEquals(1, containers.size());
+    // The results will be limited to 2 containers only
+    assertEquals(2, containers.size());
     assertEquals(2, data.getTotalCount());
   }
 
   @Test
-  public void testGetContainersWithPrevKey() {
+  public void testGetContainersWithPrevKey()
+      throws IOException, TimeoutException {
+    putContainerInfos(5);
 
-    Response response = containerEndpoint.getContainers(1, 1L);
+    // Test the case where prevKey = 2 and limit = 5
+    Response response = containerEndpoint.getContainers(5, 2L);
+
+    // Ensure that the response object is not null
+    assertNotNull(response);
 
     ContainersResponse responseObject =
         (ContainersResponse) response.getEntity();
 
     ContainersResponse.ContainersResponseData data =
         responseObject.getContainersResponseData();
-    assertEquals(2, data.getTotalCount());
+    // Ensure that the total count of containers is 4
+    assertEquals(4, data.getTotalCount());
 
     List<ContainerMetadata> containers = new ArrayList<>(data.getContainers());
 
@@ -379,33 +389,21 @@ public class TestContainerEndpoint {
 
     ContainerMetadata containerMetadata = iterator.next();
 
-    assertEquals(1, containers.size());
+    // Ensure that the containers list size is 4
+    assertEquals(4, containers.size());
+    // Ensure that the first container ID is 2
     assertEquals(2L, containerMetadata.getContainerID());
 
+    // test for negative cases
     response = containerEndpoint.getContainers(-1, 0L);
     responseObject = (ContainersResponse) response.getEntity();
-    data = responseObject.getContainersResponseData();
-    containers = new ArrayList<>(data.getContainers());
-    assertEquals(2, containers.size());
-    assertEquals(2, data.getTotalCount());
-    iterator = containers.iterator();
-    containerMetadata = iterator.next();
-    assertEquals(1L, containerMetadata.getContainerID());
+    // Ensure that the response object is null when limit is negative
+    assertNull(responseObject);
 
-    // test for negative cases
-    response = containerEndpoint.getContainers(-1, 5L);
+    response = containerEndpoint.getContainers(10, -1L);
     responseObject = (ContainersResponse) response.getEntity();
-    data = responseObject.getContainersResponseData();
-    containers = new ArrayList<>(data.getContainers());
-    assertEquals(0, containers.size());
-    assertEquals(2, data.getTotalCount());
-
-    response = containerEndpoint.getContainers(-1, -1L);
-    responseObject = (ContainersResponse) response.getEntity();
-    data = responseObject.getContainersResponseData();
-    containers = new ArrayList<>(data.getContainers());
-    assertEquals(2, containers.size());
-    assertEquals(2, data.getTotalCount());
+    // Ensure that the response object is null when prevKey is negative
+    assertNull(responseObject);
   }
 
   @Test
@@ -432,7 +430,7 @@ public class TestContainerEndpoint {
     MissingContainerMetadata containerWithLimit =
             responseWithLimitObject.getContainers().stream().findFirst()
                     .orElse(null);
-    Assert.assertNotNull(containerWithLimit);
+    assertNotNull(containerWithLimit);
 
     Collection<MissingContainerMetadata> recordsWithLimit
             = responseWithLimitObject.getContainers();
@@ -448,7 +446,7 @@ public class TestContainerEndpoint {
     assertEquals(5, responseObject.getTotalCount());
     MissingContainerMetadata container =
         responseObject.getContainers().stream().findFirst().orElse(null);
-    Assert.assertNotNull(container);
+    assertNotNull(container);
 
     assertEquals(containerID.getId(), container.getContainerID());
     assertEquals(keyCount, container.getKeys());
