@@ -60,10 +60,6 @@ class TestOzoneManagerDoubleBuffer {
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =
       mock(CreateSnapshotResponse.class);
-
-  private CreateSnapshotResponse snapshotResponse3 =
-      mock(CreateSnapshotResponse.class);
-
   private OMResponse omKeyResponse = mock(OMResponse.class);
   private OMResponse omBucketResponse = mock(OMResponse.class);
   private OMResponse omSnapshotResponse1 = mock(OMResponse.class);
@@ -116,11 +112,10 @@ class TestOzoneManagerDoubleBuffer {
     when(omSnapshotResponse2.getTraceID()).thenReturn("snapshotTraceId-2");
     when(snapshotResponse1.hasSnapshotInfo()).thenReturn(true);
     when(snapshotResponse2.hasSnapshotInfo()).thenReturn(true);
-    when(snapshotResponse3.hasSnapshotInfo()).thenReturn(false);
-    when(omKeyResponse.getCreateSnapshotResponse()).thenReturn(
-        snapshotResponse3);
-    when(omBucketResponse.getCreateSnapshotResponse()).thenReturn(
-        snapshotResponse3);
+    when(omSnapshotResponse1.hasCreateSnapshotResponse())
+        .thenReturn(true);
+    when(omSnapshotResponse2.hasCreateSnapshotResponse())
+        .thenReturn(true);
     when(omSnapshotResponse1.getCreateSnapshotResponse())
         .thenReturn(snapshotResponse1);
     when(omSnapshotResponse2.getCreateSnapshotResponse())

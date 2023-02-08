@@ -440,10 +440,9 @@ public final class OzoneManagerDoubleBuffer {
       // 1. It is first element in the response,
       // 2. Current request is createSnapshot request.
       // 3. Previous request was createSnapshot request.
-      if (response.isEmpty() || omResponse.getCreateSnapshotResponse()
-          .hasSnapshotInfo() || (previousOmResponse != null &&
-          previousOmResponse.getCreateSnapshotResponse()
-              .hasSnapshotInfo())) {
+      if (response.isEmpty() || omResponse.hasCreateSnapshotResponse()
+          || (previousOmResponse != null &&
+          previousOmResponse.hasCreateSnapshotResponse())) {
         response.add(new LinkedList<>());
       }
 

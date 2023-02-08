@@ -314,6 +314,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     File metaDir = new File(snapshotDir);
     String dbName = OM_DB_NAME + snapshotDirName;
+    // The check is only to prevent every snapshot read to perform a disk IO
+    // and check if a checkpoint dir exists. If entry is present in cache,
+    // it is most likely DB entries will get flushed in this wait time.
     if (isSnapshotInCache) {
       File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
       RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
