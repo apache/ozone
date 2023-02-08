@@ -72,6 +72,9 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
+  private final boolean enableCompactionLog;
+  private static int compactionLogEnabledCount;
+
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
@@ -96,9 +99,15 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
         dbJmxBeanNameName;
-
+    this.enableCompactionLog = enableCompactionLog;
     try {
       if (enableCompactionLog) {
+
+        compactionLogEnabledCount++;
+        if (compactionLogEnabledCount > 1) {
+          throw new RuntimeException("too many compaction logs enabled");
+        }
+
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
             dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
             OM_COMPACTION_BACKUP_DIR, OM_COMPACTION_LOG_DIR, dbLocation, maxTimeAllowedForSnapshotInDag,
@@ -206,6 +215,9 @@ public class RDBStore implements DBStore {
       statMBeanName = null;
     }
 
+    if (enableCompactionLog) {
+      compactionLogEnabledCount--;
+    }
     RDBMetrics.unRegister();
     checkPointManager.close();
     db.close();
