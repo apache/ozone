@@ -155,9 +155,12 @@ public class SstFilteringService extends BackgroundService
               .loadDB(ozoneManager.getConfiguration(), new File(snapshotCheckpointDir),
                   dbName, true);
           RocksDatabase db = rdbStore.getDb();
-          lockBootstrapState();
-          db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
-          unlockBootstrapState();
+          try {
+            lockBootstrapState();
+            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+          } finally {
+            unlockBootstrapState();
+          }
 
           // mark the snapshot as filtered by writing to the file
           String content = snapshotInfo.getSnapshotID() + "\n";

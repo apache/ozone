@@ -124,6 +124,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
 
      keyDeletingService = om.getKeyManager().getDeletingService();
      sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
+     rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
+         .getRocksDBCheckpointDiffer();
   }
 
   @Override
@@ -136,14 +138,17 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
-        includeSnapshotData(request));
 
     try (TarArchiveOutputStream archiveOutputStream =
             new TarArchiveOutputStream(destination)) {
+      lockBootstrapState();
+      getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
+          includeSnapshotData(request));
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
+    } finally {
+      unlockBootstrapState();
     }
   }
 
@@ -291,10 +296,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   @Override
   public void lockBootstrapState() throws InterruptedException {
     keyDeletingService.lockBootstrapState();
+    sstFilteringService.lockBootstrapState();
+    rocksDbCheckpointDiffer.lockBootstrapState();
   }
 
   @Override
   public void unlockBootstrapState() {
+    rocksDbCheckpointDiffer.unlockBootstrapState();
+    sstFilteringService.unlockBootstrapState();
     keyDeletingService.unlockBootstrapState();
   }
 
