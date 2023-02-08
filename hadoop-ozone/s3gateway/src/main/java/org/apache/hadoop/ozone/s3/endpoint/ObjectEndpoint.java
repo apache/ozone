@@ -444,6 +444,19 @@ public class ObjectEndpoint extends EndpointBase {
     OzoneKey key;
     try {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
+
+      /*
+        Necessary for directories in buckets with FSO layout.
+        Intended for apps which use Hadoop S3A.
+        Example of such app is Trino (through Hive connector).
+       */
+      final boolean isFSOLayout = getBucket(bucketName).getBucketLayout()
+          .isFileSystemOptimized();
+      if (isFSOLayout && getClientProtocol()
+          .getOzoneFileStatus(getVolume().getName(), bucketName, key.getName())
+          .isDirectory()) {
+        throw new OMException(ResultCodes.KEY_NOT_FOUND);
+      }
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
