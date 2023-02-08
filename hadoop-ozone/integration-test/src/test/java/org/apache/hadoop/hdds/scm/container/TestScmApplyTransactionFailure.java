@@ -25,15 +25,21 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.pipeline.DuplicatedPipelineIdException;
 import org.apache.hadoop.hdds.scm.pipeline.InvalidPipelineStateException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.pipeline.UnknownPipelineStateException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -41,6 +47,7 @@ import org.junit.jupiter.api.Timeout;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -51,35 +58,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Timeout(300)
 public class TestScmApplyTransactionFailure {
 
-  private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
-  private StorageContainerManager scm;
-  private ContainerManager containerManager;
-  private PipelineManager pipelineManager;
+  private static MiniOzoneCluster cluster;
+  private static OzoneConfiguration conf;
+  private static StorageContainerManager scm;
+  private static ContainerManager containerManager;
+  private static PipelineManagerImpl pipelineManager;
 
-  private long pipelineDestroyTimeoutInMillis;
 
-  @BeforeEach
-  public void init() throws Exception {
+  @BeforeAll
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newHABuilder(conf).setSCMServiceId("test")
         .setNumDatanodes(3).build();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
-    pipelineDestroyTimeoutInMillis = 1000;
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
-        pipelineDestroyTimeoutInMillis, TimeUnit.MILLISECONDS);
+        1000, TimeUnit.MILLISECONDS);
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
     containerManager = scm.getContainerManager();
-    pipelineManager = scm.getPipelineManager();
+    pipelineManager = (PipelineManagerImpl) scm.getPipelineManager();
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterEach
-  public void shutdown() {
+  @AfterAll
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -109,7 +114,22 @@ public class TestScmApplyTransactionFailure {
     // verify that SCMStateMachine is still functioning after the rejected
     // transaction.
     assertNotNull(containerManager.allocateContainer(replication, "test"));
+  }
 
+  @Test
+  public void testAddDuplicatePipelineId()
+      throws Exception {
+    RatisReplicationConfig replication =
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+    Pipeline existing = pipelineManager.getPipelines(
+        replication, PipelineState.OPEN).get(0);
+
+    HddsProtos.Pipeline pipelineToCreate =
+        existing.getProtobufMessage(CURRENT_VERSION);
+    StateMachineException ex = assertThrows(StateMachineException.class,
+        () -> pipelineManager.getStateManager().addPipeline(
+            pipelineToCreate));
+    assertTrue(ex.getCause() instanceof DuplicatedPipelineIdException);
   }
 
   private ContainerInfoProto createContainer(Pipeline pipeline) {
