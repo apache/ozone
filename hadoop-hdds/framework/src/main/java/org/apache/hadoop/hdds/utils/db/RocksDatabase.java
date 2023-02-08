@@ -515,21 +515,6 @@ public final class RocksDatabase {
     }
   }
 
-  public void compactRange(ColumnFamily family, final byte[] begin,
-                           final byte[] end,
-                           final ManagedCompactRangeOptions options)
-      throws IOException {
-    try {
-      counter.incrementAndGet();
-      db.get().compactRange(family.getHandle(), begin, end, options);
-    } catch (RocksDBException e) {
-      closeOnError(e, true);
-      throw toIOException(this, "compactRange", e);
-    } finally {
-      counter.decrementAndGet();
-    }
-  }
-
   public void compactDB(ManagedCompactRangeOptions options) throws IOException {
     compactRangeDefault(options);
     for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
