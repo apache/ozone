@@ -85,13 +85,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private final Logger log;
   private final AuditLogger audit;
   private final OMPerformanceMetrics perfMetrics;
+  private final String snapshotName;
 
   public OmMetadataReader(KeyManager keyManager,
                           PrefixManager prefixManager,
                           OzoneManager ozoneManager,
                           Logger log,
                           AuditLogger audit,
-                          OmMetadataReaderMetrics omMetadataReaderMetrics) {
+                          OmMetadataReaderMetrics omMetadataReaderMetrics,
+                          String snapshotName) {
     this.keyManager = keyManager;
     this.bucketManager = ozoneManager.getBucketManager();
     this.volumeManager = ozoneManager.getVolumeManager();
@@ -124,6 +126,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       accessAuthorizer = null;
       isNativeAuthorizerEnabled = false;
     }
+    this.snapshotName = snapshotName;
   }
 
   /**
@@ -470,6 +473,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
         .setOwnerName(owner)
+        .setSnapshotName(snapshotName)
         .build();
 
     return checkAcls(obj, context, throwIfPermissionDenied);

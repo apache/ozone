@@ -77,7 +77,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
                     String snapshotName) {
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         ozoneManager, LOG, AUDIT,
-        OmSnapshotMetrics.getInstance());
+        OmSnapshotMetrics.getInstance(), snapshotName);
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;

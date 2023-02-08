@@ -34,6 +34,7 @@ public class RequestContext {
   private final ACLIdentityType aclType;
   private final ACLType aclRights;
   private final String ownerName;
+  private final String snapshotName;
 
   /**
    * Represents recursive access check required for all the sub-paths of the
@@ -49,14 +50,31 @@ public class RequestContext {
       ACLIdentityType aclType, ACLType aclRights,
       String ownerName) {
     this(host, ip, clientUgi, serviceId, aclType, aclRights, ownerName,
-            false);
+            null, false);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public RequestContext(String host, InetAddress ip,
+                        UserGroupInformation clientUgi, String serviceId,
+                        ACLIdentityType aclType, ACLType aclRights,
+                        String ownerName, String snapshotName) {
+    this(host, ip, clientUgi, serviceId, aclType, aclRights, ownerName,
+            snapshotName, false);
+  }
+
+  public RequestContext(String host, InetAddress ip,
+                        UserGroupInformation clientUgi, String serviceId,
+                        ACLIdentityType aclType, ACLType aclRights,
+                        String ownerName, boolean recursiveAccessCheck) {
+    this(host, ip, clientUgi, serviceId, aclType, aclRights, ownerName,
+            null, recursiveAccessCheck);
   }
 
   @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
       UserGroupInformation clientUgi, String serviceId,
       ACLIdentityType aclType, ACLType aclRights,
-      String ownerName, boolean recursiveAccessCheck) {
+      String ownerName, String snapshotName, boolean recursiveAccessCheck) {
     this.host = host;
     this.ip = ip;
     this.clientUgi = clientUgi;
@@ -64,6 +82,7 @@ public class RequestContext {
     this.aclType = aclType;
     this.aclRights = aclRights;
     this.ownerName = ownerName;
+    this.snapshotName = snapshotName;
     this.recursiveAccessCheck = recursiveAccessCheck;
   }
 
@@ -83,6 +102,7 @@ public class RequestContext {
      *  authorizer to honor owner privilege.
      */
     private String ownerName;
+    private String snapshotName;
 
     private boolean recursiveAccessCheck;
 
@@ -125,6 +145,11 @@ public class RequestContext {
       return this;
     }
 
+    public Builder setSnapshotName(String snapshot) {
+      this.snapshotName = snapshot;
+      return this;
+    }
+
     public Builder setRecursiveAccessCheck(boolean recursiveAccessCheckFlag) {
       this.recursiveAccessCheck = recursiveAccessCheckFlag;
       return this;
@@ -132,7 +157,7 @@ public class RequestContext {
 
     public RequestContext build() {
       return new RequestContext(host, ip, clientUgi, serviceId, aclType,
-          aclRights, ownerName, recursiveAccessCheck);
+          aclRights, ownerName, snapshotName, recursiveAccessCheck);
     }
   }
 
@@ -196,6 +221,10 @@ public class RequestContext {
 
   public String getOwnerName() {
     return ownerName;
+  }
+
+  public String getSnapshotName() {
+    return snapshotName;
   }
 
   /**
