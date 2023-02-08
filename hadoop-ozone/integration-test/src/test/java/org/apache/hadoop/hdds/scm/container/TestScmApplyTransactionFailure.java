@@ -102,18 +102,27 @@ public class TestScmApplyTransactionFailure {
         () -> containerManager.getContainerStateManager()
             .addContainer(containerInfo));
     assertTrue(ex.getCause() instanceof InvalidPipelineStateException);
+    assertThrows(ContainerNotFoundException.class,
+        () -> containerManager.getContainer(
+            new ContainerID(containerInfo.getContainerID())));
 
     // verify that SCMStateMachine is still functioning after the rejected
     // transaction.
     assertNotNull(containerManager.allocateContainer(replication, "test"));
+
   }
 
   private ContainerInfoProto createContainer(Pipeline pipeline) {
     final ContainerInfoProto.Builder containerInfoBuilder =
-        ContainerInfoProto.newBuilder().setState(HddsProtos.LifeCycleState.OPEN)
-            .setPipelineID(pipeline.getId().getProtobuf()).setUsedBytes(0)
-            .setNumberOfKeys(0).setStateEnterTime(Time.now()).setOwner("test")
-            .setContainerID(1).setDeleteTransactionId(0)
+        ContainerInfoProto.newBuilder()
+            .setState(HddsProtos.LifeCycleState.OPEN)
+            .setPipelineID(pipeline.getId().getProtobuf())
+            .setUsedBytes(0)
+            .setNumberOfKeys(0)
+            .setStateEnterTime(Time.now())
+            .setOwner("test")
+            .setContainerID(1)
+            .setDeleteTransactionId(0)
             .setReplicationType(pipeline.getType());
 
     containerInfoBuilder.setReplicationFactor(
