@@ -143,8 +143,6 @@ public class BaseFreonGenerator {
   private ExecutorService executor;
   private ProgressBar progressBar;
 
-  // the `threadSequenceId` Starting from 0,
-  // each thread will be set a self-incrementing sequence number when it starts
   private final ThreadLocal<Long> threadSequenceId = new ThreadLocal<>();
   private final AtomicLong id = new AtomicLong(0);
 
@@ -571,6 +569,9 @@ public class BaseFreonGenerator {
 
   /**
    * Get current Thread sequence ID.
+   * Similar to Thread tid, but sequence ID starts at 0 and is consecutive
+   * each thread will be set a self-incrementing sequence id
+   * after it be created.
    * @return Current Thread sequence ID
    */
   public long getThreadSequenceId() {
