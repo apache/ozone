@@ -97,7 +97,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private final String sstBackupDir;
   private final String activeDBLocationStr;
-
   private final String compactionLogDir;
 
   /**
@@ -170,6 +169,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final long maxAllowedTimeInDag;
   private final Semaphore bootstrapStateLock = new Semaphore(1);
 
+  private static int instanceCount;
+  private boolean closed = false;
 
   /**
    * Constructor.
@@ -191,6 +192,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                  File activeDBLocation,
                                  long maxTimeAllowedForSnapshotInDagInMs,
                                  long pruneCompactionDagDaemonRunIntervalInMs) {
+    instanceCount++;
+    if (instanceCount > 1 && !metadataDir.contains("integration-test/target/test-dir/MiniOzoneClusterImpl")) {
+      throw new RuntimeException("too many rocksdb instances");
+    }
     this.compactionLogDir =
         createCompactionLogDir(metadataDir, compactionLogDirName);
     this.sstBackupDir = Paths.get(metadataDir, sstBackupDir) + "/";
@@ -310,6 +315,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public void close() throws Exception {
     if (executor != null) {
       executor.shutdown();
+    }
+    if (!closed) {
+      instanceCount--;
+      closed = true;
     }
   }
 
