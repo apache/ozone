@@ -514,7 +514,7 @@ public class TestContainerCommandsEC {
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
         new ECReplicationConfig(3, 2, EcCodec.RS, 1024), new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
+      for (int i = 0; i < numChunks; i++) {
         out.write(inputChunks[i]);
       }
     }
