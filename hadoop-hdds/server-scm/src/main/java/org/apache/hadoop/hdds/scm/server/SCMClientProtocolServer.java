@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfigurat
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
@@ -1048,18 +1047,8 @@ public class SCMClientProtocolServer implements
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
       DatanodeDetails node, int clientVersion) {
-    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
-
-    long capacity = stat.getCapacity().get();
-    long used = stat.getScmUsed().get();
-    long remaining = stat.getRemaining().get();
-
-    return HddsProtos.DatanodeUsageInfoProto.newBuilder()
-        .setCapacity(capacity)
-        .setUsed(used)
-        .setRemaining(remaining)
-        .setNode(node.toProto(clientVersion))
-        .build();
+    DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
+    return usageInfo.toProto(clientVersion);
   }
 
   /**
