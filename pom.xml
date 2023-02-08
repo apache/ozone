@@ -103,7 +103,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jetty.version>9.4.49.v20220914</jetty.version>
     <jetbrains.kotlin.version>1.6.21</jetbrains.kotlin.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
-    <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
     <apache.curator>4.2.0</apache.curator>
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
@@ -1533,21 +1532,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>joda-time</groupId>
         <artifactId>joda-time</artifactId>
         <version>${joda.time.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-mapper-asl</artifactId>
-        <version>${codehaus.jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-core-asl</artifactId>
-        <version>${codehaus.jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-jaxrs</artifactId>
-        <version>${codehaus.jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-lang</groupId>
