@@ -142,7 +142,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     // Verify that the number of entries in fileCountBySizeDao is 3
     assertEquals(3, fileCountBySizeDao.count());
 
-    // Create a record to find the count of files in a specific volume, bucket and file size
+    // Create a record to find the count of files in a specific volume,
+    // bucket and file size
     Record3<String, String, Long> recordToFind = dslContext
         .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
             FILE_COUNT_BY_SIZE.BUCKET,
@@ -302,8 +303,10 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     when(keyTable1.iterator()).thenReturn(mockKeyIter1);
     when(keyTable2.iterator()).thenReturn(mockKeyIter2);
 
-    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(keyTable1);
-    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTable2);
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY))
+        .thenReturn(keyTable1);
+    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
+        .thenReturn(keyTable2);
 
     when(mockKeyIter1.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
@@ -360,14 +363,14 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
           given(omKeyInfo.getDataSize()).willReturn(fileSize);
           omKeyInfoList.add(omKeyInfo);
           // All the keys ending with even will be stored in KEY-TABLE
-          if(keyIndex % 2 ==0){
+          if (keyIndex % 2 == 0) {
             omDbEventList.add(new OMUpdateEventBuilder()
                 .setAction(PUT)
                 .setKey("key" + keyIndex)
                 .setValue(omKeyInfo)
                 .setTable(OmMetadataManagerImpl.KEY_TABLE)
                 .build());
-          }else{
+          } else {
             // All the keys ending with odd will be stored in FILE-TABLE
             omDbEventList.add(new OMUpdateEventBuilder()
                 .setAction(PUT)
@@ -414,7 +417,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
           if (keyIndex <= 5) {
             long fileSize = (long)Math.pow(2, keyIndex + 9) - 1L;
             given(omKeyInfo.getDataSize()).willReturn(fileSize);
-            if(keyIndex % 2 ==0){
+            if (keyIndex % 2 == 0) {
               omDbEventList.add(new OMUpdateEventBuilder()
                   .setAction(DELETE)
                   .setKey("key" + keyIndex)

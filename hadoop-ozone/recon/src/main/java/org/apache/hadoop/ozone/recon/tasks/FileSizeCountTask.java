@@ -72,7 +72,8 @@ public class FileSizeCountTask implements ReconOmTask {
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
 
     // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
-    reprocessBucket(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager, fileSizeCountMap);
+    reprocessBucket(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager,
+        fileSizeCountMap);
     // Call reprocessBucket method for LEGACY bucket layout
     reprocessBucket(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap);
 
@@ -85,8 +86,10 @@ public class FileSizeCountTask implements ReconOmTask {
   }
 
   private void reprocessBucket(BucketLayout bucketLayout,
-                             OMMetadataManager omMetadataManager, Map<FileSizeCountKey, Long> fileSizeCountMap) {
-    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
+                               OMMetadataManager omMetadataManager,
+                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    Table<String, OmKeyInfo> omKeyInfoTable =
+        omMetadataManager.getKeyTable(bucketLayout);
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              keyIter = omKeyInfoTable.iterator()) {
       while (keyIter.hasNext()) {
@@ -94,7 +97,8 @@ public class FileSizeCountTask implements ReconOmTask {
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
       }
     } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count for " + bucketLayout + " in Recon DB. ", ioEx);
+      LOG.error("Unable to populate File Size Count for " + bucketLayout +
+          " in Recon DB. ", ioEx);
     }
   }
 
