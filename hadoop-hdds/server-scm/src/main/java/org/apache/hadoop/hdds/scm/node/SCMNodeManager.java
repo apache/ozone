@@ -606,7 +606,7 @@ public class SCMNodeManager implements NodeManager {
       LOG.debug("Processing node report from [datanode={}]",
           datanodeDetails.getHostName());
     }
-    if (LOG.isTraceEnabled()) {
+    if (LOG.isTraceEnabled() && nodeReport != null) {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
           nodeReport.toString().replaceAll("\n", "\\\\n"));

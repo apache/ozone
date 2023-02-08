@@ -76,6 +76,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER
 /**
  * Tests the EC recovery and over replication processing.
  */
+@Flaky("HDDS-7617")
 public class TestECContainerRecovery {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
@@ -254,7 +255,6 @@ public class TestECContainerRecovery {
     waitForContainerCount(5, container.containerID(), scm);
   }
 
-  @Flaky("HDDS-7617")
   @Test
   public void testECContainerRecoveryWithTimedOutRecovery() throws Exception {
     byte[] inputData = getInputBytes(3);

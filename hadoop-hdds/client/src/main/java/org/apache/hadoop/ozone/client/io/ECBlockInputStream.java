@@ -36,8 +36,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -58,6 +64,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final BlockLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
   private final BlockExtendedInputStream[] blockStreams;
+  private final Map<Integer, LinkedList<DatanodeDetails>> spareDataLocations
+      = new HashMap<>();
+  private final List<DatanodeDetails> failedLocations = new ArrayList<>();
   private final int maxLocations;
 
   private long position = 0;
@@ -263,7 +272,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       throw new IndexOutOfBoundsException("The index " + index + " is greater "
           + "than the EC Replication Config (" + repConfig + ")");
     }
-    dataLocations[index - 1] = location;
+    int arrayIndex = index - 1;
+    if (dataLocations[arrayIndex] == null) {
+      dataLocations[arrayIndex] = location;
+    } else {
+      spareDataLocations.computeIfAbsent(arrayIndex,
+          k -> new LinkedList<>()).add(location);
+    }
   }
 
   protected long blockLength() {
@@ -272,6 +287,45 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   protected long remaining() {
     return blockLength() - position;
+  }
+
+  @Override
+  public synchronized int read(byte[] b, int off, int len) throws IOException {
+    return read(ByteBuffer.wrap(b, off, len));
+  }
+
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    while (true) {
+      int currentBufferPosition = byteBuffer.position();
+      long currentPosition = getPos();
+      try {
+        return super.read(byteBuffer);
+      } catch (BadDataLocationException e) {
+        int failedIndex = e.getFailedLocationIndex();
+        if (shouldRetryFailedRead(failedIndex)) {
+          byteBuffer.position(currentBufferPosition);
+          seek(currentPosition);
+        } else {
+          e.addFailedLocations(failedLocations);
+          throw e;
+        }
+      }
+    }
+  }
+
+  private boolean shouldRetryFailedRead(int failedIndex) throws IOException {
+    LinkedList<DatanodeDetails> spare = spareDataLocations.get(failedIndex);
+    if (spare != null && spare.size() > 0) {
+      failedLocations.add(dataLocations[failedIndex]);
+      dataLocations[failedIndex] = spare.removeFirst();
+      if (blockStreams[failedIndex] != null) {
+        blockStreams[failedIndex].close();
+        blockStreams[failedIndex] = null;
+      }
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -294,15 +348,15 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     int totalRead = 0;
     while (strategy.getTargetLength() > 0 && remaining() > 0) {
+      int currentIndex = currentStreamIndex();
       try {
-        int currentIndex = currentStreamIndex();
         BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
         int read = readFromStream(stream, strategy);
         totalRead += read;
         position += read;
       } catch (IOException ioe) {
         throw new BadDataLocationException(
-            dataLocations[currentStreamIndex()], ioe);
+            dataLocations[currentIndex], currentIndex, ioe);
       }
     }
     return totalRead;

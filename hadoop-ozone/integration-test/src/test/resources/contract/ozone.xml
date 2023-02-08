@@ -123,13 +123,11 @@
 
     <property>
         <name>fs.contract.supports-hsync</name>
-        <value>false</value>
-        <!-- TODO: switch to true after HDDS-7688 -->
+        <value>true</value>
     </property>
 
     <property>
         <name>fs.contract.supports-hflush</name>
-        <value>false</value>
-        <!-- TODO: switch to true after HDDS-7688 -->
+        <value>true</value>
     </property>
 </configuration>

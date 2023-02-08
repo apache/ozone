@@ -15,33 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.ozone.shell.snapshot;
 
-import org.apache.hadoop.fs.CanUnbuffer;
-
-import java.nio.ByteBuffer;
+import org.apache.hadoop.ozone.shell.Handler;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
+import picocli.CommandLine;
 
 /**
- * Utility class to query streams for supported capabilities of Ozone.
- * Capability strings must be in lower case.
+ * Base class for bucket commands that require a snapshot URI.
  */
-final class OzoneStreamCapabilities {
+public abstract class BucketSnapshotHandler extends Handler {
 
-  private OzoneStreamCapabilities() {
+  @CommandLine.Mixin
+  private SnapshotUri address;
+
+  @Override
+  protected OzoneAddress getAddress() {
+    return address.getValue();
   }
-
-  /**
-   * Stream read(ByteBuffer) capability implemented by
-   * {@link OzoneFSInputStream#read(ByteBuffer)}.
-   *
-   * TODO: If Hadoop dependency is upgraded, this string can be removed.
-   */
-  static final String READBYTEBUFFER = "in:readbytebuffer";
-
-  /**
-   * Stream unbuffer capability implemented by {@link CanUnbuffer#unbuffer()}.
-   *
-   * TODO: If Hadoop dependency is upgraded, this string can be removed.
-   */
-  static final String UNBUFFER = "in:unbuffer";
 }

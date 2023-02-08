@@ -20,7 +20,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -104,6 +103,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -1406,7 +1406,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         keyValueTableIterator = getOpenKeyTable(bucketLayout).iterator()) {
 
       final long expiredCreationTimestamp =
-          Instant.now().minus(expireThreshold).toEpochMilli();
+          expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
       OpenKey.Builder builder = OpenKey.newBuilder();
 
