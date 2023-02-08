@@ -506,8 +506,8 @@ public class TestContainerCommandsEC {
     Assertions.assertEquals(metrics.getReconstructionTotal(), 1L);
   }
 
-  private void createKeyAndWriteData(String keyString, OzoneBucket bucket, int numChunks)
-      throws IOException {
+  private void createKeyAndWriteData(String keyString, OzoneBucket bucket,
+      int numChunks) throws IOException {
     for (int i = 0; i < numChunks; i++) {
       inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
     }
