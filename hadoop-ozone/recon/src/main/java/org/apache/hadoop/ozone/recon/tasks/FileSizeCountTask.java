@@ -67,6 +67,14 @@ public class FileSizeCountTask implements ReconOmTask {
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
   }
 
+  /**
+   * Read the Keys from OM snapshot DB and calculate the upper bound of
+   * File Size it belongs to.
+   *
+   * @param omMetadataManager OM Metadata instance.
+   * @return Pair
+   */
+  @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     // Map to store the count of files based on file size
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
