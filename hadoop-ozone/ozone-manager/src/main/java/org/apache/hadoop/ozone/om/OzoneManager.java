@@ -2592,8 +2592,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
         String remoteUserName = remoteUserUgi.getShortUserName();
+        // Convert userName to short username
+        final UserGroupInformation ugiUserParam =
+            UserGroupInformation.createRemoteUser(userName);
+        final String userParamShortName = ugiUserParam.getShortUserName();
         // if not admin nor list my own volumes, check ACL.
-        if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
+        if (!remoteUserName.equals(userParamShortName)
+            && !isAdmin(remoteUserUgi)) {
           omMetadataReader.checkAcls(ResourceType.VOLUME,
               StoreType.OZONE, ACLType.LIST,
               OzoneConsts.OZONE_ROOT, null, null);
