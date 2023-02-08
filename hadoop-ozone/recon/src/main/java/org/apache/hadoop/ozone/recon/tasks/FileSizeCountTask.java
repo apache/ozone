@@ -67,36 +67,35 @@ public class FileSizeCountTask implements ReconOmTask {
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
   }
 
-  /**
-   * Read the Keys from OM snapshot DB and calculate the upper bound of
-   * File Size it belongs to.
-   *
-   * @param omMetadataManager OM Metadata instance.
-   * @return Pair
-   */
-  @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    Table<String, OmKeyInfo> omKeyInfoTable =
-        omMetadataManager.getKeyTable(getBucketLayout());
+    // Map to store the count of files based on file size
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+
+    // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
+    reprocessBucket(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager, fileSizeCountMap);
+    // Call reprocessBucket method for LEGACY bucket layout
+    reprocessBucket(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap);
+
+    // Delete all records from FILE_COUNT_BY_SIZE table
+    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
+    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+    writeCountsToDB(true, fileSizeCountMap);
+    LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
+    return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  private void reprocessBucket(BucketLayout bucketLayout,
+                             OMMetadataManager omMetadataManager, Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        keyIter = omKeyInfoTable.iterator()) {
+             keyIter = omKeyInfoTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
       }
     } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count in Recon DB. ", ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+      LOG.error("Unable to populate File Size Count for " + bucketLayout + " in Recon DB. ", ioEx);
     }
-    // Truncate table before inserting new rows
-    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
-
-    writeCountsToDB(true, fileSizeCountMap);
-
-    LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
-    return new ImmutablePair<>(getTaskName(), true);
   }
 
   @Override
