@@ -423,7 +423,7 @@ public class TestBlockInputStream {
       Assert.assertEquals(len, bytesRead);
       verify(refreshPipeline).apply(blockID);
       verify(clientFactory).acquireClientForReadData(pipeline);
-      verify(clientFactory).releaseClient(client, true);
+      verify(clientFactory).releaseClient(client, false);
     } finally {
       subject.close();
     }

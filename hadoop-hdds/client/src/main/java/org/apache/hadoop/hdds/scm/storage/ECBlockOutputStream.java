@@ -257,6 +257,12 @@ public class ECBlockOutputStream extends BlockOutputStream {
     return flushFuture;
   }
 
+  @Override
+  public void close() throws IOException {
+    super.close();
+    cleanup(false);
+  }
+
   /**
    * @return The current chunk writer response future.
    */
