@@ -110,8 +110,6 @@ class TestOzoneManagerDoubleBuffer {
     when(omBucketResponse.getTraceID()).thenReturn("bucketTraceId");
     when(omSnapshotResponse1.getTraceID()).thenReturn("snapshotTraceId-1");
     when(omSnapshotResponse2.getTraceID()).thenReturn("snapshotTraceId-2");
-    when(snapshotResponse1.hasSnapshotInfo()).thenReturn(true);
-    when(snapshotResponse2.hasSnapshotInfo()).thenReturn(true);
     when(omSnapshotResponse1.hasCreateSnapshotResponse())
         .thenReturn(true);
     when(omSnapshotResponse2.hasCreateSnapshotResponse())
@@ -127,10 +125,6 @@ class TestOzoneManagerDoubleBuffer {
         .thenReturn(omSnapshotResponse1);
     when(omSnapshotCreateResponse2.getOMResponse())
         .thenReturn(omSnapshotResponse2);
-    when(omSnapshotResponse1
-        .getCreateSnapshotResponse()).thenReturn(snapshotResponse1);
-    when(omSnapshotResponse2
-        .getCreateSnapshotResponse()).thenReturn(snapshotResponse2);
   }
 
   @AfterEach
