@@ -259,8 +259,8 @@ public class TestContainerCommandsEC {
       Pipeline newPipeline =
           scm.getPipelineManager().createPipeline(replicationConfig);
       scm.getPipelineManager().activatePipeline(newPipeline.getId());
-      final ContainerInfo container =
-          scm.getContainerManager().allocateContainer(replicationConfig, "test");
+      final ContainerInfo container = scm.getContainerManager()
+          .allocateContainer(replicationConfig, "test");
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
           .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
