@@ -394,7 +394,8 @@ public class TestContainerCommandsEC {
         new ECReconstructionCoordinator(config, certClient,
             null, ECReconstructionMetrics.create())) {
 
-      ECReconstructionMetrics metrics = coordinator.getECReconstructionMetrics();
+      ECReconstructionMetrics metrics =
+          coordinator.getECReconstructionMetrics();
       OzoneKeyDetails key = bucket.getKey(keyString);
       long conID = key.getOzoneKeyLocations().get(0).getContainerID();
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
@@ -414,8 +415,8 @@ public class TestContainerCommandsEC {
       for (DatanodeDetails srcDn : nodeSet) {
         int replIndex = containerPipeline.getReplicaIndex(srcDn);
         if (missingIndexes.contains(replIndex)) {
-          containerToDeletePipeline
-              .add(createSingleNodePipeline(containerPipeline, srcDn, replIndex));
+          containerToDeletePipeline.add(
+              createSingleNodePipeline(containerPipeline, srcDn, replIndex));
           continue;
         }
         sourceNodeMap.put(replIndex, srcDn);
@@ -442,15 +443,16 @@ public class TestContainerCommandsEC {
       try (ECContainerOperationClient ecContainerOperationClient =
                new ECContainerOperationClient(config, certClient)) {
         for (int j = 0; j < containerToDeletePipeline.size(); j++) {
-          org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData =
-              ecContainerOperationClient
-                  .listBlock(conID, containerToDeletePipeline.get(j).getFirstNode(),
-                      (ECReplicationConfig) containerToDeletePipeline.get(j)
-                          .getReplicationConfig(), cToken);
+          Pipeline p = containerToDeletePipeline.get(j);
+          org.apache.hadoop.ozone.container.common.helpers.BlockData[]
+              blockData = ecContainerOperationClient.listBlock(
+                  conID, p.getFirstNode(),
+                  (ECReplicationConfig) p.getReplicationConfig(),
+                  cToken);
           blockDataArrList.add(blockData);
           // Delete the first index container
           XceiverClientSpi client = xceiverClientManager.acquireClient(
-              containerToDeletePipeline.get(j));
+              p);
           try {
             ContainerProtocolCalls.deleteContainer(
                 client,
@@ -470,7 +472,7 @@ public class TestContainerCommandsEC {
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
             sourceNodeMap, targetNodeMap);
 
-        // Assert the original container metadata with the new recovered container.
+        // Assert the original container metadata with the new recovered one
         Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
             targetNodeMap.entrySet().iterator();
         int i = 0;
@@ -480,12 +482,12 @@ public class TestContainerCommandsEC {
           Map<DatanodeDetails, Integer> indexes = new HashMap<>();
           indexes.put(targetNodeMap.entrySet().iterator().next().getValue(),
               targetNodeMap.entrySet().iterator().next().getKey());
-          Pipeline newTargetPipeline =
-              Pipeline.newBuilder().setId(PipelineID.randomId())
-                  .setReplicationConfig(containerPipeline.getReplicationConfig())
-                  .setReplicaIndexes(indexes)
-                  .setState(Pipeline.PipelineState.CLOSED)
-                  .setNodes(ImmutableList.of(targetDN)).build();
+          Pipeline newTargetPipeline = Pipeline.newBuilder()
+              .setId(PipelineID.randomId())
+              .setReplicationConfig(containerPipeline.getReplicationConfig())
+              .setReplicaIndexes(indexes)
+              .setState(Pipeline.PipelineState.CLOSED)
+              .setNodes(ImmutableList.of(targetDN)).build();
 
           org.apache.hadoop.ozone.container.common.helpers.BlockData[]
               reconstructedBlockData =
@@ -499,12 +501,12 @@ public class TestContainerCommandsEC {
           XceiverClientSpi client = xceiverClientManager.acquireClient(
               newTargetPipeline);
           try {
-            ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
+            ContainerProtos.ReadContainerResponseProto readContainerResponse =
                 ContainerProtocolCalls.readContainer(
                     client, conID,
                     cToken.encodeToUrlString());
             Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
-                readContainerResponseProto.getContainerData().getState());
+                readContainerResponse.getContainerData().getState());
           } finally {
             xceiverClientManager.releaseClient(client, false);
           }
