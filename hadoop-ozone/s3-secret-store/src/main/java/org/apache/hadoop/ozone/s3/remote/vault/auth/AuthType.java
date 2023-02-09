@@ -15,15 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.s3http.vault.auth;
+package org.apache.hadoop.ozone.s3.remote.vault.auth;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys;
+import org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys;
 
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.APP_ROLE_ID;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.APP_ROLE_PATH;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.APP_ROLE_SECRET;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.AUTH_TYPE;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.APP_ROLE_ID;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.APP_ROLE_PATH;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.APP_ROLE_SECRET;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.AUTH_TYPE;
 
 /**
  * Type of authentication method.

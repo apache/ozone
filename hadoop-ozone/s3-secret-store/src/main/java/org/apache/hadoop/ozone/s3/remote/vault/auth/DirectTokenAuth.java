@@ -16,8 +16,26 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.s3.remote.vault.auth;
+
+import com.bettercloud.vault.Vault;
+import com.bettercloud.vault.VaultConfig;
+import com.bettercloud.vault.VaultException;
+
+import java.util.function.Supplier;
+
 /**
- * This package contains S3 secret remote store implementation
- *   based on HashiCorp Vault.
+ * Authentication via direct token providing from configuration.
  */
-package org.apache.hadoop.ozone.om.s3http.vault;
+public class DirectTokenAuth implements Auth {
+  private final Supplier<String> tokenProvider;
+
+  public DirectTokenAuth(Supplier<String> tokenProvider) {
+    this.tokenProvider = tokenProvider;
+  }
+
+  @Override
+  public Vault auth(VaultConfig config) throws VaultException {
+    return new Vault(config.token(tokenProvider.get()).build());
+  }
+}

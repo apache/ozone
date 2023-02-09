@@ -19,4 +19,4 @@
 /**
  * This package contains S3 secret in-memory cache.
  */
-package org.apache.hadoop.ozone.om.s3http.cache;
+package org.apache.hadoop.ozone.s3.remote.cache;

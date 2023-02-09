@@ -15,22 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.s3http.vault.auth;
-
-import com.bettercloud.vault.Vault;
-import com.bettercloud.vault.VaultConfig;
-import com.bettercloud.vault.VaultException;
 
 /**
- * S3 remote secret store authenticate interface.
+ * This package contains S3 secret remote store implementation
+ *   based on HashiCorp Vault.
  */
-public interface Auth {
-  /**
-   * Authenticate and returns ready for use client.
-   *
-   * @param config Vault configuration.
-   * @return Vault authenticated REST client.
-   * @throws VaultException in case when authentication failed.
-   */
-  Vault auth(VaultConfig config) throws VaultException;
-}
+package org.apache.hadoop.ozone.s3.remote.vault;

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.s3http;
+package org.apache.hadoop.ozone.s3.remote;
 
 /**
  * Configuration keys for S3 secret store.
@@ -23,7 +23,7 @@ package org.apache.hadoop.ozone.om.s3http;
 public final class S3SecretStoreConfigurationKeys {
   public static final String S3_SECRET_STORAGE_TYPE = "ozone.secret.s3.store";
   public static final String DEFAULT_SECRET_STORAGE_TYPE
-      = S3SecretStoreType.ROCKSDB.getName();
+      = S3SecretStoreType.ROCKSDB.getType();
 
   //Vault configs
   public static final String PREFIX = "ozone.secret.s3.store.vault.";

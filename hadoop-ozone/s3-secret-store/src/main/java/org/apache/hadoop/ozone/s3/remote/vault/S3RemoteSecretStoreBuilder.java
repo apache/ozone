@@ -15,10 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.s3http.vault;
+package org.apache.hadoop.ozone.s3.remote.vault;
 
 import com.bettercloud.vault.SslConfig;
-import org.apache.hadoop.ozone.om.s3http.vault.auth.Auth;
+import org.apache.hadoop.ozone.s3.remote.vault.auth.Auth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,8 +109,13 @@ public class S3RemoteSecretStoreBuilder {
   public S3RemoteSecretStore build() throws IOException {
     SslConfig sslConfig = loadKeyStore(null);
     sslConfig = loadTrustStore(sslConfig);
-    return new S3RemoteSecretStore(address, nameSpace,
-        secretPath, engineVersion, auth, sslConfig);
+    return new S3RemoteSecretStore(
+        address,
+        nameSpace,
+        secretPath,
+        engineVersion,
+        auth,
+        sslConfig);
   }
 
   private SslConfig loadKeyStore(SslConfig sslConfig) {
@@ -126,7 +131,7 @@ public class S3RemoteSecretStoreBuilder {
           | KeyStoreException
           | IOException
           | NoSuchAlgorithmException e) {
-        LOG.error("Failed to load keystore for S3 remove secret store", e);
+        LOG.error("Failed to load keystore for S3 remote secret store", e);
       }
     }
     return null;
@@ -145,7 +150,7 @@ public class S3RemoteSecretStoreBuilder {
           | KeyStoreException
           | IOException
           | NoSuchAlgorithmException e) {
-        LOG.error("Failed to load keystore for S3 remove secret store", e);
+        LOG.error("Failed to load keystore for S3 remote secret store", e);
       }
     }
     return null;

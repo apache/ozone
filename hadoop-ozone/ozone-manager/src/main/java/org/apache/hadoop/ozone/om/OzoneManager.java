@@ -32,7 +32,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -88,11 +87,6 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.s3http.cache.S3InMemoryCache;
-import org.apache.hadoop.ozone.om.s3http.vault.S3RemoteSecretStore;
-import org.apache.hadoop.ozone.om.s3http.S3SecretStoreType;
-import org.apache.hadoop.ozone.om.s3http.vault.S3RemoteSecretStoreBuilder;
-import org.apache.hadoop.ozone.om.s3http.vault.auth.AuthType;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -285,22 +279,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.ADDRESS;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.CACHE_MAX_SIZE;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_MAX_SIZE;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.ENGINE_VER;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.KEY_STORE_PASSWORD;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.KEY_STORE_PATH;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.KEY_STORE_TYPE;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.NAMESPACE;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.S3_SECRET_STORAGE_TYPE;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.SECRET_PATH;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.TRUST_STORE_PASSWORD;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.TRUST_STORE_PATH;
-import static org.apache.hadoop.ozone.om.s3http.S3SecretStoreConfigurationKeys.TRUST_STORE_TYPE;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -776,48 +754,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     volumeManager = new VolumeManagerImpl(metadataManager);
     bucketManager = new BucketManagerImpl(metadataManager);
-    S3SecretStoreType type = S3SecretStoreType.fromName(
-        configuration.get(S3_SECRET_STORAGE_TYPE, DEFAULT_SECRET_STORAGE_TYPE));
-    S3SecretStore store;
-    S3SecretCache cache;
-    switch (type) {
-    case HASHICORP_VAULT:
-      S3RemoteSecretStoreBuilder builder = S3RemoteSecretStore.builder()
-          .setAuth(AuthType.fromConf(configuration))
-          .setAddress(configuration.get(ADDRESS))
-          .setNameSpace(configuration.get(NAMESPACE))
-          .setSecretPath(configuration.get(SECRET_PATH))
-          .setEngineVersion(configuration.getInt(ENGINE_VER, 1));
 
-      String trustStoreType = configuration.get(TRUST_STORE_TYPE);
-      if (trustStoreType != null) {
-        builder.setTrustStoreType(trustStoreType)
-            .setTrustStore(configuration.get(TRUST_STORE_PATH))
-            .setTrustStorePassword(configuration.get(TRUST_STORE_PASSWORD));
-      }
-
-      String keyStoreType = configuration.get(KEY_STORE_TYPE);
-      if (keyStoreType != null) {
-        builder.setKeyStoreType(keyStoreType)
-            .setKeyStore(configuration.get(KEY_STORE_PATH))
-            .setKeyStorePassword(configuration.get(KEY_STORE_PASSWORD));
-      }
-      store = builder.build();
-      long expireTime = configuration
-          .getLong(CACHE_LIFETIME, DEFAULT_CACHE_LIFETIME);
-      cache = S3InMemoryCache.builder()
-          .setExpireTime(expireTime, ChronoUnit.SECONDS)
-          .setMaxSize(configuration
-              .getLong(CACHE_MAX_SIZE, DEFAULT_CACHE_MAX_SIZE))
-          .build();
-      break;
-    case ROCKSDB:
-    default:
-      store = metadataManagerImpl;
-      cache = metadataManagerImpl;
-    }
+    SecretStoreProviderImpl secretStoreProvider
+        = new SecretStoreProviderImpl(metadataManagerImpl);
+    SecretCacheProvider secretCacheProvider = SecretCacheProvider.IN_MEMORY;
     s3SecretManager = new S3SecretLockedManager(
-        new S3SecretManagerImpl(store, cache),
+        new S3SecretManagerImpl(
+            secretStoreProvider.get(configuration),
+            secretCacheProvider.get(configuration)
+        ),
         metadataManager.getLock()
     );
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {

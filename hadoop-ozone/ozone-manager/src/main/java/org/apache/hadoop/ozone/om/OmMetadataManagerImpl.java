@@ -33,7 +33,6 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -48,8 +47,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
@@ -124,14 +121,14 @@ import org.slf4j.LoggerFactory;
  * Ozone metadata manager interface.
  */
 public class OmMetadataManagerImpl implements OMMetadataManager,
-    S3SecretStore, S3SecretCache {
+    S3SecretStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
   /**
    * OM RocksDB Structure .
    * <p>
-   * OM DB stores metadata as KV pairs in different column families.
+   * OM DB stores metadata as KV pairs iThis n different column families.
    * <p>
    * OM DB Schema:
    *
@@ -294,8 +291,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Map<String, Table> tableMap = new HashMap<>();
   private List<TableCacheMetrics> tableCacheMetrics = new LinkedList<>();
-
-  private TableCache<CacheKey<String>, CacheValue<S3SecretValue>> s3SecretCache;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
@@ -582,7 +577,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     s3SecretTable = this.store.getTable(S3_SECRET_TABLE, String.class,
         S3SecretValue.class);
     checkTableStatus(s3SecretTable, S3_SECRET_TABLE, addCacheMetrics);
-    s3SecretCache = new PartialTableCache<>();
 
     prefixTable = this.store.getTable(PREFIX_TABLE, String.class,
         OmPrefixInfo.class);
@@ -1565,25 +1559,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public void revokeSecret(String kerberosId) throws IOException {
     s3SecretTable.delete(kerberosId);
-  }
-
-  @Override
-  public void put(String kerberosId, S3SecretValue secretValue, long txId) {
-    s3SecretCache.put(new CacheKey<>(kerberosId),
-        new CacheValue<>(Optional.of(secretValue), txId));
-  }
-
-  @Override
-  public void invalidate(String id, long txId) {
-    s3SecretCache.put(new CacheKey<>(id),
-        new CacheValue<>(Optional.absent(), txId));
-  }
-
-  @Override
-  public S3SecretValue get(String id) {
-    CacheValue<S3SecretValue> cacheValue
-        = s3SecretCache.get(new CacheKey<>(id));
-    return cacheValue == null ? null : cacheValue.getCacheValue();
   }
 
   @Override

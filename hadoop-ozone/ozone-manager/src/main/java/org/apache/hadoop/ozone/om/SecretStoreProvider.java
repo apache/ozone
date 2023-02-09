@@ -16,7 +16,22 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.om;
+
+import org.apache.hadoop.conf.Configuration;
+
+import java.io.IOException;
+
 /**
- * This package contains S3 secret remote store code.
+ * S3 secret store provider.
  */
-package org.apache.hadoop.ozone.om.s3http;
+public interface SecretStoreProvider {
+  /**
+   * Create and return S3 secret store implementation
+   *    from provided configuration.
+   *
+   * @param conf Configuration instance.
+   * @return S3 secret store instance.
+   */
+  S3SecretStore get(Configuration conf) throws IOException;
+}

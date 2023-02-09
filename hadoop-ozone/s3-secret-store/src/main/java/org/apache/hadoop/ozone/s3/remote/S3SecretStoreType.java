@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.s3http;
+package org.apache.hadoop.ozone.s3.remote;
 
 import java.util.Objects;
 
@@ -27,19 +27,19 @@ public enum S3SecretStoreType {
   ROCKSDB("rocksDB"),
   HASHICORP_VAULT("vault");
 
-  private final String name;
+  private final String type;
 
-  S3SecretStoreType(String name) {
-    this.name = name;
+  S3SecretStoreType(String type) {
+    this.type = type;
   }
 
-  public String getName() {
-    return name;
+  public String getType() {
+    return type;
   }
 
-  public static S3SecretStoreType fromName(String name) {
+  public static S3SecretStoreType fromType(String type) {
     for (S3SecretStoreType value : values()) {
-      if (Objects.equals(value.name, name)) {
+      if (Objects.equals(value.type, type)) {
         return value;
       }
     }
