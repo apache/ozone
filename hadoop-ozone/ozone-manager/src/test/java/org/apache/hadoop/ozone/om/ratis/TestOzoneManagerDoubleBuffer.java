@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,8 +54,7 @@ import static org.mockito.Mockito.when;
  * This class tests snapshot aware OzoneManagerDoubleBuffer flushing logic.
  */
 class TestOzoneManagerDoubleBuffer {
-
-  private OzoneManagerDoubleBuffer doubleBuffer;
+    private OzoneManagerDoubleBuffer doubleBuffer;
   private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =
@@ -73,6 +73,7 @@ class TestOzoneManagerDoubleBuffer {
       mock(OMBucketCreateResponse.class);
   @TempDir
   private File tempDir;
+  private OMMetadataManager omMetadataManager;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -80,7 +81,7 @@ class TestOzoneManagerDoubleBuffer {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.getAbsolutePath());
-    OMMetadataManager omMetadataManager =
+    omMetadataManager =
         new OmMetadataManagerImpl(ozoneConfiguration);
     OzoneManager ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
@@ -126,10 +127,11 @@ class TestOzoneManagerDoubleBuffer {
   }
 
   @AfterEach
-  public void stop() {
+  public void stop() throws Exception {
     if (doubleBuffer != null) {
       doubleBuffer.stop();
     }
+    omMetadataManager.stop();
   }
 
   private static Stream<Arguments> doubleBufferFlushCases() {
