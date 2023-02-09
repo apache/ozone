@@ -351,8 +351,15 @@ public class TestContainerCommandsEC {
   @MethodSource("recoverableMissingIndexes")
   void testECReconstructionCoordinatorWith(List<Integer> missingIndexes)
       throws Exception {
-    testECReconstructionCoordinator(missingIndexes);
+    testECReconstructionCoordinator(missingIndexes, 3);
   }
+
+  @Test
+  void testECReconstructionWithPartialStripe()
+          throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
+  }
+
 
   static Stream<List<Integer>> recoverableMissingIndexes() {
     return Stream
@@ -369,7 +376,7 @@ public class TestContainerCommandsEC {
   public void testECReconstructionCoordinatorWithMissingIndexes135() {
     InsufficientLocationsException exception =
         Assert.assertThrows(InsufficientLocationsException.class, () -> {
-          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5));
+          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3);
         });
 
     String expectedMessage =
@@ -379,8 +386,8 @@ public class TestContainerCommandsEC {
     Assert.assertEquals(expectedMessage, actualMessage);
   }
 
-  private void testECReconstructionCoordinator(List<Integer> missingIndexes)
-      throws Exception {
+  private void testECReconstructionCoordinator(List<Integer> missingIndexes,
+      int numInputChunks) throws Exception {
     ObjectStore objectStore = rpcClient.getObjectStore();
     String keyString = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
@@ -389,7 +396,7 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket);
+    createKeyAndWriteData(keyString, bucket, numInputChunks);
 
     try (
         XceiverClientManager xceiverClientManager =
@@ -521,15 +528,15 @@ public class TestContainerCommandsEC {
     }
   }
 
-  private void createKeyAndWriteData(String keyString, OzoneBucket bucket)
-      throws IOException {
-    for (int i = 0; i < EC_DATA; i++) {
+  private void createKeyAndWriteData(String keyString, OzoneBucket bucket,
+      int numChunks) throws IOException {
+    for (int i = 0; i < numChunks; i++) {
       inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
     }
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
         new ECReplicationConfig(3, 2, EcCodec.RS, 1024), new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
+      for (int i = 0; i < numChunks; i++) {
         out.write(inputChunks[i]);
       }
     }
@@ -547,7 +554,7 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket);
+    createKeyAndWriteData(keyString, bucket, 3);
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();

@@ -370,10 +370,6 @@ public final class ScmConfigKeys {
   public static final String
       OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT =
       "5m";
-  public static final String OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT =
-      "ozone.scm.expired.container.replica.op.time.out";
-  public static final String
-      OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT = "30m";
 
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.

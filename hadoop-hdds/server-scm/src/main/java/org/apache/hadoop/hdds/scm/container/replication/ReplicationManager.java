@@ -425,26 +425,89 @@ public class ReplicationManager implements SCMService {
     sendDatanodeCommand(deleteCommand, container, datanode);
   }
 
+  /**
+   * Send a push replication command to the given source datanode, instructing
+   * it to copy the given container to the target.
+   * @param container Container to replicate.
+   * @param replicaIndex Replica Index of the container to replicate. Zero for
+   *                     Ratis and greater than zero for EC.
+   * @param source The source hosting the container, which is where the command
+   *               will be sent.
+   * @param target The target to push container replica to
+   * @param scmDeadlineEpochMs The epoch time in ms, after which the command
+   *                           will be discarded from the SCMPendingOps table.
+   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
+   *                                command will be discarded on the data if
+   *                                it has not been processed. In general should
+   *                                be less than scmDeadlineEpochMs.
+   * @throws NotLeaderException
+   */
+  public void sendReplicateContainerCommand(final ContainerInfo container,
+      int replicaIndex, DatanodeDetails source, DatanodeDetails target,
+      long scmDeadlineEpochMs, long datanodeDeadlineEpochMs)
+      throws NotLeaderException {
+    final ReplicateContainerCommand command = ReplicateContainerCommand
+        .toTarget(container.getContainerID(), target);
+    command.setReplicaIndex(replicaIndex);
+    sendDatanodeCommand(command, container, source, scmDeadlineEpochMs,
+        datanodeDeadlineEpochMs);
+  }
+  /**
+   * Sends a command to a datanode with the command deadline set to the default
+   * in ReplicationManager config.
+   * @param command The command to send.
+   * @param containerInfo The container the command is for.
+   * @param target The datanode which will receive the command.
+   * @throws NotLeaderException
+   */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
       throws NotLeaderException {
-    LOG.info("Sending command [{}] for container {} to {}",
-        command, containerInfo, target);
+    long scmDeadline = clock.millis() + rmConf.eventTimeout;
+    long datanodeDeadline = clock.millis() +
+        Math.round(rmConf.eventTimeout * rmConf.commandDeadlineFactor);
+    sendDatanodeCommand(command, containerInfo, target, scmDeadline,
+        datanodeDeadline);
+  }
+
+  /**
+   * Sends a command to a datanode with a user defined deadline for the
+   * commands.
+   * @param command The command to send
+   * @param containerInfo The container the command is for.
+   * @param target The datanode which will receive the command.
+   * @param scmDeadlineEpochMs The epoch time in ms, after which the command
+   *                           will be discarded from the SCMPendingOps table.
+   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
+   *                                command will be discarded on the datanode if
+   *                                it has not been processed.
+   * @throws NotLeaderException
+   */
+  public void sendDatanodeCommand(SCMCommand<?> command,
+      ContainerInfo containerInfo, DatanodeDetails target,
+      long scmDeadlineEpochMs, long datanodeDeadlineEpochMs)
+      throws NotLeaderException {
+    LOG.info("Sending command [{}] for container {} to {} with datanode "
+        + "deadline {} and scm deadline {}",
+        command, containerInfo, target, datanodeDeadlineEpochMs,
+        scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
-    command.setDeadline(clock.millis() +
-        Math.round(rmConf.eventTimeout * rmConf.commandDeadlineFactor));
+    command.setDeadline(datanodeDeadlineEpochMs);
     final CommandForDatanode<?> datanodeCommand =
         new CommandForDatanode<>(target.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-    adjustPendingOpsAndMetrics(containerInfo, command, target);
+    adjustPendingOpsAndMetrics(containerInfo, command, target,
+        scmDeadlineEpochMs);
   }
 
   private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,
-      SCMCommand<?> cmd, DatanodeDetails targetDatanode) {
+      SCMCommand<?> cmd, DatanodeDetails targetDatanode,
+      long scmDeadlineEpochMs) {
     if (cmd.getType() == Type.deleteContainerCommand) {
       DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
       containerReplicaPendingOps.scheduleDeleteReplica(
-          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex());
+          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex(),
+          scmDeadlineEpochMs);
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcDeletionCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
@@ -457,13 +520,14 @@ public class ReplicationManager implements SCMService {
       byte[] targetIndexes = rcc.getMissingContainerIndexes();
       for (int i = 0; i < targetIndexes.length; i++) {
         containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes[i]);
+            containerInfo.containerID(), targets.get(i), targetIndexes[i],
+            scmDeadlineEpochMs);
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
-      containerReplicaPendingOps.scheduleAddReplica(
-          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex());
+      containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(),
+          targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
