@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -365,12 +364,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return Table
    */
   Table<String, OmMultipartKeyInfo> getMultipartInfoTable();
-
-  /**
-   * Gets the S3 Secrets table.
-   * @return Table
-   */
-  Table<String, S3SecretValue> getS3SecretTable();
 
   Table<String, TransactionInfo> getTransactionInfoTable();
 

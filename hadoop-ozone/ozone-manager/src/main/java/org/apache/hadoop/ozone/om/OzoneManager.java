@@ -736,7 +736,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
-    metadataManager = new OmMetadataManagerImpl(configuration);
+    OmMetadataManagerImpl metadataManagerImpl =
+        new OmMetadataManagerImpl(configuration);
+    this.metadataManager = metadataManagerImpl;
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");
     if (isS3MultiTenancyEnabled) {
@@ -745,8 +747,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     volumeManager = new VolumeManagerImpl(metadataManager);
     bucketManager = new BucketManagerImpl(metadataManager);
+    s3SecretManager = new S3SecretLockedManager(
+        new S3SecretManagerImpl(metadataManagerImpl, metadataManagerImpl),
+        metadataManager.getLock()
+    );
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
-      s3SecretManager = new S3SecretManagerImpl(configuration, metadataManager);
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
@@ -1480,6 +1485,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
+  }
+
+  public S3SecretManager getS3SecretManager() {
+    return s3SecretManager;
   }
 
   /**

@@ -19,18 +19,93 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
 /**
  * Interface to manager s3 secret.
  */
 public interface S3SecretManager {
+  Logger LOG = LoggerFactory.getLogger(S3SecretManager.class);
 
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  /**
+   * API to get s3 secret for given kerberos identifier.
+   * @param kerberosID kerberos principal.
+   * @return associated s3 secret or null if secret not existed.
+   * @throws IOException
+   */
+  S3SecretValue getSecret(String kerberosID) throws IOException;
 
   /**
    * API to get s3 secret for given awsAccessKey.
-   * @param awsAccessKey
+   * @param awsAccessKey aws access key.
    * */
-  String getS3UserSecretString(String awsAccessKey) throws IOException;
+  String getSecretString(String awsAccessKey) throws IOException;
+
+  /**
+   * Store provided s3 secret and associate it with kerberos principal.
+   * @param kerberosId kerberos principal.
+   * @param secretValue s3 secret value.
+   * @throws IOException in case when secret storing failed.
+   */
+  void storeSecret(String kerberosId, S3SecretValue secretValue)
+      throws IOException;
+
+  /**
+   * Revoke s3 secret which associated with provided kerberos principal.
+   * @param kerberosId kerberos principal.
+   * @throws IOException in case when revoke failed.
+   */
+  void revokeSecret(String kerberosId) throws IOException;
+
+  /**
+   * Apply provided action under write lock.
+   * @param lockId lock identifier.
+   * @param action custom action.
+   * @param <T> type of action result.
+   * @return action result.
+   * @throws IOException in case when action failed.
+   */
+  <T> T doUnderLock(String lockId, S3SecretFunction<T> action)
+      throws IOException;
+
+  /**
+   * Default implementation of secret check method.
+   * @param kerberosId kerberos principal.
+   * @return true if exist associated s3 secret for given {@param kerberosId},
+   * false if not.
+   */
+  default boolean hasS3Secret(String kerberosId) throws IOException {
+    return getSecret(kerberosId) != null;
+  }
+
+  S3Batcher batcher();
+
+  default boolean isBatchSupported() {
+    return batcher() != null;
+  }
+
+  /**
+   * Direct cache accessor.
+   * @return s3 secret cache.
+   */
+  S3SecretCache cache();
+
+  default void updateCache(String accessId, S3SecretValue secret, long txId) {
+    S3SecretCache cache = cache();
+    if (cache != null) {
+      cache.put(accessId, secret, txId);
+    }
+  }
+
+  default void invalidateCacheEntry(String id, long txId) {
+    S3SecretCache cache = cache();
+    if (cache != null) {
+      cache.invalidate(id, txId);
+    }
+  }
+
+
 }
