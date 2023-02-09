@@ -29,12 +29,13 @@ public final class S3SecretRemoteStoreConfigurationKeys {
   public static final String SECRET_PATH = PREFIX + "secretpath";
 
   public static final String AUTH_TYPE = PREFIX + "auth";
+  public static final String AUTH_PREFIX = AUTH_TYPE + ".";
 
-  public static final String TOKEN = AUTH_TYPE + "token";
+  public static final String TOKEN = AUTH_PREFIX + "token";
 
-  public static final String APP_ROLE_ID = AUTH_TYPE + "approle.id";
-  public static final String APP_ROLE_SECRET = AUTH_TYPE + "approle.secret";
-  public static final String APP_ROLE_PATH = AUTH_TYPE + "approle.path";
+  public static final String APP_ROLE_ID = AUTH_PREFIX + "approle.id";
+  public static final String APP_ROLE_SECRET = AUTH_PREFIX + "approle.secret";
+  public static final String APP_ROLE_PATH = AUTH_PREFIX + "approle.path";
 
   public static final String ENGINE_VER = PREFIX + "enginever";
 
