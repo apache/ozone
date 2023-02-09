@@ -1581,7 +1581,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        getInputStream);
+        getInputStream, keyInfo.isFile());
   }
 
   @Override

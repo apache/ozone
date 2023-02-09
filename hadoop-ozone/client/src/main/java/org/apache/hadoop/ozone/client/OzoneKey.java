@@ -61,6 +61,11 @@ public class OzoneKey {
   private ReplicationConfig replicationConfig;
 
   private Map<String, String> metadata = new HashMap<>();
+
+  /**
+   * Indicator if key is a file.
+   */
+  private final boolean file;
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -73,7 +78,7 @@ public class OzoneKey {
                   int replicationFactor) {
     this(volumeName, bucketName, keyName, size, creationTime, modificationTime,
             ReplicationConfig.fromTypeAndFactor(type,
-                    ReplicationFactor.valueOf(replicationFactor)));
+                    ReplicationFactor.valueOf(replicationFactor)), true);
   }
 
   /**
@@ -84,6 +89,19 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig) {
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, replicationConfig, true);
+  }
+
+  /**
+   * Constructs OzoneKey from OmKeyInfo.
+   *
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+      String keyName, long size, long creationTime,
+      long modificationTime, ReplicationConfig replicationConfig,
+      boolean file) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -91,6 +109,7 @@ public class OzoneKey {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
+    this.file = file;
   }
 
   @SuppressWarnings("parameternumber")
@@ -99,7 +118,16 @@ public class OzoneKey {
                   long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig);
+        modificationTime, replicationConfig, metadata, true);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneKey(String volumeName, String bucketName,
+      String keyName, long size, long creationTime,
+      long modificationTime, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, boolean file) {
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, replicationConfig, file);
     this.metadata.putAll(metadata);
   }
 
@@ -188,11 +216,19 @@ public class OzoneKey {
     return replicationConfig;
   }
 
+  /**
+   * Returns indicator if key is a file.
+   * @return file
+   */
+  public boolean isFile() {
+    return file;
+  }
+
   public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata());
+        keyInfo.getMetadata(), keyInfo.isFile());
   }
 
 }

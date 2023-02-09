@@ -29,16 +29,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
@@ -115,7 +111,8 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testHeadFailIfFSOLayoutAndIsDirectory() throws IOException,
+  public void testHeadWhenKeyIsAFileAndKeyPathDoesNotEndWithASlash()
+      throws IOException,
       OS3Exception {
     // GIVEN
     final String keyPath = "dir";
@@ -125,26 +122,11 @@ public class TestObjectHead {
     objectEndpoint.setClient(ozoneClient);
     final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
     final OzoneKey ozoneKey = Mockito.mock(OzoneKey.class);
-    final ObjectStore objectStore = Mockito.mock(ObjectStore.class);
-    final String volumeName = "s3v";
-    final OzoneVolume ozoneVolume = Mockito.mock(OzoneVolume.class);
-    final OzoneBucket ozoneBucket = Mockito.mock(OzoneBucket.class);
-    final OzoneFileStatus ozoneFileStatus = Mockito.mock(OzoneFileStatus.class);
 
     // WHEN
     when(ozoneClient.getProxy()).thenReturn(clientProtocol);
     when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getS3Bucket(bucketName)).thenReturn(ozoneBucket);
-    when(ozoneClient.getObjectStore().getS3Volume()).thenReturn(ozoneVolume);
-    when(ozoneVolume.getBucket(bucketName)).thenReturn(ozoneBucket);
-    when(ozoneBucket.getBucketLayout())
-        .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    when(ozoneVolume.getName()).thenReturn(volumeName);
-    when(ozoneKey.getName()).thenReturn(keyPath);
-    when(clientProtocol.getOzoneFileStatus(volumeName, bucketName, keyPath))
-        .thenReturn(ozoneFileStatus);
-    when(ozoneFileStatus.isDirectory()).thenReturn(true);
+    when(ozoneKey.isFile()).thenReturn(false);
 
     final Response response = objectEndpoint.head(bucketName, keyPath);
 
@@ -153,7 +135,8 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testHeadSuccessIfNotFSOLayoutAndIsDirectory() throws IOException,
+  public void testHeadWhenKeyIsNotAFileAndKeyPathDoesNotEndWithASlash()
+      throws IOException,
       OS3Exception {
     // GIVEN
     final String keyPath = "dir";
@@ -163,26 +146,11 @@ public class TestObjectHead {
     objectEndpoint.setClient(ozoneClient);
     final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
     final OzoneKey ozoneKey = Mockito.mock(OzoneKey.class);
-    final ObjectStore objectStore = Mockito.mock(ObjectStore.class);
-    final String volumeName = "s3v";
-    final OzoneVolume ozoneVolume = Mockito.mock(OzoneVolume.class);
-    final OzoneBucket ozoneBucket = Mockito.mock(OzoneBucket.class);
-    final OzoneFileStatus ozoneFileStatus = Mockito.mock(OzoneFileStatus.class);
 
     // WHEN
     when(ozoneClient.getProxy()).thenReturn(clientProtocol);
     when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getS3Bucket(bucketName)).thenReturn(ozoneBucket);
-    when(ozoneClient.getObjectStore().getS3Volume()).thenReturn(ozoneVolume);
-    when(ozoneVolume.getBucket(bucketName)).thenReturn(ozoneBucket);
-    when(ozoneBucket.getBucketLayout())
-        .thenReturn(BucketLayout.DEFAULT);
-    when(ozoneVolume.getName()).thenReturn(volumeName);
-    when(ozoneKey.getName()).thenReturn(keyPath);
-    when(clientProtocol.getOzoneFileStatus(volumeName, bucketName, keyPath))
-        .thenReturn(ozoneFileStatus);
-    when(ozoneFileStatus.isDirectory()).thenReturn(true);
+    when(ozoneKey.isFile()).thenReturn(true);
     when(ozoneKey.getModificationTime())
         .thenReturn(Instant.ofEpochMilli(System.currentTimeMillis()));
 
@@ -193,36 +161,22 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testHeadSuccessIfFSOLayoutAndIsNotDirectory() throws IOException,
+  public void testHeadWhenKeyIsNotAFileAndKeyPathEndsWithASlash()
+      throws IOException,
       OS3Exception {
     // GIVEN
-    final String keyPath = "dir";
+    final String keyPath = "dir/";
     final ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
     final OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
     objectEndpoint.setClient(ozoneClient);
     final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
     final OzoneKey ozoneKey = Mockito.mock(OzoneKey.class);
-    final ObjectStore objectStore = Mockito.mock(ObjectStore.class);
-    final String volumeName = "s3v";
-    final OzoneVolume ozoneVolume = Mockito.mock(OzoneVolume.class);
-    final OzoneBucket ozoneBucket = Mockito.mock(OzoneBucket.class);
-    final OzoneFileStatus ozoneFileStatus = Mockito.mock(OzoneFileStatus.class);
 
     // WHEN
     when(ozoneClient.getProxy()).thenReturn(clientProtocol);
     when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getS3Bucket(bucketName)).thenReturn(ozoneBucket);
-    when(ozoneClient.getObjectStore().getS3Volume()).thenReturn(ozoneVolume);
-    when(ozoneVolume.getBucket(bucketName)).thenReturn(ozoneBucket);
-    when(ozoneBucket.getBucketLayout())
-        .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    when(ozoneVolume.getName()).thenReturn(volumeName);
-    when(ozoneKey.getName()).thenReturn(keyPath);
-    when(clientProtocol.getOzoneFileStatus(volumeName, bucketName, keyPath))
-        .thenReturn(ozoneFileStatus);
-    when(ozoneFileStatus.isDirectory()).thenReturn(false);
+    when(ozoneKey.isFile()).thenReturn(false);
     when(ozoneKey.getModificationTime())
         .thenReturn(Instant.ofEpochMilli(System.currentTimeMillis()));
 

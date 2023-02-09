@@ -72,8 +72,24 @@ public class OzoneKeyDetails extends OzoneKey {
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
       SupplierWithIOException<OzoneInputStream> contentSupplier) {
+    this(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, ozoneKeyLocations, replicationConfig, metadata,
+        feInfo, contentSupplier, true);
+  }
+
+  /**
+   * Constructs OzoneKeyDetails from OmKeyInfo.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
+      long size, long creationTime, long modificationTime,
+      List<OzoneKeyLocation> ozoneKeyLocations,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata,
+      FileEncryptionInfo feInfo,
+      SupplierWithIOException<OzoneInputStream> contentSupplier, boolean file) {
     super(volumeName, bucketName, keyName, size, creationTime,
-            modificationTime, replicationConfig, metadata);
+        modificationTime, replicationConfig, metadata, file);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
