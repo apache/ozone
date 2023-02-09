@@ -106,6 +106,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 
 /**
  * This class tests container commands on EC containers.
@@ -252,88 +253,89 @@ public class TestContainerCommandsEC {
 
   @Test
   public void testCreateRecoveryContainer() throws Exception {
-    XceiverClientManager xceiverClientManager =
-        new XceiverClientManager(config);
-    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
-    Pipeline newPipeline =
-        scm.getPipelineManager().createPipeline(replicationConfig);
-    scm.getPipelineManager().activatePipeline(newPipeline.getId());
-    final ContainerInfo container =
-        scm.getContainerManager().allocateContainer(replicationConfig, "test");
-    Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
-        .generateToken(ANY_USER, container.containerID());
-    scm.getContainerManager().getContainerStateManager()
-        .addContainer(container.getProtobuf());
-
-    XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
-        createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
-            2));
-    try {
-      // To create the actual situation, container would have been in closed
-      // state at SCM.
+    try (XceiverClientManager xceiverClientManager =
+        new XceiverClientManager(config)) {
+      ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+      Pipeline newPipeline =
+          scm.getPipelineManager().createPipeline(replicationConfig);
+      scm.getPipelineManager().activatePipeline(newPipeline.getId());
+      final ContainerInfo container =
+          scm.getContainerManager().allocateContainer(replicationConfig, "test");
+      Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
+          .generateToken(ANY_USER, container.containerID());
       scm.getContainerManager().getContainerStateManager()
-          .updateContainerState(container.containerID().getProtobuf(),
-              HddsProtos.LifeCycleEvent.FINALIZE);
-      scm.getContainerManager().getContainerStateManager()
-          .updateContainerState(container.containerID().getProtobuf(),
-              HddsProtos.LifeCycleEvent.CLOSE);
+          .addContainer(container.getProtobuf());
 
-      //Create the recovering container in DN.
-      String encodedToken = cToken.encodeToUrlString();
-      ContainerProtocolCalls.createRecoveringContainer(dnClient,
-          container.containerID().getProtobuf().getId(),
-          encodedToken, 4);
+      XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
+          createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
+              2));
+      try {
+        // To create the actual situation, container would have been in closed
+        // state at SCM.
+        scm.getContainerManager().getContainerStateManager()
+            .updateContainerState(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.FINALIZE);
+        scm.getContainerManager().getContainerStateManager()
+            .updateContainerState(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.CLOSE);
 
-      BlockID blockID = ContainerTestHelper
-          .getTestBlockID(container.containerID().getProtobuf().getId());
-      Token<? extends TokenIdentifier> blockToken =
-          blockTokenGenerator.generateToken(ANY_USER, blockID,
-              EnumSet.of(READ, WRITE), Long.MAX_VALUE);
-      byte[] data = "TestData".getBytes(UTF_8);
-      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-          ContainerTestHelper.newWriteChunkRequestBuilder(newPipeline, blockID,
-              ChunkBuffer.wrap(ByteBuffer.wrap(data)), 0)
-              .setEncodedToken(blockToken.encodeToUrlString())
-              .build();
-      dnClient.sendCommand(writeChunkRequest);
+        //Create the recovering container in DN.
+        String encodedToken = cToken.encodeToUrlString();
+        ContainerProtocolCalls.createRecoveringContainer(dnClient,
+            container.containerID().getProtobuf().getId(),
+            encodedToken, 4);
 
-      // Now, explicitly make a putKey request for the block.
-      ContainerProtos.ContainerCommandRequestProto putKeyRequest =
-          ContainerTestHelper.getPutBlockRequest(newPipeline,
-              writeChunkRequest.getWriteChunk());
-      dnClient.sendCommand(putKeyRequest);
+        BlockID blockID = ContainerTestHelper
+            .getTestBlockID(container.containerID().getProtobuf().getId());
+        Token<? extends TokenIdentifier> blockToken =
+            blockTokenGenerator.generateToken(ANY_USER, blockID,
+                EnumSet.of(READ, WRITE), Long.MAX_VALUE);
+        byte[] data = "TestData".getBytes(UTF_8);
+        ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+            newWriteChunkRequestBuilder(newPipeline, blockID,
+                    ChunkBuffer.wrap(ByteBuffer.wrap(data)), 0)
+                .setEncodedToken(blockToken.encodeToUrlString())
+                .build();
+        dnClient.sendCommand(writeChunkRequest);
 
-      ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
-          ContainerProtocolCalls.readContainer(dnClient,
-              container.containerID().getProtobuf().getId(), encodedToken);
-      Assert.assertEquals(ContainerProtos.ContainerDataProto.State.RECOVERING,
-          readContainerResponseProto.getContainerData().getState());
-      // Container at SCM should be still in closed state.
-      Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED,
-          scm.getContainerManager().getContainerStateManager()
-              .getContainer(container.containerID()).getState());
-      // close container call
-      ContainerProtocolCalls.closeContainer(dnClient,
-          container.containerID().getProtobuf().getId(), encodedToken);
-      // Make sure we have the container and readable.
-      readContainerResponseProto = ContainerProtocolCalls
-          .readContainer(dnClient,
-              container.containerID().getProtobuf().getId(), encodedToken);
-      Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
-          readContainerResponseProto.getContainerData().getState());
-      ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
-          ContainerProtocolCalls.readChunk(dnClient,
-              writeChunkRequest.getWriteChunk().getChunkData(), blockID, null,
-              blockToken);
-      ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
-          .getReadOnlyByteBuffersArray(
-              readChunkResponseProto.getDataBuffers().getBuffersList());
-      Assert.assertEquals(readOnlyByteBuffersArray[0].limit(), data.length);
-      byte[] readBuff = new byte[readOnlyByteBuffersArray[0].limit()];
-      readOnlyByteBuffersArray[0].get(readBuff, 0, readBuff.length);
-      Assert.assertArrayEquals(data, readBuff);
-    } finally {
-      xceiverClientManager.releaseClient(dnClient, false);
+        // Now, explicitly make a putKey request for the block.
+        ContainerProtos.ContainerCommandRequestProto putKeyRequest =
+            ContainerTestHelper.getPutBlockRequest(newPipeline,
+                writeChunkRequest.getWriteChunk());
+        dnClient.sendCommand(putKeyRequest);
+
+        ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
+            ContainerProtocolCalls.readContainer(dnClient,
+                container.containerID().getProtobuf().getId(), encodedToken);
+        Assert.assertEquals(ContainerProtos.ContainerDataProto.State.RECOVERING,
+            readContainerResponseProto.getContainerData().getState());
+        // Container at SCM should be still in closed state.
+        Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED,
+            scm.getContainerManager().getContainerStateManager()
+                .getContainer(container.containerID()).getState());
+        // close container call
+        ContainerProtocolCalls.closeContainer(dnClient,
+            container.containerID().getProtobuf().getId(), encodedToken);
+        // Make sure we have the container and readable.
+        readContainerResponseProto = ContainerProtocolCalls
+            .readContainer(dnClient,
+                container.containerID().getProtobuf().getId(), encodedToken);
+        Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+            readContainerResponseProto.getContainerData().getState());
+        ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
+            ContainerProtocolCalls.readChunk(dnClient,
+                writeChunkRequest.getWriteChunk().getChunkData(), blockID, null,
+                blockToken);
+        ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
+            .getReadOnlyByteBuffersArray(
+                readChunkResponseProto.getDataBuffers().getBuffersList());
+        Assert.assertEquals(readOnlyByteBuffersArray[0].limit(), data.length);
+        byte[] readBuff = new byte[readOnlyByteBuffersArray[0].limit()];
+        readOnlyByteBuffersArray[0].get(readBuff, 0, readBuff.length);
+        Assert.assertArrayEquals(data, readBuff);
+      } finally {
+        xceiverClientManager.releaseClient(dnClient, false);
+      }
     }
   }
 
@@ -387,12 +389,14 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    XceiverClientManager xceiverClientManager =
-        new XceiverClientManager(config);
     createKeyAndWriteData(keyString, bucket);
-    try (ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient,
-            null, ECReconstructionMetrics.create())) {
+
+    try (
+        XceiverClientManager xceiverClientManager =
+            new XceiverClientManager(config);
+        ECReconstructionCoordinator coordinator =
+            new ECReconstructionCoordinator(config, certClient,
+                 null, ECReconstructionMetrics.create())) {
 
       ECReconstructionMetrics metrics =
           coordinator.getECReconstructionMetrics();
