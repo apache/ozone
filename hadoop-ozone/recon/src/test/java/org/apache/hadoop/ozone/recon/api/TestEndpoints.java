@@ -635,22 +635,42 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     given(omKeyInfo3.getDataSize()).willReturn(1000L);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTable1 = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTable2 = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIter1 = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue = mock(
+    TypedTable.TypedTableIterator mockKeyIter2 = mock(TypedTable
+        .TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValue1 = mock(
+        TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValue2 = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
-    when(mockKeyIter.hasNext())
+    when(keyTable1.iterator()).thenReturn(mockKeyIter1);
+    when(keyTable2.iterator()).thenReturn(mockKeyIter2);
+
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(keyTable1);
+    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTable2);
+
+    when(mockKeyIter1.hasNext())
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockKeyIter.next()).thenReturn(mockKeyValue);
-    when(mockKeyValue.getValue())
+    when(mockKeyIter2.hasNext())
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(false);
+    when(mockKeyIter1.next()).thenReturn(mockKeyValue1);
+    when(mockKeyIter2.next()).thenReturn(mockKeyValue2);
+
+    when(mockKeyValue1.getValue())
+        .thenReturn(omKeyInfo1)
+        .thenReturn(omKeyInfo2)
+        .thenReturn(omKeyInfo3);
+    when(mockKeyValue2.getValue())
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
@@ -666,13 +686,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(3, resultSet.size());
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 131072 &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol2") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
 
     // Test for "volume" query param
     response = utilizationEndpoint.getFileCounts("vol1", null, 0);
