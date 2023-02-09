@@ -79,15 +79,16 @@ public class FileSizeCountTask implements ReconOmTask {
     // Map to store the count of files based on file size
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
 
+    // Delete all records from FILE_COUNT_BY_SIZE table
+    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
+    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+
     // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
     reprocessBucket(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager,
         fileSizeCountMap);
     // Call reprocessBucket method for LEGACY bucket layout
     reprocessBucket(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap);
 
-    // Delete all records from FILE_COUNT_BY_SIZE table
-    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
     writeCountsToDB(true, fileSizeCountMap);
     LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
@@ -103,6 +104,11 @@ public class FileSizeCountTask implements ReconOmTask {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+        //  The time complexity of .size() method is constant time, O(1)
+        if (fileSizeCountMap.size() >= 100000) {
+          writeCountsToDB(true, fileSizeCountMap);
+          fileSizeCountMap.clear();
+        }
       }
     } catch (IOException ioEx) {
       LOG.error("Unable to populate File Size Count for " + bucketLayout +
