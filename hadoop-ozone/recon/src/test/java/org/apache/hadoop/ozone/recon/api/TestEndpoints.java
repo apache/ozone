@@ -650,8 +650,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(keyTable1.iterator()).thenReturn(mockKeyIter1);
     when(keyTable2.iterator()).thenReturn(mockKeyIter2);
 
-    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(keyTable1);
-    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTable2);
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(
+        keyTable1);
+    when(omMetadataManager.getKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTable2);
 
     when(mockKeyIter1.hasNext())
         .thenReturn(true)
