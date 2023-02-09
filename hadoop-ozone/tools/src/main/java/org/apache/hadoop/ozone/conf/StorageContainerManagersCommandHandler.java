@@ -29,7 +29,7 @@ import picocli.CommandLine.ParentCommand;
  * Handler for ozone getconf storagecontainermanagers.
  */
 @Command(name = "storagecontainermanagers",
-    aliases = {"-storagecontainermanagers", "--storage-container-managers"},
+    aliases = {"-storagecontainermanagers"},
     description = "gets list of ozone storage container "
         + "manager nodes in the cluster",
     mixinStandardHelpOptions = true,
