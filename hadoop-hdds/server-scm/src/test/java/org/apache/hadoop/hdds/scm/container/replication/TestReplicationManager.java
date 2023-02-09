@@ -276,7 +276,8 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5);
+        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        clock.millis() + 10000);
 
     replicationManager.processContainer(
         container, repQueue, repReport);
@@ -440,7 +441,8 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5);
+        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        clock.millis() + 10000);
     replicationManager.processContainer(
         container, repQueue, repReport);
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());

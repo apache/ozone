@@ -1476,15 +1476,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.expired.container.replica.op.time.out</name>
-    <value>30m</value>
-    <tag>OZONE, SCM, CONTAINER</tag>
-    <description>
-      Timeout for the container replica operations(ADD/DELETE).After this
-      timeout the command will be retied
-    </description>
-  </property>
-  <property>
     <name>ozone.scm.pipeline.creation.auto.factor.one</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
