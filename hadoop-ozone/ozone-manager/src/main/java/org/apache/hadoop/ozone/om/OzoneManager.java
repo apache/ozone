@@ -3021,24 +3021,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           PERMISSION_DENIED);
     }
     if (!isRatisEnabled) {
-      throw new IOException("Ratis is not enabled at the server.");
+      throw new IOException("OM HA not enabled..");
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put("nodeId", nodeId);
     try {
-      RaftServer server = omRatisServer.getServer();
       RaftGroupId groupID = omRatisServer.getRaftGroup().getGroupId();
+      RaftServer.Division division = omRatisServer.getServer()
+          .getDivision(groupID);
       RaftPeerId targetPeerId;
       if (nodeId.isEmpty()) {
         RaftPeer curLeader = omRatisServer.getLeader();
-        targetPeerId = server.getDivision(groupID).getGroup()
+        targetPeerId = division.getGroup()
             .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
             .map(RaftPeer::getId).orElse(null);
       } else {
         targetPeerId = RaftPeerId.valueOf(nodeId);
       }
-      RatisHelper.transferRatisLeadership(configuration, server, groupID,
+      RatisHelper.transferRatisLeadership(configuration, division,
           targetPeerId);
     } catch (IOException ex) {
       auditSuccess = false;

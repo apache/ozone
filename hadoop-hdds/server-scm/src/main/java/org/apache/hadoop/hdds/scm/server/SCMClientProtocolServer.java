@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -82,7 +83,6 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
@@ -800,30 +800,33 @@ public class SCMClientProtocolServer implements
   public void transferLeadership(String nodeId)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser());
+    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
+      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
+    }
     boolean auditSuccess = true;
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("nodeId", nodeId);
     try {
       SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
-      RaftServer server = scmRatisServer.getDivision().getRaftServer();
-      RaftGroupId groupID = scmRatisServer.getSCMStateMachine().getGroupId();
+      RaftServer.Division division = scmRatisServer.getDivision();
       RaftPeerId targetPeerId;
       if (nodeId.isEmpty()) {
         RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager().
             getRatisServer()).getLeader();
-        targetPeerId = server.getDivision(groupID).getGroup()
-            .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
+        targetPeerId = division.getGroup().getPeers()
+            .stream()
+            .filter(a -> !a.equals(curLeader)).findFirst()
             .map(RaftPeer::getId).orElse(null);
       } else {
         String ratisAddr = convertToRatisAddr(nodeId);
-        targetPeerId = server.getDivision(groupID).getGroup().getPeers()
+        targetPeerId = division.getGroup().getPeers()
             .stream()
             .filter(a -> a.getAddress().equals(ratisAddr) || a.getAddress()
                 .equals(ratisAddr.replace("127.0.0.1", "localhost")))
             .findFirst().map(RaftPeer::getId).orElse(null);
       }
-      RatisHelper.transferRatisLeadership(scm.getConfiguration(), server,
-          groupID, targetPeerId);
+      RatisHelper.transferRatisLeadership(scm.getConfiguration(),
+          division, targetPeerId);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(

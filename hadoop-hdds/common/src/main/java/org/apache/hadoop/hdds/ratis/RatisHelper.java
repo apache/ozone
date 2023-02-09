@@ -497,20 +497,18 @@ public final class RatisHelper {
    * 1. Set priority and send setConfiguration request
    * 2. Trigger transferLeadership API.
    *
-   * @param server        the Raft server
-   * @param groupId       the Raft group Id
+   * @param division      the Raft division
    * @param targetPeerId  the target expected leader
    * @throws IOException
    */
   public static void transferRatisLeadership(ConfigurationSource conf,
-      RaftServer server, RaftGroupId groupId, RaftPeerId targetPeerId)
+      RaftServer.Division division, RaftPeerId targetPeerId)
       throws IOException {
-    RaftGroup raftGroup = server.getDivision(groupId).getGroup();
+    RaftGroup raftGroup = division.getGroup();
     // TODO: use common raft client related conf
     RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
         null, raftGroup, createRetryPolicy(conf), null, conf);
-    if (!raftGroup.getPeers().stream().map(RaftPeer::getId)
-        .collect(Collectors.toSet()).contains(targetPeerId)) {
+    if (raftGroup.getPeer(targetPeerId) == null) {
       throw new IOException("Cannot choose the target leader. The expected " +
           "leader RaftPeerId is " + targetPeerId + " and the peers are " +
           raftGroup.getPeers().stream().map(RaftPeer::getId)
