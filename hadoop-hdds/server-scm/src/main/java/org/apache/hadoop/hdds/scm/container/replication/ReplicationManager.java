@@ -121,12 +121,6 @@ public class ReplicationManager implements SCMService {
   private Thread replicationMonitor;
 
   /**
-   * Flag used for checking if the ReplicationMonitor thread is running or
-   * not.
-   */
-  private volatile boolean running;
-
-  /**
    * Report object that is refreshed each time replication Manager runs.
    */
   private ReplicationManagerReport containerReport;
@@ -202,7 +196,6 @@ public class ReplicationManager implements SCMService {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
-    this.running = false;
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
     this.metrics = null;
@@ -261,7 +254,6 @@ public class ReplicationManager implements SCMService {
   public synchronized void start() {
     if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
-      running = true;
       metrics = ReplicationManagerMetrics.create(this);
       legacyReplicationManager.setMetrics(metrics);
       containerReplicaPendingOps.setReplicationMetrics(metrics);
@@ -276,25 +268,19 @@ public class ReplicationManager implements SCMService {
    *
    * @return true if running, false otherwise
    */
-  public boolean isRunning() {
-    if (!running) {
-      synchronized (this) {
-        return replicationMonitor != null
-            && replicationMonitor.isAlive();
-      }
-    }
-    return true;
+  public synchronized boolean isRunning() {
+    return replicationMonitor != null
+        && replicationMonitor.isAlive();
   }
 
   /**
    * Stops Replication Monitor thread.
    */
   public synchronized void stop() {
-    if (running) {
+    if (isRunning()) {
       LOG.info("Stopping Replication Monitor Thread.");
       underReplicatedProcessorThread.interrupt();
       overReplicatedProcessorThread.interrupt();
-      running = false;
       legacyReplicationManager.clearInflightActions();
       metrics.unRegister();
       replicationMonitor.interrupt();
@@ -662,7 +648,7 @@ public class ReplicationManager implements SCMService {
    */
   private synchronized void run() {
     try {
-      while (running) {
+      while (isRunning()) {
         processAll();
         wait(rmConf.getInterval());
       }
