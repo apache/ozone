@@ -38,7 +38,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
-import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -69,7 +68,7 @@ public class OzoneDelegationTokenSecretManager
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;
-  private final S3SecretManagerImpl s3SecretManager;
+  private final S3SecretManager s3SecretManager;
   private Thread tokenRemoverThread;
   private final long tokenRemoverScanInterval;
   private String omCertificateSerialId;
@@ -93,12 +92,12 @@ public class OzoneDelegationTokenSecretManager
         b.tokenRenewInterval, b.service, LOG);
     setCertClient(b.certClient);
     this.omServiceId = b.omServiceId;
-    currentTokens = new ConcurrentHashMap();
+    currentTokens = new ConcurrentHashMap<>();
     this.tokenRemoverScanInterval = b.tokenRemoverScanInterval;
-    this.s3SecretManager = (S3SecretManagerImpl) b.s3SecretManager;
-    this.store = new OzoneSecretStore(b.ozoneConf,
-        this.s3SecretManager.getOmMetadataManager());
+    this.s3SecretManager = b.s3SecretManager;
     this.ozoneManager = b.ozoneManager;
+    this.store = new OzoneSecretStore(b.ozoneConf,
+        this.ozoneManager.getMetadataManager());
     isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
@@ -503,7 +502,7 @@ public class OzoneDelegationTokenSecretManager
     }
     String awsSecret;
     try {
-      awsSecret = s3SecretManager.getS3UserSecretString(identifier
+      awsSecret = s3SecretManager.getSecretString(identifier
           .getAwsAccessId());
     } catch (IOException e) {
       LOG.error("Error while validating S3 identifier:{}",
