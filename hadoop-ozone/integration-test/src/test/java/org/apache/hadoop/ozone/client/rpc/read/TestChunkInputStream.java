@@ -98,7 +98,7 @@ public class TestChunkInputStream extends TestInputStreamBase {
           BYTES_PER_CHECKSUM);
 
 
-      // Read the full chunk data - 1 and verify that all chunk data is read into
+      // Read the full chunk data -1 and verify that all chunk data is read into
       // buffers. We read CHUNK_SIZE - 1 as otherwise all the buffers will be
       // released once all chunk data is read.
       readData = readDataFromChunk(chunk0Stream, 0, CHUNK_SIZE - 1);
