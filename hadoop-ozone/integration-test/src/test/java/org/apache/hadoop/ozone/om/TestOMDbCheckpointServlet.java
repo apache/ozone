@@ -409,16 +409,12 @@ public class TestOMDbCheckpointServlet {
   }
 
   @Test
-  public void testBootstrapLocking()
-      throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
-        .build();
+  public void testBootstrapLocking() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
 
     BootstrapStateHandler keyDeletingService =
-        cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
+        cluster.getOzoneManager().getKeyManager().getDeletingService();
     BootstrapStateHandler sstFilteringService =
         cluster.getOzoneManager().getKeyManager()
             .getSnapshotSstFilteringService();
@@ -429,7 +425,7 @@ public class TestOMDbCheckpointServlet {
 
     OMDBCheckpointServlet omDbCheckpointServlet = new OMDBCheckpointServlet();
 
-    OMDBCheckpointServlet spyServlet = Mockito.spy(omDbCheckpointServlet);
+    OMDBCheckpointServlet spyServlet = spy(omDbCheckpointServlet);
     ServletContext servletContext = mock(ServletContext.class);
     when(servletContext.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .thenReturn(cluster.getOzoneManager());
@@ -438,41 +434,49 @@ public class TestOMDbCheckpointServlet {
 
     spyServlet.init();
 
+    // Confirm the other processes are locked out when the bootstrap
+    //  servlet takes the lock.
     spyServlet.lockBootstrapState();
-    Future<?> kdsTest = checkLock(keyDeletingService, executorService);
-    Assert.assertThrows(TimeoutException.class,
-        () -> kdsTest.get(500, TimeUnit.MILLISECONDS));
-    Future<?> filterTest = checkLock(sstFilteringService, executorService);
-    Assert.assertThrows(TimeoutException.class,
-        () -> filterTest.get(500, TimeUnit.MILLISECONDS));
-    Future<?> differTest = checkLock(differ, executorService);
-    Assert.assertThrows(TimeoutException.class,
-        () -> differTest.get(500, TimeUnit.MILLISECONDS));
-
+    confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
+    confirmServletLocksOutOtherHandler(sstFilteringService, executorService);
+    confirmServletLocksOutOtherHandler(differ, executorService);
     spyServlet.unlockBootstrapState();
-    keyDeletingService.lockBootstrapState();
-    Future<?> servletTest1 = checkLock(spyServlet, executorService);
-    Assert.assertThrows(TimeoutException.class,
-        () ->servletTest1.get(500, TimeUnit.MILLISECONDS));
 
-    keyDeletingService.unlockBootstrapState();
-    sstFilteringService.lockBootstrapState();
-    Future<?> servletTest2 = checkLock(spyServlet, executorService);
-    Assert.assertThrows(TimeoutException.class,
-        () ->servletTest2.get(500, TimeUnit.MILLISECONDS));
-    sstFilteringService.unlockBootstrapState();
-    differ.lockBootstrapState();
+    // Confirm the bootstrap servlet is locked out when any of the other
+    //  proecesses takes the lock.
+    confirmOtherHandlerLocksOutServlet(keyDeletingService, spyServlet,
+        executorService);
+    confirmOtherHandlerLocksOutServlet(sstFilteringService, spyServlet,
+        executorService);
+    confirmOtherHandlerLocksOutServlet(differ, spyServlet,
+        executorService);
 
-    Future<?> servletTest3 = checkLock(spyServlet, executorService);
-    Assert.assertThrows(TimeoutException.class,
-        () ->servletTest3.get(500, TimeUnit.MILLISECONDS));
-
-    differ.unlockBootstrapState();
+    // Confirm that servlet takes the look when none of the other
+    //  processes have it.
     Future<?> servletTest4 = checkLock(spyServlet, executorService);
     Assert.assertNull(servletTest4.get(500, TimeUnit.MILLISECONDS));
 
     executorService.shutdownNow();
 
+  }
+
+  private void confirmServletLocksOutOtherHandler(BootstrapStateHandler handler,
+      ExecutorService executorService) {
+    Future<?> test = checkLock(handler, executorService);
+    // handler should fail to take the lock because the servlet has taken theirs
+    Assert.assertThrows(TimeoutException.class,
+         () -> test.get(500, TimeUnit.MILLISECONDS));
+  }
+
+  private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
+      BootstrapStateHandler servlet, ExecutorService executorService)
+      throws InterruptedException {
+    handler.lockBootstrapState();
+    Future<?> test = checkLock(servlet, executorService);
+    // servlet should fail to lock when other handler has taken theirs
+    Assert.assertThrows(TimeoutException.class,
+        () -> test.get(500, TimeUnit.MILLISECONDS));
+    handler.unlockBootstrapState();
   }
 
   private Future<?> checkLock(BootstrapStateHandler handler,
