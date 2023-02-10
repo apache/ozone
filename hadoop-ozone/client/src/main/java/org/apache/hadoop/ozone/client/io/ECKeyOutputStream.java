@@ -409,6 +409,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private void writeToOutputStream(ECBlockOutputStreamEntry current,
       byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
+    if (closing) {
+      throw new IOException("Stream is closing, avoid re-opening streams");
+    }
     try {
       if (!isParity) {
         // In case if exception while writing, this length will be updated back
@@ -550,7 +553,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private boolean flushStripeFromQueue() throws IOException {
     try {
       ECChunkBuffers stripe = ecStripeQueue.take();
-      while (!(stripe instanceof EOFDummyStripe)) {
+      while (!closing && !(stripe instanceof EOFDummyStripe)) {
         if (stripe instanceof CheckpointDummyStripe) {
           flushCheckpoint.set(((CheckpointDummyStripe) stripe).version);
         } else {
