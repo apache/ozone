@@ -52,6 +52,7 @@ import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -60,6 +61,7 @@ import org.apache.ratis.protocol.RoutingTable;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
@@ -487,5 +489,63 @@ public final class RatisHelper {
       builder.append(buf.readByte()).append(i % 20 == 0 ? "\n  " : ", ");
     }
     log.debug("{}: {}\n  {}", name, buf, builder);
+  }
+
+
+  /**
+   * Use raft client to send admin request, transfer the leadership.
+   * 1. Set priority and send setConfiguration request
+   * 2. Trigger transferLeadership API.
+   *
+   * @param division      the Raft division
+   * @param targetPeerId  the target expected leader
+   * @throws IOException
+   */
+  public static void transferRatisLeadership(ConfigurationSource conf,
+      RaftServer.Division division, RaftPeerId targetPeerId)
+      throws IOException {
+    RaftGroup raftGroup = division.getGroup();
+    // TODO: need a common raft client related conf.
+    RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
+        null, raftGroup, createRetryPolicy(conf), null, conf);
+    if (raftGroup.getPeer(targetPeerId) == null) {
+      throw new IOException("Cannot choose the target leader. The expected " +
+          "leader RaftPeerId is " + targetPeerId + " and the peers are " +
+          raftGroup.getPeers().stream().map(RaftPeer::getId)
+              .collect(Collectors.toList()) + ".");
+    }
+    LOG.info("Chosen the targetLeaderId {} to transfer leadership",
+        targetPeerId);
+
+    // Set priority
+    List<RaftPeer> peersWithNewPriorities = new ArrayList<>();
+    for (RaftPeer peer : raftGroup.getPeers()) {
+      peersWithNewPriorities.add(
+          RaftPeer.newBuilder(peer)
+              .setPriority(peer.getId().equals(targetPeerId) ? 2 : 1)
+              .build()
+      );
+    }
+    RaftClientReply reply;
+    // Set new configuration
+    reply = raftClient.admin().setConfiguration(peersWithNewPriorities);
+    if (reply.isSuccess()) {
+      LOG.info("Successfully set new priority for division: {}",
+          peersWithNewPriorities);
+    } else {
+      LOG.warn("Failed to set new priority for division: {}." +
+          " Ratis reply: {}", peersWithNewPriorities, reply);
+      throw new IOException(reply.getException());
+    }
+
+    // Trigger the transferLeadership
+    reply = raftClient.admin().transferLeadership(targetPeerId, 60000);
+    if (reply.isSuccess()) {
+      LOG.info("Successfully transferred leadership to {}.", targetPeerId);
+    } else {
+      LOG.warn("Failed to transfer leadership to {}. Ratis reply: {}",
+          targetPeerId, reply);
+      throw new IOException(reply.getException());
+    }
   }
 }

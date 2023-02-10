@@ -130,6 +130,8 @@ enum Type {
   ListSnapshot = 113;
   SnapshotDiff = 114;
   DeleteSnapshot = 115;
+
+  TransferLeadership = 116;
 }
 
 message OMRequest {
@@ -243,6 +245,8 @@ message OMRequest {
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
 
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 116;
+
 }
 
 message OMResponse {
@@ -348,6 +352,8 @@ message OMResponse {
   optional ListSnapshotResponse              ListSnapshotResponse          = 113;
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
   optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
+
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 116;
 }
 
 enum Status {
