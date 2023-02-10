@@ -695,6 +695,8 @@ public interface OzoneManagerProtocol
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param fromSnapshot The name of the starting snapshot
    * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
