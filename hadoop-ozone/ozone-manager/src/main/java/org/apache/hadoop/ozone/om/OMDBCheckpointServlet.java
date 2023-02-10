@@ -83,9 +83,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
   private static final String DURATION_TO_WAIT_FOR_DIRECTORY = "PT10S";
-  private BootstrapStateHandler keyDeletingService;
-  private BootstrapStateHandler sstFilteringService;
-  private BootstrapStateHandler rocksDbCheckpointDiffer;
+  private transient BootstrapStateHandler keyDeletingService;
+  private transient BootstrapStateHandler sstFilteringService;
+  private transient BootstrapStateHandler rocksDbCheckpointDiffer;
 
   @Override
   public void init() throws ServletException {

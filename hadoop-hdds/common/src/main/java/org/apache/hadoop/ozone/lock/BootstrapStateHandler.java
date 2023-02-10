@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.lock;
 
 /**
- * Manage state that is needed for bootstrapping followers
+ * Manage state that is needed for bootstrapping followers.
  */
 public interface BootstrapStateHandler {
   void lockBootstrapState() throws InterruptedException;

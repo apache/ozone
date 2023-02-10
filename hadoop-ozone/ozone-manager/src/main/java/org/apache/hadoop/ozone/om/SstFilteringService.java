@@ -153,7 +153,7 @@ public class SstFilteringService extends BackgroundService
               OM_SNAPSHOT_CHECKPOINT_DIR;
           RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
               .loadDB(ozoneManager.getConfiguration(),
-              new File(snapshotCheckpointDir), dbName, true);
+                  new File(snapshotCheckpointDir), dbName, true);
           RocksDatabase db = rdbStore.getDb();
           try {
             lockBootstrapState();
