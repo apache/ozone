@@ -39,6 +39,8 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static java.lang.String.format;
+
 /**
  * Holds the data structures which maintain the information about pipeline and
  * its state.
@@ -80,8 +82,8 @@ class PipelineStateMap {
 
     if (pipelineMap.putIfAbsent(pipeline.getId(), pipeline) != null) {
       LOG.warn("Duplicate pipeline ID detected. {}", pipeline.getId());
-      throw new IOException(String
-          .format("Duplicate pipeline ID %s detected.", pipeline.getId()));
+      throw new DuplicatedPipelineIdException(
+          format("Duplicate pipeline ID %s detected.", pipeline.getId()));
     }
     pipeline2container.put(pipeline.getId(), new TreeSet<>());
     if (pipeline.getPipelineState() == PipelineState.OPEN) {
@@ -106,9 +108,8 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (pipeline.isClosed()) {
-      LOG.warn("Adding container {} to pipeline={} in CLOSED state." +
-          " This happens only for some exceptional cases." +
-          " Check for the previous exceptions.", containerID, pipelineID);
+      throw new InvalidPipelineStateException(format(
+          "Cannot add container to pipeline=%s in closed state", pipelineID));
     }
     pipeline2container.get(pipelineID).add(containerID);
   }
@@ -154,7 +155,7 @@ class PipelineStateMap {
     Pipeline pipeline = pipelineMap.get(pipelineID);
     if (pipeline == null) {
       throw new PipelineNotFoundException(
-          String.format("%s not found", pipelineID));
+          format("%s not found", pipelineID));
     }
     return pipeline;
   }
@@ -314,7 +315,7 @@ class PipelineStateMap {
     NavigableSet<ContainerID> containerIDs = pipeline2container.get(pipelineID);
     if (containerIDs == null) {
       throw new PipelineNotFoundException(
-          String.format("%s not found", pipelineID));
+          format("%s not found", pipelineID));
     }
     return new TreeSet<>(containerIDs);
   }
@@ -334,7 +335,7 @@ class PipelineStateMap {
     Set<ContainerID> containerIDs = pipeline2container.get(pipelineID);
     if (containerIDs == null) {
       throw new PipelineNotFoundException(
-          String.format("%s not found", pipelineID));
+          format("%s not found", pipelineID));
     }
     return containerIDs.size();
   }
@@ -350,8 +351,8 @@ class PipelineStateMap {
 
     Pipeline pipeline = getPipeline(pipelineID);
     if (!pipeline.isClosed()) {
-      throw new IOException(
-          String.format("Pipeline with %s is not yet closed", pipelineID));
+      throw new InvalidPipelineStateException(
+          format("Pipeline with %s is not yet closed", pipelineID));
     }
 
     pipelineMap.remove(pipelineID);
@@ -377,7 +378,7 @@ class PipelineStateMap {
     Set<ContainerID> containerIDs = pipeline2container.get(pipelineID);
     if (containerIDs == null) {
       throw new PipelineNotFoundException(
-          String.format("%s not found", pipelineID));
+          format("%s not found", pipelineID));
     }
     containerIDs.remove(containerID);
   }
