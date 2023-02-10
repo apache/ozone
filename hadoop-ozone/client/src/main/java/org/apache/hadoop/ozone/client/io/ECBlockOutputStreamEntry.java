@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -100,6 +101,13 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
                 getBufferPool(), getConf(), getToken(), getClientMetrics());
       }
+    }
+  }
+
+  @Override
+  void cleanup(boolean invalidateClient) {
+    if (isInitialized()) {
+      IOUtils.close(LOG, blockOutputStreams);
     }
   }
 
