@@ -88,7 +88,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
@@ -443,7 +442,7 @@ public class TestOMDbCheckpointServlet {
     spyServlet.unlockBootstrapState();
 
     // Confirm the bootstrap servlet is locked out when any of the other
-    //  proecesses takes the lock.
+    //  processes takes the lock.
     confirmOtherHandlerLocksOutServlet(keyDeletingService, spyServlet,
         executorService);
     confirmOtherHandlerLocksOutServlet(sstFilteringService, spyServlet,
@@ -451,10 +450,10 @@ public class TestOMDbCheckpointServlet {
     confirmOtherHandlerLocksOutServlet(differ, spyServlet,
         executorService);
 
-    // Confirm that servlet takes the look when none of the other
+    // Confirm that servlet takes the lock when none of the other
     //  processes have it.
-    Future<?> servletTest4 = checkLock(spyServlet, executorService);
-    Assert.assertNull(servletTest4.get(500, TimeUnit.MILLISECONDS));
+    Future<?> servletTest = checkLock(spyServlet, executorService);
+    Assert.assertNull(servletTest.get(500, TimeUnit.MILLISECONDS));
 
     executorService.shutdownNow();
 
