@@ -439,7 +439,6 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private void markStreamClosed() {
-    blockOutputStreamEntryPool.cleanup();
     closing = true;
   }
 
