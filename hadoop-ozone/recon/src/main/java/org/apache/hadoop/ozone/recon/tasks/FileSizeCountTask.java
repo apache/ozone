@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -122,28 +123,46 @@ public class FileSizeCountTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent<String, ?> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
       if (!taskTables.contains(omdbUpdateEvent.getTable())) {
         continue;
       }
       String updatedKey = omdbUpdateEvent.getKey();
-      OmKeyInfo omKeyInfo = omdbUpdateEvent.getValue();
+
+      // Get the updated and old OM Key Info objects
+      Object omKeyInfo = omdbUpdateEvent.getValue();
+      Object oldOmKeyInfo = omdbUpdateEvent.getOldValue();
+
+      OmKeyInfo keyInfo, oldKeyInfo;
+      // Handle the case where the updated OM Key Info is a RepeatedOmKeyInfo object
+      if (omKeyInfo instanceof RepeatedOmKeyInfo) {
+        // Handle RepeatedOmKeyInfo object
+        RepeatedOmKeyInfo repeatedKeyInfo = (RepeatedOmKeyInfo) omKeyInfo;
+        keyInfo = repeatedKeyInfo.getOmKeyInfoList().get(0);
+        oldKeyInfo = repeatedKeyInfo.getOmKeyInfoList().get(0);
+      }
+      // Handle the case where the updated OM Key Info is an OmKeyInfo object
+      else {
+        // Handle OmKeyInfo object
+        keyInfo = (OmKeyInfo) omKeyInfo;
+        oldKeyInfo = (OmKeyInfo) oldOmKeyInfo;
+      }
 
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+          handlePutKeyEvent(keyInfo, fileSizeCountMap);
           break;
 
         case DELETE:
-          handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
+          handleDeleteKeyEvent(updatedKey, keyInfo, fileSizeCountMap);
           break;
 
         case UPDATE:
-          handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue(),
+          handleDeleteKeyEvent(updatedKey, oldKeyInfo,
               fileSizeCountMap);
-          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+          handlePutKeyEvent(keyInfo, fileSizeCountMap);
           break;
 
         default: LOG.trace("Skipping DB update event : {}",
