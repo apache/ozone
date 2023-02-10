@@ -1216,7 +1216,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
             snapshotDiffRequest.getBucketName(),
             snapshotDiffRequest.getFromSnapshot(),
-            snapshotDiffRequest.getToSnapshot()).toProtobuf()).build();
+            snapshotDiffRequest.getToSnapshot(),
+            snapshotDiffRequest.getToken(),
+            snapshotDiffRequest.getPageSize()).toProtobuf()).build();
   }
 
 

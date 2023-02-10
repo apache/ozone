@@ -701,7 +701,9 @@ public interface OzoneManagerProtocol
   default SnapshotDiffReport snapshotDiff(String volumeName,
                                           String bucketName,
                                           String fromSnapshot,
-                                          String toSnapshot)
+                                          String toSnapshot,
+                                          String token,
+                                          int pageSize)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

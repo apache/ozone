@@ -4381,10 +4381,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public SnapshotDiffReport snapshotDiff(String volume, String bucket,
-                                         String fromSnapshot, String toSnapshot)
+                                         String fromSnapshot, String toSnapshot,
+                                         String token, int pageSize)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot);
+        fromSnapshot, toSnapshot, token, pageSize);
   }
 
   @Override // ReconfigureProtocol

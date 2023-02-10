@@ -562,8 +562,10 @@ public class ObjectStore {
   }
 
   public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                         String fromSnapshot, String toSnapshot)
+                                         String fromSnapshot, String toSnapshot,
+                                         String token, int pageSize)
       throws IOException {
-    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot);
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize);
   }
 }

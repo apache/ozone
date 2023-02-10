@@ -1190,16 +1190,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                         String fromSnapshot, String toSnapshot)
-      throws IOException {
+  public SnapshotDiffReport snapshotDiff(String volumeName,
+                                         String bucketName,
+                                         String fromSnapshot,
+                                         String toSnapshot,
+                                         String token,
+                                         int pageSize) throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setFromSnapshot(fromSnapshot)
-            .setToSnapshot(toSnapshot);
+            .setToSnapshot(toSnapshot)
+            .setPageSize(pageSize);
+
+    if (!StringUtils.isBlank(token)) {
+      requestBuilder.setToken(token);
+    }
 
     final OMRequest omRequest = createOMRequest(Type.SnapshotDiff)
         .setSnapshotDiffRequest(requestBuilder)

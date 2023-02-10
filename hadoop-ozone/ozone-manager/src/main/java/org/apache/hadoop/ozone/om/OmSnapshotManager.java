@@ -242,10 +242,13 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
+  //TODO: Will pass token and page size to snapshotDiffManager in HDDS-7548
   public SnapshotDiffReport getSnapshotDiffReport(final String volume,
                                                   final String bucket,
                                                   final String fromSnapshot,
-                                                  final String toSnapshot)
+                                                  final String toSnapshot,
+                                                  final String token,
+                                                  final int pageSize)
       throws IOException {
     // Validate fromSnapshot and toSnapshot
     final SnapshotInfo fsInfo = getSnapshotInfo(volume, bucket, fromSnapshot);

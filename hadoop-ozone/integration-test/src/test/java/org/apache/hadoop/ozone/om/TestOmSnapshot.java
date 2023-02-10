@@ -443,7 +443,8 @@ public class TestOmSnapshot {
     // Do nothing, take another snapshot
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap2);
-    SnapshotDiffReport diff1 = store.snapshotDiff(volume, bucket, snap1, snap2);
+    SnapshotDiffReport diff1 = store.snapshotDiff(volume, bucket, snap1, snap2,
+        null, 0);
     Assert.assertTrue(diff1.getDiffList().isEmpty());
     // Create Key2 and delete Key1, take snapshot
     String key2 = "key-2-";
@@ -452,7 +453,8 @@ public class TestOmSnapshot {
     String snap3 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap3);
     // Diff should have 2 entries
-    SnapshotDiffReport diff2 = store.snapshotDiff(volume, bucket, snap2, snap3);
+    SnapshotDiffReport diff2 = store.snapshotDiff(volume, bucket, snap2, snap3,
+        null, 0);
     Assert.assertEquals(2, diff2.getDiffList().size());
     Assert.assertTrue(diff2.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
@@ -466,7 +468,8 @@ public class TestOmSnapshot {
     bucket1.renameKey(key2, key2Renamed);
     String snap4 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap4);
-    SnapshotDiffReport diff3 = store.snapshotDiff(volume, bucket, snap3, snap4);
+    SnapshotDiffReport diff3 = store.snapshotDiff(volume, bucket, snap3, snap4,
+        null, 0);
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
@@ -478,7 +481,8 @@ public class TestOmSnapshot {
     bucket1.createDirectory(dir1);
     String snap5 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap5);
-    SnapshotDiffReport diff4 = store.snapshotDiff(volume, bucket, snap4, snap5);
+    SnapshotDiffReport diff4 = store.snapshotDiff(volume, bucket, snap4, snap5,
+        null, 0);
     Assert.assertEquals(1, diff4.getDiffList().size());
     // for non-fso, directories are a special type of key with "/" appended
     // at the end.
@@ -508,11 +512,11 @@ public class TestOmSnapshot {
     // Destination snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, snap2));
+            () -> store.snapshotDiff(volume, bucket, snap1, snap2, null, 0));
     // From snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap2, snap1));
+            () -> store.snapshotDiff(volume, bucket, snap2, snap1, null, 0));
   }
 
   @Test
@@ -537,15 +541,15 @@ public class TestOmSnapshot {
     // Bucket is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2));
+            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2, null, 0));
     // Volume is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1));
+            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1, null, 0));
     // Both volume and bucket are nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1));
+            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1, null, 0));
   }
 
   @Test
@@ -567,17 +571,17 @@ public class TestOmSnapshot {
     // Destination snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, nullstr));
+            () -> store.snapshotDiff(volume, bucket, snap1, nullstr, null, 0));
     // From snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, nullstr, snap1));
+            () -> store.snapshotDiff(volume, bucket, nullstr, snap1, null, 0));
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(volume, nullstr, snap1, snap2));
+            () -> store.snapshotDiff(volume, nullstr, snap1, snap2, null, 0));
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2));
+            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2, null, 0));
   }
 
   private String createSnapshot(String volName, String buckName)

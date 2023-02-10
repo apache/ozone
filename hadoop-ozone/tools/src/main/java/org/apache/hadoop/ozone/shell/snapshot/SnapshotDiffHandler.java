@@ -45,6 +45,15 @@ public class SnapshotDiffHandler extends Handler {
       index = "2")
   private String toSnapshot;
 
+  // TODO: Make token and pageSize optional.
+  @CommandLine.Parameters(description = "token",
+      index = "3")
+  private String token;
+
+  @CommandLine.Parameters(description = "page size",
+      index = "4")
+  private int pageSize;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -61,7 +70,8 @@ public class SnapshotDiffHandler extends Handler {
 
     try (PrintStream stream = out()) {
       stream.print(client.getObjectStore()
-          .snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
+          .snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+              token, pageSize));
     }
   }
 }

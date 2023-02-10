@@ -629,8 +629,10 @@ public class ClientProtocolStub implements ClientProtocol {
     return null;
   }
 
+  @Override
   public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                         String fromSnapshot, String toSnapshot)
+                                         String fromSnapshot, String toSnapshot,
+                                         String token, int pageSize)
       throws IOException {
     return null;
   }
