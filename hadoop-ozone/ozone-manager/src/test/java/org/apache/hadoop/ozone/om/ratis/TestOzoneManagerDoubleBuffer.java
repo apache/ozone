@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,7 +53,7 @@ import static org.mockito.Mockito.when;
  * This class tests snapshot aware OzoneManagerDoubleBuffer flushing logic.
  */
 class TestOzoneManagerDoubleBuffer {
-    private OzoneManagerDoubleBuffer doubleBuffer;
+  private OzoneManagerDoubleBuffer doubleBuffer;
   private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =

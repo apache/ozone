@@ -21,9 +21,6 @@ package org.apache.hadoop.ozone.om;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
@@ -35,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,10 +118,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
         allowedGroups,
         om.isSpnegoEnabled());
 
-     keyDeletingService = om.getKeyManager().getDeletingService();
-     sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
-     rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
-         .getRocksDBCheckpointDiffer();
+    keyDeletingService = om.getKeyManager().getDeletingService();
+    sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
+    rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
+        .getRocksDBCheckpointDiffer();
   }
 
   @Override

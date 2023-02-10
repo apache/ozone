@@ -100,7 +100,6 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -487,7 +486,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, boolean readOnly, boolean enableCompactionLog) throws IOException {
+      String dbName, boolean readOnly, boolean enableCompactionLog)
+      throws IOException {
 
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);

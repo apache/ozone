@@ -188,10 +188,11 @@ public class DBCheckpointServlet extends HttpServlet {
       }
     }
   }
+
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest ignoredRequest,
                                   OutputStream destination)
-      throws IOException, InterruptedException{
+      throws IOException, InterruptedException {
     writeDBCheckpointToStream(checkpoint, destination);
   }
 

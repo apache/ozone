@@ -567,7 +567,8 @@ public class TestOmSnapshotFileSystem {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
-    String snapshotDirName = getSnapshotPath(conf, snapshotInfo);
+    String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
+        OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
         1000, 120000);
 

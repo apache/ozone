@@ -169,9 +169,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final long maxAllowedTimeInDag;
   private final Semaphore bootstrapStateLock = new Semaphore(1);
 
-  private static int instanceCount;
-  private boolean closed = false;
-
   /**
    * Constructor.
    * Note that previous compaction logs are loaded by RDBStore after this
@@ -192,10 +189,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                                  File activeDBLocation,
                                  long maxTimeAllowedForSnapshotInDagInMs,
                                  long pruneCompactionDagDaemonRunIntervalInMs) {
-    instanceCount++;
-    if (instanceCount > 1 && !metadataDir.contains("integration-test/target/test-dir/MiniOzoneClusterImpl")) {
-      throw new RuntimeException("too many rocksdb instances");
-    }
     this.compactionLogDir =
         createCompactionLogDir(metadataDir, compactionLogDirName);
     this.sstBackupDir = Paths.get(metadataDir, sstBackupDir) + "/";
@@ -315,10 +308,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public void close() throws Exception {
     if (executor != null) {
       executor.shutdown();
-    }
-    if (!closed) {
-      instanceCount--;
-      closed = true;
     }
   }
 

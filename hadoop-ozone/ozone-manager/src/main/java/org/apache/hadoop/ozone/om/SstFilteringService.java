@@ -68,7 +68,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMI
  * to the bucket on which the snapshot was taken.
  */
 public class SstFilteringService extends BackgroundService
-    implements BootstrapStateHandler{
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SstFilteringService.class);
@@ -152,8 +152,8 @@ public class SstFilteringService extends BackgroundService
           String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
               OM_SNAPSHOT_CHECKPOINT_DIR;
           RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(), new File(snapshotCheckpointDir),
-                  dbName, true);
+              .loadDB(ozoneManager.getConfiguration(),
+              new File(snapshotCheckpointDir), dbName, true);
           RocksDatabase db = rdbStore.getDb();
           try {
             lockBootstrapState();

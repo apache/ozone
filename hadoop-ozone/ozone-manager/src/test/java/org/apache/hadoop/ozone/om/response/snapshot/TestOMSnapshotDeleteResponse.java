@@ -40,9 +40,6 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
 /**
  * This class tests OMSnapshotDeleteResponse.
