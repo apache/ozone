@@ -411,7 +411,11 @@ public class TestOMDbCheckpointServlet {
   @Test
   public void testBootstrapLocking()
       throws Exception {
-    setupCluster();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+
     BootstrapStateHandler keyDeletingService =
         cluster.getOzoneManager().getKeyManager()
             .getDeletingService();
@@ -435,20 +439,53 @@ public class TestOMDbCheckpointServlet {
     spyServlet.init();
 
     spyServlet.lockBootstrapState();
-    Future<?> testJob = executorService.submit(() -> {
-      try {
-        keyDeletingService.lockBootstrapState();
-        keyDeletingService.unlockBootstrapState();
-      } catch (InterruptedException e) {
-      }
-    });
+    Future<?> kdsTest = checkLock(keyDeletingService, executorService);
     Assert.assertThrows(TimeoutException.class,
-        () -> testJob.get(5000, TimeUnit.MILLISECONDS));
+        () -> kdsTest.get(500, TimeUnit.MILLISECONDS));
+    Future<?> filterTest = checkLock(sstFilteringService, executorService);
+    Assert.assertThrows(TimeoutException.class,
+        () -> filterTest.get(500, TimeUnit.MILLISECONDS));
+    Future<?> differTest = checkLock(differ, executorService);
+    Assert.assertThrows(TimeoutException.class,
+        () -> differTest.get(500, TimeUnit.MILLISECONDS));
+
+    spyServlet.unlockBootstrapState();
+    keyDeletingService.lockBootstrapState();
+    Future<?> servletTest1 = checkLock(spyServlet, executorService);
+    Assert.assertThrows(TimeoutException.class,
+        () ->servletTest1.get(500, TimeUnit.MILLISECONDS));
+
+    keyDeletingService.unlockBootstrapState();
+    sstFilteringService.lockBootstrapState();
+    Future<?> servletTest2 = checkLock(spyServlet, executorService);
+    Assert.assertThrows(TimeoutException.class,
+        () ->servletTest2.get(500, TimeUnit.MILLISECONDS));
+    sstFilteringService.unlockBootstrapState();
+    differ.lockBootstrapState();
+
+    Future<?> servletTest3 = checkLock(spyServlet, executorService);
+    Assert.assertThrows(TimeoutException.class,
+        () ->servletTest3.get(500, TimeUnit.MILLISECONDS));
+
+    differ.unlockBootstrapState();
+    Future<?> servletTest4 = checkLock(spyServlet, executorService);
+    Assert.assertNull(servletTest4.get(500, TimeUnit.MILLISECONDS));
+
     executorService.shutdownNow();
 
   }
 
+  private Future<?> checkLock(BootstrapStateHandler handler,
+      ExecutorService executorService) {
+    return executorService.submit(() -> {
+      try {
+        handler.lockBootstrapState();
+        handler.unlockBootstrapState();
+      } catch (InterruptedException e) {
+      }
+    });
 
+  }
 
   private void prepSnapshotData() throws Exception {
     setupCluster();
