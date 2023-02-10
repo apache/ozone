@@ -292,4 +292,43 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     Assert.assertEquals(1,
         report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
   }
+
+  @Test
+  public void shouldQueueForOverReplicationOnlyWhenSafe() {
+    ContainerInfo container =
+        createContainerInfo(repConfig, 1L, HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica mismatchedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED);
+    replicas.add(mismatchedReplica);
+    replicas.add(unhealthyReplica);
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+
+    ContainerHealthResult.OverReplicatedHealthResult
+        result = (ContainerHealthResult.OverReplicatedHealthResult)
+        handler.checkReplication(requestBuilder.build());
+
+    Assert.assertEquals(ContainerHealthResult.HealthState.OVER_REPLICATED,
+        result.getHealthState());
+    Assert.assertEquals(1, result.getExcessRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+
+    // not safe for over replication because we don't have 3 matching replicas
+    Assert.assertFalse(result.isSafelyOverReplicated());
+
+    Assert.assertTrue(handler.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(1,
+        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+  }
 }

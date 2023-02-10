@@ -90,19 +90,20 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
+      } else if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        unhealthyReplicaCount++;
+      } else if (!ReplicationManager.compareState(container.getState(),
+          cr.getState())) {
+        /*
+        Replica's state is not UNHEALTHY, but it doesn't match the
+        container's state. For example, a CLOSING replica of a CLOSED container.
+         */
+        healthyReplicaCount++;
+        misMatchedReplicaCount++;
       } else {
-        if (!ReplicationManager.compareState(container.getState(),
-            cr.getState())) {
-          if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-            unhealthyReplicaCount++;
-          } else {
-            healthyReplicaCount++;
-            misMatchedReplicaCount++;
-          }
-        } else {
-          healthyReplicaCount++;
-          matchingReplicaCount++;
-        }
+        // replica's state exactly matches container's state
+        healthyReplicaCount++;
+        matchingReplicaCount++;
       }
     }
   }
@@ -168,19 +169,20 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         decommissionCount++;
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
+      } else if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        unhealthyReplicaCount++;
+      } else if (!ReplicationManager.compareState(container.getState(),
+          cr.getState())) {
+        /*
+        Replica's state is not UNHEALTHY, but it doesn't match the
+        container's state. For example, a CLOSING replica of a CLOSED container.
+         */
+        healthyReplicaCount++;
+        misMatchedReplicaCount++;
       } else {
-        if (!ReplicationManager.compareState(container.getState(),
-            cr.getState())) {
-          if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-            unhealthyReplicaCount++;
-          } else {
-            healthyReplicaCount++;
-            misMatchedReplicaCount++;
-          }
-        } else {
-          healthyReplicaCount++;
-          matchingReplicaCount++;
-        }
+        // replica's state exactly matches container's state
+        healthyReplicaCount++;
+        matchingReplicaCount++;
       }
     }
   }
@@ -191,7 +193,11 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * their state is not UNHEALTHY (also called mismatched replicas).
    * For example, consider a CLOSED container with the following replicas:
    * {CLOSED, CLOSING, OPEN, CLOSED, UNHEALTHY}
-   * In this case, healthy replica count = 3 = 1 (CLOSED) + 2 (CLOSING, OPEN)
+   * In this case, healthy replica count equals 3. Calculation:
+   * 1 CLOSED -> 1 matching replica.
+   * 1 OPEN, 1 CLOSING -> 2 mismatched replicas.
+   * 1 UNHEALTHY -> 1 unhealthy replica. Not counted as healthy.
+   * Total healthy replicas = 3 = 1 matching + 2 mismatched replicas
    */
   public int getHealthyReplicaCount() {
     return healthyReplicaCount + healthyReplicaCountAdapter();
@@ -430,6 +436,13 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
+   * @return true if the container is under replicated, false otherwise
+   */
+  public boolean isUnderReplicated() {
+    return !isSufficientlyReplicated();
+  }
+
+  /**
    * Return true if the container is over replicated. Decommission and
    * maintenance containers are ignored for this check.
    * The check ignores inflight additions, as they may fail, but it does
@@ -453,6 +466,21 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    */
   public boolean isOverReplicated(boolean includePendingDelete) {
     return getExcessRedundancy(includePendingDelete) > 0;
+  }
+
+  /**
+   * A container is safely over replicated if:
+   * 1. It is over replicated.
+   * 2. Has at least replication factor number of matching replicas.
+   * 3. # matching replicas - replication factor >= pending deletes.
+   */
+  public boolean isSafelyOverReplicated() {
+    if (!isOverReplicated(true)) {
+      return false;
+    }
+
+    return getMatchingReplicaCount() >= repFactor &&
+        getMatchingReplicaCount() - repFactor >= inFlightDel;
   }
 
   /**

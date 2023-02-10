@@ -92,7 +92,7 @@ public class RatisUnderReplicationHandler
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated Ratis container {}", containerInfo);
 
-    RatisContainerReplicaCount replicaCount =
+    RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
             minHealthyForMaintenance, true);
 
@@ -102,13 +102,13 @@ public class RatisUnderReplicationHandler
 
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
-    if (!verifyUnderReplication(replicaCount, withoutUnhealthy)) {
+    if (!verifyUnderReplication(withUnhealthy, withoutUnhealthy)) {
       return Collections.emptySet();
     }
 
     // find sources that can provide replicas
     List<DatanodeDetails> sourceDatanodes =
-        getSources(replicaCount, pendingOps);
+        getSources(withUnhealthy, pendingOps);
     if (sourceDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no CLOSED, QUASI_CLOSED" +
           " or UNHEALTHY replicas were found.", containerInfo);
@@ -117,7 +117,7 @@ public class RatisUnderReplicationHandler
 
     // find targets to send replicas to
     List<DatanodeDetails> targetDatanodes =
-        getTargets(replicaCount, pendingOps);
+        getTargets(withUnhealthy, pendingOps);
     if (targetDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no eligible targets " +
           "were found.", containerInfo);
@@ -133,16 +133,19 @@ public class RatisUnderReplicationHandler
    * pending adds. Note that the container might be under replicated but
    * unrecoverable (no replicas), in which case this returns false.
    *
-   * @param replicaCount RatisContainerReplicaCount object to check
+   * @param withUnhealthy RatisContainerReplicaCount object to check with
+   * considerHealthy flag true
+   * @param withoutUnhealthy RatisContainerReplicaCount object to check with
+   * considerHealthy flag false
    * @return true if the container is under replicated, false if the
    * container is sufficiently replicated or unrecoverable.
    */
   private boolean verifyUnderReplication(
-      RatisContainerReplicaCount replicaCount,
+      RatisContainerReplicaCount withUnhealthy,
       RatisContainerReplicaCount withoutUnhealthy) {
     if (withoutUnhealthy.isSufficientlyReplicated()) {
       LOG.info("The container {} state changed and it's not under " +
-          "replicated any more.", replicaCount.getContainer().containerID());
+          "replicated any more.", withUnhealthy.getContainer().containerID());
       return false;
     }
     if (withoutUnhealthy.isSufficientlyReplicated(true)) {
@@ -152,16 +155,16 @@ public class RatisUnderReplicationHandler
           withoutUnhealthy.getReplicas());
       return false;
     }
-    if (replicaCount.getReplicas().isEmpty()) {
+    if (withUnhealthy.getReplicas().isEmpty()) {
       LOG.warn("Container {} does not have any replicas and is unrecoverable" +
-          ".", replicaCount.getContainer());
+          ".", withUnhealthy.getContainer());
       return false;
     }
-    if (replicaCount.isSufficientlyReplicated(true) &&
-        replicaCount.getHealthyReplicaCount() == 0) {
+    if (withUnhealthy.isSufficientlyReplicated(true) &&
+        withUnhealthy.getHealthyReplicaCount() == 0) {
       LOG.info("Container {} with only UNHEALTHY replicas [{}] will be " +
               "sufficiently replicated after pending adds are created.",
-          replicaCount.getContainer(), replicaCount.getReplicas());
+          withUnhealthy.getContainer(), withUnhealthy.getReplicas());
       return false;
     }
     return true;

@@ -57,7 +57,8 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
 
     /*
     First, verify there's perfect replication without considering UNHEALTHY
-    replicas.
+    replicas. If not, we return false. Replication issues without UNHEALTHY
+    replicas should be solved first.
      */
     if (!verifyPerfectReplication(request)) {
       return false;
@@ -69,7 +70,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
             request.getContainerReplicas(), request.getPendingOps(),
             request.getMaintenanceRedundancy(), true);
     if (replicaCount.getUnhealthyReplicaCount() == 0) {
-      LOG.info("No UNHEALTHY replicas are present for container {} with " +
+      LOG.debug("No UNHEALTHY replicas are present for container {} with " +
           "replicas [{}].", container, request.getContainerReplicas());
       return false;
     } else {
@@ -111,7 +112,8 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
           overHealth.isReplicatedOkAfterPending(),
           overHealth.hasMismatchedReplicas());
 
-      if (!overHealth.isReplicatedOkAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending() &&
+          overHealth.isSafelyOverReplicated()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
       return true;
@@ -135,14 +137,14 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     if (replicaCountWithoutUnhealthy.getHealthyReplicaCount() == 0) {
       return true;
     }
-    if (!replicaCountWithoutUnhealthy.isSufficientlyReplicated() ||
+    if (replicaCountWithoutUnhealthy.isUnderReplicated() ||
         replicaCountWithoutUnhealthy.isOverReplicated()) {
-      LOG.info("Checking replication for container {} without considering " +
-              "UNHEALTHY replicas. isSufficientlyReplicated is [{}]. " +
+      LOG.debug("Checking replication for container {} without considering " +
+              "UNHEALTHY replicas. isUnderReplicated is [{}]. " +
               "isOverReplicated is [{}]. Returning false because there should" +
               " be perfect replication for this handler to work.",
           request.getContainerInfo(),
-          replicaCountWithoutUnhealthy.isSufficientlyReplicated(),
+          replicaCountWithoutUnhealthy.isUnderReplicated(),
           replicaCountWithoutUnhealthy.isOverReplicated());
       return false;
     }
@@ -184,6 +186,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
               repOkWithPending);
       result.setHasMismatchedReplicas(
           replicaCount.getMisMatchedReplicaCount() > 0);
+      result.setIsSafelyOverReplicated(replicaCount.isSafelyOverReplicated());
       return result;
     }
 
