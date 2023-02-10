@@ -480,17 +480,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false, true);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
       String dbName, boolean readOnly) throws IOException {
-    return loadDB(configuration, metaDir, dbName, readOnly, false);
-  }
-
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, boolean readOnly, boolean enableCompactionLog)
-      throws IOException {
 
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
@@ -501,7 +495,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
-        .setEnableCompactionLog(enableCompactionLog);
+        .setEnableCompactionLog(true);
     DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
     return dbStore;
   }

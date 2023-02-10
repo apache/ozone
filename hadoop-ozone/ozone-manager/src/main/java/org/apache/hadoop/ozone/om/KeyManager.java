@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 
 import java.io.IOException;
@@ -155,7 +154,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the instance of Deleting Service.
    * @return Background service.
    */
-  KeyDeletingService getDeletingService();
+  BackgroundService getDeletingService();
 
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
@@ -248,5 +247,5 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the instance of Snapshot SST Filtering service.
    * @return Background service.
    */
-  SstFilteringService getSnapshotSstFilteringService();
+  BackgroundService getSnapshotSstFilteringService();
 }
