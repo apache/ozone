@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -33,10 +33,12 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
@@ -115,7 +117,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Ozone metadata manager interface.
  */
-public class OmMetadataManagerImpl implements OMMetadataManager {
+public class OmMetadataManagerImpl implements OMMetadataManager,
+    S3SecretStore, S3SecretCache {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
@@ -249,7 +252,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table deletedTable;
   private Table openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
-  private Table s3SecretTable;
+  private Table<String, S3SecretValue> s3SecretTable;
   private Table dTokenTable;
   private Table prefixTable;
   private Table dirTable;
@@ -1535,8 +1538,54 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public Table<String, S3SecretValue> getS3SecretTable() {
-    return s3SecretTable;
+  public void storeSecret(String kerberosId, S3SecretValue secret)
+      throws IOException {
+    s3SecretTable.put(kerberosId, secret);
+  }
+
+  @Override
+  public S3SecretValue getSecret(String kerberosID) throws IOException {
+    return s3SecretTable.get(kerberosID);
+  }
+
+  @Override
+  public void revokeSecret(String kerberosId) throws IOException {
+    s3SecretTable.delete(kerberosId);
+  }
+
+  @Override
+  public void put(String kerberosId, S3SecretValue secretValue, long txId) {
+    s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
+        new CacheValue<>(Optional.of(secretValue), txId));
+  }
+
+  @Override
+  public void invalidate(String id, long txId) {
+    s3SecretTable.addCacheEntry(new CacheKey<>(id),
+        new CacheValue<>(Optional.absent(), txId));
+  }
+
+  @Override
+  public S3Batcher batcher() {
+    return new S3Batcher() {
+      @Override
+      public void addWithBatch(AutoCloseable batchOperator,
+                               String id, S3SecretValue s3SecretValue)
+          throws IOException {
+        if (batchOperator instanceof BatchOperation) {
+          s3SecretTable.putWithBatch((BatchOperation) batchOperator,
+              id, s3SecretValue);
+        }
+      }
+
+      @Override
+      public void deleteWithBatch(AutoCloseable batchOperator, String id)
+          throws IOException {
+        if (batchOperator instanceof BatchOperation) {
+          s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
+        }
+      }
+    };
   }
 
   @Override

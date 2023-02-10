@@ -1427,6 +1427,70 @@ public class TestLegacyReplicationManager {
           ReplicationManagerReport.HealthState.UNHEALTHY));
     }
 
+    /**
+     * If a QUASI_CLOSED container and a QUASI_CLOSED replica have the same
+     * sequence ID, it's not guaranteed that this is the latest sequence ID.
+     * Such a replica should not be closed.
+     */
+    @Test
+    public void testQuasiClosedContainerAndReplicaWithSameSequenceID()
+        throws IOException, TimeoutException {
+      /*
+      Create an under replicated QUASI_CLOSED container with 2 QUASI_CLOSED
+      replicas. All have the container's sequence ID.
+       */
+      final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
+      container.setUsedBytes(100);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica replicaOne = getReplicas(
+          id, QUASI_CLOSED, container.getSequenceId(), originNodeId,
+          randomDatanodeDetails());
+      final ContainerReplica replicaTwo = getReplicas(
+          id, QUASI_CLOSED, container.getSequenceId(), originNodeId,
+          randomDatanodeDetails());
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, replicaOne);
+      containerStateManager.updateContainerReplica(id, replicaTwo);
+
+      final int currentCloseCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
+      final int currentReplicateCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+      final long currentBytesToReplicate = replicationManager.getMetrics()
+          .getNumReplicationBytesTotal();
+
+      /*
+      One of the quasi closed replicas should be replicated and no close
+      commands should be sent.
+       */
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentCloseCommandCount,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.closeContainerCommand));
+
+      // One replication command should be sent
+      Assertions.assertEquals(currentReplicateCommandCount + 1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+      Assertions.assertEquals(currentReplicateCommandCount + 1,
+          replicationManager.getMetrics().getNumReplicationCmdsSent());
+      Assertions.assertEquals(
+          currentBytesToReplicate + container.getUsedBytes(),
+          replicationManager.getMetrics().getNumReplicationBytesTotal());
+      Assertions.assertEquals(1, getInflightCount(InflightType.REPLICATION));
+      Assertions.assertEquals(1, replicationManager.getMetrics()
+          .getInflightReplication());
+
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.QUASI_CLOSED));
+      Assertions.assertEquals(1, report.getStat(
+          ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+      Assertions.assertEquals(1, report.getStat(
+          ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    }
 
     /**
      * 3 quasi-closed replicas.

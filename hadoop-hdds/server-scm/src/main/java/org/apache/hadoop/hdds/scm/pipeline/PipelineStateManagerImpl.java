@@ -96,10 +96,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     try {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
       if (pipelineStore != null) {
-        transactionBuffer
-            .addToBuffer(pipelineStore, pipeline.getId(), pipeline);
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
+        transactionBuffer
+            .addToBuffer(pipelineStore, pipeline.getId(), pipeline);
         LOG.info("Created pipeline {}.", pipeline);
       }
     } finally {
