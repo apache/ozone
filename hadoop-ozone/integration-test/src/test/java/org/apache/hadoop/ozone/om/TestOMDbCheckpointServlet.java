@@ -40,6 +40,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -53,6 +57,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -83,6 +88,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
+import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
@@ -90,7 +96,9 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -398,6 +406,46 @@ public class TestOMDbCheckpointServlet {
         testDirLength);
 
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
+  }
+
+  @Test
+  public void testBootstrapLocking()
+      throws Exception {
+    setupCluster();
+    BootstrapStateHandler keyDeletingService =
+        cluster.getOzoneManager().getKeyManager()
+            .getDeletingService();
+    BootstrapStateHandler sstFilteringService =
+        cluster.getOzoneManager().getKeyManager()
+            .getSnapshotSstFilteringService();
+    BootstrapStateHandler differ =
+        cluster.getOzoneManager().getMetadataManager()
+            .getStore().getRocksDBCheckpointDiffer();
+    ExecutorService executorService = Executors.newCachedThreadPool();
+
+    OMDBCheckpointServlet omDbCheckpointServlet = new OMDBCheckpointServlet();
+
+    OMDBCheckpointServlet spyServlet = Mockito.spy(omDbCheckpointServlet);
+    ServletContext servletContext = mock(ServletContext.class);
+    when(servletContext.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .thenReturn(cluster.getOzoneManager());
+    doReturn(servletContext).when(spyServlet).getServletContext();
+
+
+    spyServlet.init();
+
+    spyServlet.lockBootstrapState();
+    Future<?> testJob = executorService.submit(() -> {
+      try {
+        keyDeletingService.lockBootstrapState();
+        keyDeletingService.unlockBootstrapState();
+      } catch (InterruptedException e) {
+      }
+    });
+    Assert.assertThrows(TimeoutException.class,
+        () -> testJob.get(5000, TimeUnit.MILLISECONDS));
+    executorService.shutdownNow();
+
   }
 
 
