@@ -71,7 +71,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
       required = true)
   private String omServiceId;
 
-  @CommandLine.Option(names = {"-nodeid"},
+  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
       description = "NodeID of the OM to be decommissioned.",
       required = true)
   private String decommNodeId;
