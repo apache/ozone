@@ -84,17 +84,19 @@ public class FileSizeCountTask implements ReconOmTask {
     LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
 
     // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
-    reprocessBucket(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager,
+    boolean statusFSO = reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager,
         fileSizeCountMap);
     // Call reprocessBucket method for LEGACY bucket layout
-    reprocessBucket(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap);
-
+    boolean statusOBS = reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap);
+    if(statusFSO && statusOBS){
+      return new ImmutablePair<>(getTaskName(), false);
+    }
     writeCountsToDB(true, fileSizeCountMap);
     LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  private void reprocessBucket(BucketLayout bucketLayout,
+  private boolean reprocessBucketLayout(BucketLayout bucketLayout,
                                OMMetadataManager omMetadataManager,
                                Map<FileSizeCountKey, Long> fileSizeCountMap) {
     Table<String, OmKeyInfo> omKeyInfoTable =
@@ -113,7 +115,9 @@ public class FileSizeCountTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate File Size Count for " + bucketLayout +
           " in Recon DB. ", ioEx);
+      return false;
     }
+    return true;
   }
 
   @Override
