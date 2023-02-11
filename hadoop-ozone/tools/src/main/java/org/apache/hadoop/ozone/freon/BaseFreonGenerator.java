@@ -35,6 +35,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -106,9 +107,9 @@ public class BaseFreonGenerator {
   private boolean timebase;
 
   @Option(names = {"--runtime"},
-      description = "Tell freon to terminate processing after"
-          + "the specified period of time in seconds.")
-  private long runtime;
+      description = "Duration to run the test."
+          + " Can be '30s', '5m', '1h', '7d' etc..")
+  private String runtime;
 
   @Option(names = {"-f", "--fail-at-end"},
       description = "If turned on, all the tasks will be executed even if "
@@ -137,6 +138,7 @@ public class BaseFreonGenerator {
   private AtomicLong attemptCounter;
 
   private long startTime;
+  private long durationInSecond;
 
   private PathSchema pathSchema;
   private String spanName;
@@ -189,7 +191,7 @@ public class BaseFreonGenerator {
       long counter = attemptCounter.getAndIncrement();
       if (timebase) {
         if (System.currentTimeMillis()
-            > startTime + TimeUnit.SECONDS.toMillis(runtime)) {
+            > startTime + TimeUnit.SECONDS.toMillis(durationInSecond)) {
           completed.set(true);
           break;
         }
@@ -290,7 +292,9 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    if (timebase && runtime <= 0) {
+    durationInSecond = TimeDurationUtil.getTimeDurationHelper(
+            "--runtime", runtime, TimeUnit.SECONDS);
+    if (timebase && durationInSecond <= 0) {
       throw new IllegalArgumentException(
               "Incomplete command, "
                       + "the runtime must be given, and must not be negative");
@@ -322,7 +326,7 @@ public class BaseFreonGenerator {
     long maxValue;
     LongSupplier supplier;
     if (timebase) {
-      maxValue = runtime;
+      maxValue = durationInSecond;
       supplier = () -> Duration.between(
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
     } else {
