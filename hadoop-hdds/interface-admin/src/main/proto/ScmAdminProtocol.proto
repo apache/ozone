@@ -351,12 +351,6 @@ message DatanodeDiskBalancerInfoResponseProto {
   repeated DatanodeDiskBalancerInfoProto info = 1;
 }
 
-enum DatanodeDiskBalancerOpType{
-  start = 1;
-  stop = 2;
-  update = 3;
-}
-
 message DatanodeDiskBalancerOpRequestProto {
   required DatanodeDiskBalancerOpType opType = 1;
   repeated string hosts = 2;
