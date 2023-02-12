@@ -80,6 +80,11 @@ public class DiskBalancerService extends BackgroundService {
 
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
+
+  // Every time a container is decided to be moved from Vol A to Vol B,
+  // the size will be deducted from Vol A and added to Vol B.
+  // This map is used to help calculate the expected storage size after
+  // the container balancing finished.
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
@@ -370,5 +375,13 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public void setBalancedBytesInLastWindow(long bytes) {
     this.balancedBytesInLastWindow.set(bytes);
+  }
+
+  @Override
+  public void shutdown() {
+    super.shutdown();
+    if (metrics != null) {
+      DiskBalancerServiceMetrics.unRegister();
+    }
   }
 }

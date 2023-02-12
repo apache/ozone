@@ -1084,7 +1084,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
-            .setOpType(HddsProtos.DatanodeDiskBalancerOpType.start)
+            .setOpType(HddsProtos.DiskBalancerOpType.start)
             .setConf(confBuilder);
     hosts.ifPresent(requestBuilder::addAllHosts);
 
@@ -1106,7 +1106,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       throws IOException {
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
-            .setOpType(HddsProtos.DatanodeDiskBalancerOpType.stop);
+            .setOpType(HddsProtos.DiskBalancerOpType.stop);
     hosts.ifPresent(requestBuilder::addAllHosts);
 
     DatanodeDiskBalancerOpResponseProto response =
@@ -1135,7 +1135,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
-            .setOpType(HddsProtos.DatanodeDiskBalancerOpType.update)
+            .setOpType(HddsProtos.DiskBalancerOpType.update)
             .setConf(confBuilder);
     hosts.ifPresent(requestBuilder::addAllHosts);
 

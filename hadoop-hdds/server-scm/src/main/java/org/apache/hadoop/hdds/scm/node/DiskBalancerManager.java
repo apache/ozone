@@ -156,12 +156,17 @@ public class DiskBalancerManager {
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
+        if (nodeManager.getNodeStatus(dn).isHealthy()) {
+          errors.add(new DatanodeAdminError(dn.getHostName(),
+              "Datanode not in healthy state"));
+          continue;
+        }
         // If command doesn't have configuration change, then we reuse the
         // latest configuration reported from Datnaodes
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
             threshold, bandwidthInMB, parallelThread);
         DiskBalancerCommand command = new DiskBalancerCommand(
-            HddsProtos.DatanodeDiskBalancerOpType.start, updateConf);
+            HddsProtos.DiskBalancerOpType.start, updateConf);
         sendCommand(dn, command);
       } catch (Exception e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
@@ -189,7 +194,7 @@ public class DiskBalancerManager {
     for (DatanodeDetails dn : dns) {
       try {
         DiskBalancerCommand command = new DiskBalancerCommand(
-            HddsProtos.DatanodeDiskBalancerOpType.stop, null);
+            HddsProtos.DiskBalancerOpType.stop, null);
         sendCommand(dn, command);
       } catch (Exception e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
@@ -229,7 +234,7 @@ public class DiskBalancerManager {
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
             threshold, bandwidthInMB, parallelThread);
         DiskBalancerCommand command = new DiskBalancerCommand(
-            HddsProtos.DatanodeDiskBalancerOpType.update, updateConf);
+            HddsProtos.DiskBalancerOpType.update, updateConf);
         sendCommand(dn, command);
       } catch (Exception e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));

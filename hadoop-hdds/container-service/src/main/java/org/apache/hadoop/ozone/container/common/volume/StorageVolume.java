@@ -62,7 +62,6 @@ public abstract class StorageVolume
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolume.class);
 
-  // TODO: Will change to implementation of HDDS-6449
   public static final String TMP_DIR = "tmp";
 
   /**

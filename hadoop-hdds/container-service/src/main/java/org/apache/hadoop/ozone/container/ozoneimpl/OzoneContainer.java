@@ -419,6 +419,7 @@ public class OzoneContainer {
     hddsDispatcher.init();
     hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
+    diskBalancerService.start();
     recoveringContainerScrubbingService.start();
 
     // mark OzoneContainer as INITIALIZED.
@@ -444,6 +445,7 @@ public class OzoneContainer {
       dbVolumeSet.shutdown();
     }
     blockDeletingService.shutdown();
+    diskBalancerService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     ContainerMetrics.remove();
   }

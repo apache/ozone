@@ -39,6 +39,8 @@ public final class DiskBalancerConfiguration {
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
   // The path where datanode diskBalancer's conf is to be written to.
+  // if this property is not defined, ozone will fall back to use
+  // metadata directory instead.
   public static final String HDDS_DATANODE_DISK_BALANCER_INFO_DIR =
       "hdds.datanode.disk.balancer.info.dir";
 

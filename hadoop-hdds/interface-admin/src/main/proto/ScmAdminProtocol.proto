@@ -352,7 +352,7 @@ message DatanodeDiskBalancerInfoResponseProto {
 }
 
 message DatanodeDiskBalancerOpRequestProto {
-  required DatanodeDiskBalancerOpType opType = 1;
+  required DiskBalancerOpType opType = 1;
   repeated string hosts = 2;
   optional DiskBalancerConfigurationProto conf = 3;
 }

@@ -65,7 +65,7 @@ public class DiskBalancerCommandHandler implements CommandHandler {
     final long startTime = Time.monotonicNow();
     DiskBalancerCommand diskBalancerCommand = (DiskBalancerCommand) command;
 
-    final HddsProtos.DatanodeDiskBalancerOpType opType =
+    final HddsProtos.DiskBalancerOpType opType =
         diskBalancerCommand.getOpType();
     final DiskBalancerConfiguration diskBalancerConf =
         diskBalancerCommand.getDiskBalancerConfiguration();

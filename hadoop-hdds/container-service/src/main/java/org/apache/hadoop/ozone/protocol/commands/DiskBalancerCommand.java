@@ -30,10 +30,10 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
  */
 public class DiskBalancerCommand extends SCMCommand<DiskBalancerCommandProto> {
 
-  private final HddsProtos.DatanodeDiskBalancerOpType opType;
+  private final HddsProtos.DiskBalancerOpType opType;
   private final DiskBalancerConfiguration diskBalancerConfiguration;
 
-  public DiskBalancerCommand(final HddsProtos.DatanodeDiskBalancerOpType opType,
+  public DiskBalancerCommand(final HddsProtos.DiskBalancerOpType opType,
       final DiskBalancerConfiguration diskBalancerConfiguration) {
     this.opType = opType;
     this.diskBalancerConfiguration = diskBalancerConfiguration;
@@ -69,7 +69,7 @@ public class DiskBalancerCommand extends SCMCommand<DiskBalancerCommandProto> {
             diskbalancerCommandProto.getDiskBalancerConf(), configuration));
   }
 
-  public HddsProtos.DatanodeDiskBalancerOpType getOpType() {
+  public HddsProtos.DiskBalancerOpType getOpType() {
     return opType;
   }
 

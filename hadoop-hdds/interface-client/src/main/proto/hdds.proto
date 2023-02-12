@@ -465,7 +465,7 @@ enum DiskBalancerRunningStatus {
     UNKNOWN = 3;
 }
 
-enum DatanodeDiskBalancerOpType{
+enum DiskBalancerOpType{
     start = 1;
     stop = 2;
     update = 3;
