@@ -84,11 +84,15 @@ public class FileSizeCountTask implements ReconOmTask {
     LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
 
     // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
-    boolean statusFSO = reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager,
-        fileSizeCountMap);
+    boolean statusFSO =
+        reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+            omMetadataManager,
+            fileSizeCountMap);
     // Call reprocessBucket method for LEGACY bucket layout
-    boolean statusOBS = reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap);
-    if(statusFSO && statusOBS){
+    boolean statusOBS =
+        reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
+            fileSizeCountMap);
+    if (statusFSO && statusOBS) {
       return new ImmutablePair<>(getTaskName(), false);
     }
     writeCountsToDB(true, fileSizeCountMap);
