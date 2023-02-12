@@ -378,7 +378,6 @@ public abstract class StorageVolume
     return volumeInfo != null ? volumeInfo.getRootDir() : null;
   }
 
-
   public long getCapacity() {
     return volumeInfo != null ? volumeInfo.getCapacity() : 0;
   }

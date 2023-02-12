@@ -110,6 +110,7 @@ public final class DiskBalancerConfiguration {
    *
    * @return max disk bandwidth per second
    */
+
   public long getDiskBandwidthInMB() {
     return diskBandwidthInMB;
   }

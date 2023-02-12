@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
@@ -202,6 +203,32 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
 
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
+      throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+    OMRequest modifiedOmRequest =
+        doPreExecute(createKeyRequest(false, 0, "test/" + keyName));
+
+    // test with FSO type
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(
+        modifiedOmRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    // create bucket with quota limit 1
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .setQuotaInNamespace(1));
+
+    OMClientResponse omKeyCreateResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertTrue(omKeyCreateResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   private void checkResponse(OMRequest modifiedOmRequest,
@@ -689,5 +716,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
     return new OMKeyCreateRequest(omRequest, BucketLayout.DEFAULT);
+  }
+
+  protected OMKeyCreateRequest getOMKeyCreateRequest(
+      OMRequest omRequest, BucketLayout layout) {
+    return new OMKeyCreateRequest(omRequest, layout);
   }
 }

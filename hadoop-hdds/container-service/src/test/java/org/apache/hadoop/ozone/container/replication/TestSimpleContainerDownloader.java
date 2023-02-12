@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -31,13 +34,25 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
-import org.junit.Assert;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Timeout;
+
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Test SimpleContainerDownloader.
  */
 public class TestSimpleContainerDownloader {
+
+  @Rule
+  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private static final String SUCCESS_PATH = "downloaded";
 
@@ -52,10 +67,12 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
-    Assert.assertEquals(datanodes.get(0).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(0).getUuidString(),
+        result.toString());
   }
 
   @Test
@@ -70,11 +87,13 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
-    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+        result.toString());
   }
 
   @Test
@@ -88,19 +107,22 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
-    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+        result.toString());
   }
 
   /**
    * Test if different datanode is used for each download attempt.
    */
-  @Test(timeout = 10_000L)
+  @Test
+  @Timeout(10)
   public void testRandomSelection()
-      throws ExecutionException, InterruptedException {
+      throws ExecutionException, InterruptedException, IOException {
 
     //GIVEN
     final List<DatanodeDetails> datanodes = createDatanodes();
@@ -110,8 +132,8 @@ public class TestSimpleContainerDownloader {
 
           @Override
           protected CompletableFuture<Path> downloadContainer(
-              long containerId, DatanodeDetails datanode
-          ) {
+              long containerId, DatanodeDetails datanode, Path downloadPath,
+              CopyContainerCompression compression) {
             //download is always successful.
             return CompletableFuture
                 .completedFuture(Paths.get(datanode.getUuidString()));
@@ -121,14 +143,15 @@ public class TestSimpleContainerDownloader {
     //WHEN executed, THEN at least once the second datanode should be
     //returned.
     for (int i = 0; i < 10000; i++) {
-      Path path = downloader.getContainerDataFromReplicas(1L, datanodes);
+      Path path = downloader.getContainerDataFromReplicas(1L, datanodes,
+          tempDir.newFolder().toPath(), NO_COMPRESSION);
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }
     }
 
     //there is 1/3^10_000 chance for false positive, which is practically 0.
-    Assert.fail(
+    Assertions.fail(
         "Datanodes are selected 10000 times but second datanode was never "
             + "used.");
   }
@@ -162,9 +185,8 @@ public class TestSimpleContainerDownloader {
 
       @Override
       protected CompletableFuture<Path> downloadContainer(
-          long containerId,
-          DatanodeDetails datanode
-      ) {
+          long containerId, DatanodeDetails datanode, Path downloadPath,
+          CopyContainerCompression compression) {
 
         if (datanodes.contains(datanode)) {
           if (directException) {
@@ -191,5 +213,22 @@ public class TestSimpleContainerDownloader {
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return datanodes;
+  }
+
+  private VolumeSet getVolumeSet(DatanodeDetails datanodeDetails,
+      OzoneConfiguration conf) throws IOException {
+    String clusterId = UUID.randomUUID().toString();
+    int volumeNum = 3;
+    File[] hddsVolumeDirs = new File[volumeNum];
+    StringBuilder hddsDirs = new StringBuilder();
+    for (int i = 0; i < volumeNum; i++) {
+      hddsVolumeDirs[i] = tempDir.newFolder();
+      hddsDirs.append(hddsVolumeDirs[i]).append(",");
+    }
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
+    VolumeSet hddsVolumeSet = new MutableVolumeSet(
+        datanodeDetails.getUuidString(), clusterId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    return hddsVolumeSet;
   }
 }

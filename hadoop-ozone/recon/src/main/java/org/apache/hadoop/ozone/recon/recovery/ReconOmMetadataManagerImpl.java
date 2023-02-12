@@ -94,7 +94,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables();
+      initializeOmTables(true);
       omTablesInitialized = true;
     }
   }
@@ -109,7 +109,15 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
         FileUtils.deleteDirectory(oldDBLocation);
       }
     }
-    initializeNewRdbStore(newDbLocation);
+    DBStore current = getStore();
+    try {
+      initializeNewRdbStore(newDbLocation);
+    } finally {
+      // Always close DBStore if it's replaced.
+      if (current != null && current != getStore()) {
+        current.close();
+      }
+    }
   }
 
   @Override

@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -130,5 +131,18 @@ public class DiskBalancerCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return 0;
+  }
+
+  private void startDiskBalancer(DiskBalancerConfiguration configuration) {
+    // Todo: add implementation to start DiskBalancer
+  }
+
+  private void stopDiskBalancer() {
+    // Todo: add implementation to stop DiskBalancer
+  }
+
+  private void updateDiskBalancer(DiskBalancerConfiguration
+      configuration) {
+    // Todo: add implementation to update diskBalancer configuration
   }
 }

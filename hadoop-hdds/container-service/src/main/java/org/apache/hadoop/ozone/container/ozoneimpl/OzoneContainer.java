@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
@@ -87,7 +88,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.VOLUME_BYTES_PER_SECOND_KEY;
 
 /**
  * Ozone main class sets up the network servers and initializes the container
@@ -152,7 +154,8 @@ public class OzoneContainer {
         new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
             context, VolumeType.DB_VOLUME, volumeChecker);
     if (SchemaV3.isFinalizedAndEnabled(config)) {
-      HddsVolumeUtil.loadAllHddsVolumeDbStore(volumeSet, dbVolumeSet, LOG);
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
     }
 
     long recoveringContainerTimeout = config.getTimeDuration(
@@ -206,7 +209,9 @@ public class OzoneContainer {
         controller,
         conf.getObject(ReplicationConfig.class),
         secConf,
-        certClient);
+        certClient,
+        new ContainerImporter(conf, containerSet, controller,
+            volumeSet));
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
@@ -317,32 +322,47 @@ public class OzoneContainer {
    * Start background daemon thread for performing container integrity checks.
    */
   private void startContainerScrub() {
-    ContainerScrubberConfiguration c = config.getObject(
-        ContainerScrubberConfiguration.class);
-    boolean enabled = c.isEnabled();
-
-    if (!enabled) {
-      LOG.info("Background container scanner has been disabled.");
-    } else {
-      if (this.metadataScanner == null) {
-        this.metadataScanner = new ContainerMetadataScanner(c, controller);
-      }
-      this.metadataScanner.start();
-
-      if (c.getBandwidthPerVolume() == 0L) {
-        LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
-            "so background container data scanner will not start.");
-        return;
-      }
-
-      dataScanners = new ArrayList<>();
-      for (StorageVolume v : volumeSet.getVolumesList()) {
-        ContainerDataScanner s = new ContainerDataScanner(c, controller,
-            (HddsVolume) v);
-        s.start();
-        dataScanners.add(s);
-      }
+    ContainerScannerConfiguration c = config.getObject(
+        ContainerScannerConfiguration.class);
+    if (!c.isEnabled()) {
+      LOG.info("Scheduled background container scanners and " +
+          "the on-demand container scanner have been disabled.");
+      return;
     }
+    initOnDemandContainerScanner(c);
+    initMetadataScanner(c);
+    initContainerScanner(c);
+  }
+
+  private void initContainerScanner(ContainerScannerConfiguration c) {
+    if (c.getBandwidthPerVolume() == 0L) {
+      LOG.warn(VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+          "so background container data scanner will not start.");
+      return;
+    }
+    dataScanners = new ArrayList<>();
+    for (StorageVolume v : volumeSet.getVolumesList()) {
+      ContainerDataScanner s = new ContainerDataScanner(c, controller,
+          (HddsVolume) v);
+      s.start();
+      dataScanners.add(s);
+    }
+  }
+
+  private void initMetadataScanner(ContainerScannerConfiguration c) {
+    if (this.metadataScanner == null) {
+      this.metadataScanner = new ContainerMetadataScanner(c, controller);
+    }
+    this.metadataScanner.start();
+  }
+
+  private void initOnDemandContainerScanner(ContainerScannerConfiguration c) {
+    if (c.getOnDemandBandwidthPerVolume() == 0L) {
+      LOG.warn(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY + " is set to 0, " +
+          "so the on-demand container data scanner will not start.");
+      return;
+    }
+    OnDemandContainerScanner.init(c, controller);
   }
 
   /**
@@ -361,6 +381,7 @@ public class OzoneContainer {
     for (ContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
+    OnDemandContainerScanner.shutdown();
   }
 
   /**

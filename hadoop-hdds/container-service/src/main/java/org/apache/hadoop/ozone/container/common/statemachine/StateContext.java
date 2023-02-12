@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors.Descriptor;
@@ -146,7 +147,7 @@ public class StateContext {
    *
    * For non-HA mode, term of SCMCommand will be 0.
    */
-  private Optional<Long> termOfLeaderSCM = Optional.empty();
+  private OptionalLong termOfLeaderSCM = OptionalLong.empty();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -727,10 +728,9 @@ public class StateContext {
 
     // if commandQueue is not empty, init termOfLeaderSCM
     // with the largest term found in commandQueue
-    commandQueue.stream()
+    termOfLeaderSCM = commandQueue.stream()
         .mapToLong(SCMCommand::getTerm)
-        .max()
-        .ifPresent(term -> termOfLeaderSCM = Optional.of(term));
+        .max();
   }
 
   /**
@@ -738,12 +738,27 @@ public class StateContext {
    * Always record the latest term that has seen.
    */
   private void updateTermOfLeaderSCM(SCMCommand<?> command) {
+    updateTermOfLeaderSCM(command.getTerm());
+  }
+
+  public void updateTermOfLeaderSCM(final long newTerm) {
     if (!termOfLeaderSCM.isPresent()) {
-      LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-    termOfLeaderSCM = Optional.of(
-        Long.max(termOfLeaderSCM.get(), command.getTerm()));
+
+    final long currentTerm = termOfLeaderSCM.getAsLong();
+    if (currentTerm < newTerm) {
+      setTermOfLeaderSCM(newTerm);
+    }
+  }
+
+  @VisibleForTesting
+  public void setTermOfLeaderSCM(long term) {
+    termOfLeaderSCM = OptionalLong.of(term);
+  }
+
+  public OptionalLong getTermOfLeaderSCM() {
+    return termOfLeaderSCM;
   }
 
   /**
@@ -766,13 +781,14 @@ public class StateContext {
         }
 
         updateTermOfLeaderSCM(command);
-        if (command.getTerm() == termOfLeaderSCM.get()) {
+        final long currentTerm = termOfLeaderSCM.getAsLong();
+        if (command.getTerm() == currentTerm) {
           return command;
         }
 
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
-            command, command.getTerm(), termOfLeaderSCM.get());
+            command, command.getTerm(), currentTerm);
       }
     } finally {
       lock.unlock();
@@ -787,6 +803,7 @@ public class StateContext {
   public void addCommand(SCMCommand command) {
     lock.lock();
     try {
+      updateTermOfLeaderSCM(command);
       commandQueue.add(command);
     } finally {
       lock.unlock();
@@ -894,6 +911,9 @@ public class StateContext {
         mp.putIfAbsent(e, new AtomicBoolean(true));
       });
       this.isFullReportReadyToBeSent.putIfAbsent(endpoint, mp);
+      if (getQueueMetrics() != null) {
+        getQueueMetrics().addEndpoint(endpoint);
+      }
     }
   }
 
@@ -931,5 +951,24 @@ public class StateContext {
    */
   public long getReconHeartbeatFrequency() {
     return reconHeartbeatFrequency.get();
+  }
+
+  public Map<InetSocketAddress, Integer> getPipelineActionQueueSize() {
+    return pipelineActions.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+  }
+
+  public Map<InetSocketAddress, Integer> getContainerActionQueueSize() {
+    return containerActions.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+  }
+
+  public Map<InetSocketAddress, Integer> getIncrementalReportQueueSize() {
+    return incrementalReportsQueue.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+  }
+
+  public DatanodeQueueMetrics getQueueMetrics() {
+    return parentDatanodeStateMachine.getQueueMetrics();
   }
 }

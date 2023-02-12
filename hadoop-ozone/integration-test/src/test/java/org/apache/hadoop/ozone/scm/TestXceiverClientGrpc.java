@@ -31,9 +31,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,7 +54,7 @@ public class TestXceiverClientGrpc {
   private List<DatanodeDetails> dnsInOrder;
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-  @Before
+  @BeforeEach
   public void setup() {
     dns = new ArrayList<>();
     dns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -77,12 +78,13 @@ public class TestXceiverClientGrpc {
 
   @Test
   public void testCorrectDnsReturnedFromPipeline() throws IOException {
-    Assert.assertEquals(dnsInOrder.get(0), pipeline.getClosestNode());
-    Assert.assertEquals(dns.get(0), pipeline.getFirstNode());
-    Assert.assertNotEquals(dns.get(0), dnsInOrder.get(0));
+    Assertions.assertEquals(dnsInOrder.get(0), pipeline.getClosestNode());
+    Assertions.assertEquals(dns.get(0), pipeline.getFirstNode());
+    Assertions.assertNotEquals(dns.get(0), dnsInOrder.get(0));
   }
 
-  @Test(timeout = 5000)
+  @Test
+  @Timeout(5)
   public void testRandomFirstNodeIsCommandTarget() throws IOException {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     // Using a new Xceiver Client, call it repeatedly until all DNs in the
@@ -124,7 +126,7 @@ public class TestXceiverClientGrpc {
       };
       invokeXceiverClientGetBlock(client);
     }
-    Assert.assertEquals(1, seenDNs.size());
+    Assertions.assertEquals(1, seenDNs.size());
   }
 
   @Test
@@ -146,7 +148,7 @@ public class TestXceiverClientGrpc {
       invokeXceiverClientGetBlock(client);
       invokeXceiverClientReadChunk(client);
       invokeXceiverClientReadSmallFile(client);
-      Assert.assertEquals(1, seenDNs.size());
+      Assertions.assertEquals(1, seenDNs.size());
     }
   }
 

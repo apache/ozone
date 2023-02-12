@@ -97,6 +97,7 @@ public final class OzoneConsts {
   public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
+  public static final String OZONE_O3TRASH_URI_SCHEME = "o3trash";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
@@ -394,6 +395,8 @@ public final class OzoneConsts {
 
   public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
 
+  public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
+
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";
@@ -552,4 +555,11 @@ public final class OzoneConsts {
    * tenant.
    */
   public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
+
+  public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
+
+  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
 }

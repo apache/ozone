@@ -642,6 +642,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setGetContainerCountResponse(getContainerCount(
                   request.getGetContainerCountRequest()))
           .build();
+      case GetClosedContainerCount:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerCountResponse(getClosedContainerCount(
+                request.getGetContainerCountRequest()))
+            .build();
       case GetContainerReplicas:
         return ScmContainerLocationResponse.newBuilder()
           .setCmdType(request.getCmdType())
@@ -1164,6 +1171,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerCountResponseProto.newBuilder()
       .setContainerCount(impl.getContainerCount())
       .build();
+  }
+
+  public GetContainerCountResponseProto getClosedContainerCount(
+      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+          request) throws IOException {
+
+    return GetContainerCountResponseProto.newBuilder()
+        .setContainerCount(impl.getContainerCount(
+            HddsProtos.LifeCycleState.CLOSED))
+        .build();
   }
 
   public ResetDeletedBlockRetryCountResponseProto

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -36,11 +35,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import org.apache.commons.lang3.StringUtils;
@@ -57,6 +60,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
@@ -267,12 +271,15 @@ public final class OmUtils {
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
+    case ListSnapshot:
     case EchoRPC:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
       // Although indirectly the Ranger sync service task could invoke write
       // operation SetRangerServiceVersion.
+    case GetKeyInfo:
+    case SnapshotDiff:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -317,20 +324,12 @@ public final class OmUtils {
     case TenantAssignAdmin:
     case TenantRevokeAdmin:
     case SetRangerServiceVersion:
+    case CreateSnapshot:
+    case DeleteSnapshot:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
-    }
-  }
-
-  public static byte[] getMD5Digest(String input) throws IOException {
-    try {
-      MessageDigest md = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
-      return md.digest(input.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException ex) {
-      throw new IOException("Error creating an instance of MD5 digest.\n" +
-          "This could possibly indicate a faulty JRE");
     }
   }
 
@@ -546,6 +545,23 @@ public final class OmUtils {
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid bucket name: " + bucketName,
           OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
+  }
+
+  /**
+   * Verify snapshot name is a valid DNS name.
+   */
+  public static void validateSnapshotName(String snapshotName)
+      throws OMException {
+    // allow null name, for when user wants generated name
+    if (snapshotName == null) {
+      return;
+    }
+    try {
+      HddsClientUtils.verifyResourceName(snapshotName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid snapshot name: " + snapshotName,
+          OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
     }
   }
 
@@ -794,5 +810,44 @@ public final class OmUtils {
     }
     printString.append("]");
     return printString.toString();
+  }
+
+  // Key points to entire bucket's snapshot
+  public static boolean isBucketSnapshotIndicator(String key) {
+    return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
+  }
+
+  public static String format(List<ServiceInfo> nodes, int port,
+                              String leaderId) {
+    StringBuilder sb = new StringBuilder();
+    // Ensuring OM's are printed in correct order
+    List<ServiceInfo> omNodes = nodes.stream()
+        .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
+        .sorted(Comparator.comparing(ServiceInfo::getHostname))
+        .collect(Collectors.toList());
+    int count = 0;
+    for (ServiceInfo info : omNodes) {
+      // Printing only the OM's running
+      if (info.getNodeType() == HddsProtos.NodeType.OM) {
+        String role =
+            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
+                "FOLLOWER";
+        sb.append(
+            String.format(
+                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
+                info.getHostname(),
+                info.getOmRoleInfo().getNodeId(),
+                port,
+                role
+            ));
+        count++;
+      }
+    }
+    // Print Stand-alone if only one OM exists
+    if (count == 1) {
+      return "STANDALONE";
+    } else {
+      return sb.toString();
+    }
   }
 }

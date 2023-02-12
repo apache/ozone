@@ -127,46 +127,36 @@ public class TestObjectStoreWithLegacyFS {
         cluster.getOzoneManager().getMetadataManager()
             .getKeyTable(BucketLayout.OBJECT_STORE);
 
-    String seekKey = "dir";
-    String dbKey = cluster.getOzoneManager().getMetadataManager()
-        .getOzoneKey(volumeName, bucketName, seekKey);
-
-    GenericTestUtils
-        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, keyName), 500,
-            60000);
+    GenericTestUtils.waitFor(() -> isKeyExist(keyTable, keyName),
+        500, 60000);
 
     ozoneBucket.renameKey(keyName, "dir1/NewKey-1");
 
-    GenericTestUtils
-        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, "dir1/NewKey-1"), 500,
-            60000);
+    // RenameKey changes keyTable cache, so we need to
+    // wait for the transaction to be flushed to db
+    GenericTestUtils.waitFor(() -> !isKeyExist(keyTable, keyName),
+        500, 60000);
+    // When the old key is removed, new key should exist
+    Assert.assertTrue(isKeyExist(keyTable, "dir1/NewKey-1"));
   }
 
-  private boolean assertKeyCount(
-      Table<String, OmKeyInfo> keyTable,
-      String dbKey, int expectedCnt, String keyName) {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        itr = keyTable.iterator();
-    int countKeys = 0;
-    try {
-      itr.seek(dbKey);
-      while (itr.hasNext()) {
-
-        Table.KeyValue<String, OmKeyInfo> keyValue = itr.next();
-        if (!keyValue.getKey().startsWith(dbKey)) {
-          break;
+  private boolean isKeyExist(Table<String, OmKeyInfo> keyTable,
+      String keyName) {
+    String dbKey = cluster.getOzoneManager().getMetadataManager()
+        .getOzoneKey(volumeName, bucketName, keyName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = keyTable.iterator()) {
+      iterator.seek(dbKey);
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        if (kv.getKey().equals(dbKey)) {
+          return true;
         }
-        countKeys++;
-        Assert.assertTrue(keyValue.getKey().endsWith(keyName));
       }
     } catch (IOException ex) {
-      LOG.info("Test failed with: " + ex.getMessage(), ex);
-      Assert.fail("Test failed with: " + ex.getMessage());
+      LOG.error("Error while iterating key table", ex);
     }
-    if (countKeys != expectedCnt) {
-      LOG.info("Couldn't find KeyName:{} in KeyTable, retrying...", keyName);
-    }
-    return countKeys == expectedCnt;
+    return false;
   }
 
   @Test

@@ -246,7 +246,7 @@ public final class KeyValueContainerUtil {
     // Set pending deleted block count.
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
-            .pendingDeleteBlockCountKey());
+            .getPendingDeleteBlockCountKey());
     if (pendingDeleteBlockCount != null) {
       kvContainerData.incrPendingDeletionBlocks(
           pendingDeleteBlockCount);
@@ -263,7 +263,7 @@ public final class KeyValueContainerUtil {
 
     // Set delete transaction id.
     Long delTxnId =
-        metadataTable.get(kvContainerData.latestDeleteTxnKey());
+        metadataTable.get(kvContainerData.getLatestDeleteTxnKey());
     if (delTxnId != null) {
       kvContainerData
           .updateDeleteTransactionId(delTxnId);
@@ -271,7 +271,7 @@ public final class KeyValueContainerUtil {
 
     // Set BlockCommitSequenceId.
     Long bcsId = metadataTable.get(
-        kvContainerData.bcsIdKey());
+        kvContainerData.getBcsIdKey());
     if (bcsId != null) {
       kvContainerData
           .updateBlockCommitSequenceId(bcsId);
@@ -280,7 +280,7 @@ public final class KeyValueContainerUtil {
     // Set bytes used.
     // commitSpace for Open Containers relies on usedBytes
     Long bytesUsed =
-        metadataTable.get(kvContainerData.bytesUsedKey());
+        metadataTable.get(kvContainerData.getBytesUsedKey());
     if (bytesUsed != null) {
       isBlockMetadataSet = true;
       kvContainerData.setBytesUsed(bytesUsed);
@@ -288,7 +288,7 @@ public final class KeyValueContainerUtil {
 
     // Set block count.
     Long blockCount = metadataTable.get(
-        kvContainerData.blockCountKey());
+        kvContainerData.getBlockCountKey());
     if (blockCount != null) {
       isBlockMetadataSet = true;
       kvContainerData.setBlockCount(blockCount);

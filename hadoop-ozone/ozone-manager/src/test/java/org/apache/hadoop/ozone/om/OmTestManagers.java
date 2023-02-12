@@ -101,7 +101,7 @@ public final class OmTestManagers {
 
     keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
         .getInternalState(om, "keyManager");
-    ScmClient scmClient = new ScmClient(scmBlockClient, containerClient);
+    ScmClient scmClient = new ScmClient(scmBlockClient, containerClient, conf);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,

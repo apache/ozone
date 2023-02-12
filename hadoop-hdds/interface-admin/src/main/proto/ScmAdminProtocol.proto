@@ -178,8 +178,9 @@ enum Type {
   GetContainerReplicas = 34;
   GetReplicationManagerReport = 35;
   ResetDeletedBlockRetryCount = 36;
-  DatanodeDiskBalancerInfo = 37;
-  DatanodeDiskBalancerOp = 38;
+  GetClosedContainerCount = 37;
+  DatanodeDiskBalancerInfo= 38;
+  DatanodeDiskBalancerOp = 39;
 }
 
 /**
@@ -348,6 +349,12 @@ message DatanodeDiskBalancerInfoRequestProto {
 
 message DatanodeDiskBalancerInfoResponseProto {
   repeated DatanodeDiskBalancerInfoProto info = 1;
+}
+
+enum DatanodeDiskBalancerOpType{
+  start = 1;
+  stop = 2;
+  update = 3;
 }
 
 message DatanodeDiskBalancerOpRequestProto {

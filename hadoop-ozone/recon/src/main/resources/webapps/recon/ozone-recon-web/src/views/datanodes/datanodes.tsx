@@ -121,39 +121,40 @@ const renderDatanodeOpState = (opState: DatanodeOpState) => {
 
 const COLUMNS = [
   {
+    title: 'Hostname',
+    dataIndex: 'hostname',
+    key: 'hostname',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname, undefined, {numeric: true}),
+    defaultSortOrder: 'ascend' as const,
+    fixed: 'left'
+  },
+  {
     title: 'State',
     dataIndex: 'state',
     key: 'state',
     isVisible: true,
+    isSearchable: true,
     filterMultiple: true,
-    filters: DatanodeStateList.map(state => ({text: state, value: state})),
+    filters: DatanodeStateList && DatanodeStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeState, record: IDatanode) => record.state === value,
     render: (text: DatanodeState) => renderDatanodeState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
-    fixed: 'left'
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
   },
   {
     title: 'Operational State',
     dataIndex: 'opState',
     key: 'opState',
     isVisible: true,
+    isSearchable: true,
     filterMultiple: true,
-    filters: DatanodeOpStateList.map(state => ({text: state, value: state})),
+    filters: DatanodeOpStateList && DatanodeOpStateList.map(state => ({text: state, value: state})),
     onFilter: (value: DatanodeOpState, record: IDatanode) => record.opState === value,
     render: (text: DatanodeOpState) => renderDatanodeOpState(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState),
-    fixed: 'left'
+    sorter: (a: IDatanode, b: IDatanode) => a.opState.localeCompare(b.opState)
   },
-  {
-    title: 'Hostname',
-    dataIndex: 'hostname',
-    key: 'hostname',
-    isVisible: true,
-    isSearchable: true,
-    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname),
-    defaultSortOrder: 'ascend' as const,
-    fixed: 'left'
-  },
+ 
   {
     title: 'Uuid',
     dataIndex: 'uuid',
@@ -193,7 +194,7 @@ const COLUMNS = [
       return (
         <div>
           {
-            pipelines.map((pipeline, index) => (
+            pipelines && pipelines.map((pipeline, index) => (
               <div key={index} className='pipeline-container'>
                 <ReplicationIcon
                   replicationFactor={pipeline.replicationFactor}
@@ -231,7 +232,13 @@ const COLUMNS = [
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
   },
   {
-    title: 'Open Containers',
+    title:
+    <span>
+    Open Containers&nbsp;
+    <Tooltip title='The number of open containers per pipeline.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'openContainers',
     key: 'openContainers',
     isVisible: true,
@@ -336,7 +343,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
-      const dataSource: IDatanode[] = datanodes.map(datanode => {
+      const dataSource: IDatanode[] = datanodes && datanodes.map(datanode => {
         return {
           hostname: datanode.hostname,
           uuid: datanode.uuid,
@@ -413,7 +420,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           </div>
           <AutoReloadPanel
             isLoading={loading}
-            lastUpdated={lastUpdated}
+            lastRefreshed={lastUpdated}
             togglePolling={this.autoReload.handleAutoReloadToggle}
             onReload={this._loadData}
           />

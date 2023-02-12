@@ -82,9 +82,9 @@ public class DeletedBlockLogImpl
   private final ContainerManager containerManager;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
-  private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
   // Maps txId to its retry counts;
-  private Map<Long, Integer> transactionToRetryCountMap;
+  private final Map<Long, Integer> transactionToRetryCountMap;
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
@@ -194,6 +194,9 @@ public class DeletedBlockLogImpl
         txIDs = getFailedTransactions().stream()
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
+      }
+      for (Long txID: txIDs) {
+        transactionToRetryCountMap.computeIfPresent(txID, (key, value) -> 0);
       }
       return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
           new ArrayList<>(new HashSet<>(txIDs)));
@@ -390,17 +393,22 @@ public class DeletedBlockLogImpl
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions) {
     try {
+      DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
+          .newBuilder(tx)
+          .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
+          .build();
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueOf(tx.getContainerID()));
+          .getContainerReplicas(
+              ContainerID.valueOf(updatedTxn.getContainerID()));
       for (ContainerReplica replica : replicas) {
         UUID dnID = replica.getDatanodeDetails().getUuid();
         Set<UUID> dnsWithTransactionCommitted =
-            transactionToDNsCommitMap.get(tx.getTxID());
+            transactionToDNsCommitMap.get(updatedTxn.getTxID());
         if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
             .contains(dnID)) {
           // Transaction need not be sent to dns which have
           // already committed it
-          transactions.addTransactionToDN(dnID, tx);
+          transactions.addTransactionToDN(dnID, updatedTxn);
         }
       }
     } catch (IOException e) {
@@ -418,16 +426,24 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        int numBlocksAdded = 0;
         ArrayList<Long> txIDs = new ArrayList<>();
-        while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
+        // Here takes block replica count as the threshold to avoid the case
+        // that part of replicas committed the TXN and recorded in the
+        // transactionToDNsCommitMap, while they are counted in the threshold.
+        while (iter.hasNext() &&
+            transactions.getBlocksDeleted() < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
-            if (txn.getCount() > -1 && txn.getCount() <= maxRetry
+            // HDDS-7126. When container is under replicated, it is possible
+            // that container is deleted, but transactions are not deleted.
+            if (containerManager.getContainer(id).isDeleted()) {
+              LOG.warn("Container: " + id + " was deleted for the " +
+                  "transaction: " + txn);
+              txIDs.add(txn.getTxID());
+            } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              numBlocksAdded += txn.getLocalIDCount();
               getTransaction(txn, transactions);
               transactionToDNsCommitMap
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());

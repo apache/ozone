@@ -166,7 +166,7 @@ public class TestContainerStateManagerIntegration {
     cluster.restartStorageContainerManager(false);
 
     List<ContainerInfo> result = cluster.getStorageContainerManager()
-        .getContainerManager().getContainers(null, 100);
+        .getContainerManager().getContainers();
 
     long matchCount = result.stream()
         .filter(info ->

@@ -82,6 +82,7 @@ import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.StringUtils;
@@ -726,6 +727,18 @@ public final class OzoneManagerRatisServer {
       ConfigurationSource configuration) {
     return configuration
         .getPropsMatchPrefixAndTrimPrefix(OZONE_OM_HA_PREFIX + ".");
+  }
+
+  public RaftPeer getLeader() throws IOException {
+    RaftServer.Division division = server.getDivision(raftGroupId);
+    if (division.getInfo().isLeader()) {
+      return division.getPeer();
+    } else {
+      ByteString leaderId = division.getInfo().getRoleInfoProto()
+          .getFollowerInfo().getLeaderInfo().getId().getId();
+      return leaderId.isEmpty() ? null :
+          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+    }
   }
 
   /**

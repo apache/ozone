@@ -47,5 +47,6 @@ public enum ConfigTag {
   HA,
   BALANCER,
   UPGRADE,
+  DATASTREAM,
   DISKBALANCER
 }

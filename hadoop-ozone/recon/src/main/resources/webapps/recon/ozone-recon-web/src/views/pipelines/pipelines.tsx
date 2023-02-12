@@ -31,7 +31,7 @@ import {IAxiosResponse} from 'types/axios.types';
 import {ColumnSearch} from 'utils/columnSearch';
 
 const {TabPane} = Tabs;
-const PipelineStatusList = ['OPEN', 'CLOSING', 'QUASI_CLOSED', 'CLOSED', 'UNHEALTHY', 'INVALID', 'DELETED'] as const;
+const PipelineStatusList = ['OPEN', 'CLOSING', 'QUASI_CLOSED', 'CLOSED', 'UNHEALTHY', 'INVALID', 'DELETED', 'DORMANT'] as const;
 type PipelineStatusTuple = typeof PipelineStatusList;
 export type PipelineStatus = PipelineStatusTuple[number]; // 'OPEN' | 'CLOSING' | 'QUASI_CLOSED' | 'CLOSED' | 'UNHEALTHY' | 'INVALID' | 'DELETED';
 
@@ -66,7 +66,8 @@ const COLUMNS = [
     dataIndex: 'pipelineId',
     key: 'pipelineId',
     isSearchable: true,
-    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId),
+    fixed: 'left'
   },
   {
     title: 'Replication Type & Factor',
@@ -110,7 +111,15 @@ const COLUMNS = [
     dataIndex: 'datanodes',
     key: 'datanodes',
     isSearchable: true,
-    render: (datanodes: string[]) => <div>{datanodes.map(datanode => <div key={datanode}>{datanode}</div>)}</div>
+    render: (datanodes: string[]) => <div> {datanodes && datanodes.map(datanode =>
+      <div key={datanode.hostName}>
+        <div className='uuidtooltip'>
+          <Tooltip placement='top' title={`UUID: ${datanode && datanode.uuid}`} getPopupContainer={(triggerNode) => triggerNode}>
+            {datanode && datanode.hostName}
+          </Tooltip>
+        </div>
+      </div>)}
+    </div>
   },
   {
     title: 'Leader',
@@ -225,11 +234,11 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
       <div className='pipelines-container'>
         <div className='page-header'>
           Pipelines ({activeTotalCount})
-          <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={activeLoading} lastRefreshed={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <div className='content-div'>
           <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
-            <TabPane key='1' tab='Active'>
+            <TabPane key='1'>
               <Table
                 dataSource={activeDataSource}
                 columns={COLUMNS.reduce<any[]>((filtered, column) => {
@@ -245,9 +254,11 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
 
                   return filtered;
                 }, [])}
-                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
+                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
+                scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+                />
             </TabPane>
-            <TabPane key='2' tab='Inactive'/>
+
           </Tabs>
         </div>
       </div>

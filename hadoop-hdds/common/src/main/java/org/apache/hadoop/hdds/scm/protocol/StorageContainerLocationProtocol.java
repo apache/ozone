@@ -116,7 +116,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException;
+      Iterable<? extends Long> containerIDs) throws IOException;
 
   /**
    * Ask SCM which containers of the given list exist.
@@ -426,6 +426,13 @@ public interface StorageContainerLocationProtocol extends Closeable {
   Token<?> getContainerToken(ContainerID containerID) throws IOException;
 
   long getContainerCount() throws IOException;
+
+  long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException;
+
+  List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException;
 
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count, int clientVersion) throws IOException;

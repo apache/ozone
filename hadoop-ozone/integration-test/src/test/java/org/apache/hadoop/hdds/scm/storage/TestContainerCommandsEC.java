@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -348,8 +349,15 @@ public class TestContainerCommandsEC {
   @MethodSource("recoverableMissingIndexes")
   void testECReconstructionCoordinatorWith(List<Integer> missingIndexes)
       throws Exception {
-    testECReconstructionCoordinator(missingIndexes);
+    testECReconstructionCoordinator(missingIndexes, 3);
   }
+
+  @Test
+  void testECReconstructionWithPartialStripe()
+          throws Exception {
+    testECReconstructionCoordinator(ImmutableList.of(4, 5), 1);
+  }
+
 
   static Stream<List<Integer>> recoverableMissingIndexes() {
     return Stream
@@ -366,7 +374,7 @@ public class TestContainerCommandsEC {
   public void testECReconstructionCoordinatorWithMissingIndexes135() {
     InsufficientLocationsException exception =
         Assert.assertThrows(InsufficientLocationsException.class, () -> {
-          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5));
+          testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3);
         });
 
     String expectedMessage =
@@ -376,8 +384,8 @@ public class TestContainerCommandsEC {
     Assert.assertEquals(expectedMessage, actualMessage);
   }
 
-  private void testECReconstructionCoordinator(List<Integer> missingIndexes)
-      throws Exception {
+  private void testECReconstructionCoordinator(List<Integer> missingIndexes,
+      int numInputChunks) throws Exception {
     ObjectStore objectStore = rpcClient.getObjectStore();
     String keyString = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
@@ -388,10 +396,12 @@ public class TestContainerCommandsEC {
     OzoneBucket bucket = volume.getBucket(bucketName);
     XceiverClientManager xceiverClientManager =
         new XceiverClientManager(config);
-    createKeyAndWriteData(keyString, bucket);
+    createKeyAndWriteData(keyString, bucket, numInputChunks);
     ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient);
+        new ECReconstructionCoordinator(config, certClient,
+            null, ECReconstructionMetrics.create());
 
+    ECReconstructionMetrics metrics = coordinator.getECReconstructionMetrics();
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
     Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
@@ -493,18 +503,18 @@ public class TestContainerCommandsEC {
           readContainerResponseProto.getContainerData().getState());
       i++;
     }
-
+    Assertions.assertEquals(metrics.getReconstructionTotal(), 1L);
   }
 
-  private void createKeyAndWriteData(String keyString, OzoneBucket bucket)
-      throws IOException {
-    for (int i = 0; i < EC_DATA; i++) {
+  private void createKeyAndWriteData(String keyString, OzoneBucket bucket,
+      int numChunks) throws IOException {
+    for (int i = 0; i < numChunks; i++) {
       inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
     }
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
         new ECReplicationConfig(3, 2, EcCodec.RS, 1024), new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
+      for (int i = 0; i < numChunks; i++) {
         out.write(inputChunks[i]);
       }
     }
@@ -522,7 +532,7 @@ public class TestContainerCommandsEC {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    createKeyAndWriteData(keyString, bucket);
+    createKeyAndWriteData(keyString, bucket, 3);
 
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
@@ -565,7 +575,8 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient);
+          new ECReconstructionCoordinator(config, certClient,
+              null, ECReconstructionMetrics.create());
       coordinator.reconstructECContainerGroup(conID,
           (ECReplicationConfig) containerPipeline.getReplicationConfig(),
           sourceNodeMap, targetNodeMap);
@@ -624,11 +635,11 @@ public class TestContainerCommandsEC {
     conf.setFromObject(writableECContainerProviderConfig);
 
     OzoneManager.setTestSecureOmFlag(true);
-    certClient = new CertificateClientTestImpl(config);
+    certClient = new CertificateClientTestImpl(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(NUM_DN)
         .setScmId(SCM_ID).setClusterId(CLUSTER_ID)
-        .setCertificateClient(new CertificateClientTestImpl(conf))
+        .setCertificateClient(certClient)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
@@ -658,8 +669,13 @@ public class TestContainerCommandsEC {
         out.write(values[i]);
       }
     }
+//    List<ContainerID> containerIDs =
+//        new ArrayList<>(scm.getContainerManager().getContainerIDs());
     List<ContainerID> containerIDs =
-        new ArrayList<>(scm.getContainerManager().getContainerIDs());
+            scm.getContainerManager().getContainers()
+                    .stream()
+                    .map(ContainerInfo::containerID)
+                    .collect(Collectors.toList());
     Assertions.assertEquals(1, containerIDs.size());
     containerID = containerIDs.get(0).getId();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);
@@ -672,10 +688,10 @@ public class TestContainerCommandsEC {
     SecurityConfig conf = new SecurityConfig(tweakedConfig);
     long tokenLifetime = TimeUnit.DAYS.toMillis(1);
     containerTokenGenerator = new ContainerTokenSecretManager(
-        conf, tokenLifetime, "1");
+        conf, tokenLifetime);
     containerTokenGenerator.start(certClient);
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
-        conf, tokenLifetime, "1");
+        conf, tokenLifetime);
     blockTokenGenerator.start(certClient);
     containerToken = containerTokenGenerator
         .generateToken(ANY_USER, new ContainerID(containerID));

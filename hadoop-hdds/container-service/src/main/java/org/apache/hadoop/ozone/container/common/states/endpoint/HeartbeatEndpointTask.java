@@ -308,6 +308,9 @@ public class HeartbeatEndpointTask
     Preconditions.checkState(response.getDatanodeUUID()
             .equalsIgnoreCase(datanodeDetails.getUuid()),
         "Unexpected datanode ID in the response.");
+    if (response.hasTerm()) {
+      context.updateTermOfLeaderSCM(response.getTerm());
+    }
     // Verify the response is indeed for this datanode.
     for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
       switch (commandResponseProto.getCommandType()) {
@@ -433,6 +436,7 @@ public class HeartbeatEndpointTask
    * Common processing for SCM commands.
    *  - set term
    *  - set encoded token
+   *  - any deadline which is relevant to the command
    *  - add to context's queue
    */
   private void processCommonCommand(
@@ -442,6 +446,9 @@ public class HeartbeatEndpointTask
     }
     if (response.hasEncodedToken()) {
       cmd.setEncodedToken(response.getEncodedToken());
+    }
+    if (response.hasDeadlineMsSinceEpoch()) {
+      cmd.setDeadline(response.getDeadlineMsSinceEpoch());
     }
     context.addCommand(cmd);
   }

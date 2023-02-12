@@ -64,6 +64,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress) throws IOException;
 
+  /**
+   * Return info of an existing key to client side to access to data on
+   * datanodes.
+   * @param args the args of the key provided by client.
+   * @param clientAddress a hint to key manager, order the datanode in returned
+   *                      pipeline by distance between client and datanode.
+   * @return a OmKeyInfo instance client uses to talk to container.
+   * @throws IOException
+   */
+  OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress) throws IOException;
+
 
   /**
    * Returns a list of keys represented by {@link OmKeyInfo}
@@ -231,4 +242,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   BackgroundService getOpenKeyCleanupService();
+
+  /**
+   * Returns the instance of Snapshot SST Filtering service.
+   * @return Background service.
+   */
+  BackgroundService getSnapshotSstFilteringService();
 }

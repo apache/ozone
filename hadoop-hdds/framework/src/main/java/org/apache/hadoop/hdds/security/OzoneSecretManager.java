@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
@@ -36,7 +37,9 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * SecretManager for Ozone Master. Responsible for signing identifiers with
@@ -45,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public abstract class OzoneSecretManager<T extends TokenIdentifier>
-    extends SecretManager<T> {
+    extends SecretManager<T> implements CertificateNotification {
 
   private final Logger logger;
   /**
@@ -57,7 +60,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
   private final Text service;
   private CertificateClient certClient;
   private volatile boolean running;
-  private OzoneSecretKey currentKey;
+  private AtomicReference<OzoneSecretKey> currentKey;
   private AtomicInteger currentKeyId;
   private AtomicInteger tokenSequenceNumber;
 
@@ -81,6 +84,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     tokenSequenceNumber = new AtomicInteger();
     this.service = service;
     this.logger = logger;
+    this.currentKey = new AtomicReference<>();
   }
 
 
@@ -112,12 +116,12 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
   public byte[] createPassword(T identifier) {
     if (logger.isDebugEnabled()) {
       logger.debug("Creating password for identifier: {}, currentKey: {}",
-          formatTokenId(identifier), currentKey.getKeyId());
+          formatTokenId(identifier), currentKey.get().getKeyId());
     }
     byte[] password = null;
     try {
       password = createPassword(identifier.getBytes(),
-          currentKey.getPrivateKey());
+          currentKey.get().getPrivateKey());
     } catch (IOException ioe) {
       logger.error("Could not store token {}!!", formatTokenId(identifier),
           ioe);
@@ -166,16 +170,33 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    * Update the current master key. This is called once by start method before
    * tokenRemoverThread is created,
    */
-  private OzoneSecretKey updateCurrentKey(KeyPair keyPair) throws IOException {
-    logger.info("Updating the current master key for generating tokens");
+  private OzoneSecretKey updateCurrentKey(KeyPair keyPair,
+      X509Certificate certificate) {
+    logger.info("Updating current master key for generating tokens. Cert id {}",
+        certificate.getSerialNumber().toString());
 
-    // TODO: fix me based on the certificate expire time to set the key
-    // expire time.
     int newCurrentId = incrementCurrentKeyId();
-    OzoneSecretKey newKey = new OzoneSecretKey(newCurrentId, -1,
-        keyPair);
-    currentKey = newKey;
-    return currentKey;
+    OzoneSecretKey newKey = new OzoneSecretKey(newCurrentId,
+        certificate.getNotAfter().getTime(), keyPair,
+        certificate.getSerialNumber().toString());
+    currentKey.set(newKey);
+    return newKey;
+  }
+
+  public void notifyCertificateRenewed(String oldCertId, String newCertId) {
+    if (!oldCertId.equals(getCertSerialId())) {
+      logger.info("Old certificate Id doesn't match. Holding {}, oldCertId {}",
+          getCertSerialId(), oldCertId);
+    }
+    if (!newCertId.equals(
+        certClient.getCertificate().getSerialNumber().toString())) {
+      logger.info("New certificate Id doesn't match. Holding in caClient {}," +
+          " newCertId {}", newCertId,
+          certClient.getCertificate().getSerialNumber().toString());
+    }
+    logger.info("Certificate is changed from {} to {}", oldCertId, newCertId);
+    updateCurrentKey(new KeyPair(certClient.getPublicKey(),
+        certClient.getPrivateKey()), certClient.getCertificate());
   }
 
   public String formatTokenId(T id) {
@@ -193,7 +214,8 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     Preconditions.checkState(!isRunning());
     setCertClient(client);
     updateCurrentKey(new KeyPair(certClient.getPublicKey(),
-        certClient.getPrivateKey()));
+        certClient.getPrivateKey()), certClient.getCertificate());
+    client.registerNotificationReceiver(this);
     setIsRunning(true);
   }
 
@@ -236,11 +258,15 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
   }
 
   public OzoneSecretKey getCurrentKey() {
-    return currentKey;
+    return currentKey.get();
   }
 
   public AtomicInteger getCurrentKeyId() {
     return currentKeyId;
+  }
+
+  public String getCertSerialId() {
+    return currentKey.get().getCertSerialId();
   }
 
   public AtomicInteger getTokenSequenceNumber() {

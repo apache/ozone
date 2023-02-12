@@ -51,4 +51,21 @@ public final class IOUtils {
     }
   }
 
+  /**
+   * Close each argument, catching exceptions and logging them as error.
+   */
+  public static void close(Logger logger, AutoCloseable... closeables) {
+    for (AutoCloseable c : closeables) {
+      if (c != null) {
+        try {
+          c.close();
+        } catch (Exception e) {
+          if (logger != null) {
+            logger.error("Exception in closing {}", c, e);
+          }
+        }
+      }
+    }
+  }
+
 }

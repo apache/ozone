@@ -39,6 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -77,35 +79,51 @@ public class TestCommandQueueReportHandler implements EventPublisher {
   public void testQueueReportProcessed() throws NodeNotFoundException {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn, null, null);
+
+    // Add some queued commands to be sent to the DN on this heartbeat. This
+    // means the real queued count will be the value reported plus the commands
+    // sent to the DN.
+    Map<SCMCommandProto.Type, Integer> commandsToBeSent = new HashMap<>();
+    commandsToBeSent.put(SCMCommandProto.Type.valueOf(1), 2);
+    commandsToBeSent.put(SCMCommandProto.Type.valueOf(2), 1);
+
     SCMDatanodeHeartbeatDispatcher.CommandQueueReportFromDatanode
-        commandReport = getQueueReport(dn);
+        commandReport = getQueueReport(dn, commandsToBeSent);
     commandQueueReportHandler.onMessage(commandReport, this);
 
     int commandCount = commandReport.getReport().getCommandCount();
     for (int i = 0; i < commandCount; i++) {
       int storedCount = nodeManager.getNodeQueuedCommandCount(dn,
           commandReport.getReport().getCommand(i));
-      Assertions.assertEquals(commandReport.getReport().getCount(i),
-          storedCount);
+      int expectedCount = commandReport.getReport().getCount(i);
+      // For the first two commands, we added extra commands
+      if (i == 0) {
+        expectedCount += 2;
+      }
+      if (i == 1) {
+        expectedCount += 1;
+      }
+      Assertions.assertEquals(expectedCount, storedCount);
       Assertions.assertTrue(storedCount > 0);
     }
   }
 
   private SCMDatanodeHeartbeatDispatcher.CommandQueueReportFromDatanode
-      getQueueReport(DatanodeDetails dn) {
+      getQueueReport(DatanodeDetails dn,
+          Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     CommandQueueReportProto.Builder builder =
         CommandQueueReportProto.newBuilder();
     int i = 10;
     for (SCMCommandProto.Type cmd : SCMCommandProto.Type.values()) {
       if (cmd == SCMCommandProto.Type.unknownScmCommand) {
-        // Do not include the unknow command type in the message.
+        // Do not include the unknown command type in the message.
         continue;
       }
       builder.addCommand(cmd);
       builder.addCount(i++);
     }
     return new SCMDatanodeHeartbeatDispatcher.CommandQueueReportFromDatanode(
-        dn, builder.build());
+        dn, builder.build(), commandsToBeSent);
   }
 
 
