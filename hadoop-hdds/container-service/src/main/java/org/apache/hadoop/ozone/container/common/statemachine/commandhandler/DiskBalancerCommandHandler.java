@@ -85,6 +85,7 @@ public class DiskBalancerCommandHandler implements CommandHandler {
         diskBalancerInfo.updateFromConf(diskBalancerConf);
         break;
       default:
+        throw new IOException("Unexpected type " + opType);
       }
       ozoneContainer.getDiskBalancerService().refresh(diskBalancerInfo);
     } catch (IOException e) {

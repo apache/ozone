@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -51,9 +50,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_INFO_DIR;
-
 
 /**
  * A per-datanode disk balancing service takes in charge
@@ -155,8 +151,9 @@ public class DiskBalancerService extends BackgroundService {
           "Falling back to default configs", e);
     } finally {
       if (diskBalancerInfo == null) {
-        boolean shouldRunDefault = conf.getObject(DatanodeConfiguration.class)
-            .getDiskBalancerShouldRun();
+        boolean shouldRunDefault =
+            conf.getObject(DiskBalancerConfiguration.class)
+                .getDiskBalancerShouldRun();
         diskBalancerInfo = new DiskBalancerInfo(shouldRunDefault,
             new DiskBalancerConfiguration());
       }
@@ -185,7 +182,8 @@ public class DiskBalancerService extends BackgroundService {
 
   private String getDiskBalancerInfoPath() {
     String diskBalancerInfoDir =
-        conf.getTrimmed(HDDS_DATANODE_DISK_BALANCER_INFO_DIR);
+        conf.getObject(DiskBalancerConfiguration.class)
+            .getDiskBalancerInfoDir();
     if (Strings.isNullOrEmpty(diskBalancerInfoDir)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {

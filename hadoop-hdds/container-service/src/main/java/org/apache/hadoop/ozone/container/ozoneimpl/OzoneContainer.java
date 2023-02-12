@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -232,9 +233,9 @@ public class OzoneContainer {
             blockDeletingServiceWorkerSize, config);
 
     Duration diskBalancerSvcInterval = conf.getObject(
-        DatanodeConfiguration.class).getDiskBalancerInterval();
+        DiskBalancerConfiguration.class).getDiskBalancerInterval();
     Duration diskBalancerSvcTimeout = conf.getObject(
-        DatanodeConfiguration.class).getDiskBalancerTimeout();
+        DiskBalancerConfiguration.class).getDiskBalancerTimeout();
     diskBalancerService =
         new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
             diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
