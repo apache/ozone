@@ -410,7 +410,7 @@ public class TestECContainerRecovery {
 
   private void waitForReplicationManagerStopped(ReplicationManager rm)
       throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> !rm.isRunning(), 1000, 10000);
+    GenericTestUtils.waitFor(() -> !rm.isRunning(), 100, 10000);
   }
 
 }
