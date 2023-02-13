@@ -78,6 +78,23 @@ public class TestRequestContext {
             context.isRecursiveAccessCheck());
   }
 
+  @Test
+  public void testSnapshotName() {
+    RequestContext context = getUserRequestContext("om",
+            IAccessAuthorizer.ACLType.CREATE,"volume1",
+            "snapshotName");
+
+    Assert.assertTrue("Wrongly sets snapshotName value",
+            "snapshotName".equals(context.getSnapshotName()));
+
+    context = getUserRequestContext("om",
+            IAccessAuthorizer.ACLType.CREATE,"volume1",
+            null);
+
+    Assert.assertNull("Wrongly sets snapshotName value",
+            context.getSnapshotName());
+  }
+
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
       boolean recursiveAccessCheck) throws IOException {
@@ -85,6 +102,17 @@ public class TestRequestContext {
     return RequestContext.getBuilder(
             UserGroupInformation.createRemoteUser(username), null, null,
             type, ownerName, recursiveAccessCheck).build();
+  }
+
+  private RequestContext getUserRequestContext(String username,
+      IAccessAuthorizer.ACLType type, String ownerName,
+      String snapshotName) {
+
+    return RequestContext.getBuilder(
+            UserGroupInformation.createRemoteUser(username), null, null,
+            type, ownerName, false)
+            .setSnapshotName(snapshotName)
+            .build();
   }
 
   private RequestContext getUserRequestContext(String username,
