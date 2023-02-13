@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -88,7 +89,9 @@ public class Gateway extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        Gateway.class, originalArgs, LOG);
+        Gateway.class, originalArgs, LOG,
+            ozoneConfiguration.getAllPropertiesByTag(
+                    ConfigTag.S3GATEWAY.name()).toString());
 
     LOG.info("Starting Ozone S3 gateway");
     HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");

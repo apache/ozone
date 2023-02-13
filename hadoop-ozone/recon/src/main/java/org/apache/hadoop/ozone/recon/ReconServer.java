@@ -24,6 +24,7 @@ import com.google.inject.Injector;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -91,10 +92,12 @@ public class ReconServer extends GenericCli {
   public Void call() throws Exception {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
-    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        ReconServer.class, originalArgs, LOG);
 
     configuration = createOzoneConfiguration();
+    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+            ReconServer.class, originalArgs, LOG,
+            configuration.getAllPropertiesByTag(
+                    ConfigTag.RECON.name()).toString());
     ConfigurationProvider.setConfiguration(configuration);
 
     injector = Guice.createInjector(new ReconControllerModule(),
