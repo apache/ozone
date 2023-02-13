@@ -1951,7 +1951,8 @@ public class LegacyReplicationManager {
         sendCloseCommand(container, replica.getDatanodeDetails(), false);
         numCloseCmdsSent++;
         iterator.remove();
-      } else if (state == State.QUASI_CLOSED) {
+      } else if (state == State.QUASI_CLOSED &&
+          container.getState() == LifeCycleState.CLOSED) {
         // Send force close command if the BCSID matches
         if (container.getSequenceId() == replica.getSequenceId()) {
           sendCloseCommand(container, replica.getDatanodeDetails(), true);

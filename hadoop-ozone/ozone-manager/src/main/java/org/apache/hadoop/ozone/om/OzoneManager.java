@@ -196,6 +196,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
+import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -736,7 +737,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
-    metadataManager = new OmMetadataManagerImpl(configuration);
+    OmMetadataManagerImpl metadataManagerImpl =
+        new OmMetadataManagerImpl(configuration);
+    this.metadataManager = metadataManagerImpl;
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");
     if (isS3MultiTenancyEnabled) {
@@ -745,8 +748,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     volumeManager = new VolumeManagerImpl(metadataManager);
     bucketManager = new BucketManagerImpl(metadataManager);
+    s3SecretManager = new S3SecretLockedManager(
+        new S3SecretManagerImpl(metadataManagerImpl, metadataManagerImpl),
+        metadataManager.getLock()
+    );
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
-      s3SecretManager = new S3SecretManagerImpl(configuration, metadataManager);
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
@@ -1480,6 +1486,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
+  }
+
+  public S3SecretManager getS3SecretManager() {
+    return s3SecretManager;
   }
 
   /**
@@ -2592,8 +2602,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
         String remoteUserName = remoteUserUgi.getShortUserName();
+        // Convert userName to short username
+        String userParamShortName = new HadoopKerberosName(userName)
+            .getShortName();
         // if not admin nor list my own volumes, check ACL.
-        if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
+        if (!remoteUserName.equals(userParamShortName)
+            && !isAdmin(remoteUserUgi)) {
           omMetadataReader.checkAcls(ResourceType.VOLUME,
               StoreType.OZONE, ACLType.LIST,
               OzoneConsts.OZONE_ROOT, null, null);

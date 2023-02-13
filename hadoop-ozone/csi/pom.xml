@@ -71,7 +71,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty</artifactId>
-      <version>${io.grpc.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -101,7 +100,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-protobuf</artifactId>
-      <version>${io.grpc.version}</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.protobuf</groupId>
@@ -112,7 +110,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-stub</artifactId>
-      <version>${io.grpc.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
