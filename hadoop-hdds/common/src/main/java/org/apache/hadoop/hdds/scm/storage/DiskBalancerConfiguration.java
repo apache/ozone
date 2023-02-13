@@ -52,18 +52,6 @@ public final class DiskBalancerConfiguration {
     return infoDir;
   }
 
-  // TODO: modify contents
-  @Config(key = "volume.choosing.policy", type = ConfigType.CLASS,
-      defaultValue = "", tags = {ConfigTag.DISKBALANCER},
-      description = "")
-  private Class<?> volumeChoosingPolicy = Object.class;
-
-  // TODO: modify contents
-  @Config(key = "container.choosing.policy", type = ConfigType.CLASS,
-      defaultValue = "", tags = {ConfigTag.DISKBALANCER},
-      description = "")
-  private Class<?> containerChoosingPolicy = Object.class;
-
   @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
