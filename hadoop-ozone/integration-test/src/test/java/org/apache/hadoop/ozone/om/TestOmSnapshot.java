@@ -496,14 +496,14 @@ public class TestOmSnapshot {
 
   }
 
-  private SnapshotDiffReport getSnapDiffReport(String volumeName,
-                                               String bucketName,
+  private SnapshotDiffReport getSnapDiffReport(String volume,
+                                               String bucket,
                                                String fromSnapshot,
                                                String toSnapshot)
       throws InterruptedException, IOException {
     SnapshotDiffResponse response;
     do {
-      response = store.snapshotDiff(volumeName, bucketName, fromSnapshot,
+      response = store.snapshotDiff(volume, bucket, fromSnapshot,
           toSnapshot, null, 0);
       Thread.sleep(response.getWaitTimeInMs());
     } while (response.getJobStatus() != DONE);
