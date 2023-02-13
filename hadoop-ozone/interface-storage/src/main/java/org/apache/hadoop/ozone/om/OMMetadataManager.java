@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -276,10 +275,10 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param count The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
    * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
-   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
+   * @return the expired open keys.
    * @throws IOException
    */
-  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
+  ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
 
   /**
