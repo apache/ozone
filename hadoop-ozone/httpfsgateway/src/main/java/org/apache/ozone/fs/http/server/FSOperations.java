@@ -2118,15 +2118,9 @@ public final class FSOperations {
 
     @Override
     public Void execute(FileSystem fs) throws IOException {
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        dfs.satisfyStoragePolicy(path);
-      } else {
-        throw new UnsupportedOperationException("satisfyStoragePolicy is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return null;
+      throw new UnsupportedOperationException("satisfyStoragePolicy is "
+          + "not supported for HttpFs on " + fs.getClass()
+          + ". Please check your fs.defaultFS configuration");
     }
   }
 }
