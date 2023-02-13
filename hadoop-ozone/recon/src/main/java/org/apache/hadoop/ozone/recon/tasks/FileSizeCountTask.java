@@ -92,7 +92,7 @@ public class FileSizeCountTask implements ReconOmTask {
     boolean statusOBS =
         reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
             fileSizeCountMap);
-    if (statusFSO && statusOBS) {
+    if (!statusFSO && !statusOBS) {
       return new ImmutablePair<>(getTaskName(), false);
     }
     writeCountsToDB(true, fileSizeCountMap);
