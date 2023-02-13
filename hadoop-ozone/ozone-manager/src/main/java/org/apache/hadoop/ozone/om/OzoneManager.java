@@ -3026,7 +3026,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void transferLeadership(String nodeId)
+  public void transferLeadership(String newLeaderId)
       throws IOException {
     final UserGroupInformation ugi = getRemoteUser();
     if (!isAdmin(ugi)) {
@@ -3035,25 +3035,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           PERMISSION_DENIED);
     }
     if (!isRatisEnabled) {
-      throw new IOException("OM HA not enabled..");
+      throw new IOException("OM HA not enabled.");
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put("nodeId", nodeId);
+    auditMap.put("newLeaderId", newLeaderId);
     try {
       RaftGroupId groupID = omRatisServer.getRaftGroup().getGroupId();
       RaftServer.Division division = omRatisServer.getServer()
           .getDivision(groupID);
       RaftPeerId targetPeerId;
-      if (nodeId.isEmpty()) {
+      if (newLeaderId.isEmpty()) {
         RaftPeer curLeader = omRatisServer.getLeader();
         targetPeerId = division.getGroup()
             .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
-            .map(RaftPeer::getId).orElse(null);
+            .map(RaftPeer::getId).orElseThrow(() -> new IOException("Cannot" +
+                " find a new leader to transfer leadership."));
       } else {
-        targetPeerId = RaftPeerId.valueOf(nodeId);
+        targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
-      RatisHelper.transferRatisLeadership(configuration, division,
+      RatisHelper.transferRatisLeadership(configuration, division.getGroup(),
           targetPeerId);
     } catch (IOException ex) {
       auditSuccess = false;

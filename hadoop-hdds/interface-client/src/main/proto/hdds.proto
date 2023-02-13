@@ -454,7 +454,7 @@ message ContainerBalancerConfigurationProto {
 }
 
 message TransferLeadershipRequestProto {
-    required string nodeId = 1;
+    required string newLeaderId = 1;
 }
 
 message TransferLeadershipResponseProto {

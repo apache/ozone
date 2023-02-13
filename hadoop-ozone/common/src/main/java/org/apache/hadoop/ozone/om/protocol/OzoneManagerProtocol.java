@@ -402,10 +402,10 @@ public interface OzoneManagerProtocol
   /**
    * Transfer the raft leadership.
    *
-   * @param nodeId        the nodeId of the target expected leader
+   * @param newLeaderId  the newLeaderId of the target expected leader
    * @throws IOException
    */
-  void transferLeadership(String nodeId) throws IOException;
+  void transferLeadership(String newLeaderId) throws IOException;
 
   /**
    * Triggers Ranger background sync task immediately.

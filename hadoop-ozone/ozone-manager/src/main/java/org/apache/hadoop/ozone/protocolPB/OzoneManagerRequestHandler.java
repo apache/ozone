@@ -1260,8 +1260,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private TransferLeadershipResponseProto transferLeadership(
       TransferLeadershipRequestProto req) throws IOException {
-    String nodeId = req.getNodeId();
-    impl.transferLeadership(nodeId);
+    String newLeaderId = req.getNewLeaderId();
+    impl.transferLeadership(newLeaderId);
     return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

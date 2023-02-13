@@ -1576,11 +1576,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void transferLeadership(String nodeId)
+  public void transferLeadership(String newLeaderId)
       throws IOException {
     TransferLeadershipRequestProto.Builder builder =
         TransferLeadershipRequestProto.newBuilder();
-    builder.setNodeId(nodeId);
+    builder.setNewLeaderId(newLeaderId);
     OMRequest omRequest = createOMRequest(Type.TransferLeadership)
         .setTransferOmLeadershipRequest(builder.build())
         .build();
