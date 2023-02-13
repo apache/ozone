@@ -128,55 +128,72 @@ public class FileSizeCountTask implements ReconOmTask {
       if (!taskTables.contains(omdbUpdateEvent.getTable())) {
         continue;
       }
+      OMDBUpdateEvent.OMDBUpdateAction event = omdbUpdateEvent.getAction();
       String updatedKey = omdbUpdateEvent.getKey();
-
-      // Get the updated and old OM Key Info objects
       Object omKeyInfo = omdbUpdateEvent.getValue();
       Object oldOmKeyInfo = omdbUpdateEvent.getOldValue();
 
-      OmKeyInfo keyInfo, oldKeyInfo;
-      // Handle the case where the updated OM Key Info is a RepeatedOmKeyInfo object
+      List<OmKeyInfo> omKeyInfoList, oldOmKeyInfoList;
       if (omKeyInfo instanceof RepeatedOmKeyInfo) {
         // Handle RepeatedOmKeyInfo object
         RepeatedOmKeyInfo repeatedKeyInfo = (RepeatedOmKeyInfo) omKeyInfo;
-        keyInfo = repeatedKeyInfo.getOmKeyInfoList().get(0);
-        oldKeyInfo = repeatedKeyInfo.getOmKeyInfoList().get(0);
-      }
-      // Handle the case where the updated OM Key Info is an OmKeyInfo object
-      else {
-        // Handle OmKeyInfo object
-        keyInfo = (OmKeyInfo) omKeyInfo;
-        oldKeyInfo = (OmKeyInfo) oldOmKeyInfo;
-      }
-
-      try {
-        switch (omdbUpdateEvent.getAction()) {
-        case PUT:
-          handlePutKeyEvent(keyInfo, fileSizeCountMap);
-          break;
-
-        case DELETE:
-          handleDeleteKeyEvent(updatedKey, keyInfo, fileSizeCountMap);
-          break;
-
-        case UPDATE:
-          handleDeleteKeyEvent(updatedKey, oldKeyInfo,
-              fileSizeCountMap);
-          handlePutKeyEvent(keyInfo, fileSizeCountMap);
-          break;
-
-        default: LOG.trace("Skipping DB update event : {}",
-            omdbUpdateEvent.getAction());
+        RepeatedOmKeyInfo repeatedOldKeyInfo = (RepeatedOmKeyInfo) oldOmKeyInfo;
+        omKeyInfoList = repeatedKeyInfo.getOmKeyInfoList();
+        oldOmKeyInfoList = repeatedOldKeyInfo.getOmKeyInfoList();
+        int size = Math.min(omKeyInfoList.size(), oldOmKeyInfoList.size());
+        for (int i = 0; i < size; i++) {
+          OmKeyInfo keyInfo = omKeyInfoList.get(i);
+          OmKeyInfo oldKeyInfo = oldOmKeyInfoList.get(i);
+          if (!processEvent(updatedKey, keyInfo, oldKeyInfo, event,
+              fileSizeCountMap)) {
+            return new ImmutablePair<>(getTaskName(), false);
+          }
         }
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while processing key {}.",
-                updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), false);
+      } else {
+        // Handle OmKeyInfo object
+        OmKeyInfo keyInfo = (OmKeyInfo) omKeyInfo;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldOmKeyInfo;
+        if (!processEvent(updatedKey, keyInfo, oldKeyInfo, event,
+            fileSizeCountMap)) {
+          return new ImmutablePair<>(getTaskName(), false);
+        }
       }
     }
     writeCountsToDB(false, fileSizeCountMap);
     LOG.info("Completed a 'process' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  public boolean processEvent(String updatedKey, OmKeyInfo keyInfo,
+                              OmKeyInfo oldKeyInfo,
+                              OMDBUpdateEvent.OMDBUpdateAction event,
+                              Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    try {
+      switch (event) {
+      case PUT:
+        handlePutKeyEvent(keyInfo, fileSizeCountMap);
+        break;
+
+      case DELETE:
+        handleDeleteKeyEvent(updatedKey, keyInfo, fileSizeCountMap);
+        break;
+
+      case UPDATE:
+        handleDeleteKeyEvent(updatedKey, oldKeyInfo,
+            fileSizeCountMap);
+        handlePutKeyEvent(keyInfo, fileSizeCountMap);
+        break;
+
+      default:
+        LOG.trace("Skipping DB update event : {}",
+            event);
+      }
+    } catch (Exception e) {
+      LOG.error("Unexpected exception while processing key {}.",
+          updatedKey, e);
+      return false;
+    }
+    return true;
   }
 
   /**
