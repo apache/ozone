@@ -263,7 +263,9 @@ public class ReplicationManager implements SCMService {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
       metrics = ReplicationManagerMetrics.create(this);
-      legacyReplicationManager.setMetrics(metrics);
+      if (rmConf.isLegacyEnabled()) {
+        legacyReplicationManager.setMetrics(metrics);
+      }
       containerReplicaPendingOps.setReplicationMetrics(metrics);
       startSubServices();
     } else {
@@ -295,7 +297,9 @@ public class ReplicationManager implements SCMService {
       underReplicatedProcessorThread.interrupt();
       overReplicatedProcessorThread.interrupt();
       running = false;
-      legacyReplicationManager.clearInflightActions();
+      if (rmConf.isLegacyEnabled()) {
+        legacyReplicationManager.clearInflightActions();
+      }
       metrics.unRegister();
       replicationMonitor.interrupt();
     } else {
@@ -345,7 +349,7 @@ public class ReplicationManager implements SCMService {
         break;
       }
       report.increment(c.getState());
-      if (c.getReplicationType() != EC) {
+      if (c.getReplicationType() != EC && rmConf.isLegacyEnabled()) {
         legacyReplicationManager.processContainer(c, report);
         continue;
       }
@@ -755,7 +759,12 @@ public class ReplicationManager implements SCMService {
     if (container.getReplicationType() == EC) {
       return getECContainerReplicaCount(container);
     }
-    return legacyReplicationManager.getContainerReplicaCount(container);
+
+    if (rmConf.isLegacyEnabled()) {
+      return legacyReplicationManager.getContainerReplicaCount(container);
+    } else {
+      return getRatisContainerReplicaCount(container);
+    }
   }
 
   /**
@@ -801,6 +810,29 @@ public class ReplicationManager implements SCMService {
    */
   @ConfigGroup(prefix = "hdds.scm.replication")
   public static class ReplicationManagerConfiguration {
+    /**
+     * True if LegacyReplicationManager should be used for RATIS containers.
+     */
+    @Config(key = "enable.legacy",
+        type = ConfigType.BOOLEAN,
+        defaultValue = "true",
+        tags = {SCM, OZONE},
+        description = "This configuration decides if " +
+            "LegacyReplicationManager should be used to handle RATIS " +
+            "containers. Default is true, which means " +
+            "LegacyReplicationManager will handle RATIS containers while " +
+            "ReplicationManager will handle EC containers."
+    )
+    private boolean enableLegacy = true;
+
+    public boolean isLegacyEnabled() {
+      return enableLegacy;
+    }
+
+    public void enableLegacy(boolean enableLegacy) {
+      this.enableLegacy = enableLegacy;
+    }
+
     /**
      * The frequency in which ReplicationMonitor thread should run.
      */
@@ -1002,9 +1034,11 @@ public class ReplicationManager implements SCMService {
           lastTimeToBeReadyInMillis = clock.millis();
           serviceStatus = ServiceStatus.RUNNING;
         }
-        //now, as the current scm is leader and it`s state is up-to-date,
-        //we need to take some action about replicated inflight move options.
-        legacyReplicationManager.notifyStatusChanged();
+        if (rmConf.isLegacyEnabled()) {
+          //now, as the current scm is leader and it`s state is up-to-date,
+          //we need to take some action about replicated inflight move options.
+          legacyReplicationManager.notifyStatusChanged();
+        }
       } else {
         serviceStatus = ServiceStatus.PAUSING;
       }
@@ -1084,6 +1118,16 @@ public class ReplicationManager implements SCMService {
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     return new ECContainerReplicaCount(
         containerInfo, replicas, pendingOps, maintenanceRedundancy);
+  }
+
+  private RatisContainerReplicaCount getRatisContainerReplicaCount(
+      ContainerInfo containerInfo) throws ContainerNotFoundException {
+    Set<ContainerReplica> replicas =
+        containerManager.getContainerReplicas(containerInfo.containerID());
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
+    return new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+        ratisMaintenanceMinReplicas);
   }
   
   public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
