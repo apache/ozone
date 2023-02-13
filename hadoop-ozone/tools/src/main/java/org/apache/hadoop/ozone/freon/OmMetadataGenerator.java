@@ -136,7 +136,6 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       description = "Print operation help, or list available operation")
   private boolean opHelp;
 
-
   @Option(
       names = "--om-service-id",
       description = "OM Service ID"
