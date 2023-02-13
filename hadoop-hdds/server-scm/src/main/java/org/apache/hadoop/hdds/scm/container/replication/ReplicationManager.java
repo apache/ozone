@@ -821,7 +821,8 @@ public class ReplicationManager implements SCMService {
             "LegacyReplicationManager should be used to handle RATIS " +
             "containers. Default is true, which means " +
             "LegacyReplicationManager will handle RATIS containers while " +
-            "ReplicationManager will handle EC containers."
+            "ReplicationManager will handle EC containers. If false, " +
+            "ReplicationManager will handle both RATIS and EC."
     )
     private boolean enableLegacy = true;
 
