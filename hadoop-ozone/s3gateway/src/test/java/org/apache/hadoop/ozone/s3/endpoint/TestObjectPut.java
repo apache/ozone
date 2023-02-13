@@ -321,7 +321,6 @@ public class TestObjectPut {
     final ClientProtocol protocol = Mockito.mock(ClientProtocol.class);
 
     // WHEN
-    when(headers.getHeaderString(any())).thenReturn("");
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getObjectStore().getS3Volume()).thenReturn(volume);
     when(volume.getBucket(bucketName)).thenReturn(bucket);
