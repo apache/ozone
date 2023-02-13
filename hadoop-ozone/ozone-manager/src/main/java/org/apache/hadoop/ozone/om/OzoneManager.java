@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -4380,9 +4381,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ozoneObj.getKeyName());
   }
 
-  public SnapshotDiffReport snapshotDiff(String volume, String bucket,
-                                         String fromSnapshot, String toSnapshot,
-                                         String token, int pageSize)
+  public SnapshotDiffResponse snapshotDiff(String volume,
+                                           String bucket,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize);

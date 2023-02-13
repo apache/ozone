@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
 
@@ -1062,8 +1063,8 @@ public interface ClientProtocol {
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
-  SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                  String fromSnapshot, String toSnapshot,
-                                  String token, int pageSize)
+  SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
+                                    String fromSnapshot, String toSnapshot,
+                                    String token, int pageSize)
       throws IOException;
 }

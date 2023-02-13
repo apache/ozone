@@ -189,6 +189,8 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -1190,12 +1192,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public SnapshotDiffReport snapshotDiff(String volumeName,
-                                         String bucketName,
-                                         String fromSnapshot,
-                                         String toSnapshot,
-                                         String token,
-                                         int pageSize) throws IOException {
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize) throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
@@ -1214,8 +1216,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    return SnapshotDiffReport.fromProtobuf(omResponse
-        .getSnapshotDiffResponse().getSnapshotDiffReport());
+    OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
+        omResponse.getSnapshotDiffResponse();
+
+    return new SnapshotDiffResponse(
+        SnapshotDiffReport.fromProtobuf(diffResponse.getSnapshotDiffReport()),
+        JobStatus.fromProtobuf(diffResponse.getJobStatus()),
+        diffResponse.getWaitTimeInMs());
   }
 
   /**

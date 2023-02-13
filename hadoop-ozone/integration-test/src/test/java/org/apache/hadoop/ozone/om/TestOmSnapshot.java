@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
@@ -70,6 +71,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONT
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertThrows;
@@ -443,8 +445,8 @@ public class TestOmSnapshot {
     // Do nothing, take another snapshot
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap2);
-    SnapshotDiffReport diff1 = store.snapshotDiff(volume, bucket, snap1, snap2,
-        null, 0);
+
+    SnapshotDiffReport diff1 = getSnapDiffReport(volume, bucket, snap1, snap2);
     Assert.assertTrue(diff1.getDiffList().isEmpty());
     // Create Key2 and delete Key1, take snapshot
     String key2 = "key-2-";
@@ -452,9 +454,9 @@ public class TestOmSnapshot {
     bucket1.deleteKey(key1);
     String snap3 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap3);
+
     // Diff should have 2 entries
-    SnapshotDiffReport diff2 = store.snapshotDiff(volume, bucket, snap2, snap3,
-        null, 0);
+    SnapshotDiffReport diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
     Assert.assertTrue(diff2.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
@@ -468,8 +470,8 @@ public class TestOmSnapshot {
     bucket1.renameKey(key2, key2Renamed);
     String snap4 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap4);
-    SnapshotDiffReport diff3 = store.snapshotDiff(volume, bucket, snap3, snap4,
-        null, 0);
+
+    SnapshotDiffReport diff3 = getSnapDiffReport(volume, bucket, snap3, snap4);
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
@@ -481,8 +483,7 @@ public class TestOmSnapshot {
     bucket1.createDirectory(dir1);
     String snap5 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap5);
-    SnapshotDiffReport diff4 = store.snapshotDiff(volume, bucket, snap4, snap5,
-        null, 0);
+    SnapshotDiffReport diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
     Assert.assertEquals(1, diff4.getDiffList().size());
     // for non-fso, directories are a special type of key with "/" appended
     // at the end.
@@ -493,6 +494,21 @@ public class TestOmSnapshot {
         SnapshotDiffReport.DiffReportEntry
             .of(SnapshotDiffReport.DiffType.CREATE, dir1)));
 
+  }
+
+  private SnapshotDiffReport getSnapDiffReport(String volumeName,
+                                               String bucketName,
+                                               String fromSnapshot,
+                                               String toSnapshot)
+      throws InterruptedException, IOException {
+    SnapshotDiffResponse response;
+    do {
+      response = store.snapshotDiff(volumeName, bucketName, fromSnapshot,
+          toSnapshot, null, 0);
+      Thread.sleep(response.getWaitTimeInMs());
+    } while (response.getJobStatus() != DONE);
+
+    return response.getSnapshotDiffReport();
   }
 
   @Test

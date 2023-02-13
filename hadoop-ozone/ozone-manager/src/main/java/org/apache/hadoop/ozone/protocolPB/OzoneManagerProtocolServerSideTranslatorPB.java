@@ -174,7 +174,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       }
 
       if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
+        try {
+          return submitReadRequestToOM(request);
+        } catch (Exception e) {
+          LOG.info("HEKU: Request type:" + request.getCmdType());
+          throw e;
+        }
       }
 
       // To validate credentials we have already verified leader status.

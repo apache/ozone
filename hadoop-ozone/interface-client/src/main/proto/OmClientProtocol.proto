@@ -1739,7 +1739,16 @@ message ListSnapshotResponse {
 }
 
 message SnapshotDiffResponse {
+  enum JobStatusProto {
+    QUEUED = 1;
+    IN_PROGRESS = 2;
+    DONE = 3;
+    REJECTED = 4;
+    FAILED = 5;
+  }
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional JobStatusProto jobStatus = 2;
+  optional int64 waitTimeInMs = 3;
 }
 
 message DeleteSnapshotResponse {

@@ -133,6 +133,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1212,13 +1213,26 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private SnapshotDiffResponse snapshotDiff(
       SnapshotDiffRequest snapshotDiffRequest) throws IOException {
-    return SnapshotDiffResponse.newBuilder().setSnapshotDiffReport(
-        impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
+    org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse response =
+        impl.snapshotDiff(
+            snapshotDiffRequest.getVolumeName(),
             snapshotDiffRequest.getBucketName(),
             snapshotDiffRequest.getFromSnapshot(),
             snapshotDiffRequest.getToSnapshot(),
             snapshotDiffRequest.getToken(),
-            snapshotDiffRequest.getPageSize()).toProtobuf()).build();
+            snapshotDiffRequest.getPageSize());
+
+    OzoneManagerProtocolProtos.SnapshotDiffReportProto snapshotDiffReportProto;
+    if (response.getSnapshotDiffReport() == null) {
+      snapshotDiffReportProto = null;
+    } else {
+      snapshotDiffReportProto = response.getSnapshotDiffReport().toProtobuf();
+    }
+
+    return SnapshotDiffResponse.newBuilder()
+        .setSnapshotDiffReport(snapshotDiffReportProto)
+        .setJobStatus(response.getJobStatus().toProtobuf())
+        .setWaitTimeInMs(response.getWaitTimeInMs()).build();
   }
 
 
