@@ -436,9 +436,9 @@ public class RpcClient implements ClientProtocol {
     verifySpaceQuota(volArgs.getQuotaInBytes());
 
     String admin = volArgs.getAdmin() == null ?
-        ugi.getShortUserName() : volArgs.getAdmin();
+        getRealUserInfo().getShortUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
-        ugi.getShortUserName() : volArgs.getOwner();
+        getRealUserInfo().getShortUserName() : volArgs.getOwner();
     long quotaInNamespace = volArgs.getQuotaInNamespace();
     long quotaInBytes = volArgs.getQuotaInBytes();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
@@ -645,7 +645,7 @@ public class RpcClient implements ClientProtocol {
       owner = s3gUGI.getShortUserName();
     } else {
       owner = bucketArgs.getOwner() == null ?
-          ugi.getShortUserName() : bucketArgs.getOwner();
+          getRealUserInfo().getShortUserName() : bucketArgs.getOwner();
     }
 
     Boolean isVersionEnabled = bucketArgs.getVersioning() == null ?
@@ -745,17 +745,25 @@ public class RpcClient implements ClientProtocol {
    * @return listOfAcls
    * */
   private List<OzoneAcl> getAclList() {
+    UserGroupInformation realUserInfo = getRealUserInfo();
+    return OzoneAclUtil.getAclList(realUserInfo.getUserName(),
+        realUserInfo.getGroupNames(), userRights, groupRights);
+  }
+
+  /**
+   * Helper function to get the actual operating user.
+   *
+   * @return listOfAcls
+   * */
+  private UserGroupInformation getRealUserInfo() {
+    // After HDDS-5881 the user will not be different,
+    // as S3G uses single RpcClient. So we should be checking thread-local
+    // S3Auth and use it during proxy.
     if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
-      UserGroupInformation aclUgi =
-          UserGroupInformation.createRemoteUser(
-             ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
-      return OzoneAclUtil.getAclList(
-          aclUgi.getUserName(),
-          aclUgi.getGroupNames(),
-         userRights, groupRights);
+      return UserGroupInformation.createRemoteUser(
+                      ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
     }
-    return OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-        userRights, groupRights);
+    return ugi;
   }
 
   /**
@@ -1265,7 +1273,7 @@ public class RpcClient implements ClientProtocol {
       validator.validate(replicationConfig);
     }
     String requestId = UUID.randomUUID().toString();
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1309,7 +1317,7 @@ public class RpcClient implements ClientProtocol {
     }
     HddsClientUtils.checkNotNull(keyName, replicationConfig);
     String requestId = UUID.randomUUID().toString();
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1716,7 +1724,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     String requestId = UUID.randomUUID().toString();
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1771,7 +1779,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     String requestId = UUID.randomUUID().toString();
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1824,7 +1832,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1929,7 +1937,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createDirectory(String volumeName, String bucketName,
       String keyName) throws IOException {
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -2007,7 +2015,7 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication.");
       }
     }
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -2039,7 +2047,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, boolean overWrite, boolean recursive)
       throws IOException {
-    String ownerName = ugi.getShortUserName();
+    String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
