@@ -200,17 +200,6 @@ public class ObjectEndpoint extends EndpointBase {
 
       // Normal put object
       OzoneBucket bucket = volume.getBucket(bucketName);
-      if (length == 0 &&
-          ozoneConfiguration
-              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
-          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-        s3GAction = S3GAction.CREATE_DIRECTORY;
-        // create directory
-        getClientProtocol()
-            .createDirectory(volume.getName(), bucketName, keyPath);
-        return Response.ok().status(HttpStatus.SC_OK).build();
-      }
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType);
 
@@ -222,6 +211,18 @@ public class ObjectEndpoint extends EndpointBase {
             storageTypeDefault);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
+      }
+
+      if (length == 0 &&
+          ozoneConfiguration
+              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
+          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        s3GAction = S3GAction.CREATE_DIRECTORY;
+        // create directory
+        getClientProtocol()
+            .createDirectory(volume.getName(), bucketName, keyPath);
+        return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
       // Normal put object
