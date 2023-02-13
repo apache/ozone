@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,5 +42,6 @@ public interface NodeManagerMXBean {
    * storage type.
    */
   Map<String, Long> getNodeInfo();
+  Map<String, List<String>> getNodeStatusInfo();
 
 }

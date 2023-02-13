@@ -36,7 +36,7 @@
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
                 .then(function (result) {
                     ctrl.nodemanagermetrics = result.data.beans[0];
-                $scope.nodeStatus = ctrl.nodemanagermetrics && ctrl.nodemanagermetrics.NodeStatus && ctrl.nodemanagermetrics.NodeStatus.map(({ key, value}) =>{
+                $scope.nodeStatus = ctrl.nodemanagermetrics && ctrl.nodemanagermetrics.NodeStatusInfo && ctrl.nodemanagermetrics.NodeStatusInfo.map(({ key, value}) =>{
                             return {
                                 hostname: key,
                                 opstate: value[0],
