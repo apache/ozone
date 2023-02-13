@@ -761,7 +761,7 @@ public class RpcClient implements ClientProtocol {
     // S3Auth and use it during proxy.
     if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
       return UserGroupInformation.createRemoteUser(
-                      ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
+          ozoneManagerClient.getThreadLocalS3Auth().getAccessID());
     }
     return ugi;
   }
