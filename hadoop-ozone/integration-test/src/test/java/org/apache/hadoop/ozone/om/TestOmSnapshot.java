@@ -641,11 +641,11 @@ public class TestOmSnapshot {
   private static List<LiveFileMetaData> getKeyTableSstFiles() {
     if (!bucketLayout.isFileSystemOptimized()) {
       return rdbStore.getDb().getSstFileList().stream().filter(
-          x -> new String(x.columnFamilyName()).equals(
+          x -> new String(x.columnFamilyName(), UTF_8).equals(
               OmMetadataManagerImpl.KEY_TABLE)).collect(Collectors.toList());
     }
     return rdbStore.getDb().getSstFileList().stream().filter(
-        x -> new String(x.columnFamilyName()).equals(
+        x -> new String(x.columnFamilyName(), UTF_8).equals(
             OmMetadataManagerImpl.FILE_TABLE)).collect(Collectors.toList());
   }
 
