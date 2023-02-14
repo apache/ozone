@@ -832,7 +832,7 @@ public class ReplicationManager implements SCMService {
       return enableLegacy;
     }
 
-    public void enableLegacy(boolean enableLegacy) {
+    public void setEnableLegacy(boolean enableLegacy) {
       this.enableLegacy = enableLegacy;
     }
 
