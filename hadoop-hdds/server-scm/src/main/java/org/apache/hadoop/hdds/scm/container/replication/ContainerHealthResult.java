@@ -278,6 +278,7 @@ public class ContainerHealthResult {
     private final int excessRedundancy;
     private final boolean sufficientlyReplicatedAfterPending;
     private boolean hasMismatchedReplicas;
+    private boolean isSafelyOverReplicated;
 
     public OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
@@ -316,6 +317,14 @@ public class ContainerHealthResult {
 
     public void setHasMismatchedReplicas(boolean hasMismatchedReplicas) {
       this.hasMismatchedReplicas = hasMismatchedReplicas;
+    }
+
+    public boolean isSafelyOverReplicated() {
+      return isSafelyOverReplicated;
+    }
+
+    public void setIsSafelyOverReplicated(boolean isSafelyOverReplicated) {
+      this.isSafelyOverReplicated = isSafelyOverReplicated;
     }
   }
 }
