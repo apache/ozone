@@ -1130,7 +1130,7 @@ public class ReplicationManager implements SCMService {
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     return new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
-        ratisMaintenanceMinReplicas);
+        ratisMaintenanceMinReplicas, false);
   }
   
   public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
