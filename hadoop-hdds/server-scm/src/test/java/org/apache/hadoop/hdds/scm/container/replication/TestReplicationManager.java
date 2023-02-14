@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -52,6 +53,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -70,6 +72,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAF
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
@@ -813,6 +816,35 @@ public class TestReplicationManager {
         .getEcReplicationCmdsSentTotal());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getNumReplicationCmdsSent());
+  }
+
+  @Test
+  public void testSendLowPriorityReplicateContainerCommand()
+      throws NotLeaderException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails src = MockDatanodeDetails.randomDatanodeDetails();
+    long scmDeadline = clock.millis() + 1000;
+    long datanodeDeadline = clock.millis() + 500;
+
+    replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+        0, src, target, scmDeadline, datanodeDeadline);
+
+    ArgumentCaptor<CommandForDatanode> command =
+        ArgumentCaptor.forClass(CommandForDatanode.class);
+    Mockito.verify(eventPublisher).fireEvent(any(), command.capture());
+
+    CommandForDatanode sentCommand = command.getValue();
+    Assertions.assertEquals(datanodeDeadline,
+        sentCommand.getCommand().getDeadline());
+    ReplicateContainerCommand replicateContainerCommand =
+        (ReplicateContainerCommand) sentCommand.getCommand();
+    Assertions.assertEquals(LOW, replicateContainerCommand.getPriority());
+    Assertions.assertEquals(src.getUuid(), sentCommand.getDatanodeId());
+    Assertions.assertEquals(target,
+        replicateContainerCommand.getTargetDatanode());
   }
 
   @SafeVarargs
