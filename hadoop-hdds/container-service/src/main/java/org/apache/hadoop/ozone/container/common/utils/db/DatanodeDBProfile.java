@@ -57,6 +57,7 @@ public abstract class DatanodeDBProfile {
     case SSD:
       return new SSD();
     case DISK:
+    case TEST:
       return new Disk();
     default:
       throw new IllegalArgumentException(
