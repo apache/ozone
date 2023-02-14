@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -732,16 +733,23 @@ public final class OzoneManagerRatisServer {
         .getPropsMatchPrefixAndTrimPrefix(OZONE_OM_HA_PREFIX + ".");
   }
 
-  public RaftPeer getLeader() throws IOException {
-    RaftServer.Division division = server.getDivision(raftGroupId);
-    if (division.getInfo().isLeader()) {
-      return division.getPeer();
-    } else {
-      ByteString leaderId = division.getInfo().getRoleInfoProto()
-          .getFollowerInfo().getLeaderInfo().getId().getId();
-      return leaderId.isEmpty() ? null :
-          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+  public RaftPeer getLeader() {
+    try {
+      RaftServer.Division division = server.getDivision(raftGroupId);
+      if (division.getInfo().isLeader()) {
+        return division.getPeer();
+      } else {
+        ByteString leaderId = division.getInfo().getRoleInfoProto()
+            .getFollowerInfo().getLeaderInfo().getId().getId();
+        return leaderId.isEmpty() ? null :
+            division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+      }
+    } catch (IOException e) {
+      // In this case we return not a leader.
+      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
+          "whether it's leader. ", e);
     }
+    return null;
   }
 
   /**
@@ -812,53 +820,28 @@ public final class OzoneManagerRatisServer {
 
   @VisibleForTesting
   public RaftPeerId getRaftLeaderId() {
-    return this.getRaftLeader() == null ? null : this.getRaftLeader().getId();
+    return this.getLeader() == null ? null : this.getLeader().getId();
   }
 
   @VisibleForTesting
   public String getRaftLeaderAddress() {
-    if (this.getRaftLeader() == null) {
+    RaftPeer leaderPeer = getLeader();
+    if (leaderPeer == null) {
       return null;
     }
     InetAddress leaderInetAddress = null;
     try {
       Optional<String> hostname =
-          HddsUtils.getHostName(getRaftLeader().getAddress());
+          HddsUtils.getHostName(leaderPeer.getAddress());
       if (hostname.isPresent()) {
         leaderInetAddress = InetAddress.getByName(hostname.get());
       }
-    } catch (IOException ex) {
+    } catch (UnknownHostException e) {
       LOG.error("OM Ratis LeaderInetAddress {} is unresolvable",
-          getRaftLeader().getAddress());
+          leaderPeer.getAddress(), e);
     }
     return leaderInetAddress == null ? null :
         leaderInetAddress.toString();
-  }
-
-  @VisibleForTesting
-  public RaftPeer getRaftLeader() {
-    RaftPeerId leaderId = null;
-    try {
-      RaftServer.Division division = server.getDivision(raftGroupId);
-      if (division != null) {
-        if (division.getInfo().isLeader()) {
-          leaderId = getRaftPeerId();
-        } else {
-          ByteString leaderIdByteString = division.getInfo().getRoleInfoProto()
-              .getFollowerInfo().getLeaderInfo().getId().getId();
-          leaderId =  leaderIdByteString.isEmpty() ? null :
-              RaftPeerId.valueOf(leaderIdByteString);
-        }
-        if (leaderId != null) {
-          return division.getRaftConf().getPeer(leaderId);
-        }
-      }
-    } catch (IOException ioe) {
-      // In this case we return not a leader.
-      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
-          "whether it's leader. ", ioe);
-    }
-    return null;
   }
 
   public static UUID getRaftGroupIdFromOmServiceId(String omServiceId) {
