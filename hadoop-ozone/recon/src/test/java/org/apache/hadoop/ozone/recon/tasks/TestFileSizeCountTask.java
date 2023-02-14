@@ -73,7 +73,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocessFSO1() throws IOException {
+  public void testReprocessFSO() throws IOException {
     OmKeyInfo[] omKeyInfos = new OmKeyInfo[3];
     String[] keyNames = {"key1", "key2", "key3"};
     String[] volumeNames = {"vol1", "vol1", "vol1"};
@@ -92,40 +92,40 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     // Create two mock instances of TypedTable, one for FILE_SYSTEM_OPTIMIZED
     // layout and one for LEGACY layout
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable1 = mock(TypedTable.class);
-    TypedTable<String, OmKeyInfo> keyTable2 = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
     // Set return values for getKeyTable() for FILE_SYSTEM_OPTIMIZED
     // and LEGACY layout
-    when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
-        .thenReturn(keyTable1);
     when(omMetadataManager.getKeyTable(eq(BucketLayout.LEGACY)))
-        .thenReturn(keyTable2);
+        .thenReturn(keyTableLegacy);
+    when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
+        .thenReturn(keyTableFso);
 
     // Create two mock instances of TypedTableIterator, one for each
     // instance of TypedTable
-    TypedTable.TypedTableIterator mockKeyIter1 =
+    TypedTable.TypedTableIterator mockKeyIterLegacy =
         mock(TypedTable.TypedTableIterator.class);
-    when(keyTable1.iterator()).thenReturn(mockKeyIter1);
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
     // Set return values for hasNext() and next() of the mock instance of
-    // TypedTableIterator for keyTable1
-    when(mockKeyIter1.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValue1 =
+    // TypedTableIterator for keyTableLegacy
+    when(mockKeyIterLegacy.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueLegacy =
         mock(TypedTable.TypedKeyValue.class);
-    when(mockKeyIter1.next()).thenReturn(mockKeyValue1);
-    when(mockKeyValue1.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyValueLegacy.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
         omKeyInfos[2]);
 
 
-    // Same as above, but for keyTable2
-    TypedTable.TypedTableIterator mockKeyIter2 =
+    // Same as above, but for keyTableFso
+    TypedTable.TypedTableIterator mockKeyIterFso =
         mock(TypedTable.TypedTableIterator.class);
-    when(keyTable2.iterator()).thenReturn(mockKeyIter2);
-    when(mockKeyIter2.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValue2 =
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
+    when(mockKeyIterFso.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueFso =
         mock(TypedTable.TypedKeyValue.class);
-    when(mockKeyIter2.next()).thenReturn(mockKeyValue2);
-    when(mockKeyValue2.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
+    when(mockKeyValueFso.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
         omKeyInfos[2]);
 
     // Reprocess could be called from table having existing entries. Adding
@@ -288,36 +288,36 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     hasNextAnswer.add(false);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable1 = mock(TypedTable.class);
-    TypedTable<String, OmKeyInfo> keyTable2 = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter1 = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedTableIterator mockKeyIter2 = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue1 = mock(
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
         TypedTable.TypedKeyValue.class);
-    TypedTable.TypedKeyValue mockKeyValue2 = mock(
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable1.iterator()).thenReturn(mockKeyIter1);
-    when(keyTable2.iterator()).thenReturn(mockKeyIter2);
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
 
     when(omMetadataManager.getKeyTable(BucketLayout.LEGACY))
-        .thenReturn(keyTable1);
+        .thenReturn(keyTableLegacy);
     when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
-        .thenReturn(keyTable2);
+        .thenReturn(keyTableFso);
 
-    when(mockKeyIter1.hasNext())
+    when(mockKeyIterLegacy.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
-    when(mockKeyIter2.hasNext())
+    when(mockKeyIterFso.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
-    when(mockKeyIter1.next()).thenReturn(mockKeyValue1);
-    when(mockKeyIter2.next()).thenReturn(mockKeyValue2);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
 
-    when(mockKeyValue1.getValue())
+    when(mockKeyValueLegacy.getValue())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(omKeyInfoList));
-    when(mockKeyValue2.getValue())
+    when(mockKeyValueFso.getValue())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(omKeyInfoList));
 
     Pair<String, Boolean> result =

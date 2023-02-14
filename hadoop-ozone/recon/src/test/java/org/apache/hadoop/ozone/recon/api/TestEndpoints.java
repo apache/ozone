@@ -635,44 +635,44 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     given(omKeyInfo3.getDataSize()).willReturn(1000L);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable1 = mock(TypedTable.class);
-    TypedTable<String, OmKeyInfo> keyTable2 = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter1 = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedTableIterator mockKeyIter2 = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue1 = mock(
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
         TypedTable.TypedKeyValue.class);
-    TypedTable.TypedKeyValue mockKeyValue2 = mock(
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable1.iterator()).thenReturn(mockKeyIter1);
-    when(keyTable2.iterator()).thenReturn(mockKeyIter2);
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
 
     when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(
-        keyTable1);
+        keyTableLegacy);
     when(omMetadataManager.getKeyTable(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTable2);
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTableFso);
 
-    when(mockKeyIter1.hasNext())
+    when(mockKeyIterLegacy.hasNext())
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockKeyIter2.hasNext())
+    when(mockKeyIterFso.hasNext())
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockKeyIter1.next()).thenReturn(mockKeyValue1);
-    when(mockKeyIter2.next()).thenReturn(mockKeyValue2);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
 
-    when(mockKeyValue1.getValue())
+    when(mockKeyValueLegacy.getValue())
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
-    when(mockKeyValue2.getValue())
+    when(mockKeyValueFso.getValue())
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
