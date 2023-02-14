@@ -453,6 +453,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOzonePathKey(long volumeId, long bucketId,
                          long parentObjectId, String pathComponentName);
 
+  default String getOzonePathKey(long volumeId, long bucketId,
+      OmDirectoryInfo dir) {
+    return getOzonePathKey(volumeId, bucketId,
+        dir.getParentObjectID(), dir.getName());
+  }
+
   /**
    * Given ozone path key, component id, return the corresponding 
    * DB path key for delete table.
