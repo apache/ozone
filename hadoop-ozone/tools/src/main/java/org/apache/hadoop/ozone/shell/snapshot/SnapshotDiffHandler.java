@@ -45,13 +45,12 @@ public class SnapshotDiffHandler extends Handler {
       index = "2")
   private String toSnapshot;
 
-  // TODO: Make token and pageSize optional.
-  @CommandLine.Parameters(description = "token",
-      index = "3")
+  @CommandLine.Option(names={"-t", "--token"},
+      description = "token (optional) ")
   private String token;
 
-  @CommandLine.Parameters(description = "page size",
-      index = "4")
+  @CommandLine.Option(names={"-p", "--pageSize"},
+      description = "page size (optional)")
   private int pageSize;
 
   @Override

@@ -66,4 +66,20 @@ public class SnapshotDiffResponse {
   public long getWaitTimeInMs() {
     return waitTimeInMs;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder str = new StringBuilder();
+    if (jobStatus == JobStatus.DONE) {
+      str.append(snapshotDiffReport.toString());
+    } else {
+      str.append("Snapshot diff job is ");
+      str.append(jobStatus);
+      str.append("\n");
+      str.append("Please retry after ");
+      str.append(waitTimeInMs);
+      str.append("millis.");
+    }
+    return str.toString();
+  }
 }
