@@ -452,3 +452,10 @@ message ContainerBalancerConfigurationProto {
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
 }
+
+message TransferLeadershipRequestProto {
+    required string newLeaderId = 1;
+}
+
+message TransferLeadershipResponseProto {
+}
