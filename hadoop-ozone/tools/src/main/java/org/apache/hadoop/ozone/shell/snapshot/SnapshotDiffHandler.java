@@ -45,11 +45,11 @@ public class SnapshotDiffHandler extends Handler {
       index = "2")
   private String toSnapshot;
 
-  @CommandLine.Option(names={"-t", "--token"},
+  @CommandLine.Option(names = {"-t", "--token"},
       description = "token (optional) ")
   private String token;
 
-  @CommandLine.Option(names={"-p", "--pageSize"},
+  @CommandLine.Option(names = {"-p", "--pageSize"},
       description = "page size (optional)")
   private int pageSize;
 
