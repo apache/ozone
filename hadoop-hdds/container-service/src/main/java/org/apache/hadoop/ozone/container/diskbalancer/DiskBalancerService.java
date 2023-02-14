@@ -70,6 +70,8 @@ public class DiskBalancerService extends BackgroundService {
   private long bandwidthInMB;
   private int parallelThread;
 
+  private DiskBalancerVersion version;
+
   private AtomicLong totalBalancedBytes = new AtomicLong(0L);
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
@@ -121,7 +123,7 @@ public class DiskBalancerService extends BackgroundService {
     applyDiskBalancerInfo(diskBalancerInfo);
   }
 
-  private void constructTmpDir() {
+  private void constructTmpDir() throws IOException {
     for (HddsVolume volume:
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
       Path tmpDir = getDiskBalancerTmpDir(volume);
@@ -131,6 +133,7 @@ public class DiskBalancerService extends BackgroundService {
       } catch (IOException ex) {
         LOG.warn("Can not reconstruct tmp directory under volume {}", volume,
             ex);
+        throw ex;
       }
     }
   }
@@ -141,22 +144,21 @@ public class DiskBalancerService extends BackgroundService {
    * @throws IOException
    */
   private void loadDiskBalancerInfo() throws IOException {
-    DiskBalancerInfo diskBalancerInfo = null;
+    DiskBalancerInfo diskBalancerInfo;
     try {
       if (diskBalancerInfoFile.exists()) {
         diskBalancerInfo = readDiskBalancerInfoFile(diskBalancerInfoFile);
-      }
-    } catch (IOException e) {
-      LOG.warn("Can not load diskBalancerInfo from diskBalancer.info file. " +
-          "Falling back to default configs", e);
-    } finally {
-      if (diskBalancerInfo == null) {
+      } else {
         boolean shouldRunDefault =
             conf.getObject(DiskBalancerConfiguration.class)
                 .getDiskBalancerShouldRun();
         diskBalancerInfo = new DiskBalancerInfo(shouldRunDefault,
             new DiskBalancerConfiguration());
       }
+    } catch (IOException e) {
+      LOG.warn("Can not load diskBalancerInfo from diskBalancer.info file. " +
+          "Falling back to default configs", e);
+      throw e;
     }
 
     applyDiskBalancerInfo(diskBalancerInfo);
@@ -171,6 +173,7 @@ public class DiskBalancerService extends BackgroundService {
     setThreshold(diskBalancerInfo.getThreshold());
     setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
     setParallelThread(diskBalancerInfo.getParallelThread());
+    setVersion(diskBalancerInfo.getVersion());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
     // update the poll size by setting corePoolSize.
@@ -196,7 +199,8 @@ public class DiskBalancerService extends BackgroundService {
     }
     // Use default datanode disk balancer file name for file path
     return new File(diskBalancerInfoDir,
-        OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_DEFAULT).toString();
+        OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT)
+        .toString();
   }
 
   /**
@@ -260,9 +264,13 @@ public class DiskBalancerService extends BackgroundService {
     this.parallelThread = parallelThread;
   }
 
+  public void setVersion(DiskBalancerVersion version) {
+    this.version = version;
+  }
+
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
-        parallelThread);
+        parallelThread, version);
   }
 
   public DiskBalancerReportProto getDiskBalancerReportProto() {

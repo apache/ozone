@@ -125,6 +125,7 @@ public class TestDiskBalancerService {
     svc.setThreshold(10.0d);
     svc.setBandwidthInMB(1L);
     svc.setParallelThread(5);
+    svc.setVersion(DiskBalancerVersion.DEFAULT_VERSION);
 
     svc.start();
 

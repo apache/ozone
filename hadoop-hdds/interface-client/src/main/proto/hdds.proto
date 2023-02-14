@@ -466,9 +466,9 @@ enum DiskBalancerRunningStatus {
 }
 
 enum DiskBalancerOpType{
-    start = 1;
-    stop = 2;
-    update = 3;
+    START = 1;
+    STOP = 2;
+    UPDATE = 3;
 }
 
 message DatanodeDiskBalancerInfoProto {

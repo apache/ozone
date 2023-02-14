@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT;
 
 /**
  * Tests to test DiskBalancer's YAML operation.
@@ -36,12 +36,13 @@ public class TestDiskBalancerYaml {
     double threshold = 10;
     long bandwidthInMB = 100;
     int parallelThread = 5;
+    DiskBalancerVersion version = DiskBalancerVersion.DEFAULT_VERSION;
 
     File file = new File(GenericTestUtils.getTestDir(),
-        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_DEFAULT);
+        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
 
     DiskBalancerInfo info = new DiskBalancerInfo(shouldRun, threshold,
-        bandwidthInMB, parallelThread);
+        bandwidthInMB, parallelThread, version);
 
     DiskBalancerYaml.createDiskBalancerInfoFile(info, file);
 

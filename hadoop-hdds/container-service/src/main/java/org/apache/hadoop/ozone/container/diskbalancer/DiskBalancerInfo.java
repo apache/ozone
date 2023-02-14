@@ -28,13 +28,21 @@ public class DiskBalancerInfo {
   private double threshold;
   private long bandwidthInMB;
   private int parallelThread;
+  private DiskBalancerVersion version;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread) {
+    this(shouldRun, threshold, bandwidthInMB, parallelThread,
+        DiskBalancerVersion.DEFAULT_VERSION);
+  }
+
+  public DiskBalancerInfo(boolean shouldRun, double threshold,
+      long bandwidthInMB, int parallelThread, DiskBalancerVersion version) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
+    this.version = version;
   }
 
   public DiskBalancerInfo(boolean shouldRun,
@@ -43,6 +51,8 @@ public class DiskBalancerInfo {
     this.threshold = diskBalancerConf.getThreshold();
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
     this.parallelThread = diskBalancerConf.getParallelThread();
+    this.version = DiskBalancerVersion.getDiskBalancerVersion(
+        diskBalancerConf.getDiskBalancerVersion());
   }
 
   public void updateFromConf(DiskBalancerConfiguration diskBalancerConf) {
@@ -89,6 +99,14 @@ public class DiskBalancerInfo {
     this.parallelThread = parallelThread;
   }
 
+  public DiskBalancerVersion getVersion() {
+    return version;
+  };
+
+  public void setVersion(DiskBalancerVersion version) {
+    this.version = version;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -101,11 +119,13 @@ public class DiskBalancerInfo {
     return shouldRun == that.shouldRun &&
         Double.compare(that.threshold, threshold) == 0 &&
         bandwidthInMB == that.bandwidthInMB &&
-        parallelThread == that.parallelThread;
+        parallelThread == that.parallelThread &&
+        version == that.version;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(shouldRun, threshold, bandwidthInMB, parallelThread);
+    return Objects.hash(shouldRun, threshold, bandwidthInMB, parallelThread,
+        version);
   }
 }

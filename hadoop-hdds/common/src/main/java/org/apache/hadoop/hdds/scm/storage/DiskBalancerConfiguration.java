@@ -71,7 +71,7 @@ public final class DiskBalancerConfiguration {
       description = "The max parallel balance thread count.")
   private int parallelThread = 5;
 
-  @Config(key = "disk.balancer.should.run.default",
+  @Config(key = "should.run.default",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
@@ -90,7 +90,7 @@ public final class DiskBalancerConfiguration {
     this.diskBalancerShouldRun = shouldRun;
   }
 
-  @Config(key = "disk.balancer.service.interval",
+  @Config(key = "service.interval",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
@@ -109,7 +109,7 @@ public final class DiskBalancerConfiguration {
     this.diskBalancerInterval = duration.toMillis();
   }
 
-  @Config(key = "disk.balancer.service.timeout",
+  @Config(key = "service.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DISKBALANCER},
@@ -124,6 +124,22 @@ public final class DiskBalancerConfiguration {
 
   public void setDiskBalancerTimeout(Duration duration) {
     this.diskBalancerTimeout = duration.toMillis();
+  }
+
+  @Config(key = "version",
+      defaultValue = "ONE",
+      type = ConfigType.STRING,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description = "The version of the disk balancer service"
+  )
+  private String diskBalancerVersion = "ONE";
+
+  public String getDiskBalancerVersion() {
+    return diskBalancerVersion;
+  }
+
+  public void setDiskBalancerVersion(String version) {
+    this.diskBalancerVersion = version;
   }
 
   public DiskBalancerConfiguration() {

@@ -74,14 +74,14 @@ public class DiskBalancerCommandHandler implements CommandHandler {
 
     try {
       switch (opType) {
-      case start:
+      case START:
         diskBalancerInfo.setShouldRun(true);
         diskBalancerInfo.updateFromConf(diskBalancerConf);
         break;
-      case stop:
+      case STOP:
         diskBalancerInfo.setShouldRun(false);
         break;
-      case update:
+      case UPDATE:
         diskBalancerInfo.updateFromConf(diskBalancerConf);
         break;
       default:
