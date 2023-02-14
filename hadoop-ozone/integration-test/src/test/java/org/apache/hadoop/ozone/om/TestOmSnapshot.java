@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -42,6 +44,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.Rule;
@@ -50,6 +53,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
@@ -62,7 +66,9 @@ import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -90,6 +96,8 @@ public class TestOmSnapshot {
   private static ObjectStore store;
   private static File metaDir;
   private static OzoneManager leaderOzoneManager;
+
+  private static RDBStore rdbStore;
 
   private static OzoneBucket ozoneBucket;
 
@@ -136,6 +144,7 @@ public class TestOmSnapshot {
         enabledFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
+    conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
@@ -151,6 +160,8 @@ public class TestOmSnapshot {
     bucketName = ozoneBucket.getName();
 
     leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    rdbStore =
+        (RDBStore) leaderOzoneManager.getMetadataManager().getStore();
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
 
@@ -578,6 +589,72 @@ public class TestOmSnapshot {
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> store.snapshotDiff(nullstr, bucket, snap1, snap2));
+  }
+
+
+  /**
+   * Tests snapdiff when there are multiple sst files in the from & to
+   * snapshots pertaining to different buckets. This will test the
+   * sst filtering code path.
+   */
+  @Test
+  public void testSnapDiffWithMultipleSSTs()
+      throws IOException, InterruptedException, TimeoutException {
+    // Create a volume and 2 buckets
+    String volumeName1 = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucketName1 = "buck1";
+    String bucketName2 = "buck2";
+    store.createVolume(volumeName1);
+    OzoneVolume volume1 = store.getVolume(volumeName1);
+    volume1.createBucket(bucketName1);
+    volume1.createBucket(bucketName2);
+    OzoneBucket bucket1 = volume1.getBucket(bucketName1);
+    OzoneBucket bucket2 = volume1.getBucket(bucketName2);
+    String keyPrefix = "key-";
+    // add file to bucket1 and take snapshot
+    createFileKey(bucket1, keyPrefix);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volumeName1, bucketName1, snap1); // 1.sst
+    Assert.assertEquals(1, getKeyTableSstFiles().size());
+    // add files to bucket2 and flush twice to create 2 sst files
+    for (int i = 0; i < 5; i++) {
+      createFileKey(bucket2, keyPrefix);
+    }
+    flushKeyTable(); // 1.sst 2.sst
+    Assert.assertEquals(2, getKeyTableSstFiles().size());
+    for (int i = 0; i < 5; i++) {
+      createFileKey(bucket2, keyPrefix);
+    }
+    flushKeyTable(); // 1.sst 2.sst 3.sst
+    Assert.assertEquals(3, getKeyTableSstFiles().size());
+    // add a file to bucket1 and take second snapshot
+    createFileKey(bucket1, keyPrefix);
+    String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
+    Assert.assertEquals(4, getKeyTableSstFiles().size());
+    SnapshotDiffReport diff1 =
+        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2);
+    Assert.assertEquals(1, diff1.getDiffList().size());
+  }
+
+  @NotNull
+  private static List<LiveFileMetaData> getKeyTableSstFiles() {
+    if (!bucketLayout.isFileSystemOptimized()) {
+      return rdbStore.getDb().getSstFileList().stream().filter(
+          x -> new String(x.columnFamilyName(), UTF_8).equals(
+              OmMetadataManagerImpl.KEY_TABLE)).collect(Collectors.toList());
+    }
+    return rdbStore.getDb().getSstFileList().stream().filter(
+        x -> new String(x.columnFamilyName(), UTF_8).equals(
+            OmMetadataManagerImpl.FILE_TABLE)).collect(Collectors.toList());
+  }
+
+  private static void flushKeyTable() throws IOException {
+    if (!bucketLayout.isFileSystemOptimized()) {
+      rdbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    } else {
+      rdbStore.getDb().flush(OmMetadataManagerImpl.FILE_TABLE);
+    }
   }
 
   private String createSnapshot(String volName, String buckName)
