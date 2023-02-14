@@ -61,6 +61,7 @@ public enum OMAction implements AuditAction {
   RENEW_DELEGATION_TOKEN,
   CANCEL_DELEGATION_TOKEN,
   GET_SERVICE_LIST,
+  TRANSFER_LEADERSHIP,
 
   //ACL Actions
   ADD_ACL,

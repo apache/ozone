@@ -280,6 +280,7 @@ public final class OmUtils {
       // operation SetRangerServiceVersion.
     case GetKeyInfo:
     case SnapshotDiff:
+    case TransferLeadership:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
