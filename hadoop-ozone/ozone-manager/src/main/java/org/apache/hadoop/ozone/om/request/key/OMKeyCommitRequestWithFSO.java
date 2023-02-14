@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -47,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +80,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     String keyName = commitKeyArgs.getKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumKeyCommits();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
@@ -97,6 +94,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
+    boolean isHSync = commitKeyRequest.hasHsync() &&
+        commitKeyRequest.getHsync();
+    if (!isHSync) {
+      omMetrics.incNumKeyCommits();
+    }
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -114,10 +116,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
-      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
-      }
+      List<OmKeyLocationInfo>
+          locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
       bucketLockAcquired =
               omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -142,8 +142,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);
       if (omKeyInfo == null) {
-        throw new OMException("Failed to commit key, as " + dbOpenFileKey +
-                "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+        String action = "commit";
+        if (isHSync) {
+          action = "hsync";
+        }
+        throw new OMException("Failed to " + action + " key, as " +
+                dbOpenFileKey + "entry is not found in the OpenKey table",
+                KEY_NOT_FOUND);
       }
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
@@ -173,10 +178,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
 
@@ -193,8 +200,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
 
       // Add to cache of open key table and key table.
-      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
-              null, fileName, trxnLogIndex);
+      if (!isHSync) {
+        OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+            dbOpenFileKey, null, fileName, trxnLogIndex);
+      }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
               omKeyInfo, fileName, trxnLogIndex);
@@ -208,7 +217,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-              oldKeyVersionsToDelete, volumeId);
+              oldKeyVersionsToDelete, volumeId, isHSync);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -226,11 +235,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
-            exception, getOmRequest().getUserInfo()));
-
-    processResult(commitKeyRequest, volumeName, bucketName, keyName, omMetrics,
-            exception, omKeyInfo, result);
+    if (!isHSync) {
+      auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
+              exception, getOmRequest().getUserInfo()));
+      processResult(commitKeyRequest, volumeName, bucketName, keyName,
+          omMetrics, exception, omKeyInfo, result);
+    }
 
     return omClientResponse;
   }

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -52,6 +53,7 @@ import org.apache.hadoop.util.Time;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -245,12 +247,7 @@ public class OzoneBucket extends WithMetadata {
         quotaInNamespace, bucketLayout, owner);
     this.bucketLayout = bucketLayout;
     if (defaultReplicationConfig != null) {
-      this.defaultReplication =
-          defaultReplicationConfig.getType() == ReplicationType.EC ?
-              defaultReplicationConfig.getEcReplicationConfig() :
-              ReplicationConfig
-                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
-                      defaultReplicationConfig.getFactor());
+      defaultReplication = defaultReplicationConfig.getReplicationConfig();
     } else {
       // Bucket level replication is not configured by default.
       this.defaultReplication = null;
@@ -600,6 +597,40 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a new key in the bucket, with default replication type RATIS and
+   * with replication factor THREE.
+   *
+   * @param key  Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size)
+      throws IOException {
+    return createStreamKey(key, size, defaultReplication,
+        Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKey(volumeName, name, key, size,
+        replicationConfig, keyMetadata);
+  }
+
+  /**
    * Reads an existing key from the bucket.
    *
    * @param key Name of the key to be read.
@@ -792,6 +823,21 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Create a part key for a multipart upload key.
+   * @param key
+   * @param size
+   * @param partNumber
+   * @param uploadID
+   * @return OzoneDataStreamOutput
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createMultipartStreamKey(String key,
+      long size, int partNumber, String uploadID) throws IOException {
+    return proxy.createMultipartStreamKey(volumeName, name,
+            key, size, partNumber, uploadID);
+  }
+
+  /**
    * Complete Multipart upload. This will combine all the parts and make the
    * key visible in ozone.
    * @param key
@@ -919,6 +965,13 @@ public class OzoneBucket extends WithMetadata {
     return proxy
         .createFile(volumeName, name, keyName, size, replicationConfig,
             overWrite, recursive);
+  }
+
+  public OzoneDataStreamOutput createStreamFile(String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite,
+      boolean recursive) throws IOException {
+    return proxy.createStreamFile(volumeName, name, keyName, size,
+        replicationConfig, overWrite, recursive);
   }
 
   /**
@@ -1368,9 +1421,12 @@ public class OzoneBucket extends WithMetadata {
       addedKeyPrefix = true;
 
       // not required to addKeyPrefix
-      // case-1) if keyPrefix is null or empty
+      // case-1) if keyPrefix is null/empty/just contains snapshot indicator
+      // (The snapshot indicator is the null prefix equivalent for snapshot
+      //  reads.)
       // case-2) if startKey is not null or empty
-      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey)) {
+      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey) ||
+          OmUtils.isBucketSnapshotIndicator(keyPrefix)) {
         return;
       }
 

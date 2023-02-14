@@ -112,6 +112,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
         ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
+        ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
         ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
         ReconServerConfigKeys
@@ -132,7 +133,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_RANGER_OM_CONNECTION_REQUEST_TIMEOUT,
         OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
-        OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD
+        OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY
     ));
   }
 }

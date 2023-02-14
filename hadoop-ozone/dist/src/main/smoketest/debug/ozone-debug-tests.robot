@@ -31,7 +31,7 @@ ${TESTFILE}         testfile
 *** Keywords ***
 Write keys
     Execute             ozone sh volume create o3://om/${VOLUME} --space-quota 100TB --namespace-quota 100
-    Execute             ozone sh bucket create o3://om/${VOLUME}/${BUCKET}
+    Execute             ozone sh bucket create o3://om/${VOLUME}/${BUCKET} --space-quota 1TB
     Execute             dd if=/dev/urandom of=${TESTFILE} bs=100000 count=15
     Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TESTFILE}
 

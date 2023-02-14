@@ -23,7 +23,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,8 +35,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,13 +74,15 @@ public class TestCertificateCodec {
       IOException, SCMSecurityException, CertificateException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())
@@ -119,13 +119,15 @@ public class TestCertificateCodec {
       IOException, SCMSecurityException, CertificateException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())
@@ -157,13 +159,15 @@ public class TestCertificateCodec {
       NoSuchProviderException, NoSuchAlgorithmException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())
@@ -190,13 +194,15 @@ public class TestCertificateCodec {
       NoSuchProviderException, NoSuchAlgorithmException, CertificateException {
     HDDSKeyGenerator keyGenerator =
         new HDDSKeyGenerator(conf);
+    LocalDateTime startDate = LocalDateTime.now();
+    LocalDateTime endDate = startDate.plusDays(1);
     X509CertificateHolder cert =
         SelfSignedCertificate.newBuilder()
             .setSubject(RandomStringUtils.randomAlphabetic(4))
             .setClusterID(RandomStringUtils.randomAlphabetic(4))
             .setScmID(RandomStringUtils.randomAlphabetic(4))
-            .setBeginDate(LocalDate.now())
-            .setEndDate(LocalDate.now().plus(1, ChronoUnit.DAYS))
+            .setBeginDate(startDate)
+            .setEndDate(endDate)
             .setConfiguration(keyGenerator.getSecurityConfig()
                 .getConfiguration())
             .setKey(keyGenerator.generateKey())

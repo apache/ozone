@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Random;
-import java.util.UUID;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -29,11 +24,15 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -47,8 +46,17 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import org.mockito.Mockito;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Helper utility to test containers.
@@ -156,5 +164,24 @@ public final class ContainerTestUtils {
       StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf,
           null, null);
     }
+  }
+
+  public static void setupMockContainer(
+      Container<ContainerData> c, boolean shouldScanData,
+      boolean scanMetaDataSuccess, boolean scanDataSuccess,
+      AtomicLong containerIdSeq) {
+    setupMockContainer(c, shouldScanData, scanDataSuccess, containerIdSeq);
+    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+  }
+
+  public static void setupMockContainer(
+      Container<ContainerData> c, boolean shouldScanData,
+      boolean scanDataSuccess, AtomicLong containerIdSeq) {
+    ContainerData data = mock(ContainerData.class);
+    when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
+    when(c.getContainerData()).thenReturn(data);
+    when(c.shouldScanData()).thenReturn(shouldScanData);
+    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(scanDataSuccess);
   }
 }

@@ -17,6 +17,9 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -25,9 +28,14 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
@@ -38,7 +46,13 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  */
 public class ECReplicationCheckHandler extends AbstractCheck {
 
-  public ECReplicationCheckHandler() {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECReplicationCheckHandler.class);
+
+  private final PlacementPolicy placementPolicy;
+
+  public ECReplicationCheckHandler(PlacementPolicy placementPolicy) {
+    this.placementPolicy = placementPolicy;
   }
 
   @Override
@@ -51,6 +65,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     ContainerInfo container = request.getContainerInfo();
     ContainerID containerID = container.containerID();
     ContainerHealthResult health = checkHealth(request);
+    LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
       // If the container is healthy, there is nothing else to do in this
       // handler so return as unhandled so any further handlers will be tried.
@@ -69,12 +84,16 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.MISSING, containerID);
       }
-      // TODO - if it is unrecoverable, should we return false to other
-      //        handlers can be tried?
-      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
-          !underHealth.isUnrecoverable()) {
+      if (!underHealth.isReplicatedOkAfterPending() &&
+          (!underHealth.isUnrecoverable()
+              || underHealth.hasUnreplicatedOfflineIndexes())) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
+          + "is [{}]. isUnrecoverable is [{}]. hasUnreplicatedOfflineIndexes "
+          + "is [{}]", container, underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable(),
+          underHealth.hasUnreplicatedOfflineIndexes());
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
@@ -82,13 +101,29 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.OVER_REPLICATED, containerID);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
+      LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending "
+          + "is [{}]", container, overHealth.isReplicatedOkAfterPending());
+      return true;
+    } else if (health.getHealthState() ==
+        ContainerHealthResult.HealthState.MIS_REPLICATED) {
+      report.incrementAndSample(
+          ReplicationManagerReport.HealthState.MIS_REPLICATED, containerID);
+      ContainerHealthResult.MisReplicatedHealthResult misRepHealth
+          = ((ContainerHealthResult.MisReplicatedHealthResult) health);
+      if (!misRepHealth.isReplicatedOkAfterPending()) {
+        request.getReplicationQueue().enqueue(misRepHealth);
+      }
+      LOG.debug("Container {} is Mis Replicated. isReplicatedOkAfterPending "
+          + "is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
       return true;
     }
-    // Should not get here, but incase it does the container is not healthy,
+    // Should not get here, but in case it does the container is not healthy,
     // but is also not under or over replicated.
+    LOG.warn("Container {} is not healthy but is not under, over or "
+        + " mis-replicated. Should not happen.", container);
     return false;
   }
 
@@ -116,10 +151,16 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         dueToDecommission = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
-      return new ContainerHealthResult.UnderReplicatedHealthResult(
-          container, remainingRedundancy, dueToDecommission,
-          replicaCount.isSufficientlyReplicated(true),
-          replicaCount.isUnrecoverable());
+      ContainerHealthResult.UnderReplicatedHealthResult result =
+          new ContainerHealthResult.UnderReplicatedHealthResult(
+              container, remainingRedundancy, dueToDecommission,
+              replicaCount.isSufficientlyReplicated(true),
+              replicaCount.isUnrecoverable());
+      if (replicaCount.decommissioningOnlyIndexes(true).size() > 0
+          || replicaCount.maintenanceOnlyIndexes(true).size() > 0) {
+        result.setHasUnReplicatedOfflineIndexes(true);
+      }
+      return result;
     }
 
     if (replicaCount.isOverReplicated(false)) {
@@ -128,7 +169,43 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           .OverReplicatedHealthResult(container, overRepIndexes.size(),
           !replicaCount.isOverReplicated(true));
     }
+    ContainerPlacementStatus placement = getPlacementStatus(replicas,
+        container.getReplicationConfig().getRequiredNodes(),
+        Collections.emptyList());
+    if (!placement.isPolicySatisfied()) {
+      ContainerPlacementStatus placementAfterPending = getPlacementStatus(
+          replicas, container.getReplicationConfig().getRequiredNodes(),
+          request.getPendingOps());
+      return new ContainerHealthResult.MisReplicatedHealthResult(
+          container, placementAfterPending.isPolicySatisfied());
+    }
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);
+  }
+
+  /**
+   * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
+   * and then check if the list meets the container placement policy.
+   * @param replicas List of containerReplica
+   * @param replicationFactor Expected Replication Factor of the containe
+   * @return ContainerPlacementStatus indicating if the policy is met or not
+   */
+  private ContainerPlacementStatus getPlacementStatus(
+      Set<ContainerReplica> replicas, int replicationFactor,
+      List<ContainerReplicaOp> pendingOps) {
+
+    Set<DatanodeDetails> replicaDns = replicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toSet());
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        replicaDns.add(op.getTarget());
+      }
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        replicaDns.remove(op.getTarget());
+      }
+    }
+    return placementPolicy.validateContainerPlacement(
+        new ArrayList<>(replicaDns), replicationFactor);
   }
 }

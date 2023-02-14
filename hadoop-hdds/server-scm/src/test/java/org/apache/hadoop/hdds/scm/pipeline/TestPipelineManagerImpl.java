@@ -88,6 +88,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCAT
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -762,7 +763,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testAddContainerWithClosedPipeline() throws Exception {
+  public void testAddContainerWithClosedPipelineScmStart() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
             captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
     SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
@@ -784,6 +785,27 @@ public class TestPipelineManagerImpl {
     assertTrue(logCapturer.getOutput().contains("Container " +
             ContainerID.valueOf(2) + " in open state for pipeline=" +
             pipelineID + " in closed state"));
+  }
+
+  @Test
+  public void testAddContainerWithClosedPipeline() throws Exception {
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
+    PipelineManagerImpl pipelineManager =
+        createPipelineManager(true, buffer);
+    Table<PipelineID, Pipeline> pipelineStore =
+        SCMDBDefinition.PIPELINES.getTable(dbStore);
+    Pipeline pipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
+    PipelineID pipelineID = pipeline.getId();
+    pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
+    pipelineManager.getStateManager().updatePipelineState(
+        pipelineID.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
+    buffer.flush();
+    Assertions.assertTrue(pipelineStore.get(pipelineID).isClosed());
+    assertThrows(InvalidPipelineStateException.class,
+        () -> pipelineManager.addContainerToPipeline(pipelineID,
+        ContainerID.valueOf(2)));
   }
 
   @Test

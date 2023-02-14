@@ -94,7 +94,7 @@ public class TestS3MultipartResponse {
 
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponse(
       String volumeName, String bucketName, String keyName,
-      String multipartUploadID) {
+      String multipartUploadID) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
@@ -193,7 +193,7 @@ public class TestS3MultipartResponse {
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseFSO(
       String volumeName, String bucketName, long parentID, String keyName,
       String multipartUploadID, List<OmDirectoryInfo> parentDirInfos,
-      long volumeId, long bucketId) {
+      long volumeId, long bucketId) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
             .setCreationTime(Time.now())
@@ -232,9 +232,13 @@ public class TestS3MultipartResponse {
         omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
         keyName, multipartUploadID);
 
+    String buckDBKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(buckDBKey);
+
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
         multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout(),
-        volumeId, bucketId);
+        volumeId, bucketId, omBucketInfo);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -326,7 +330,7 @@ public class TestS3MultipartResponse {
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
-      OMResponse omResponse, long volumeId, long bucketId) {
+      OMResponse omResponse, long volumeId, long bucketId) throws IOException {
     return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
         omKeyInfo, getBucketLayout());
   }

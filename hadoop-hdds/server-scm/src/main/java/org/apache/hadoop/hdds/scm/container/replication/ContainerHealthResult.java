@@ -34,7 +34,8 @@ public class ContainerHealthResult {
     HEALTHY,
     UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 
   private final ContainerInfo containerInfo;
@@ -79,7 +80,7 @@ public class ContainerHealthResult {
    */
   public static class UnHealthyResult extends ContainerHealthResult {
 
-    UnHealthyResult(ContainerInfo containerInfo) {
+    public UnHealthyResult(ContainerInfo containerInfo) {
       super(containerInfo, HealthState.UNHEALTHY);
     }
   }
@@ -106,58 +107,27 @@ public class ContainerHealthResult {
     private final int remainingRedundancy;
     private final boolean dueToDecommission;
     private final boolean sufficientlyReplicatedAfterPending;
-    private boolean dueToMisReplication = false;
-    private boolean isMisReplicated = false;
-    private boolean isMisReplicatedAfterPending = false;
     private final boolean unrecoverable;
+    private boolean hasHealthyReplicas;
+    private boolean hasUnReplicatedOfflineIndexes = false;
     private int requeueCount = 0;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToDecommission,
         boolean replicatedOkWithPending, boolean unrecoverable) {
-      super(containerInfo, HealthState.UNDER_REPLICATED);
+      this(containerInfo, remainingRedundancy, dueToDecommission,
+          replicatedOkWithPending, unrecoverable, HealthState.UNDER_REPLICATED);
+    }
+
+    protected UnderReplicatedHealthResult(ContainerInfo containerInfo,
+        int remainingRedundancy, boolean dueToDecommission,
+        boolean replicatedOkWithPending, boolean unrecoverable,
+        HealthState healthState) {
+      super(containerInfo, healthState);
       this.remainingRedundancy = remainingRedundancy;
       this.dueToDecommission = dueToDecommission;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
-    }
-
-    /**
-     * Pass true to indicate the container is mis-replicated - ie it does not
-     * meet the placement policy.
-     * @param isMisRep True if the container is mis-replicated, false if not.
-     * @return this object to allow calls to be chained
-     */
-    public UnderReplicatedHealthResult
-        setMisReplicated(boolean isMisRep) {
-      this.isMisReplicated = isMisRep;
-      return this;
-    }
-
-    /**
-     * Pass true to indicate the container is mis-replicated after considering
-     * pending replicas scheduled for create or delete.
-     * @param isMisRep True if the container is mis-replicated considering
-     *                 pending replicas, or false if not.
-     * @return this object to allow calls to be chained
-     */
-    public UnderReplicatedHealthResult
-        setMisReplicatedAfterPending(boolean isMisRep) {
-      this.isMisReplicatedAfterPending = isMisRep;
-      return this;
-    }
-
-    /**
-     * If the container is ONLY under replicated due to mis-replication, pass
-     * true, otherwise pass false.
-     * @param dueToMisRep Pass true if the container has enough replicas but
-     *                    does not meet the placement policy.
-     * @return
-     */
-    public UnderReplicatedHealthResult
-        setDueToMisReplication(boolean dueToMisRep) {
-      this.dueToMisReplication = dueToMisRep;
-      return this;
     }
 
     /**
@@ -188,7 +158,7 @@ public class ContainerHealthResult {
       if (dueToDecommission) {
         result += DECOMMISSION_REDUNDANCY;
       } else {
-        result += remainingRedundancy;
+        result += getRemainingRedundancy();
       }
       return result;
     }
@@ -224,36 +194,8 @@ public class ContainerHealthResult {
      * @return True if the under-replication is corrected by the pending
      *         replicas. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
-    }
-
-    /**
-     * Returns true if the container is mis-replicated, ignoring any pending
-     * replicas scheduled to be created.
-     * @return True if mis-replicated, ignoring pending
-     */
-    public boolean isMisReplicated() {
-      return isMisReplicated;
-    }
-
-    /**
-     * Returns true if the container is mis-replicated after taking account of
-     * pending replicas, which are schedule to be created.
-     * @return true is mis-replicated after pending.
-     */
-    public boolean isMisReplicatedAfterPending() {
-      return isMisReplicatedAfterPending;
-    }
-
-    /**
-     * Returns true if the under replication is only due to mis-replication.
-     * In other words, the container has enough replicas, but they do not meet
-     * the placement policy.
-     * @return true if the under-replication is only due to mis-replication
-     */
-    public boolean isDueToMisReplication() {
-      return dueToMisReplication;
     }
 
     /**
@@ -266,6 +208,66 @@ public class ContainerHealthResult {
     public boolean isUnrecoverable() {
       return unrecoverable;
     }
+
+    /**
+     * Pass true if a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @param val pass true if the container has indexes on nodes going offline
+     *            or false otherwise.
+     */
+    public void setHasUnReplicatedOfflineIndexes(boolean val) {
+      hasUnReplicatedOfflineIndexes = val;
+    }
+    /**
+     * Indicates whether a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @return True if the container has some decommission or maintenance only
+     *         indexes.
+     */
+    public boolean hasUnreplicatedOfflineIndexes() {
+      return hasUnReplicatedOfflineIndexes;
+    }
+
+    public boolean hasHealthyReplicas() {
+      return hasHealthyReplicas;
+    }
+
+    public void setHasHealthyReplicas(boolean hasHealthyReplicas) {
+      this.hasHealthyReplicas = hasHealthyReplicas;
+    }
+  }
+
+  /**
+   * Class to represent a container healthy state which is mis-Replicated. This
+   * means the container is neither over nor under replicated, but its replicas
+   * don't meet the requirements of the container placement policy. Eg the
+   * containers are not spread across enough racks.
+   */
+  public static class MisReplicatedHealthResult
+      extends UnderReplicatedHealthResult {
+
+    /**
+     * In UnderReplicatedHealthState, DECOMMISSION_REDUNDANCY is defined as
+     * 5 so that containers which are really under replicated get fixed as a
+     * priority over decommissioning hosts. We have defined that a container
+     * can only be mis replicated if it is not over or under replicated. Fixing
+     * mis replication is arguably less important than competing a decommission.
+     * So as a lot of mis replicated container do not block decommission, we
+     * set the redundancy of mis replicated containers to 6 so they sort after
+     * under / over replicated and decommissioning replicas in the under
+     * replication queue.
+     */
+    private static final int MIS_REP_REDUNDANCY = 6;
+
+    public MisReplicatedHealthResult(ContainerInfo containerInfo,
+        boolean replicatedOkAfterPending) {
+      super(containerInfo, MIS_REP_REDUNDANCY, false,
+          replicatedOkAfterPending, false,
+          HealthState.MIS_REPLICATED);
+    }
+
   }
 
   /**
@@ -275,7 +277,7 @@ public class ContainerHealthResult {
 
     private final int excessRedundancy;
     private final boolean sufficientlyReplicatedAfterPending;
-
+    private boolean hasMismatchedReplicas;
 
     public OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
@@ -304,8 +306,16 @@ public class ContainerHealthResult {
      * @return True if the over-replication is corrected by the pending
      *         deletes. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
+    }
+
+    public boolean hasMismatchedReplicas() {
+      return hasMismatchedReplicas;
+    }
+
+    public void setHasMismatchedReplicas(boolean hasMismatchedReplicas) {
+      this.hasMismatchedReplicas = hasMismatchedReplicas;
     }
   }
 }

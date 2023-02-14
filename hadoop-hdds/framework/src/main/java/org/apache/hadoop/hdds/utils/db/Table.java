@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 /**
@@ -213,6 +214,13 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   default Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>>
       cacheIterator() {
     throw new NotImplementedException("cacheIterator is not implemented");
+  }
+
+  /**
+   * Create the metrics datasource that emits table cache metrics.
+   */
+  default TableCacheMetrics createCacheMetrics() throws IOException {
+    throw new NotImplementedException("getCacheValue is not implemented");
   }
 
   /**
