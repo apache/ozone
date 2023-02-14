@@ -3608,4 +3608,14 @@
       production environments.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.snapshot.use.full.diff</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      If true, snapshot diff will not follow the optimised DAG based pruning approach
+      for computation.
+    </description>
+  </property>
 </configuration>
