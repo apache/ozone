@@ -28,13 +28,13 @@ import java.util.Objects;
  */
 public class CacheValue<VALUE> {
   /** @return a {@link CacheValue} with a non-null value. */
-  public static <V> CacheValue<V> newInstance(long epoch, V value) {
+  public static <V> CacheValue<V> get(long epoch, V value) {
     Objects.requireNonNull(value, "value == null");
     return new CacheValue<>(epoch, value);
   }
 
   /** @return a {@link CacheValue} with a null value. */
-  public static <V> CacheValue<V> newInstance(long epoch) {
+  public static <V> CacheValue<V> get(long epoch) {
     return new CacheValue<>(epoch, null);
   }
 
@@ -50,7 +50,7 @@ public class CacheValue<VALUE> {
 
   /**
    * @deprecated
-   * use {@link #newInstance(long, Object)} or {@link #newInstance(long)}.
+   * use {@link #get(long, Object)} or {@link #get(long)}.
    */
   @Deprecated
   public CacheValue(Optional<VALUE> value, long epoch) {
