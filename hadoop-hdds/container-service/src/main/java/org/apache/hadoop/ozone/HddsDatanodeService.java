@@ -68,8 +68,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS_PORT;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP_PORT;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.*;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
@@ -280,11 +279,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
         if (policy.isHttpEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP_PORT,
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
                   httpServer.getHttpAddress().getPort()));
         }
         if (policy.isHttpsEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS_PORT,
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
                   httpServer.getHttpsAddress().getPort()));
         }
       } catch (Exception ex) {
