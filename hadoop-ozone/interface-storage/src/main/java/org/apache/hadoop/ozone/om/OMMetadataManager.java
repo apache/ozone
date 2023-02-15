@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -282,6 +283,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Retrieve RWLock for the table.
+   * @param tableName table name.
+   * @return ReentrantReadWriteLock
+   */
+  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -264,6 +265,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
+
+  // Table-level locks that protects table read/write access.
+  // This is intended to be a finer-grained lock than OzoneManagerLock.
+  private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
+  // TODO: To discuss if there is a better way to achieve deletedTable mutex.
+  //
+  // 1. No extra room in OzoneManagerLock#Resource. All 8 bits in 1B are taken.
+  // 2. OzoneManagerLock enforces a lock hierarchy which may not be desired
+  //  in all cases, like deletedTable here.
+
+  @Override
+  public ReentrantReadWriteLock getTableLock(String tableName) {
+    return tableLockMap.get(tableName);
+  }
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -552,6 +567,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
     checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
+    // Currently, deletedTable is the only table that will need the table lock
+    tableLockMap.put(DELETED_TABLE, new ReentrantReadWriteLock(true));
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
@@ -1372,8 +1389,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       while (keyIter.hasNext() && currentCount < keyCount) {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
+          // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
+            // Skip the key if it exists in the previous snapshot (of the same
+            // scope) so that its blocks won't be reclaimed.
+            // TODO: Further optimization that skip all snapshotted keys
+            //  altogether
+
+            // TODO: Wait for HDDS-7740 merge to reuse the util methods
+//            if (previousSnapshot != null) {
+//              // TODO: For efficient lookup, the addition in design doc
+//              //  4.b)1.b. is crucial.
+//              if (prev snapshot keyTable has key objId info.getObjectID()) {
+//                continue;
+//              }
+//            }
+
+            // TODO: Double check if only some of the keys in the list is
+            //  reclaimed, whether deletedTable would be updated correctly.
+
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :
                 info.getKeyLocationVersions()) {

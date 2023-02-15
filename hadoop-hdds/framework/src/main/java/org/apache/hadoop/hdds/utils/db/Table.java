@@ -149,6 +149,15 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   void deleteWithBatch(BatchOperation batch, KEY key) throws IOException;
 
   /**
+   * Deletes a range of keys from the metadata store.
+   *
+   * @param beginKey start metadata key
+   * @param endKey end metadata key
+   * @throws IOException on Failure
+   */
+  void deleteRange(KEY beginKey, KEY endKey) throws IOException;
+
+  /**
    * Returns the iterator for this metadata store.
    *
    * @return MetaStoreIterator
