@@ -73,7 +73,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocessFSO() throws IOException {
+  public void testReprocess() throws IOException {
     OmKeyInfo[] omKeyInfos = new OmKeyInfo[3];
     String[] keyNames = {"key1", "key2", "key3"};
     String[] volumeNames = {"vol1", "vol1", "vol1"};
