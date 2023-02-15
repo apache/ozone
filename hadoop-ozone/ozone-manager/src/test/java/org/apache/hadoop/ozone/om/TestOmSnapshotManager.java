@@ -89,7 +89,7 @@ public class TestOmSnapshotManager {
         first);
 
     // retrieve it and setup store mock
-    OmSnapshotManager omSnapshotManager = new OmSnapshotManager(om);
+    OmSnapshotManager omSnapshotManager = om.getOmSnapshotManager();
     OmSnapshot firstSnapshot = (OmSnapshot) omSnapshotManager
         .checkForSnapshot(first.getVolumeName(),
         first.getBucketName(), getSnapshotPrefix(first.getName()));
