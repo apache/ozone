@@ -27,15 +27,15 @@ import java.util.Objects;
  * @param <VALUE>
  */
 public class CacheValue<VALUE> {
-  /** Create a {@link CacheValue} with a non-null value. */
-  public static <V> CacheValue<V> newInstance(V value, long epoch) {
+  /** @return a {@link CacheValue} with a non-null value. */
+  public static <V> CacheValue<V> newInstance(long epoch, V value) {
     Objects.requireNonNull(value, "value == null");
-    return new CacheValue<>(value, epoch);
+    return new CacheValue<>(epoch, value);
   }
 
-  /** Create a {@link CacheValue} with a null value. */
+  /** @return a {@link CacheValue} with a null value. */
   public static <V> CacheValue<V> newInstance(long epoch) {
-    return new CacheValue<>(null, epoch);
+    return new CacheValue<>(epoch, null);
   }
 
   private final VALUE value;
@@ -43,14 +43,14 @@ public class CacheValue<VALUE> {
   // This value is set with ratis transaction context log entry index.
   private final long epoch;
 
-  private CacheValue(VALUE value, long epoch) {
+  private CacheValue(long epoch, VALUE value) {
     this.value = value;
     this.epoch = epoch;
   }
 
   /**
    * @deprecated
-   * use {@link #newInstance(Object, long)} or {@link #newInstance(long)}.
+   * use {@link #newInstance(long, Object)} or {@link #newInstance(long)}.
    */
   @Deprecated
   public CacheValue(Optional<VALUE> value, long epoch) {
