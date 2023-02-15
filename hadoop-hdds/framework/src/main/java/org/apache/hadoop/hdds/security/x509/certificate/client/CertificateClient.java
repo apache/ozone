@@ -387,9 +387,19 @@ public interface CertificateClient extends Closeable {
   /**
    * Type for specifying the type of the certificate to be stored.
    */
-  enum CertType {
-    INTERMEDIATE,
-    CA,
-    ROOT_CA
+  enum CAType {
+    NONE(""),
+    SUBORDINATE("CA-"),
+    ROOT("ROOTCA-");
+
+    private final String fileNamePrefix;
+
+    public final String getFileNamePrefix() {
+      return fileNamePrefix;
+    }
+
+    CAType(String fileNamePrefix) {
+      this.fileNamePrefix = fileNamePrefix;
+    }
   }
 }

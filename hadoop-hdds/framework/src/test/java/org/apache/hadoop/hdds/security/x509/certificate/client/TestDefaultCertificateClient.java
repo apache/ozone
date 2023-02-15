@@ -553,7 +553,7 @@ public class TestDefaultCertificateClient {
     certCodec = new CertificateCodec(dnSecurityConfig,
         newCertDir.toPath());
     dnCertClient.storeCertificate(getPEMEncodedString(cert),
-        CertificateClient.CertType.INTERMEDIATE,
+        CertificateClient.CAType.NONE,
         certCodec, false);
     // a success renew after auto cleanup new key and cert dir
     dnCertClient.renewAndStoreKeyAndCertificate(true);

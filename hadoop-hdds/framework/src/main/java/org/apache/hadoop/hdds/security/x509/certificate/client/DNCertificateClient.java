@@ -119,15 +119,17 @@ public class DNCertificateClient extends DefaultCertificateClient {
         CertificateCodec certCodec = new CertificateCodec(
             getSecurityConfig(), certificatePath);
         // Certs will be added to cert map after reloadAllCertificate called
-        storeCertificate(pemEncodedCert, CertType.INTERMEDIATE, certCodec,
+        storeCertificate(pemEncodedCert, CAType.NONE,
+            certCodec,
             false);
-        storeCertificate(response.getX509CACertificate(), CertType.CA,
+        storeCertificate(response.getX509CACertificate(),
+            CAType.SUBORDINATE,
             certCodec, false);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              CertType.ROOT_CA, certCodec, false);
+              CAType.ROOT, certCodec, false);
         }
         // Return the default certificate ID
         String dnCertSerialId = getX509Certificate(pemEncodedCert).

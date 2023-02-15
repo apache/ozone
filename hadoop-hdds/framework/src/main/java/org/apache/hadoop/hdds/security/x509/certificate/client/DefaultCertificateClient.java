@@ -111,9 +111,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private static final Random RANDOM = new SecureRandom();
 
   private static final String CERT_FILE_NAME_FORMAT = "%s.crt";
-  private static final String CA_CERT_PREFIX = "CA-";
   private static final int CA_CERT_PREFIX_LEN = 3;
-  private static final String ROOT_CA_CERT_PREFIX = "ROOTCA-";
   private static final int ROOT_CA_PREFIX_LEN = 7;
   private final Logger logger;
   private final SecurityConfig securityConfig;
@@ -199,7 +197,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                 }
                 certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
                     allCertificates);
-                if (file.getName().startsWith(CA_CERT_PREFIX)) {
+                if (file.getName().startsWith(
+                    CAType.SUBORDINATE.getFileNamePrefix())) {
                   String certFileName = FilenameUtils.getBaseName(
                       file.getName());
                   long tmpCaCertSerailId = NumberUtils.toLong(
@@ -209,7 +208,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   }
                 }
 
-                if (file.getName().startsWith(ROOT_CA_CERT_PREFIX)) {
+                if (file.getName().startsWith(
+                    CAType.ROOT.getFileNamePrefix())) {
                   String certFileName = FilenameUtils.getBaseName(
                       file.getName());
                   long tmpRootCaCertSerailId = NumberUtils.toLong(
@@ -644,18 +644,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         component);
     if (caCert) {
-      storeCertificate(pemEncodedCert, CertType.CA,
+      storeCertificate(pemEncodedCert, CAType.SUBORDINATE,
           certificateCodec, true);
     } else {
-      storeCertificate(pemEncodedCert, CertType.INTERMEDIATE,
-          certificateCodec, true);
+      storeCertificate(pemEncodedCert, CAType.NONE, certificateCodec, true);
     }
 
   }
 
   public synchronized void storeCertificate(String pemEncodedCert,
-      CertType certType,
-      CertificateCodec codec, boolean addToCertMap)
+      CAType caType, CertificateCodec codec, boolean addToCertMap)
       throws CertificateException {
     try {
       CertPath certificatePath =
@@ -664,13 +662,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           (X509Certificate) certificatePath.getCertificates().get(0);
 
       String certName = String.format(CERT_FILE_NAME_FORMAT,
-          cert.getSerialNumber().toString());
+          caType.getFileNamePrefix() + cert.getSerialNumber().toString());
 
-      if (certType == CertType.CA) {
-        certName = CA_CERT_PREFIX + certName;
+      if (caType == CAType.SUBORDINATE) {
         caCertId = cert.getSerialNumber().toString();
-      } else if (certType == CertType.ROOT_CA) {
-        certName = ROOT_CA_CERT_PREFIX + certName;
+      }
+      if (caType == CAType.ROOT) {
         rootCaCertId = cert.getSerialNumber().toString();
       }
 
@@ -1027,8 +1024,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws CertificateException {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         component);
-    storeCertificate(pemEncodedCert, CertType.ROOT_CA,
-        certificateCodec, true);
+    storeCertificate(pemEncodedCert, CAType.ROOT, certificateCodec, true);
   }
 
   @Override
@@ -1084,11 +1080,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         String certName = String.format(CERT_FILE_NAME_FORMAT, certId);
 
         if (certId.equals(caCertId)) {
-          certName = CA_CERT_PREFIX + certName;
+          certName = CAType.SUBORDINATE.getFileNamePrefix() + certName;
         }
 
         if (certId.equals(rootCaCertId)) {
-          certName = ROOT_CA_CERT_PREFIX + certName;
+          certName = CAType.ROOT.getFileNamePrefix() + certName;
         }
 
         FileUtils.deleteQuietly(basePath.resolve(certName).toFile());
