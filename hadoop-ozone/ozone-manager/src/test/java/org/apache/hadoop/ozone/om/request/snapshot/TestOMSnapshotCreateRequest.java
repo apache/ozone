@@ -237,15 +237,6 @@ public class TestOMSnapshotCreateRequest {
           "dtkey" + i);
       omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
     }
-//    try (TableIterator<String,
-//        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-//        keyIter = omMetadataManager.getDeletedTable().iterator()) {
-//      while (keyIter.hasNext()) {
-//        Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
-//        String dtKey = entry.getKey();
-//        System.out.println(dtKey);
-//      }
-//    }
 
     // run validateAndUpdateCache. add key to cache and clears deletedTable
     OMClientResponse omClientResponse =
@@ -282,7 +273,6 @@ public class TestOMSnapshotCreateRequest {
         Assert.assertTrue("deletedTable should contain key",
             dtSentinelKeys.contains(dtKey));
         dtSentinelKeys.remove(dtKey);
-//        System.out.println(dtKey);
       }
     }
 

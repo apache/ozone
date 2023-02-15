@@ -172,9 +172,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  Table#deleteKeysWithPrefix()
 
       // Range delete start key (inclusive)
-      // TODO: Double check that this gives the same prefix as getOzoneKey()
-      String beginKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-//      beginKey = omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+      String beginKey =
+          omMetadataManager.getOzoneKey(volumeName, bucketName, "");
 
       // Range delete end key (exclusive) to be found
       String endKey;
@@ -208,8 +207,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // TODO: End timer. Print time elapsed to debug log
 
       if (endKey != null) {
-        // TODO: beginKey === endKey case
-
         // Clean up deletedTable
         omMetadataManager.getDeletedTable().deleteRange(beginKey, endKey);
 
