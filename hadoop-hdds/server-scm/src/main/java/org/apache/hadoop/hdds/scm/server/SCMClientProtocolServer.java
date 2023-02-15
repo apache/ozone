@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -49,6 +50,10 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -73,9 +78,13 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +96,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -95,8 +105,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -780,6 +793,89 @@ public class SCMClientProtocolServer implements
         );
       }
     }
+  }
+
+  @Override
+  public void transferLeadership(String newLeaderId)
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
+      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
+    }
+    boolean auditSuccess = true;
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("newLeaderId", newLeaderId);
+    try {
+      SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
+      RaftGroup group = scmRatisServer.getDivision().getGroup();
+      RaftPeerId targetPeerId;
+      if (newLeaderId.isEmpty()) {
+        RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager()
+            .getRatisServer()).getLeader();
+        targetPeerId = group.getPeers()
+            .stream()
+            .filter(a -> !a.equals(curLeader)).findFirst()
+            .map(RaftPeer::getId)
+            .orElseThrow(() -> new IOException("Cannot" +
+                " find a new leader to transfer leadership."));
+      } else {
+        String ratisAddr = convertToRatisAddr(newLeaderId);
+        targetPeerId = group.getPeers()
+            .stream()
+            .filter(a -> a.getAddress().equals(ratisAddr) || a.getAddress()
+                .equals(ratisAddr.replace("127.0.0.1", "localhost")))
+            .findFirst().map(RaftPeer::getId)
+            .orElseThrow(() -> new IOException("Cannot find a new" +
+                " leader. The expected leader address is " + ratisAddr +
+                " and the peers are " + group.getPeers().stream()
+                .map(RaftPeer::getAddress).collect(Collectors.toList()) + "."));
+      }
+      RatisHelper.transferRatisLeadership(scm.getConfiguration(), group,
+          targetPeerId);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.TRANSFER_LEADERSHIP, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            SCMAction.TRANSFER_LEADERSHIP, auditMap));
+      }
+    }
+  }
+
+  /**
+   * Convert SCM nodeId to Ratis Address through config
+   * since SCM raft group do not have any direct node info.
+   *
+   * @param scmNodeId the node id of SCM
+   * @return the Ratis address of the corresponding SCM node or null
+   *         if not found in config.
+   * @throws IOException
+   */
+  private String convertToRatisAddr(String scmNodeId) throws IOException {
+    SCMNodeDetails localScm = scm.getSCMHANodeDetails().getLocalNodeDetails();
+    String scmServiceId = localScm.getServiceId();
+    Objects.requireNonNull(scmServiceId);
+    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, scmNodeId);
+
+    String rpcAddrStr = scm.getConfiguration().get(rpcAddrKey);
+    if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
+      throw new IOException("Configuration does not have any" +
+          " value set for " + rpcAddrKey + ". Please confirm the nodeId " +
+          "is right.");
+    }
+    String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
+        scmServiceId, scmNodeId);
+    int ratisPort = scm.getConfiguration().getInt(ratisPortKey,
+        OZONE_SCM_RATIS_PORT_DEFAULT);
+    // Remove possible RPC port
+    if (rpcAddrStr.contains(":")) {
+      rpcAddrStr = rpcAddrStr.split(":")[0];
+    }
+    return rpcAddrStr.concat(":").concat(String.valueOf(ratisPort));
   }
 
   @Override
