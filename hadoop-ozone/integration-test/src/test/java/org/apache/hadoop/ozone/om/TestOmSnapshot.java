@@ -615,14 +615,15 @@ public class TestOmSnapshot {
     key1 = createFileKey(bucket1, key1);
     String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucketName1, snap1);
-    // Create key in bucket2 and calculate diff
+    // Create key in bucket2 and bucket1 and calculate diff
     // Diff should not contain bucket2's key
+    createFileKey(bucket1, key1);
     createFileKey(bucket2, key1);
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucketName1, snap2);
     SnapshotDiffReport diff1 =
         store.snapshotDiff(volume, bucketName1, snap1, snap2);
-    Assert.assertTrue(diff1.getDiffList().isEmpty());
+    Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
 
