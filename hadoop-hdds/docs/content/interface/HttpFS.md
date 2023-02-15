@@ -28,22 +28,22 @@ Ozone HttpFS can be used to integrate Ozone with other tools via REST API.
 
 ## Introduction
 
-Ozone HttpFS started as forking the HDFS HttpFS endpoint implementation ([HDDS-5448](https://issues.apache.org/jira/browse/HDDS-5448)). It is added a separate role to Ozone, like S3G. 
+Ozone HttpFS is forked from the HDFS HttpFS endpoint implementation ([HDDS-5448](https://issues.apache.org/jira/browse/HDDS-5448)). It is added as a separate role to Ozone, like S3G. 
 
-HttpFS is a server that provides a REST HTTP gateway supporting File System operations (read and write). And it is interoperable with the **webhdfs** REST HTTP API.
+HttpFS is a service that provides a REST HTTP gateway supporting File System operations (read and write). It is interoperable with the **webhdfs** REST HTTP API.
 
-HttpFS can be used to access data in Ozone on a cluster behind of a firewall (the HttpFS server acts as a gateway and is the only system that is allowed to cross the firewall into the cluster).
+HttpFS can be used to access data on an Ozone cluster behind of a firewall (the HttpFS service acts as a gateway and is the only system that is allowed to cross the firewall into the cluster).
 
 HttpFS can be used to access data in Ozone using HTTP utilities (such as curl and wget) and HTTP libraries Perl from other languages than Java.
 
 The **webhdfs** client FileSystem implementation can be used to access HttpFS using the Ozone filesystem command line tool (`ozone fs`) as well as from Java applications using the Hadoop FileSystem Java API.
 
-HttpFS has built-in security supporting Hadoop pseudo authentication and HTTP SPNEGO Kerberos and other pluggable authentication mechanisms. It also provides Hadoop proxy user support.
+HttpFS has built-in security supporting Hadoop pseudo authentication and Kerberos SPNEGO and other pluggable authentication mechanisms. It also provides Hadoop proxy user support.
 
 
 ## Getting started
 
-HttpFS itself is Java Jetty web-application. Ozone HttpFS Gateway is a separated component which provides access to Ozone via REST API. It should be started additional to the regular Ozone components.
+HttpFS service itself is a Jetty based web-application that uses the Hadoop FileSystem API to talk to the cluster, it is a separate service which provides access to Ozone via a REST API. It should be started additionally to the regular Ozone components.
 
 You can start a docker based cluster, including the HttpFS gateway from the release package.
 
@@ -53,10 +53,10 @@ Go to the `compose/ozone` directory and start the server:
 docker-compose up -d --scale datanode=3
 ```
 
-You can now see the HttpFS gateway in docker with the name `ozone_httpfs`.
+You can/should find now the HttpFS gateway in docker with the name `ozone_httpfs`.
 HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file system operation. For example, using the `curl` Unix command.
 
-E.g. in the docker cluster you can execute commands these:
+E.g. in the docker cluster you can execute commands like these:
 
 * `curl -i -X PUT "http://httpfs:14000/webhdfs/v1/vol1?op=MKDIRS&user.name=hdfs"` creates a volume called `vol1`.
 
@@ -73,14 +73,14 @@ These are the WebHDFS REST API operations that are supported/unsupported in Ozon
 Operation                       |      Support
 --------------------------------|---------------------
 Create and Write to a File      | supported
-Append to a File                | unsupported, as append is not implemented in Ozone
-Concat File(s)                  | unsupported, as append is not implemented in Ozone
+Append to a File                | not implemented in Ozone FileSystem API
+Concat File(s)                  | not implemented in Ozone FileSystem API
 Open and Read a File            | supported
 Make a Directory                | supported
 Create a Symbolic Link          | unsupported
 Rename a File/Directory         | unsupported
 Delete a File/Directory         | supported
-Truncate a File                 | unsupported, not implemented in Ozone
+Truncate a File                 | not implemented in Ozone FileSystem API
 Status of a File/Directory      | supported
 List a Directory                | supported
 List a File                     | supported
@@ -93,22 +93,22 @@ Operation                             |      Support
 --------------------------------------|---------------------
 Get Content Summary of a Directory    | supported
 Get Quota Usage of a Directory        | supported
-Set Quota                             | unsupported, not implemented in Ozone
-Set Quota By Storage Type             | unsupported, not implemented in Ozone
-Get File Checksum                     | unsupported, not implemented in Ozone
+Set Quota                             | not implemented in Ozone
+Set Quota By Storage Type             | not implemented in Ozone
+Get File Checksum                     | not implemented in Ozone
 Get Home Directory                    | supported
 Get Trash Root                        | supported
 Set Permission                        | supported
 Set Owner                             | supported
 Set Replication Factor                | supported
 Set Access or Modification Time       | supported
-Modify ACL Entries                    | unsupported, not implemented in Ozone
-Remove ACL Entries                    | unsupported, not implemented in Ozone
-Remove Default ACL                    | unsupported, not implemented in Ozone
-Remove ACL                            | unsupported, not implemented in Ozone
-Set ACL                               | unsupported, not implemented in Ozone
-Get ACL Status                        | unsupported, not implemented in Ozone
-Check access                          | unsupported, not implemented in Ozone
+Modify ACL Entries                    | not implemented in Ozone FileSystem API
+Remove ACL Entries                    | not implemented in Ozone FileSystem API
+Remove Default ACL                    | not implemented in Ozone FileSystem API
+Remove ACL                            | not implemented in Ozone FileSystem API
+Set ACL                               | not implemented in Ozone FileSystem API
+Get ACL Status                        | not implemented in Ozone FileSystem API
+Check access                          | not implemented in Ozone FileSystem API
 
 
 
