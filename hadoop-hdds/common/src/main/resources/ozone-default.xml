@@ -3593,4 +3593,19 @@
       history from compaction DAG. Uses millisecond by default when no time unit is specified.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.db.dir</name>
+    <value/>
+    <tag>OZONE, OM</tag>
+    <description>
+      Directory where the OzoneManager stores the snapshot diff related data.
+      This should be specified as a single directory. If the directory does not
+      exist then the OM will attempt to create it.
+
+      If undefined, then the OM will log a warning and fallback to
+      ozone.metadata.dirs. This fallback approach is not recommended for
+      production environments.
+    </description>
+  </property>
 </configuration>
