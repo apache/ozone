@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -41,14 +42,16 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   public static final Logger LOG =
       LoggerFactory.getLogger(DownloadAndImportReplicator.class);
 
+  private final ConfigurationSource conf;
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
 
   public DownloadAndImportReplicator(
-      ContainerSet containerSet,
+      ConfigurationSource conf, ContainerSet containerSet,
       ContainerImporter containerImporter,
       ContainerDownloader downloader) {
+    this.conf = conf;
     this.containerSet = containerSet;
     this.downloader = downloader;
     this.containerImporter = containerImporter;
@@ -64,9 +67,11 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     }
 
     List<DatanodeDetails> sourceDatanodes = task.getSources();
+    CopyContainerCompression compression =
+        CopyContainerCompression.getConf(conf);
 
-    LOG.info("Starting replication of container {} from {}", containerID,
-        sourceDatanodes);
+    LOG.info("Starting replication of container {} from {} using {}",
+        containerID, sourceDatanodes, compression);
 
     try {
       HddsVolume targetVolume = containerImporter.chooseNextVolume();
@@ -74,7 +79,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =
           downloader.getContainerDataFromReplicas(containerID, sourceDatanodes,
-              ContainerImporter.getUntarDirectory(targetVolume));
+              ContainerImporter.getUntarDirectory(targetVolume), compression);
       if (tarFilePath == null) {
         task.setStatus(Status.FAILED);
         return;
@@ -84,7 +89,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
               containerID, bytes);
       task.setTransferredBytes(bytes);
 
-      containerImporter.importContainer(containerID, tarFilePath, targetVolume);
+      containerImporter.importContainer(containerID, tarFilePath, targetVolume,
+          compression);
 
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);

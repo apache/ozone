@@ -317,9 +317,6 @@ public class DatanodeConfiguration {
   )
   private String containerSchemaV3KeySeparator = "|";
 
-  /**
-   * Following RocksDB related configuration applies to Schema V3 only.
-   */
   @Config(key = "rocksdb.log.level",
       defaultValue = "INFO",
       type = ConfigType.STRING,
@@ -336,7 +333,7 @@ public class DatanodeConfiguration {
       description = "The max size of each user log file of RocksDB. " +
           "O means no size limit."
   )
-  private long rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+  private long rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
   @Config(key = "rocksdb.log.max-file-num",
       defaultValue = "64",
@@ -344,8 +341,11 @@ public class DatanodeConfiguration {
       tags = { DATANODE },
       description = "The max user log file number to keep for each RocksDB"
   )
-  private int rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+  private int rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
 
+  /**
+   * Following RocksDB related configuration applies to Schema V3 only.
+   */
   @Config(key = "rocksdb.delete-obsolete-files-period",
       defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
@@ -363,6 +363,34 @@ public class DatanodeConfiguration {
       description = "The total number of files that a RocksDB can open. "
   )
   private int rocksdbMaxOpenFiles = ROCKSDB_MAX_OPEN_FILES_DEFAULT;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Auto compact small SST files " +
+          "(rocksdb.auto-compaction-small-sst-file-size-threshold) when " +
+          "count exceeds (rocksdb.auto-compaction-small-sst-file-num-threshold)"
+  )
+  private boolean autoCompactionSmallSstFile = true;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file-size-threshold",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "SST files smaller than this configuration will be " +
+          "auto compacted."
+  )
+  private long autoCompactionSmallSstFileSize = 1024 * 1024;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file-num-threshold",
+      defaultValue = "512",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "Auto compaction will happen if the number of small SST " +
+          " files exceeds this threshold."
+  )
+  private int autoCompactionSmallSstFileNum = 512;
 
   @PostConstruct
   public void validate() {
@@ -417,18 +445,18 @@ public class DatanodeConfiguration {
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
-    if (rocksdbMaxFileSize < 0) {
+    if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
-          rocksdbMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
-      rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+          rocksdbLogMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
+      rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
     }
 
-    if (rocksdbMaxFileNum <= 0) {
+    if (rocksdbLogMaxFileNum <= 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_NUM_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
-          rocksdbMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
-      rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+          rocksdbLogMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
+      rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
     }
 
     if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
@@ -555,20 +583,20 @@ public class DatanodeConfiguration {
     this.rocksdbLogLevel = level;
   }
 
-  public void setRocksdbMaxFileNum(int count) {
-    this.rocksdbMaxFileNum = count;
+  public void setRocksdbLogMaxFileNum(int count) {
+    this.rocksdbLogMaxFileNum = count;
   }
 
-  public int getRocksdbMaxFileNum() {
-    return rocksdbMaxFileNum;
+  public int getRocksdbLogMaxFileNum() {
+    return rocksdbLogMaxFileNum;
   }
 
-  public void setRocksdbMaxFileSize(long size) {
-    this.rocksdbMaxFileSize = size;
+  public void setRocksdbLogMaxFileSize(long size) {
+    this.rocksdbLogMaxFileSize = size;
   }
 
-  public long getRocksdbMaxFileSize() {
-    return rocksdbMaxFileSize;
+  public long getRocksdbLogMaxFileSize() {
+    return rocksdbLogMaxFileSize;
   }
 
   public long getRocksdbDeleteObsoleteFilesPeriod() {
@@ -585,5 +613,29 @@ public class DatanodeConfiguration {
 
   public int getRocksdbMaxOpenFiles() {
     return this.rocksdbMaxOpenFiles;
+  }
+
+  public boolean autoCompactionSmallSstFile() {
+    return autoCompactionSmallSstFile;
+  }
+
+  public void setAutoCompactionSmallSstFile(boolean auto) {
+    this.autoCompactionSmallSstFile = auto;
+  }
+
+  public long getAutoCompactionSmallSstFileSize() {
+    return autoCompactionSmallSstFileSize;
+  }
+
+  public void setAutoCompactionSmallSstFileSize(long size) {
+    this.autoCompactionSmallSstFileSize = size;
+  }
+
+  public int getAutoCompactionSmallSstFileNum() {
+    return autoCompactionSmallSstFileNum;
+  }
+
+  public void setAutoCompactionSmallSstFileNum(int num) {
+    this.autoCompactionSmallSstFileNum = num;
   }
 }

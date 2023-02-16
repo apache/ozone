@@ -122,6 +122,9 @@ public final class S3ErrorTable {
       "NotImplemented", "This part of feature is not implemented yet.",
       HTTP_NOT_IMPLEMENTED);
 
+  public static final OS3Exception NO_OVERWRITE = new OS3Exception(
+      "Conflict", "Cannot overwrite file with directory", HTTP_CONFLICT);
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }

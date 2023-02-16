@@ -61,19 +61,17 @@ public class RandomContainerDeletionChoosingPolicy
     // blocks don't exceed the number of blocks to be deleted in an interval.
 
     for (ContainerData entry : shuffled) {
-      if (((KeyValueContainerData) entry).getNumPendingDeletionBlocks() > 0) {
-        long numBlocksToDelete = Math.min(blockCount,
+      long numBlocksToDelete = Math.min(blockCount,
+          ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
+      blockCount -= numBlocksToDelete;
+      result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Select container {} for block deletion, "
+                + "pending deletion blocks num: {}.", entry.getContainerID(),
             ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
-        blockCount -= numBlocksToDelete;
-        result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Select container {} for block deletion, "
-                  + "pending deletion blocks num: {}.", entry.getContainerID(),
-              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
-        }
-        if (blockCount == 0) {
-          break;
-        }
+      }
+      if (blockCount == 0) {
+        break;
       }
     }
     return result;

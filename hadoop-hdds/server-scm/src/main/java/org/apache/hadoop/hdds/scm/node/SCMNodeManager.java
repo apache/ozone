@@ -606,7 +606,7 @@ public class SCMNodeManager implements NodeManager {
       LOG.debug("Processing node report from [datanode={}]",
           datanodeDetails.getHostName());
     }
-    if (LOG.isTraceEnabled()) {
+    if (LOG.isTraceEnabled() && nodeReport != null) {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
           nodeReport.toString().replaceAll("\n", "\\\\n"));
@@ -826,8 +826,8 @@ public class SCMNodeManager implements NodeManager {
     // create a DatanodeUsageInfo from each DatanodeDetails and add it to the
     // list
     for (DatanodeDetails node : healthyNodes) {
-      SCMNodeStat stat = getNodeStatInternal(node);
-      datanodeUsageInfoList.add(new DatanodeUsageInfo(node, stat));
+      DatanodeUsageInfo datanodeUsageInfo = getUsageInfo(node);
+      datanodeUsageInfoList.add(datanodeUsageInfo);
     }
 
     // sort the list according to appropriate comparator
@@ -850,7 +850,14 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
     SCMNodeStat stat = getNodeStatInternal(dn);
-    return new DatanodeUsageInfo(dn, stat);
+    DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
+    try {
+      int containerCount = getContainers(dn).size();
+      usageInfo.setContainerCount(containerCount);
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Unknown datanode {}.", dn, ex);
+    }
+    return usageInfo;
   }
 
   /**

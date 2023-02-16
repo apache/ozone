@@ -94,7 +94,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables();
+      initializeOmTables(true);
       omTablesInitialized = true;
     }
   }

@@ -70,7 +70,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   public static final Logger LOG =
       LoggerFactory.getLogger(DBScanner.class);
 
-  @CommandLine.Option(names = {"--column_family"},
+  @CommandLine.Option(names = {"--column_family", "--column-family"},
       required = true,
       description = "Table name")
   private String tableName;

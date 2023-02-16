@@ -15,33 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.fs.CanUnbuffer;
-
-import java.nio.ByteBuffer;
+package org.apache.hadoop.ozone.om.snapshot;
 
 /**
- * Utility class to query streams for supported capabilities of Ozone.
- * Capability strings must be in lower case.
+ * Define an interface for persistent map.
  */
-final class OzoneStreamCapabilities {
+public interface PersistentMap<K, V> {
 
-  private OzoneStreamCapabilities() {
-  }
+  V get(K key);
 
-  /**
-   * Stream read(ByteBuffer) capability implemented by
-   * {@link OzoneFSInputStream#read(ByteBuffer)}.
-   *
-   * TODO: If Hadoop dependency is upgraded, this string can be removed.
-   */
-  static final String READBYTEBUFFER = "in:readbytebuffer";
-
-  /**
-   * Stream unbuffer capability implemented by {@link CanUnbuffer#unbuffer()}.
-   *
-   * TODO: If Hadoop dependency is upgraded, this string can be removed.
-   */
-  static final String UNBUFFER = "in:unbuffer";
+  void put(K key, V value);
 }

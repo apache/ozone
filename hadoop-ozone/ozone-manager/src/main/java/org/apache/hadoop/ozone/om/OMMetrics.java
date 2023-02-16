@@ -32,7 +32,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Metrics", context = "dfs")
-public class OMMetrics {
+public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
@@ -68,6 +68,9 @@ public class OMMetrics {
   private @Metric MutableCounterLong numBucketS3Lists;
   private @Metric MutableCounterLong numInitiateMultipartUploads;
   private @Metric MutableCounterLong numCompleteMultipartUploads;
+  private @Metric MutableCounterLong numSnapshotCreates;
+  private @Metric MutableCounterLong numSnapshotDeletes;
+  private @Metric MutableCounterLong numSnapshotLists;
 
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
@@ -116,6 +119,12 @@ public class OMMetrics {
   private @Metric MutableCounterLong numListMultipartUploadParts;
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
+  private @Metric MutableCounterLong numSnapshotCreateFails;
+  private @Metric MutableCounterLong numSnapshotDeleteFails;
+  private @Metric MutableCounterLong numSnapshotListFails;
+  private @Metric MutableCounterLong numSnapshotActive;
+  private @Metric MutableCounterLong numSnapshotDeleted;
+  private @Metric MutableCounterLong numSnapshotReclaimed;
 
   // Number of tenant operations attempted
   private @Metric MutableCounterLong numTenantOps;
@@ -379,6 +388,7 @@ public class OMMetrics {
     numBucketLists.incr();
   }
 
+  @Override
   public void incNumKeyLists() {
     numKeyOps.incr();
     numKeyLists.incr();
@@ -425,6 +435,69 @@ public class OMMetrics {
   public void incNumCompleteMultipartUploads() {
     numKeyOps.incr();
     numCompleteMultipartUploads.incr();
+  }
+
+  public void incNumSnapshotCreates() {
+    numSnapshotCreates.incr();
+  }
+
+  public void incNumSnapshotCreateFails() {
+    numSnapshotCreateFails.incr();
+  }
+
+  public void incNumSnapshotDeletes() {
+    numSnapshotDeletes.incr();
+  }
+
+  public void incNumSnapshotDeleteFails() {
+    numSnapshotDeleteFails.incr();
+  }
+
+  public void incNumSnapshotLists() {
+    numSnapshotLists.incr();
+  }
+
+  public void incNumSnapshotListFails() {
+    numSnapshotListFails.incr();
+  }
+
+  public void setNumSnapshotActive(long num) {
+    long currVal = numSnapshotActive.value();
+    numSnapshotActive.incr(num - currVal);
+  }
+
+  public void incNumSnapshotActive() {
+    numSnapshotActive.incr();
+  }
+
+  public void decNumSnapshotActive() {
+    numSnapshotActive.incr(-1);
+  }
+
+  public void setNumSnapshotDeleted(long num) {
+    long currVal = numSnapshotDeleted.value();
+    numSnapshotDeleted.incr(num - currVal);
+  }
+
+  public void incNumSnapshotDeleted() {
+    numSnapshotDeleted.incr();
+  }
+
+  public void decNumSnapshotDeleted() {
+    numSnapshotDeleted.incr(-1);
+  }
+
+  public void setNumSnapshotReclaimed(long num) {
+    long currVal = numSnapshotReclaimed.value();
+    numSnapshotReclaimed.incr(num - currVal);
+  }
+
+  public void incNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr();
+  }
+
+  public void decNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr(-1);
   }
 
   public void incNumCompleteMultipartUploadFails() {
@@ -530,12 +603,14 @@ public class OMMetrics {
     numTenantTenantUserLists.incr();
   }
 
+  @Override
   public void incNumGetFileStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numGetFileStatus.incr();
   }
 
+  @Override
   public void incNumGetFileStatusFails() {
     numGetFileStatusFails.incr();
   }
@@ -560,22 +635,26 @@ public class OMMetrics {
     numCreateFileFails.incr();
   }
 
+  @Override
   public void incNumLookupFile() {
     numKeyOps.incr();
     numFSOps.incr();
     numLookupFile.incr();
   }
 
+  @Override
   public void incNumLookupFileFails() {
     numLookupFileFails.incr();
   }
 
+  @Override
   public void incNumListStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numListStatus.incr();
   }
 
+  @Override
   public void incNumListStatusFails() {
     numListStatusFails.incr();
   }
@@ -633,11 +712,13 @@ public class OMMetrics {
     numKeyAllocateFails.incr();
   }
 
+  @Override
   public void incNumKeyLookups() {
     numKeyOps.incr();
     numKeyLookup.incr();
   }
 
+  @Override
   public void incNumKeyLookupFails() {
     numKeyLookupFails.incr();
   }
@@ -681,6 +762,7 @@ public class OMMetrics {
     numBucketListFails.incr();
   }
 
+  @Override
   public void incNumKeyListFails() {
     numKeyListFails.incr();
   }
@@ -721,6 +803,7 @@ public class OMMetrics {
     numSetAcl.incr();
   }
 
+  @Override
   public void incNumGetAcl() {
     numGetAcl.incr();
   }
@@ -729,11 +812,13 @@ public class OMMetrics {
     numRemoveAcl.incr();
   }
 
+  @Override
   public void incNumGetKeyInfo() {
     numGetKeyInfo.incr();
     numKeyOps.incr();
   }
 
+  @Override
   public void incNumGetKeyInfoFails() {
     getNumGetKeyInfoFails.incr();
   }
@@ -1093,6 +1178,35 @@ public class OMMetrics {
   public long getNumTenantTenantUserLists() {
     return numTenantTenantUserLists.value();
   }
+
+  public long getNumSnapshotCreates() {
+    return numSnapshotCreates.value();
+  }
+
+  public long getNumSnapshotLists() {
+    return numSnapshotLists.value();
+  }
+
+  public long getNumSnapshotCreateFails() {
+    return numSnapshotCreateFails.value();
+  }
+
+  public long getNumSnapshotListFails() {
+    return numSnapshotListFails.value();
+  }
+
+  public long getNumSnapshotActive() {
+    return numSnapshotActive.value();
+  }
+
+  public long getNumSnapshotDeleted() {
+    return numSnapshotDeleted.value();
+  }
+
+  public long getNumSnapshotReclaimed() {
+    return numSnapshotReclaimed.value();
+  }
+
 
   public void incNumTrashRenames() {
     numTrashRenames.incr();

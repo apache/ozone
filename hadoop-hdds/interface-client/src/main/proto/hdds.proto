@@ -186,6 +186,7 @@ message DatanodeUsageInfoProto {
     optional int64 used = 2;
     optional int64 remaining = 3;
     optional DatanodeDetailsProto node = 4;
+    optional int64 containerCount = 5;
 }
 
 /**
@@ -450,4 +451,11 @@ message ContainerBalancerConfigurationProto {
 
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
+}
+
+message TransferLeadershipRequestProto {
+    required string newLeaderId = 1;
+}
+
+message TransferLeadershipResponseProto {
 }

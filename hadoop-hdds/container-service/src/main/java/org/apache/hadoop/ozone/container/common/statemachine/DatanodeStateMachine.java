@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Repl
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.SetNodeOperationalStateCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -181,12 +180,12 @@ public class DatanodeStateMachine implements Closeable {
     ContainerImporter importer = new ContainerImporter(conf,
         container.getContainerSet(),
         container.getController(),
-        new TarContainerPacker(), container.getVolumeSet());
+        container.getVolumeSet());
     ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
-        container.getContainerSet(),
+        conf, container.getContainerSet(),
         importer,
         new SimpleContainerDownloader(conf, dnCertClient));
-    ContainerReplicator pushReplicator = new PushReplicator(
+    ContainerReplicator pushReplicator = new PushReplicator(conf,
         new OnDemandContainerReplicationSource(container.getController()),
         new GrpcContainerUploader(conf, dnCertClient)
     );

@@ -44,6 +44,8 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
 
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+
 /**
  * Test SimpleContainerDownloader.
  */
@@ -66,7 +68,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir.newFolder().toPath());
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     Assertions.assertEquals(datanodes.get(0).getUuidString(),
@@ -86,7 +88,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir.newFolder().toPath());
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
@@ -106,7 +108,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir.newFolder().toPath());
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
@@ -130,8 +132,8 @@ public class TestSimpleContainerDownloader {
 
           @Override
           protected CompletableFuture<Path> downloadContainer(
-              long containerId, DatanodeDetails datanode, Path downloadPath
-          ) {
+              long containerId, DatanodeDetails datanode, Path downloadPath,
+              CopyContainerCompression compression) {
             //download is always successful.
             return CompletableFuture
                 .completedFuture(Paths.get(datanode.getUuidString()));
@@ -142,7 +144,7 @@ public class TestSimpleContainerDownloader {
     //returned.
     for (int i = 0; i < 10000; i++) {
       Path path = downloader.getContainerDataFromReplicas(1L, datanodes,
-          tempDir.newFolder().toPath());
+          tempDir.newFolder().toPath(), NO_COMPRESSION);
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }
@@ -183,8 +185,8 @@ public class TestSimpleContainerDownloader {
 
       @Override
       protected CompletableFuture<Path> downloadContainer(
-          long containerId, DatanodeDetails datanode, Path downloadPath
-      ) {
+          long containerId, DatanodeDetails datanode, Path downloadPath,
+          CopyContainerCompression compression) {
 
         if (datanodes.contains(datanode)) {
           if (directException) {
