@@ -581,18 +581,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // an IOException.
         pair.getValue().get();
       } catch (ExecutionException ee) {
-        String message = "Failed to read from block {} EC index {}. Excluding" +
-                " the block";
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(message, getBlockID(), index + 1, ee.getCause());
+        boolean added = failedDataIndexes.add(index);
+        Throwable t = ee.getCause() != null ? ee.getCause() : ee;
+        String msg = "Error reading index={} for block {}";
+        if (added) {
+          msg += ", marked as failed";
         } else {
-          Throwable t = ee.getCause() != null ? ee.getCause() : ee;
-          LOG.warn(message + " Exception: {} Exception Message: {}",
-                  getBlockID(), index + 1, t.getClass().getName(),
-                  t.getMessage());
+          msg += ", already had failed"; // should not really happen
         }
+        LOG.info(msg, index + 1, getBlockID(), t);
 
-        failedDataIndexes.add(index);
         exceptionOccurred = true;
       } catch (InterruptedException ie) {
         // Catch each InterruptedException to ensure all the futures have been
@@ -606,7 +604,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
           "Interrupted while waiting for reads to complete");
     }
     if (exceptionOccurred) {
-      throw new IOException("One or more errors occurred reading blocks");
+      throw new IOException("One or more errors occurred reading block "
+          + getBlockID());
     }
   }
 
