@@ -18,7 +18,7 @@
 
 package org.apache.ozone.lib.lang;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.util.Check;
 
 import java.util.concurrent.Callable;

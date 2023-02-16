@@ -17,9 +17,9 @@
  */
 package org.apache.ozone.fs.http;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
  * Constants for the HttpFs server side implementations.

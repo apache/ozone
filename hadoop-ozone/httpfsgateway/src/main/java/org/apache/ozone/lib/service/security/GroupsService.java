@@ -18,8 +18,8 @@
 
 package org.apache.ozone.lib.service.security;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.server.BaseService;
 import org.apache.ozone.lib.server.ServiceException;
 import org.apache.ozone.lib.service.Groups;

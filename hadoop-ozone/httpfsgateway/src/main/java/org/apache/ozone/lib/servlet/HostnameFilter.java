@@ -19,7 +19,7 @@
 package org.apache.ozone.lib.servlet;
 
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;

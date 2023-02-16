@@ -19,7 +19,7 @@
 package org.apache.ozone.fs.http.server;
 
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.fs.http.HttpFSConstants;
 import org.apache.hadoop.util.StringUtils;
 

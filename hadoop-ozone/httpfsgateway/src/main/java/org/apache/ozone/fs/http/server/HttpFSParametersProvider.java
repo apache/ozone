@@ -17,9 +17,9 @@
  */
 package org.apache.ozone.fs.http.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.fs.http.HttpFSConstants;
 import org.apache.ozone.fs.http.HttpFSConstants.Operation;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
