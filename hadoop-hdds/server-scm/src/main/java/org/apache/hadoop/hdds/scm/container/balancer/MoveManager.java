@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -90,7 +91,8 @@ public interface MoveManager {
   /**
    * get all the pending move operations .
    */
-  Map<ContainerID, MoveDataNodePair> getPendingMove();
+  Map<ContainerID, Pair<CompletableFuture<MoveResult>, MoveDataNodePair>>
+      getPendingMove();
 
   /**
    * move a container replica from source datanode to

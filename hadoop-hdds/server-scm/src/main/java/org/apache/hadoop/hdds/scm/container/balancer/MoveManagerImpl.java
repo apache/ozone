@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -58,7 +59,6 @@ public final class MoveManagerImpl implements MoveManager,
   public static final Logger LOG =
       LoggerFactory.getLogger(MoveManagerImpl.class);
 
-  // TODO - Delay moves until some time after failover
   // TODO - Should pending ops notify under lock to allow MM to schedule a
   //        delete after the move, but before anything else can, eg RM?
 
@@ -69,10 +69,11 @@ public final class MoveManagerImpl implements MoveManager,
   private final ReplicationManager replicationManager;
   private final ContainerManager containerManager;
   private final Clock clock;
-  private final Map<ContainerID, CompletableFuture<MoveResult>>
-      pendingMoveFuture = new ConcurrentHashMap<>();
-  private final Map<ContainerID, MoveDataNodePair>
-      pendingMoveOps = new ConcurrentHashMap<>();
+
+  private final Map<ContainerID,
+      Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> pendingMoves =
+      new ConcurrentHashMap<>();
+
   private volatile boolean running = false;
 
   public MoveManagerImpl(final ReplicationManager replicationManager,
@@ -85,8 +86,9 @@ public final class MoveManagerImpl implements MoveManager,
   /**
    * get all the pending move operations.
    */
-  public Map<ContainerID, MoveDataNodePair> getPendingMove() {
-    return pendingMoveOps;
+  public Map<ContainerID,
+      Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> getPendingMove() {
+    return pendingMoves;
   }
 
   /**
@@ -95,9 +97,10 @@ public final class MoveManagerImpl implements MoveManager,
    * @param cid Container id to which the move option is finished
    */
   private void completeMove(final ContainerID cid, final MoveResult mr) {
-    if (pendingMoveOps.containsKey(cid)) {
-      CompletableFuture<MoveResult> future = pendingMoveFuture.remove(cid);
-      pendingMoveOps.remove(cid);
+    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> move =
+        pendingMoves.remove(cid);
+    if (move != null) {
+      CompletableFuture<MoveResult> future = move.getLeft();
       if (future != null && mr != null) {
         // when we know the future is null, and we want to complete
         // the move , then we set mr to null.
@@ -121,11 +124,10 @@ public final class MoveManagerImpl implements MoveManager,
       final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret)
       throws ContainerReplicaNotFoundException,
       ContainerNotFoundException {
-    if (!pendingMoveOps.containsKey(containerInfo.containerID())) {
+    if (!pendingMoves.containsKey(containerInfo.containerID())) {
       MoveDataNodePair mp = new MoveDataNodePair(src, tgt);
       sendReplicateCommand(containerInfo, tgt, src);
-      pendingMoveOps.putIfAbsent(containerInfo.containerID(), mp);
-      pendingMoveFuture.putIfAbsent(containerInfo.containerID(), ret);
+      pendingMoves.putIfAbsent(containerInfo.containerID(), Pair.of(ret, mp));
     }
   }
 
@@ -135,8 +137,7 @@ public final class MoveManagerImpl implements MoveManager,
   @Override
   public void onLeaderReady() {
     //discard all stale records
-    pendingMoveOps.clear();
-    pendingMoveFuture.clear();
+    pendingMoves.clear();
     running = true;
   }
 
@@ -261,22 +262,18 @@ public final class MoveManagerImpl implements MoveManager,
       return;
     }
 
-    MoveDataNodePair mdnp = pendingMoveOps.get(containerID);
-    if (mdnp != null) {
+    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
+        pendingMoves.get(containerID);
+    if (pair != null) {
+      MoveDataNodePair mdnp = pair.getRight();
       PendingOpType opType = containerReplicaOp.getOpType();
       DatanodeDetails dn = containerReplicaOp.getTarget();
       if (opType.equals(PendingOpType.ADD) && mdnp.getTgt().equals(dn)) {
-        if (pendingMoveFuture.containsKey(containerID)) {
-          try {
-            handleSuccessfulAdd(containerID);
-          } catch (ContainerNotFoundException | NodeNotFoundException |
-                   ContainerReplicaNotFoundException e) {
-            LOG.warn("Can not handle successful Add for move", e);
-          }
-        } else {
-          LOG.warn("No matching entry found in pendingMoveFuture for " +
-              "containerID {}. Should not happen", containerID);
-          completeMove(containerID, null);
+        try {
+          handleSuccessfulAdd(containerID);
+        } catch (ContainerNotFoundException | NodeNotFoundException |
+                 ContainerReplicaNotFoundException e) {
+          LOG.warn("Can not handle successful Add for move", e);
         }
       } else if (
             opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
@@ -297,8 +294,10 @@ public final class MoveManagerImpl implements MoveManager,
       return;
     }
 
-    MoveDataNodePair mdnp = pendingMoveOps.get(containerID);
-    if (mdnp != null) {
+    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
+        pendingMoves.get(containerID);
+    if (pair != null) {
+      MoveDataNodePair mdnp = pair.getRight();
       PendingOpType opType = containerReplicaOp.getOpType();
       DatanodeDetails dn = containerReplicaOp.getTarget();
       if (opType.equals(PendingOpType.ADD) && mdnp.getTgt().equals(dn)) {
@@ -313,10 +312,13 @@ public final class MoveManagerImpl implements MoveManager,
   private void handleSuccessfulAdd(final ContainerID cid)
       throws ContainerNotFoundException,
       ContainerReplicaNotFoundException, NodeNotFoundException {
-    MoveDataNodePair movePair = pendingMoveOps.get(cid);
-    if (movePair == null) {
+
+    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
+        pendingMoves.get(cid);
+    if (pair == null) {
       return;
     }
+    MoveDataNodePair movePair = pair.getRight();
     final DatanodeDetails src = movePair.getSrc();
     Set<ContainerReplica> currentReplicas = containerManager
         .getContainerReplicas(cid);
