@@ -1921,7 +1921,7 @@
 
   <property>
     <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Enable/disable OM HA leader election pre-vote phase.
     </description>
@@ -3276,7 +3276,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
-    <value>false</value>
+    <value>true</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Enable/disable SCM HA leader election pre-vote phase.</description>
   </property>

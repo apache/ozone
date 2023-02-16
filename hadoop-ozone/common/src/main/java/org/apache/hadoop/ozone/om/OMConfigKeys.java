@@ -183,7 +183,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE =
       "ozone.om.ratis.server.leaderelection.pre-vote";
   public static final boolean
-      OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+      OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
 
   // OM SnapshotProvider configurations
