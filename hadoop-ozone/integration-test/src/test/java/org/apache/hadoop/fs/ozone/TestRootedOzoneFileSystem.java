@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -135,6 +136,7 @@ public class TestRootedOzoneFileSystem {
       LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+  private static OzoneClient client;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -166,6 +168,7 @@ public class TestRootedOzoneFileSystem {
 
   @Parameterized.AfterParam
   public static void teardownParam() {
+    IOUtils.closeQuietly(client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();
@@ -257,7 +260,8 @@ public class TestRootedOzoneFileSystem {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = cluster.getClient().getObjectStore();
+    client = cluster.getClient();
+    objectStore = client.getObjectStore();
 
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
