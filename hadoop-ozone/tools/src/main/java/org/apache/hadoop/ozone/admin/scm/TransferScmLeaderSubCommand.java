@@ -48,9 +48,9 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     @CommandLine.Option(
         names = {"-n", "--newLeaderId"},
         description = "The new leader id of SCM to transfer leadership. " +
-            "E.g SCM1"
+            "Should be ScmId(UUID)."
     )
-    private String scmNodeId;
+    private String scmId;
 
     @CommandLine.Option(names = {"-r", "--random"},
         description = "Randomly choose a follower to transfer leadership.")
@@ -62,11 +62,11 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
     ScmClient client = scmOption.createScmClient(
         parent.getParent().getOzoneConf());
     if (configGroup.isRandom) {
-      configGroup.scmNodeId = "";
+      configGroup.scmId = "";
     }
-    client.transferLeadership(configGroup.scmNodeId);
+    client.transferLeadership(configGroup.scmId);
     System.out.println("Transfer leadership successfully to " +
-        (configGroup.isRandom ? "random node" : configGroup.scmNodeId) + ".");
+        (configGroup.isRandom ? "random node" : configGroup.scmId) + ".");
     return null;
   }
 }

@@ -114,7 +114,7 @@ public class TestTransferLeadershipShell {
     StorageContainerManager newLeader = scmList.get(0);
 
     OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
-    String[] args1 = {"scm", "transfer", "-n", newLeader.getSCMNodeId()};
+    String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
     ozoneAdmin.execute(args1);
     cluster.waitForClusterToBeReady();
     Assertions.assertEquals(newLeader, getScmLeader(cluster));

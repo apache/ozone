@@ -819,16 +819,7 @@ public class SCMClientProtocolServer implements
             .orElseThrow(() -> new IOException("Cannot" +
                 " find a new leader to transfer leadership."));
       } else {
-        String ratisAddr = convertToRatisAddr(newLeaderId);
-        targetPeerId = group.getPeers()
-            .stream()
-            .filter(a -> a.getAddress().equals(ratisAddr) || a.getAddress()
-                .equals(ratisAddr.replace("127.0.0.1", "localhost")))
-            .findFirst().map(RaftPeer::getId)
-            .orElseThrow(() -> new IOException("Cannot find a new" +
-                " leader. The expected leader address is " + ratisAddr +
-                " and the peers are " + group.getPeers().stream()
-                .map(RaftPeer::getAddress).collect(Collectors.toList()) + "."));
+        targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
       RatisHelper.transferRatisLeadership(scm.getConfiguration(), group,
           targetPeerId);
@@ -843,39 +834,6 @@ public class SCMClientProtocolServer implements
             SCMAction.TRANSFER_LEADERSHIP, auditMap));
       }
     }
-  }
-
-  /**
-   * Convert SCM nodeId to Ratis Address through config
-   * since SCM raft group do not have any direct node info.
-   *
-   * @param scmNodeId the node id of SCM
-   * @return the Ratis address of the corresponding SCM node or null
-   *         if not found in config.
-   * @throws IOException
-   */
-  private String convertToRatisAddr(String scmNodeId) throws IOException {
-    SCMNodeDetails localScm = scm.getSCMHANodeDetails().getLocalNodeDetails();
-    String scmServiceId = localScm.getServiceId();
-    Objects.requireNonNull(scmServiceId);
-    String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
-        scmServiceId, scmNodeId);
-
-    String rpcAddrStr = scm.getConfiguration().get(rpcAddrKey);
-    if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
-      throw new IOException("Configuration does not have any" +
-          " value set for " + rpcAddrKey + ". Please confirm the nodeId " +
-          "is right.");
-    }
-    String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
-        scmServiceId, scmNodeId);
-    int ratisPort = scm.getConfiguration().getInt(ratisPortKey,
-        OZONE_SCM_RATIS_PORT_DEFAULT);
-    // Remove possible RPC port
-    if (rpcAddrStr.contains(":")) {
-      rpcAddrStr = rpcAddrStr.split(":")[0];
-    }
-    return rpcAddrStr.concat(":").concat(String.valueOf(ratisPort));
   }
 
   @Override
