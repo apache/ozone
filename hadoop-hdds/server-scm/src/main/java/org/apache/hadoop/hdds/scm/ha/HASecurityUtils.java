@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
@@ -61,7 +62,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.*;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
@@ -212,7 +212,7 @@ public final class HASecurityUtils {
       //note: this does exactly the same as store certificate
       persistSubCACertificate(config, client, pemEncodedCert);
       X509Certificate cert =
-          CertificateCodec.firstCertificateFrom(subSCMCertHolderList);
+          (X509Certificate) subSCMCertHolderList.getCertificates().get(0);
       X509CertificateHolder subSCMCertHolder =
           CertificateCodec.getCertificateHolder(cert);
 
@@ -249,8 +249,7 @@ public final class HASecurityUtils {
         scmStorageConfig.getScmId(), scmCertStore, pkiProfile,
         SCM_ROOT_CA_COMPONENT_NAME);
 
-    rootCAServer.init(new SecurityConfig(config),
-        CertificateServer.CAType.SELF_SIGNED_CA);
+    rootCAServer.init(new SecurityConfig(config), CAType.ROOT);
 
     return rootCAServer;
   }

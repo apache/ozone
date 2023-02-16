@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
@@ -383,23 +384,4 @@ public interface CertificateClient extends Closeable {
    * @param receiver
    */
   void registerNotificationReceiver(CertificateNotification receiver);
-
-  /**
-   * Type for specifying the type of the certificate to be stored.
-   */
-  enum CAType {
-    NONE(""),
-    SUBORDINATE("CA-"),
-    ROOT("ROOTCA-");
-
-    private final String fileNamePrefix;
-
-    public final String getFileNamePrefix() {
-      return fileNamePrefix;
-    }
-
-    CAType(String fileNamePrefix) {
-      this.fileNamePrefix = fileNamePrefix;
-    }
-  }
 }

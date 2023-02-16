@@ -165,12 +165,4 @@ public interface CertificateServer {
    * @return latest CRL id.
    */
   long getLatestCrlId();
-
-  /**
-   * Make it explicit what type of CertificateServer we are creating here.
-   */
-  enum CAType {
-    SELF_SIGNED_CA,
-    INTERMEDIARY_CA
-  }
 }

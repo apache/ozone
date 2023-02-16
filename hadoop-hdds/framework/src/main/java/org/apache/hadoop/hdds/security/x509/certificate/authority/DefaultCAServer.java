@@ -489,9 +489,9 @@ public class DefaultCAServer implements CertificateServer {
       };
       break;
     case INITIALIZE:
-      if (type == CAType.SELF_SIGNED_CA) {
+      if (type == CAType.ROOT) {
         consumer = this::initRootCa;
-      } else if (type == CAType.INTERMEDIARY_CA) {
+      } else if (type == CAType.SUBORDINATE) {
         // For sub CA certificates are generated during bootstrap/init. If
         // both keys/certs are missing, init/bootstrap is missed to be
         // performed.
