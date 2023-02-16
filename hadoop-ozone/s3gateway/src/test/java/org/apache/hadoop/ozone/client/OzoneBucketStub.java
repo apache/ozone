@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -64,29 +65,66 @@ public class OzoneBucketStub extends OzoneBucket {
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
 
-  /**
-   * Constructs OzoneBucket instance.
-   *
-   * @param volumeName   Name of the volume the bucket belongs to.
-   * @param bucketName   Name of the bucket.
-   * @param storageType  StorageType of the bucket.
-   * @param versioning   versioning status of the bucket.
-   * @param creationTime creation time of the bucket.
-   */
-  public OzoneBucketStub(
-      String volumeName,
-      String bucketName,
-      StorageType storageType, Boolean versioning,
-      long creationTime) {
-    super(volumeName,
-        bucketName,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        storageType,
-        versioning,
-        creationTime);
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  public OzoneBucketStub(Builder b) {
+    super(b);
     this.replicationConfig = super.getReplicationConfig();
   }
 
+  /**
+   * Inner builder for OzoneBucketStub.
+   */
+  public static final class Builder extends OzoneBucket.Builder {
+
+    private Builder() {
+    }
+
+    @Override
+    public Builder setVolumeName(String volumeName) {
+      super.setVolumeName(volumeName);
+      return this;
+    }
+
+    @Override
+    public Builder setName(String name) {
+      super.setName(name);
+      return this;
+    }
+
+    @Override
+    public Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultReplicationConfig) {
+      super.setDefaultReplicationConfig(defaultReplicationConfig);
+      return this;
+    }
+
+    @Override
+    public Builder setStorageType(StorageType storageType) {
+      super.setStorageType(storageType);
+      return this;
+    }
+
+    @Override
+    public Builder setVersioning(Boolean versioning) {
+      super.setVersioning(versioning);
+      return this;
+    }
+
+    @Override
+    public Builder setCreationTime(long creationTime) {
+      super.setCreationTime(creationTime);
+      return this;
+    }
+
+    @Override
+    public OzoneBucketStub build() {
+      return new OzoneBucketStub(this);
+    }
+  }
+  
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
     return createKey(key, size,
