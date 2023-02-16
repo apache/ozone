@@ -4480,6 +4480,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String token,
                                            int pageSize)
       throws IOException {
+    //TODO: Pass token and page size from request once PR-4264 gets merged.
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize);
   }

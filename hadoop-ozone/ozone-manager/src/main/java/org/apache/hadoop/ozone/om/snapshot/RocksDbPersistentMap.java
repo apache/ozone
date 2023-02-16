@@ -69,4 +69,15 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       throw new RuntimeException(exception);
     }
   }
+
+  @Override
+  public void remove(K key) {
+    try {
+      byte[] rawKey = codecRegistry.asRawData(key);
+      db.get().delete(columnFamilyHandle, rawKey);
+    } catch (IOException | RocksDBException exception) {
+      // TODO:: Fail gracefully.
+      throw new RuntimeException(exception);
+    }
+  }
 }
