@@ -169,7 +169,7 @@ public class CertificateCodec {
    */
   public static X509Certificate getX509Certificate(String pemEncodedString)
       throws CertificateException, IOException {
-    CertificateFactory fact = new CertificateFactory();
+    CertificateFactory fact = getCertFactory();
     try (InputStream input = IOUtils.toInputStream(pemEncodedString, UTF_8)) {
       return (X509Certificate) fact.engineGenerateCertificate(input);
     }
@@ -177,6 +177,10 @@ public class CertificateCodec {
 
   public static X509Certificate firstCertificateFrom(CertPath certificatePath) {
     return (X509Certificate) certificatePath.getCertificates().get(0);
+  }
+
+  public static CertificateFactory getCertFactory() {
+    return new CertificateFactory();
   }
 
   /**
@@ -314,7 +318,7 @@ public class CertificateCodec {
     for (Certificate cert : certificates) {
       updatedList.add((X509Certificate) cert);
     }
-    CertificateFactory factory = new CertificateFactory();
+    CertificateFactory factory = getCertFactory();
     return factory.engineGenerateCertPath(updatedList);
   }
 
@@ -341,7 +345,7 @@ public class CertificateCodec {
 
   private static CertPath generateCertPathFromInputStream(
       InputStream inputStream) throws CertificateException {
-    CertificateFactory fact = new CertificateFactory();
+    CertificateFactory fact = getCertFactory();
     return fact.engineGenerateCertPath(inputStream, "PEM");
   }
 

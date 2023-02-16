@@ -25,7 +25,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.CertPath;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,6 +54,8 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -139,10 +140,11 @@ public class TestOzoneDelegationTokenSecretManager {
    * */
   private CertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+    CertificateFactory fact = CertificateCodec.getCertFactory();
     X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
-    CertPath certPath = fact.generateCertPath(ImmutableList.of(singleCert));
+    CertPath certPath = fact.engineGenerateCertPath(
+        ImmutableList.of(singleCert));
 
     return new OMCertificateClient(securityConfig) {
       @Override

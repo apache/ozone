@@ -24,7 +24,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
 import java.security.cert.CertStore;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +39,7 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
@@ -56,10 +56,11 @@ public class CertificateClientTest implements CertificateClient {
       throws Exception {
     secConfig = new SecurityConfig(conf);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+    org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory fact
+        = CertificateCodec.getCertFactory();
     X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
-    certPath = fact.generateCertPath(ImmutableList.of(singleCert));
+    certPath = fact.engineGenerateCertPath(ImmutableList.of(singleCert));
   }
 
   @Override
@@ -280,8 +281,8 @@ public class CertificateClientTest implements CertificateClient {
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
 
     keyPair = newKeyPair;
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
-    certPath = fact.generateCertPath(ImmutableList.of(newCert));
+    CertificateFactory fact = CertificateCodec.getCertFactory();
+    certPath = fact.engineGenerateCertPath(ImmutableList.of(newCert));
   }
 
   @Override
