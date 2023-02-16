@@ -66,6 +66,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.CAType;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
@@ -175,7 +176,7 @@ public class TestDefaultCertificateClient {
     X509Certificate cert = dnCertClient.getCertificate();
     assertNull(cert);
     dnCertClient.storeCertificate(getPEMEncodedString(x509Certificate),
-        CertificateClient.CAType.SUBORDINATE);
+        CAType.SUBORDINATE);
 
     cert = dnCertClient.getCertificate(
         x509Certificate.getSerialNumber().toString());
@@ -476,7 +477,7 @@ public class TestDefaultCertificateClient {
         keyPair, (int) (gracePeriod.toDays()),
         dnSecurityConfig.getSignatureAlgo());
     dnCertClient.storeCertificate(
-        getPEMEncodedString(cert), CertificateClient.CAType.SUBORDINATE);
+        getPEMEncodedString(cert), CAType.SUBORDINATE);
     Duration duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.isZero());
 
@@ -484,7 +485,7 @@ public class TestDefaultCertificateClient {
         keyPair, (int) (gracePeriod.toDays() + 1),
         dnSecurityConfig.getSignatureAlgo());
     dnCertClient.storeCertificate(
-        getPEMEncodedString(cert), CertificateClient.CAType.SUBORDINATE);
+        getPEMEncodedString(cert), CAType.SUBORDINATE);
     duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
         duration.toMillis() > Duration.ofHours(23).plusMinutes(59).toMillis());
@@ -555,7 +556,7 @@ public class TestDefaultCertificateClient {
     certCodec = new CertificateCodec(dnSecurityConfig,
         newCertDir.toPath());
     dnCertClient.storeCertificate(getPEMEncodedString(cert),
-        CertificateClient.CAType.NONE,
+        CAType.NONE,
         certCodec, false);
     // a success renew after auto cleanup new key and cert dir
     dnCertClient.renewAndStoreKeyAndCertificate(true);
