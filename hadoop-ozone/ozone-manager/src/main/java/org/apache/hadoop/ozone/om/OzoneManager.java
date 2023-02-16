@@ -74,6 +74,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -4441,55 +4442,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize);
-  }
-
-  @Override // ReconfigureProtocol
-  public void startReconfigure() throws IOException {
-    String operationName = "startOmReconfiguration";
-    checkAdminUserPrivilege(operationName);
-    startReconfigurationTask();
-  }
-
-  @Override // ReconfigureProtocol
-  public ReconfigurationTaskStatus getReconfigureStatus()
-      throws IOException {
-    String operationName = "getOmReconfigurationStatus";
-    checkAdminUserPrivilege(operationName);
-    return getReconfigurationTaskStatus();
-  }
-
-  @Override // ReconfigureProtocol
-  public List<String> listReconfigureProperties() throws IOException {
-    String operationName = "listOmReconfigurableProperties";
-    checkAdminUserPrivilege(operationName);
-    return Lists.newArrayList(getReconfigurableProperties());
-  }
-
-  @Override // ReconfigurableBase
-  public Collection<String> getReconfigurableProperties() {
-    return reconfigurableProperties;
-  }
-
-  @Override // ReconfigurableBase
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    if (property.equals(OZONE_ADMINISTRATORS)) {
-      return reconfOzoneAdmins(newVal);
-    } else {
-      throw new ReconfigurationException(property, newVal,
-          getConfiguration().get(property));
-    }
-  }
-
-  private String reconfOzoneAdmins(String newVal) {
-    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
-    Collection<String> admins =
-        OzoneConfigUtil.getOzoneAdminsFromConfig(getConfiguration(),
-            omStarterUser);
-    omAdmins.setAdminUsernames(admins);
-    LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
-        newVal, admins);
-    return String.valueOf(newVal);
   }
 
   @Override // ReconfigureProtocol
