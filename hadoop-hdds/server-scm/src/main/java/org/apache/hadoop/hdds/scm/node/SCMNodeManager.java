@@ -394,16 +394,16 @@ public class SCMNodeManager implements NodeManager {
         addEntryToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
-        LOG.info("Registered Data node : {}", datanodeDetails);
+        LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
         scmNodeEventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
       } catch (NodeAlreadyExistsException e) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Datanode is already registered. Datanode: {}",
-              datanodeDetails.toString());
+              datanodeDetails);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
-            datanodeDetails.toString());
+            datanodeDetails);
       }
     } else {
       // Update datanode if it is registered but the ip or hostname changes
@@ -543,9 +543,11 @@ public class SCMNodeManager implements NodeManager {
     if (opStateDiffers(reportedDn, scmStatus)) {
       if (scmContext.isLeader()) {
         LOG.info("Scheduling a command to update the operationalState " +
-                "persisted on {} as the reported value does not " +
+                "persisted on {} as the reported value ({}, {}) does not " +
                 "match the value stored in SCM ({}, {})",
             reportedDn,
+            reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
 
@@ -563,9 +565,11 @@ public class SCMNodeManager implements NodeManager {
         }
       } else {
         LOG.info("Update the operationalState saved in follower SCM " +
-                "for {} as the reported value does not " +
+                "for {} as the reported value ({}, {}) does not " +
                 "match the value stored in SCM ({}, {})",
             reportedDn,
+            reportedDn.getPersistedOpState(),
+            reportedDn.getPersistedOpStateExpiryEpochSec(),
             scmStatus.getOperationalState(),
             scmStatus.getOpStateExpiryEpochSeconds());
 
@@ -602,7 +606,7 @@ public class SCMNodeManager implements NodeManager {
       LOG.debug("Processing node report from [datanode={}]",
           datanodeDetails.getHostName());
     }
-    if (LOG.isTraceEnabled()) {
+    if (LOG.isTraceEnabled() && nodeReport != null) {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
           nodeReport.toString().replaceAll("\n", "\\\\n"));
@@ -822,8 +826,8 @@ public class SCMNodeManager implements NodeManager {
     // create a DatanodeUsageInfo from each DatanodeDetails and add it to the
     // list
     for (DatanodeDetails node : healthyNodes) {
-      SCMNodeStat stat = getNodeStatInternal(node);
-      datanodeUsageInfoList.add(new DatanodeUsageInfo(node, stat));
+      DatanodeUsageInfo datanodeUsageInfo = getUsageInfo(node);
+      datanodeUsageInfoList.add(datanodeUsageInfo);
     }
 
     // sort the list according to appropriate comparator
@@ -846,7 +850,14 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
     SCMNodeStat stat = getNodeStatInternal(dn);
-    return new DatanodeUsageInfo(dn, stat);
+    DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
+    try {
+      int containerCount = getContainers(dn).size();
+      usageInfo.setContainerCount(containerCount);
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Unknown datanode {}.", dn, ex);
+    }
+    return usageInfo;
   }
 
   /**

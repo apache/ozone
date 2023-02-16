@@ -28,7 +28,6 @@ import java.util.TreeMap;
 import java.util.stream.IntStream;
 
 import static java.util.Collections.unmodifiableSortedMap;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toMap;
 
 /**
@@ -91,14 +90,8 @@ public class ECReconstructionCommandInfo {
         + "containerID=" + containerID
         + ", replication=" + ecReplicationConfig.getReplication()
         + ", missingIndexes=" + Arrays.toString(missingContainerIndexes)
-        + ", sources={" + toString(sourceNodeMap) + "}"
-        + ", targets={" + toString(targetNodeMap) + "}}";
-  }
-
-  private String toString(SortedMap<Integer, DatanodeDetails> nodeMap) {
-    return nodeMap.entrySet().stream()
-        .map(e -> e.getKey() + ":" + e.getValue().getHostNameAndIP())
-        .collect(joining(","));
+        + ", sources=" + sourceNodeMap
+        + ", targets=" + targetNodeMap + "}";
   }
 
   public long getTerm() {

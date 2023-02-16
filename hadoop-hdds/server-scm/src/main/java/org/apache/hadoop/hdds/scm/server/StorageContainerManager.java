@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -72,8 +73,9 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultCAProfile;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -254,7 +256,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ReplicationManager replicationManager;
 
   private SCMSafeModeManager scmSafeModeManager;
-  private SCMCertificateClient scmCertificateClient;
+  private CertificateClient scmCertificateClient;
   private ContainerTokenSecretManager containerTokenMgr;
 
   private JvmPauseMonitor jvmPauseMonitor;
@@ -692,11 +694,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    long containerReplicaOpExpiryMs = conf.getTimeDuration(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
     long backgroundServiceSafemodeWaitMs = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
@@ -710,7 +707,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setIntervalInMillis(containerReplicaOpScrubberIntervalMs)
             .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
             .setPeriodicalTask(() -> containerReplicaPendingOps
-                .removeExpiredEntries(containerReplicaOpExpiryMs)).build();
+                .removeExpiredEntries()).build();
 
     serviceManager.register(expiredContainerReplicaOpScrubber);
 
@@ -892,8 +889,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return getSecurityProtocolServer().getScmCertificateServer();
   }
 
-  public SCMCertificateClient getScmCertificateClient() {
+  public CertificateClient getScmCertificateClient() {
     return scmCertificateClient;
+  }
+
+  @VisibleForTesting
+  public void setScmCertificateClient(CertificateClient client) {
+    scmCertificateClient = client;
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
@@ -903,6 +905,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
+    long certificateGracePeriod = Duration.parse(
+        conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
+            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
+    if (expiryTime > certificateGracePeriod) {
+      throw new IllegalArgumentException("Certificate grace period " +
+          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+          " should be greater than maximum block/container token lifetime " +
+          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
+    }
 
     // Means this is an upgraded cluster and it has no sub-ca,
     // so SCM Certificate client is not initialized. To make Tokens
@@ -926,10 +937,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmCertificateClient = new SCMCertificateClient(securityConfig,
           certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
     }
-    String certId = scmCertificateClient.getCertificate().getSerialNumber()
-        .toString();
     return new ContainerTokenSecretManager(securityConfig,
-        expiryTime, certId);
+        expiryTime);
   }
 
   /**

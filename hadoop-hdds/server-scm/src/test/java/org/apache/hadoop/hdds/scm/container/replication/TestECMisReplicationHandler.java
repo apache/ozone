@@ -169,6 +169,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   protected MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           NodeManager nodeManager) {
-    return new ECMisReplicationHandler(placementPolicy, conf, nodeManager);
+    return new ECMisReplicationHandler(placementPolicy, conf, nodeManager,
+        false);
   }
 }

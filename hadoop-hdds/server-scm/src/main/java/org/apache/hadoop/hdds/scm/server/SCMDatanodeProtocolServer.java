@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -349,22 +348,6 @@ public class SCMDatanodeProtocolServer implements
               .getDefaultInstance())
           .build();
     case deleteBlocksCommand:
-      // Once SCM sends out the deletion message, increment the count.
-      // this is done here instead of when SCM receives the ACK, because
-      // DN might not be able to response the ACK for sometime. In case
-      // it times out, SCM needs to re-send the message some more times.
-      List<Long> txs =
-          ((DeleteBlocksCommand) cmd)
-              .blocksTobeDeleted()
-              .stream()
-              .map(tx -> tx.getTxID())
-              .collect(Collectors.toList());
-      /*
-       * TODO: Can we avoid this?
-       *   This introduces a Ratis call while processing datanode heartbeat,
-       *   which is not good.
-       */
-      scm.getScmBlockManager().getDeletedBlockLog().incrementCount(txs);
       return builder
           .setCommandType(deleteBlocksCommand)
           .setDeleteBlocksCommandProto(

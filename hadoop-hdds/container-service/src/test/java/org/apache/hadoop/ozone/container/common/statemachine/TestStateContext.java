@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -615,10 +614,10 @@ public class TestStateContext {
   @Test
   public void testCommandQueueSummary() throws IOException {
     StateContext ctx = createSubject();
-    ctx.addCommand(new ReplicateContainerCommand(1, null));
+    ctx.addCommand(ReplicateContainerCommand.forTest(1));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(new ReplicateContainerCommand(2, null));
-    ctx.addCommand(new ReplicateContainerCommand(3, null));
+    ctx.addCommand(ReplicateContainerCommand.forTest(2));
+    ctx.addCommand(ReplicateContainerCommand.forTest(3));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
 
@@ -682,7 +681,7 @@ public class TestStateContext {
   }
 
   private static SCMCommand<?> someCommand() {
-    return new ReplicateContainerCommand(1, emptyList());
+    return ReplicateContainerCommand.forTest(1);
   }
 
 }

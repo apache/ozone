@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
@@ -33,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
+import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +45,12 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +76,9 @@ public final class RocksDatabase {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+
+  private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
+      new HashMap<>();
 
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
@@ -138,6 +148,7 @@ public final class RocksDatabase {
         db = ManagedRocksDB.open(dbOptions, dbFile.getAbsolutePath(),
             descriptors, handles);
       }
+      dbNameToCfHandleMap.put(db.get().getName(), handles);
       // init a column family map.
       AtomicLong counter = new AtomicLong(0);
       for (ColumnFamilyHandle h : handles) {
@@ -433,11 +444,35 @@ public final class RocksDatabase {
       counter.incrementAndGet();
       options.setWaitForFlush(true);
       db.get().flush(options);
+      for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
+        db.get().flush(options, columnFamily.handle);
+      }
     } catch (RocksDBException e) {
       closeOnError(e, true);
       throw toIOException(this, "flush", e);
     } finally {
       counter.decrementAndGet();
+    }
+  }
+
+  /**
+   * @param cfName columnFamily on which flush will run.
+   * @throws IOException
+   */
+  public void flush(String cfName) throws IOException {
+    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
+    try (ManagedFlushOptions options = new ManagedFlushOptions()) {
+      options.setWaitForFlush(true);
+      if (handle != null) {
+        db.get().flush(options, handle);
+      } else {
+        LOG.error("Provided column family doesn't exist."
+            + " Calling flush on null columnFamily");
+        flush();
+      }
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "flush", e);
     }
   }
 
@@ -462,6 +497,94 @@ public final class RocksDatabase {
     } catch (RocksDBException e) {
       closeOnError(e, true);
       throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void compactRangeDefault(final ManagedCompactRangeOptions options)
+      throws IOException {
+    try {
+      counter.incrementAndGet();
+      db.get().compactRange(null, null, null, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void compactDB(ManagedCompactRangeOptions options) throws IOException {
+    compactRangeDefault(options);
+    for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
+      compactRange(columnFamily, null, null, options);
+    }
+  }
+
+  public int getLiveFilesMetaDataSize() {
+    try {
+      counter.incrementAndGet();
+      return db.get().getLiveFilesMetaData().size();
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  /**
+   * @param cfName columnFamily on which compaction will run.
+   * @throws IOException
+   */
+  public void compactRange(String cfName) throws IOException {
+    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
+    try {
+      if (handle != null) {
+        db.get().compactRange(handle);
+      } else {
+        LOG.error("Provided column family doesn't exist."
+            + " Calling compactRange on null columnFamily");
+        db.get().compactRange();
+      }
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    }
+  }
+
+  private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
+      throws IOException {
+    for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
+      try {
+        String table = new String(cf.getName(), StandardCharsets.UTF_8);
+        if (cfName.equals(table)) {
+          return cf;
+        }
+      } catch (RocksDBException e) {
+        closeOnError(e, true);
+        throw toIOException(this, "columnFamilyHandle.getName", e);
+      }
+    }
+    return null;
+  }
+
+  public void compactRange(ColumnFamily family, final byte[] begin,
+      final byte[] end, final ManagedCompactRangeOptions options)
+      throws IOException {
+    try {
+      counter.incrementAndGet();
+      db.get().compactRange(family.getHandle(), begin, end, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public List<LiveFileMetaData> getLiveFilesMetaData() {
+    try {
+      counter.incrementAndGet();
+      return db.get().getLiveFilesMetaData();
     } finally {
       counter.decrementAndGet();
     }
@@ -673,5 +796,71 @@ public final class RocksDatabase {
   public String toString() {
     return name;
   }
+
+  @VisibleForTesting
+  public List<LiveFileMetaData> getSstFileList() {
+    return db.get().getLiveFilesMetaData();
+  }
+
+  /**
+   * return the max compaction level of sst files in the db.
+   * @return level
+   */
+  private int getLastLevel() {
+    return getSstFileList().stream()
+        .max(Comparator.comparing(LiveFileMetaData::level)).get().level();
+  }
+
+  /**
+   * Deletes sst files which do not correspond to prefix
+   * for given table.
+   * @param prefixPairs, a list of pair (TableName,prefixUsed).
+   * @throws RocksDBException
+   */
+  public void deleteFilesNotMatchingPrefix(
+      List<Pair<String, String>> prefixPairs,
+      BooleanTriFunction<String, String, String, Boolean> filterFunction)
+      throws RocksDBException {
+    for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
+      String sstFileColumnFamily =
+          new String(liveFileMetaData.columnFamilyName(),
+              StandardCharsets.UTF_8);
+      int lastLevel = getLastLevel();
+      for (Pair<String, String> prefixPair : prefixPairs) {
+        String columnFamily = prefixPair.getKey();
+        String prefixForColumnFamily = prefixPair.getValue();
+        if (!sstFileColumnFamily.equals(columnFamily)) {
+          continue;
+        }
+        // RocksDB #deleteFile API allows only to delete the last level of
+        // SST Files. Any level < last level won't get deleted and
+        // only last file of level 0 can be deleted
+        // and will throw warning in the rocksdb manifest.
+        // Instead, perform the level check here
+        // itself to avoid failed delete attempts for lower level files.
+        if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
+          continue;
+        }
+        String firstDbKey =
+            new String(liveFileMetaData.smallestKey(), StandardCharsets.UTF_8);
+        String lastDbKey =
+            new String(liveFileMetaData.largestKey(), StandardCharsets.UTF_8);
+        boolean isKeyWithPrefixPresent =
+            filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
+        if (!isKeyWithPrefixPresent) {
+          String sstFileName = liveFileMetaData.fileName();
+          LOG.info("Deleting sst file {} corresponding to column family"
+                  + " {} from db: {}", sstFileName,
+              liveFileMetaData.columnFamilyName(), db.get().getName());
+          db.get().deleteFile(sstFileName);
+        }
+      }
+    }
+  }
+
+  public static Map<String, List<ColumnFamilyHandle>> getCfHandleMap() {
+    return dbNameToCfHandleMap;
+  }
+
 
 }

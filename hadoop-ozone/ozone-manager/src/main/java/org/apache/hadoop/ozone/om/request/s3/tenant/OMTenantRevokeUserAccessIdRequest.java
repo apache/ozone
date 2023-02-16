@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -51,7 +52,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
@@ -173,7 +173,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     final String accessId = request.getAccessId();
     final String tenantId = request.getTenantId();
 
-    boolean acquiredS3SecretLock = false;
     boolean acquiredVolumeLock = false;
     IOException exception = null;
 
@@ -210,15 +209,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           new CacheKey<>(accessId),
           new CacheValue<>(Optional.absent(), transactionLogIndex));
 
-      // Remove from S3SecretTable.
-      // Note: S3SecretTable will be deprecated in the future.
-      acquiredS3SecretLock = omMetadataManager.getLock()
-          .acquireWriteLock(S3_SECRET_LOCK, accessId);
-
-      omMetadataManager.getS3SecretTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
-
+      S3SecretManager s3SecretManager = ozoneManager.getS3SecretManager();
+      s3SecretManager.invalidateCacheEntry(accessId, transactionLogIndex);
       // Update tenant cache
       multiTenantManager.getCacheOp().revokeUserAccessId(accessId, tenantId);
 
@@ -227,7 +219,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           TenantRevokeUserAccessIdResponse.newBuilder()
               .build());
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
-          omResponse.build(), accessId, userPrincipal, principalInfo);
+          omResponse.build(), accessId, userPrincipal, principalInfo,
+          s3SecretManager);
 
     } catch (IOException ex) {
       exception = ex;
@@ -237,9 +230,6 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
-      if (acquiredS3SecretLock) {
-        omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
-      }
       if (acquiredVolumeLock) {
         Preconditions.checkNotNull(volumeName);
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);

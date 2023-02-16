@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Class used to pick messages from the respective ReplicationManager
@@ -107,17 +109,16 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
   /**
    * Gets the commands to be run datanode to process the
    * container health result.
-   * @param rm
-   * @param healthResult
    * @return Commands to be run on Datanodes
    */
-  protected abstract Map<DatanodeDetails, SCMCommand<?>> getDatanodeCommands(
-          ReplicationManager rm, HealthResult healthResult)
+  protected abstract Set<Pair<DatanodeDetails, SCMCommand<?>>>
+      getDatanodeCommands(ReplicationManager rm, HealthResult healthResult)
           throws IOException;
+
   private void processContainer(HealthResult healthResult) throws IOException {
-    Map<DatanodeDetails, SCMCommand<?>> cmds = getDatanodeCommands(
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds = getDatanodeCommands(
             replicationManager, healthResult);
-    for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
+    for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds) {
       replicationManager.sendDatanodeCommand(cmd.getValue(),
               healthResult.getContainerInfo(), cmd.getKey());
     }

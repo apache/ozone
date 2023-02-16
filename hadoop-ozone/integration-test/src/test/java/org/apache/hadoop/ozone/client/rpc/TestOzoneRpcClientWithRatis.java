@@ -244,7 +244,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     final String bucketName = "buck-" + UUID.randomUUID();
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setDefaultReplicationConfig(
-            new DefaultReplicationConfig(ReplicationType.RATIS, THREE))
+            new DefaultReplicationConfig(ReplicationConfig.fromTypeAndFactor(
+                ReplicationType.RATIS, THREE)))
         .build();
     volume.createBucket(bucketName, bucketArgs);
     final OzoneBucket bucket = volume.getBucket(bucketName);

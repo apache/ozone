@@ -691,6 +691,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.metastore.rocksdb.cf.write.buffer.size</name>
+    <value>128MB</value>
+    <tag>OZONE, OM, SCM, STORAGE, PERFORMANCE</tag>
+    <description>
+      The write buffer (memtable) size for each column family of the rocksdb
+      store. Check the rocksdb documentation for more details.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.db.dirs</name>
     <value/>
     <tag>OZONE, SCM, STORAGE, PERFORMANCE</tag>
@@ -1467,15 +1476,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.expired.container.replica.op.time.out</name>
-    <value>30m</value>
-    <tag>OZONE, SCM, CONTAINER</tag>
-    <description>
-      Timeout for the container replica operations(ADD/DELETE).After this
-      timeout the command will be retied
-    </description>
-  </property>
-  <property>
     <name>ozone.scm.pipeline.creation.auto.factor.one</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -1579,9 +1579,9 @@
   <property>
     <name>hdds.datanode.replication.work.dir</name>
     <tag>DATANODE</tag>
-    <description>Temporary which is used during the container replication
-      betweeen datanodes. Should have enough space to store multiple container
-      (in compressed format), but doesn't require fast io access such as SSD.
+    <description>This configuration is deprecated. Temporary sub directory under
+      each hdds.datanode.dir will be used during the container replication between
+      datanodes to save the downloaded container(in compressed format).
     </description>
   </property>
 
@@ -1921,7 +1921,7 @@
 
   <property>
     <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Enable/disable OM HA leader election pre-vote phase.
     </description>
@@ -1973,6 +1973,15 @@
     <description>
       Connection request timeout for HTTP call made by OM Snapshot Provider to
       request OM snapshot from OM Leader.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.fs.snapshot.max.limit</name>
+    <value>1000</value>
+    <tag>OZONE, OM, MANAGEMENT</tag>
+    <description>
+      The maximum number of filesystem snapshot allowed in an Ozone Manager.
     </description>
   </property>
 
@@ -3139,6 +3148,28 @@
       directory deleting service per time interval.
     </description>
   </property>
+  <property>
+    <name>ozone.snapshot.filtering.limit.per.task</name>
+    <value>2</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of snapshots to be filtered by
+      sst filtering service per time interval.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.filtering.service.interval</name>
+    <value>1m</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sst.filtering.service.timeout</name>
+    <value>300000ms</value>
+    <tag>OZONE, PERFORMANCE,OM</tag>
+    <description>A timeout value of sst filtering service.
+    </description>
+  </property>
 
   <property>
     <name>ozone.scm.event.ContainerReport.thread.pool.size</name>
@@ -3245,7 +3276,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
-    <value>false</value>
+    <value>true</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Enable/disable SCM HA leader election pre-vote phase.</description>
   </property>
@@ -3446,6 +3477,15 @@
       will create intermediate directories.
     </description>
   </property>
+  <property>
+    <name>ozone.om.snapshot.cache.max.size</name>
+    <value>10</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Size of the OM Snapshot LRU cache.  This is the maximum number of open OM Snapshot RocksDb instances
+      that will be held in memory at any time.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.container.location.cache.size</name>
@@ -3463,6 +3503,16 @@
     <tag>OZONE, OM</tag>
     <description>
       The time to live for container location cache in Ozone.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.enable.ofs.shared.tmp.dir</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable shared ofs tmp directory ofs://tmp.  Allows a root tmp
+      directory with sticky-bit behaviour.
     </description>
   </property>
 
@@ -3515,12 +3565,47 @@
       Initial delay in MINUTES by Recon to request SCM DB Snapshot.
     </description>
   </property>
+
   <property>
     <name>ozone.recon.scm.snapshot.task.interval.delay</name>
     <value>24h</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
       Interval in MINUTES by Recon to request SCM DB Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.compaction.dag.max.time.allowed</name>
+    <value>30d</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum time a snapshot is allowed to be in compaction DAG before it gets pruned out by pruning daemon.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.compaction.dag.prune.daemon.run.interval</name>
+    <value>3600s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval at which compaction DAG pruning daemon thread is running to remove older snapshots with compaction
+      history from compaction DAG. Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.db.dir</name>
+    <value/>
+    <tag>OZONE, OM</tag>
+    <description>
+      Directory where the OzoneManager stores the snapshot diff related data.
+      This should be specified as a single directory. If the directory does not
+      exist then the OM will attempt to create it.
+
+      If undefined, then the OM will log a warning and fallback to
+      ozone.metadata.dirs. This fallback approach is not recommended for
+      production environments.
     </description>
   </property>
 </configuration>
