@@ -1829,18 +1829,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     }
     String leaderId = "";
-    if (isRatisEnabled) {
-      RaftPeer leader = null;
-      try {
-        leader = omRatisServer.getLeader();
-      } catch (IOException ex) {
-        LOG.error("IOException while getting the " +
-            "Ratis server leader.", ex);
-      }
-      if (Objects.nonNull(leader)) {
-        leaderId = leader.getId().toString();
-      }
+    RaftPeer leader = null;
+    try {
+      leader = omRatisServer.getLeader();
+    } catch (IOException ex) {
+      LOG.error("IOException while getting the " +
+          "Ratis server leader.", ex);
     }
+    if (Objects.nonNull(leader)) {
+      leaderId = leader.getId().toString();
+    }
+    // If leaderId is empty, then for some reason there is
+    // no leader and all OMs will present as followers.
     omHAMetricsInit(leaderId);
   }
 
