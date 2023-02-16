@@ -175,7 +175,7 @@ public class TestDefaultCertificateClient {
     X509Certificate cert = dnCertClient.getCertificate();
     assertNull(cert);
     dnCertClient.storeCertificate(getPEMEncodedString(x509Certificate),
-        true);
+        CertificateClient.CAType.SUBORDINATE);
 
     cert = dnCertClient.getCertificate(
         x509Certificate.getSerialNumber().toString());
@@ -473,16 +473,18 @@ public class TestDefaultCertificateClient {
     Duration gracePeriod = dnSecurityConfig.getRenewalGracePeriod();
 
     X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=Test",
-        keyPair, (int)(gracePeriod.toDays()),
+        keyPair, (int) (gracePeriod.toDays()),
         dnSecurityConfig.getSignatureAlgo());
-    dnCertClient.storeCertificate(getPEMEncodedString(cert), true);
+    dnCertClient.storeCertificate(
+        getPEMEncodedString(cert), CertificateClient.CAType.SUBORDINATE);
     Duration duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.isZero());
 
     cert = KeyStoreTestUtil.generateCertificate("CN=Test",
-        keyPair, (int)(gracePeriod.toDays() + 1),
+        keyPair, (int) (gracePeriod.toDays() + 1),
         dnSecurityConfig.getSignatureAlgo());
-    dnCertClient.storeCertificate(getPEMEncodedString(cert), true);
+    dnCertClient.storeCertificate(
+        getPEMEncodedString(cert), CertificateClient.CAType.SUBORDINATE);
     duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
         duration.toMillis() > Duration.ofHours(23).plusMinutes(59).toMillis());

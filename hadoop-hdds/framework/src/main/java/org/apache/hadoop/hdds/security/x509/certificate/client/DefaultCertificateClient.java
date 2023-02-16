@@ -627,7 +627,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public void storeCertificate(String pemEncodedCert)
       throws CertificateException {
-    this.storeCertificate(pemEncodedCert, false);
+    this.storeCertificate(pemEncodedCert, CAType.NONE);
   }
 
   /**
@@ -635,21 +635,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * certificates of others.
    *
    * @param pemEncodedCert - pem encoded X509 Certificate
-   * @param caCert         - Is CA certificate.
+   * @param caType         - Is CA certificate.
    * @throws CertificateException - on Error.
    */
   @Override
   public void storeCertificate(String pemEncodedCert,
-      boolean caCert) throws CertificateException {
+      CAType caType) throws CertificateException {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         component);
-    if (caCert) {
-      storeCertificate(pemEncodedCert, CAType.SUBORDINATE,
-          certificateCodec, true);
-    } else {
-      storeCertificate(pemEncodedCert, CAType.NONE, certificateCodec, true);
-    }
-
+    storeCertificate(pemEncodedCert, caType,
+        certificateCodec, true);
   }
 
   public synchronized void storeCertificate(String pemEncodedCert,

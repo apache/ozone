@@ -293,7 +293,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean caCert)
+  public void storeCertificate(String cert, CAType caType)
       throws CertificateException {
   }
 

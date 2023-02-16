@@ -213,10 +213,10 @@ public interface CertificateClient extends Closeable {
    * trusted certificates of others.
    *
    * @param pemEncodedCert - pem encoded X509 Certificate
-   * @param caCert         - Is CA certificate.
+   * @param caType         - Is CA certificate.
    * @throws CertificateException - on Error.
    */
-  void storeCertificate(String pemEncodedCert, boolean caCert)
+  void storeCertificate(String pemEncodedCert, CAType caType)
       throws CertificateException;
 
   /**

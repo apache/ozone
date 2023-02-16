@@ -61,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
+import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.*;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
@@ -154,7 +155,8 @@ public final class HASecurityUtils {
       // Store SCM sub CA and root CA certificate.
       if (response.hasX509CACertificate()) {
         String pemEncodedRootCert = response.getX509CACertificate();
-        client.storeCertificate(pemEncodedRootCert, true);
+        client.storeCertificate(
+            pemEncodedRootCert, CAType.SUBORDINATE);
         client.storeCertificate(pemEncodedCert);
         //note: this does exactly the same as store certificate
         persistSubCACertificate(config, client,
@@ -200,11 +202,12 @@ public final class HASecurityUtils {
 
       String pemEncodedCert =
           CertificateCodec.getPEMEncodedString(subSCMCertHolderList);
-      
+
       String pemEncodedRootCert =
           CertificateCodec.getPEMEncodedString(rootCACertificatePath);
 
-      client.storeCertificate(pemEncodedRootCert, true);
+      client.storeCertificate(
+          pemEncodedRootCert, CAType.SUBORDINATE);
       client.storeCertificate(pemEncodedCert);
       //note: this does exactly the same as store certificate
       persistSubCACertificate(config, client, pemEncodedCert);
