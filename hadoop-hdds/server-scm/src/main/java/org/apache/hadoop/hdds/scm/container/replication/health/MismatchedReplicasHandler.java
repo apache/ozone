@@ -47,10 +47,10 @@ public class MismatchedReplicasHandler extends AbstractCheck {
 
   /**
    * Handles CLOSED EC or CLOSED/QUASI-CLOSED RATIS containers. If some
-   * replicas are CLOSING or OPEN, this tries to close them. Force close
-   * command is sent for CLOSED and close command is sent for QUASI-CLOSED
-   * containers (replicas of quasi-closed containers should move to
-   * quasi-closed state).
+   * replicas are CLOSING or OPEN or QUASI_CLOSED, this tries to close them.
+   * Force close command is sent for replicas of CLOSED containers and close
+   * command is sent for replicas of QUASI-CLOSED containers (replicas of
+   * quasi-closed containers should move to quasi-closed state).
    *
    * @param request ContainerCheckRequest object representing the container
    * @return always returns false so that other handlers in the chain can fix
@@ -68,9 +68,9 @@ public class MismatchedReplicasHandler extends AbstractCheck {
     LOG.debug("Checking container {} in MismatchedReplicasHandler",
         containerInfo);
 
-    // close replica if its state is OPEN or CLOSING
+    // close replica if needed
     for (ContainerReplica replica : replicas) {
-      if (isMismatched(replica)) {
+      if (shouldBeClosed(containerInfo, replica)) {
         LOG.debug("Sending close command for mismatched replica {} of " +
             "container {}.", replica, containerInfo);
 
@@ -94,12 +94,22 @@ public class MismatchedReplicasHandler extends AbstractCheck {
 
   /**
    * If a CLOSED or QUASI-CLOSED container has an OPEN or CLOSING replica,
-   * there is a state mismatch.
-   * @param replica replica to check for mismatch
-   * @return true if the replica is in CLOSING or OPEN state, else false
+   * there is a state mismatch. QUASI_CLOSED replica of a CLOSED container
+   * should be closed if their sequence IDs match.
+   * @param replica replica to check for mismatch and if it should be closed
+   * @return true if the replica should be closed, else false
    */
-  private boolean isMismatched(ContainerReplica replica) {
-    return replica.getState() == ContainerReplicaProto.State.OPEN ||
-        replica.getState() == ContainerReplicaProto.State.CLOSING;
+  private boolean shouldBeClosed(ContainerInfo container,
+      ContainerReplica replica) {
+    if (replica.getState() == ContainerReplicaProto.State.OPEN ||
+        replica.getState() == ContainerReplicaProto.State.CLOSING) {
+      return true;
+    }
+
+    // a quasi closed replica of a closed container should be closed if their
+    // sequence IDs match
+    return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
+        replica.getState() == ContainerReplicaProto.State.QUASI_CLOSED &&
+        container.getSequenceId() == replica.getSequenceId();
   }
 }
