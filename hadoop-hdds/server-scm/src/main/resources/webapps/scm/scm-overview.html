@@ -36,6 +36,7 @@
             <option value="10" ng-selected="{true}">10</option>
             <option value="20">20</option>
             <option value="50">50</option>
+            <option value="All">All</option>
         </select>
     </div>
     <div class="col-md-6 text-right">
@@ -44,18 +45,18 @@
 </div>
 <table class="table table-bordered table-striped col-md-6">
     <thead>
-    <tr>
-        <th ng-click="columnSort('hostname')">HostName</th>
-        <th ng-click="columnSort('opstate')">Operational State</th>
-        <th ng-click="columnSort('comstate')">Commisioned State</th>
-    </tr>
+        <tr>
+            <th ng-click = "columnSort('hostname')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">HostName</th>
+            <th ng-click = "columnSort('opstate')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">Operational State</th>
+            <th ng-click = "columnSort('comstate')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">Commisioned State</th>
+        </tr>
     </thead>
     <tbody>
-    <tr ng-repeat="typestat in nodeStatus|filter:search|orderBy:columnName:reverse">
-        <td>{{typestat.hostname}}</td>
-        <td>{{typestat.opstate}}</td>
-        <td>{{typestat.comstate}}</td>
-    </tr>
+        <tr ng-repeat="typestat in nodeStatus|filter:search|orderBy:columnName:reverse">
+            <td>{{typestat.hostname}}</td>
+            <td>{{typestat.opstate}}</td>
+            <td>{{typestat.comstate}}</td>
+        </tr>
     </tbody>
 </table>
 <div>

@@ -26,11 +26,11 @@
         },
         controller: function ($http,$scope) {
             var ctrl = this;
-            $scope.reverse=true;
-            $scope.columnName="";
-            let nodeStatusCopy=[];
-            $scope.RecordsToDisplay ="10";
-            $scope.currentPage=1;
+            $scope.reverse = true;
+            $scope.columnName = "";
+            let nodeStatusCopy = [];
+            $scope.RecordsToDisplay = "10";
+            $scope.currentPage = 1;
             $scope.lastIndex = 0;
 
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
@@ -42,27 +42,36 @@
                                 opstate: value[0],
                                 comstate: value[1]
                             }});
-                  nodeStatusCopy = [...$scope.nodeStatus];
-                  $scope.lastIndex= Math.ceil(nodeStatusCopy.length/$scope.RecordsToDisplay);
-                  $scope.nodeStatus =nodeStatusCopy.slice(0,$scope.RecordsToDisplay);
+                nodeStatusCopy = [...$scope.nodeStatus];
+                $scope.lastIndex = Math.ceil(nodeStatusCopy.length/$scope.RecordsToDisplay);
+                $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
                   });
-                    $scope.UpdateRecordsToShow= ()=>{
-                       $scope.lastIndex= Math.ceil(nodeStatusCopy.length/$scope.RecordsToDisplay);
-                       $scope.nodeStatus =nodeStatusCopy.slice(0,$scope.RecordsToDisplay);
-                       $scope.currentPage=1;
+                /*if option is 'All' display all records else display specified record on page*/
+                $scope.UpdateRecordsToShow = () => {
+                     if($scope.RecordsToDisplay == 'All') {
+                         $scope.lastIndex = 1;
+                         $scope.nodeStatus = nodeStatusCopy;
+                     }
+                     else {
+                         $scope.lastIndex = Math.ceil(nodeStatusCopy.length/$scope.RecordsToDisplay);
+                         $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                     }
+                     $scope.currentPage=1;
+                }
+                /* Page Slicing  logic */
+                 $scope.handlePagination = (pageIndex, isDisabled) => {
+                    if(!isDisabled) {
+                        let startIndex = 0, endIndex = 0;
+                        $scope.currentPage = pageIndex;
+                        startIndex = (pageIndex * $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
+                        endIndex = startIndex + parseInt($scope.RecordsToDisplay);
+                        $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
                     }
-                 $scope.handlePagination= (pageIndex,isDisabled )=>{
-                                    if(!isDisabled){
-                                        let startIndex=0, endIndex=0;
-                                        $scope.currentPage =pageIndex;
-                                        startIndex= (pageIndex* $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
-                                        endIndex= startIndex + parseInt($scope.RecordsToDisplay);
-                                        $scope.nodeStatus= nodeStatusCopy.slice(startIndex, endIndex);
-                                    }
-                                  }
-                $scope.columnSort = (colName)=> {
-                    $scope.columnName=colName;
-                    $scope.reverse= !$scope.reverse;
+                 }
+                 /*column sort logic*/
+                $scope.columnSort = (colName) => {
+                    $scope.columnName = colName;
+                    $scope.reverse = !$scope.reverse;
                 }
 
             const nodeOpStateSortOrder = {
