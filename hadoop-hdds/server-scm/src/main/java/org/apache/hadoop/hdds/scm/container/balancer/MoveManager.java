@@ -162,14 +162,17 @@ public final class MoveManager implements
    */
   private void startMove(
       final ContainerInfo containerInfo, final DatanodeDetails src,
-      final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret)
-      throws ContainerReplicaNotFoundException,
-      ContainerNotFoundException {
-    if (!pendingMoves.containsKey(containerInfo.containerID())) {
-      MoveDataNodePair mp = new MoveDataNodePair(src, tgt);
-      sendReplicateCommand(containerInfo, tgt, src);
-      pendingMoves.putIfAbsent(containerInfo.containerID(), Pair.of(ret, mp));
-    }
+      final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret) {
+    pendingMoves.computeIfAbsent(containerInfo.containerID(), key -> {
+      try {
+        sendReplicateCommand(containerInfo, tgt, src);
+      } catch (Exception e) {
+        LOG.error("Unable to schedule the replication command for container {}",
+            containerInfo, e);
+        return null;
+      }
+      return Pair.of(ret, new MoveDataNodePair(src, tgt));
+    });
   }
 
   /**
@@ -427,18 +430,14 @@ public final class MoveManager implements
   private void sendReplicateCommand(
       final ContainerInfo containerInfo, final DatanodeDetails tgt,
       final DatanodeDetails src)
-      throws ContainerReplicaNotFoundException, ContainerNotFoundException {
+      throws ContainerReplicaNotFoundException, ContainerNotFoundException,
+      NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), src);
-    try {
-      long now = clock.millis();
-      replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-          replicaIndex, src, tgt, now + MOVE_DEADLINE,
-          now + Math.round(MOVE_DEADLINE * MOVE_DEADLINE_FACTOR));
-    } catch (NotLeaderException nle) {
-      LOG.warn("Skip sending replicate container command as the current SCM " +
-          "is not leader.", nle);
-    }
+    long now = clock.millis();
+    replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+        replicaIndex, src, tgt, now + MOVE_DEADLINE,
+        now + Math.round(MOVE_DEADLINE * MOVE_DEADLINE_FACTOR));
   }
 
   /**
