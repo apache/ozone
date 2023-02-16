@@ -46,19 +46,19 @@ public final class OMHAMetrics implements MetricsSource {
     private static final MetricsInfo NODE_ID =
         Interns.info("NodeId", "OM node Id");
 
-    private long ozoneManagerHALeaderState;
+    private int ozoneManagerHALeaderState;
     private String nodeId;
 
     OMHAMetricsInfo() {
-      this.ozoneManagerHALeaderState = 0L;
+      this.ozoneManagerHALeaderState = 0;
       this.nodeId = "";
     }
 
-    public long getOzoneManagerHALeaderState() {
+    public int getOzoneManagerHALeaderState() {
       return ozoneManagerHALeaderState;
     }
 
-    public void setOzoneManagerHALeaderState(long ozoneManagerHALeaderState) {
+    public void setOzoneManagerHALeaderState(int ozoneManagerHALeaderState) {
       this.ozoneManagerHALeaderState = ozoneManagerHALeaderState;
     }
 
@@ -126,7 +126,7 @@ public final class OMHAMetrics implements MetricsSource {
   }
 
   @VisibleForTesting
-  public long getOmhaInfoOzoneManagerHALeaderState() {
+  public int getOmhaInfoOzoneManagerHALeaderState() {
     return omhaMetricsInfo.getOzoneManagerHALeaderState();
   }
 }
