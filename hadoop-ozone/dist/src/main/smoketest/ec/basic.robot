@@ -21,60 +21,81 @@ Resource            ../ozone-lib/shell.robot
 Resource            lib.resource
 Suite Setup         Prepare For Tests
 
+*** Variables ***
+${PREFIX}    ${EMPTY}
+${VOLUME}    vol${PREFIX}
+
+*** Keywords ***
+Create Key In EC Bucket
+    [arguments]    ${size}
+    ${key} =    Set Variable    /${VOLUME}/ecbucket/${size}
+    ${file} =    Set Variable    /tmp/${size}
+    Create Key    ${key}    ${file}
+    Key Should Match Local File    ${key}      ${file}
+    Verify Key EC Replication Config    ${key}    RS    3    2    1048576
+
 *** Test Cases ***
 Test Bucket Creation
-    ${result} =     Execute             ozone sh volume create /${prefix}vol1
+    ${result} =     Execute             ozone sh volume create /${VOLUME}
                     Should not contain  ${result}       Failed
-    ${result} =     Execute             ozone sh bucket create /${prefix}vol1/${prefix}default
+    ${result} =     Execute             ozone sh bucket create /${VOLUME}/default
                     Should not contain  ${result}       Failed
-                    Verify Bucket Empty Replication Config      /${prefix}vol1/${prefix}default
-    ${result} =     Execute             ozone sh bucket create --replication 3 --type RATIS /${prefix}vol1/${prefix}ratis
+                    Verify Bucket Empty Replication Config      /${VOLUME}/default
+    ${result} =     Execute             ozone sh bucket create --replication 3 --type RATIS /${VOLUME}/ratis
                     Should not contain  ${result}       Failed
-                    Verify Bucket Replica Replication Config    /${prefix}vol1/${prefix}ratis   RATIS   THREE
-    ${result} =     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${prefix}vol1/${prefix}ec
+                    Verify Bucket Replica Replication Config    /${VOLUME}/ratis   RATIS   THREE
+    ${result} =     Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${VOLUME}/ecbucket
                     Should not contain  ${result}       Failed
-                    Verify Bucket EC Replication Config    /${prefix}vol1/${prefix}ec    RS    3    2    1048576
+                    Verify Bucket EC Replication Config    /${VOLUME}/ecbucket    RS    3    2    1048576
 
-Test Key Creation EC Bucket
-                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}1mb /tmp/1mb
-                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}2mb /tmp/2mb
-                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}3mb /tmp/3mb
-                    Execute                             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}100mb /tmp/100mb
+Create 1MB Key In EC Bucket
+    Create Key In EC Bucket    1mb
 
-                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}1mb      /tmp/1mb
-                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}2mb      /tmp/2mb
-                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}3mb      /tmp/3mb
-                    Key Should Match Local File         /${prefix}vol1/${prefix}ec/${prefix}100mb    /tmp/100mb
+Create 2MB Key In EC Bucket
+    Create Key In EC Bucket    2mb
 
-                    Verify Key EC Replication Config    /${prefix}vol1/${prefix}ec/${prefix}1mb    RS    3    2    1048576
+Create 3MB Key In EC Bucket
+    Create Key In EC Bucket    3mb
 
-Test Key Creation Default Bucket
-                    Execute                             ozone sh key put /${prefix}vol1/${prefix}default/${prefix}1mb /tmp/1mb
-                    Key Should Match Local File         /${prefix}vol1/${prefix}default/${prefix}1mb      /tmp/1mb
-                    Verify Key Replica Replication Config   /${prefix}vol1/${prefix}default/${prefix}1mb     RATIS    THREE
+Create 100MB Key In EC Bucket
+    Create Key In EC Bucket    100mb
 
-Test Ratis Key EC Bucket
-                    Execute                       ozone sh key put --replication=THREE --type=RATIS /${prefix}vol1/${prefix}ec/${prefix}1mbRatis /tmp/1mb
-                    Key Should Match Local File   /${prefix}vol1/${prefix}ec/${prefix}1mbRatis    /tmp/1mb
-                    Verify Key Replica Replication Config   /${prefix}vol1/${prefix}ec/${prefix}1mbRatis    RATIS   THREE
+Create Key in Ratis Bucket
+    ${size} =    Set Variable    1mb
+    ${key} =    Set Variable    /${VOLUME}/default/${size}
+    ${file} =    Set Variable    /tmp/${size}
+    Create Key    ${key}    ${file}
+    Key Should Match Local File    ${key}      ${file}
+    Verify Key Replica Replication Config   ${key}     RATIS    THREE
 
-Test EC Key Ratis Bucket
-                    Execute                             ozone sh key put --replication=rs-3-2-1024k --type=EC /${prefix}vol1/${prefix}ratis/${prefix}1mbEC /tmp/1mb
-                    Key Should Match Local File         /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    /tmp/1mb
-                    Verify Key EC Replication Config    /${prefix}vol1/${prefix}ratis/${prefix}1mbEC    RS    3    2    1048576
+Create Ratis Key In EC Bucket
+    ${size} =    Set Variable    1mb
+    ${key} =    Set Variable    /${VOLUME}/ecbucket/${size}Ratis
+    ${file} =    Set Variable    /tmp/${size}
+    Create Key    ${key}    ${file}    --replication=THREE --type=RATIS
+    Key Should Match Local File   ${key}    ${file}
+    Verify Key Replica Replication Config   ${key}    RATIS   THREE
 
-Test RATIS or STAND_ALONE Type with EC Replication
-    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${prefix}vol1/${prefix}foo
+Create EC Key In Ratis Bucket
+    ${size} =    Set Variable    1mb
+    ${key} =    Set Variable    /${VOLUME}/ratis/${size}EC
+    ${file} =    Set Variable    /tmp/${size}
+    Create Key    ${key}    ${file}    --replication=rs-3-2-1024k --type=EC 
+    Key Should Match Local File    ${key}    ${file}
+    Verify Key EC Replication Config    ${key}    RS    3    2    1048576
+
+Test Invalid Replication Parameters
+    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${VOLUME}/foo
                     Should contain              ${message}          RATIS
                     Should contain              ${message}          rs-3-2-1024k
                     Should contain              ${message}          not supported
-    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-6-3-1024k --type=RATIS /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
+    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-6-3-1024k --type=RATIS /${VOLUME}/foo/bar /tmp/1mb
                     Should contain              ${message}          RATIS
                     Should contain              ${message}          rs-6-3-1024k
                     Should contain              ${message}          not supported
-    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-6-3-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo
+    ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-6-3-1024k --type=STAND_ALONE /${VOLUME}/foo
                     Should contain              ${message}          STAND_ALONE
                     Should contain              ${message}          Invalid value
-    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-3-2-1024k --type=STAND_ALONE /${prefix}vol1/${prefix}foo/${prefix}bar /tmp/1mb
+    ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-3-2-1024k --type=STAND_ALONE /${VOLUME}/foo/bar /tmp/1mb
                     Should contain              ${message}          STAND_ALONE
                     Should contain              ${message}          Invalid value
