@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -228,6 +227,7 @@ public class TestECContainerRecovery {
         .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -240,6 +240,7 @@ public class TestECContainerRecovery {
     // Let's verify for Over replications now.
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Restart the DN to make the over replication and expect replication to be
     // increased.
@@ -329,6 +330,7 @@ public class TestECContainerRecovery {
             .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -403,6 +405,11 @@ public class TestECContainerRecovery {
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;
+  }
+
+  private void waitForReplicationManagerStopped(ReplicationManager rm)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> !rm.isRunning(), 100, 10000);
   }
 
 }

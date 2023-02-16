@@ -196,6 +196,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
+import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -288,6 +289,7 @@ import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -2602,8 +2604,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
         String remoteUserName = remoteUserUgi.getShortUserName();
+        // Convert userName to short username
+        String userParamShortName = new HadoopKerberosName(userName)
+            .getShortName();
         // if not admin nor list my own volumes, check ACL.
-        if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
+        if (!remoteUserName.equals(userParamShortName)
+            && !isAdmin(remoteUserUgi)) {
           omMetadataReader.checkAcls(ResourceType.VOLUME,
               StoreType.OZONE, ACLType.LIST,
               OzoneConsts.OZONE_ROOT, null, null);
@@ -3017,6 +3023,52 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
     return new ServiceInfoEx(getServiceList(), caCertPem, caCertPemList);
+  }
+
+  @Override
+  public void transferLeadership(String newLeaderId)
+      throws IOException {
+    final UserGroupInformation ugi = getRemoteUser();
+    if (!isAdmin(ugi)) {
+      throw new OMException(
+          "Only Ozone admins are allowed to transfer raft leadership.",
+          PERMISSION_DENIED);
+    }
+    if (!isRatisEnabled) {
+      throw new IOException("OM HA not enabled.");
+    }
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put("newLeaderId", newLeaderId);
+    try {
+      RaftGroupId groupID = omRatisServer.getRaftGroup().getGroupId();
+      RaftServer.Division division = omRatisServer.getServer()
+          .getDivision(groupID);
+      RaftPeerId targetPeerId;
+      if (newLeaderId.isEmpty()) {
+        RaftPeer curLeader = omRatisServer.getLeader();
+        targetPeerId = division.getGroup()
+            .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
+            .map(RaftPeer::getId).orElseThrow(() -> new IOException("Cannot" +
+                " find a new leader to transfer leadership."));
+      } else {
+        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+      }
+      RatisHelper.transferRatisLeadership(configuration, division.getGroup(),
+          targetPeerId);
+    } catch (IOException ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(OMAction.TRANSFER_LEADERSHIP,
+              auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(
+            buildAuditMessageForSuccess(OMAction.TRANSFER_LEADERSHIP,
+                auditMap));
+      }
+    }
   }
 
   @Override
@@ -4389,6 +4441,55 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize);
+  }
+
+  @Override // ReconfigureProtocol
+  public void startReconfigure() throws IOException {
+    String operationName = "startOmReconfiguration";
+    checkAdminUserPrivilege(operationName);
+    startReconfigurationTask();
+  }
+
+  @Override // ReconfigureProtocol
+  public ReconfigurationTaskStatus getReconfigureStatus()
+      throws IOException {
+    String operationName = "getOmReconfigurationStatus";
+    checkAdminUserPrivilege(operationName);
+    return getReconfigurationTaskStatus();
+  }
+
+  @Override // ReconfigureProtocol
+  public List<String> listReconfigureProperties() throws IOException {
+    String operationName = "listOmReconfigurableProperties";
+    checkAdminUserPrivilege(operationName);
+    return Lists.newArrayList(getReconfigurableProperties());
+  }
+
+  @Override // ReconfigurableBase
+  public Collection<String> getReconfigurableProperties() {
+    return reconfigurableProperties;
+  }
+
+  @Override // ReconfigurableBase
+  public String reconfigurePropertyImpl(String property, String newVal)
+      throws ReconfigurationException {
+    if (property.equals(OZONE_ADMINISTRATORS)) {
+      return reconfOzoneAdmins(newVal);
+    } else {
+      throw new ReconfigurationException(property, newVal,
+          getConfiguration().get(property));
+    }
+  }
+
+  private String reconfOzoneAdmins(String newVal) {
+    getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
+    Collection<String> admins =
+        OzoneConfigUtil.getOzoneAdminsFromConfig(getConfiguration(),
+            omStarterUser);
+    omAdmins.setAdminUsernames(admins);
+    LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
+        newVal, admins);
+    return String.valueOf(newVal);
   }
 
   @Override // ReconfigureProtocol

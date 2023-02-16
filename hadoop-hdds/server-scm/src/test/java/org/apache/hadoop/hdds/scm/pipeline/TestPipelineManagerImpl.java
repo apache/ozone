@@ -88,6 +88,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCAT
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -788,8 +789,6 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testAddContainerWithClosedPipeline() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
-        captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
     SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer);
@@ -804,10 +803,9 @@ public class TestPipelineManagerImpl {
         pipelineID.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
     buffer.flush();
     Assertions.assertTrue(pipelineStore.get(pipelineID).isClosed());
-    pipelineManager.addContainerToPipeline(pipelineID,
-        ContainerID.valueOf(2));
-    assertTrue(logCapturer.getOutput().contains(
-        "Adding container #2 to pipeline=" + pipelineID + " in CLOSED state."));
+    assertThrows(InvalidPipelineStateException.class,
+        () -> pipelineManager.addContainerToPipeline(pipelineID,
+        ContainerID.valueOf(2)));
   }
 
   @Test

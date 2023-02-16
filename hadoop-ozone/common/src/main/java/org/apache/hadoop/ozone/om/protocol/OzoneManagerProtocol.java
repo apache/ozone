@@ -400,6 +400,14 @@ public interface OzoneManagerProtocol
   ServiceInfoEx getServiceInfo() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param newLeaderId  the newLeaderId of the target expected leader
+   * @throws IOException
+   */
+  void transferLeadership(String newLeaderId) throws IOException;
+
+  /**
    * Triggers Ranger background sync task immediately.
    *
    * Requires Ozone administrator privilege.
