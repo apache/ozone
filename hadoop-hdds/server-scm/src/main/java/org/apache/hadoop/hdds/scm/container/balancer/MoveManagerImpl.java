@@ -38,7 +38,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -77,8 +76,7 @@ public final class MoveManagerImpl implements MoveManager,
   private volatile boolean running = false;
 
   public MoveManagerImpl(final ReplicationManager replicationManager,
-      final Clock clock, final ContainerManager containerManager)
-      throws IOException {
+      final Clock clock, final ContainerManager containerManager) {
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     this.clock = clock;
@@ -281,7 +279,7 @@ public final class MoveManagerImpl implements MoveManager,
           completeMove(containerID, null);
         }
       } else if (
-          opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
+            opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
         completeMove(containerID, MoveResult.COMPLETED);
       }
     }
@@ -354,7 +352,7 @@ public final class MoveManagerImpl implements MoveManager,
       sendDeleteCommand(containerInfo, src);
     } else {
       LOG.info("Cannot remove source replica as the container health would " +
-          " be {}", healthResult.getHealthState());
+          "be {}", healthResult.getHealthState());
       completeMove(cid, MoveResult.DELETE_FAIL_POLICY);
     }
   }
