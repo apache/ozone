@@ -61,14 +61,14 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
- * Tests for the MoveManagerImpl class.
+ * Tests for the MoveManager class.
  */
-public class TestMoveManagerImpl {
+public class TestMoveManager {
 
   private TestClock clock;
   private ReplicationManager replicationManager;
   private ContainerManager containerManager;
-  private MoveManagerImpl moveManager;
+  private MoveManager moveManager;
   private ContainerInfo containerInfo;
   private Set<ContainerReplica> replicas;
   private Map<DatanodeDetails, NodeStatus> nodes;
@@ -105,7 +105,7 @@ public class TestMoveManagerImpl {
     Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult.HealthyResult(containerInfo));
 
-    moveManager = new MoveManagerImpl(
+    moveManager = new MoveManager(
         replicationManager, clock, containerManager);
     moveManager.onLeaderReady();
   }
