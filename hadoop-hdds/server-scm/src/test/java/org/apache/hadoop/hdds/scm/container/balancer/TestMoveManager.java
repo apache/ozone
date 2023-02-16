@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ozone.test.TestClock;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
@@ -57,6 +58,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -232,6 +234,26 @@ public class TestMoveManager {
 
     assertMoveFailsWith(MoveManager.MoveResult.REPLICATION_NOT_HEALTHY,
         containerInfo.containerID());
+  }
+
+  @Test
+  public void testExistingMoveScheduled() throws Exception {
+    setupSuccessfulMove();
+    // Try to make the same move again
+    CompletableFuture<MoveManager.MoveResult> res =
+        moveManager.move(containerInfo.containerID(), src, tgt);
+    Assert.assertEquals(
+        MoveManager.MoveResult.FAIL_CONTAINER_ALREADY_BEING_MOVED, res.get());
+  }
+
+  @Test
+  public void testReplicationCommandFails() throws Exception {
+    Mockito.doThrow(new RuntimeException("test")).when(replicationManager)
+            .sendLowPriorityReplicateContainerCommand(
+        any(), anyInt(), any(), any(), anyLong(), anyLong());
+    CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
+    Assert.assertEquals(
+        MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR, res.get());
   }
 
   @Test

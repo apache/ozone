@@ -93,8 +93,10 @@ public final class MoveManager implements
     DELETE_FAIL_POLICY,
     //  replicas + target - src does not satisfy placement policy
     REPLICATION_NOT_HEALTHY,
-    //write DB error
-    FAIL_CAN_NOT_RECORD_TO_DB
+    // A move is already scheduled for this container
+    FAIL_CONTAINER_ALREADY_BEING_MOVED,
+    // Unexpected error
+    FAIL_UNEXPECTED_ERROR
   }
 
   public static final Logger LOG =
@@ -163,16 +165,24 @@ public final class MoveManager implements
   private void startMove(
       final ContainerInfo containerInfo, final DatanodeDetails src,
       final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret) {
-    pendingMoves.computeIfAbsent(containerInfo.containerID(), key -> {
+    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> move =
+        pendingMoves.putIfAbsent(containerInfo.containerID(),
+            Pair.of(ret, new MoveDataNodePair(src, tgt)));
+    if (move == null) {
+      // A move for this container did not exist, so send a replicate command
       try {
         sendReplicateCommand(containerInfo, tgt, src);
       } catch (Exception e) {
         LOG.error("Unable to schedule the replication command for container {}",
             containerInfo, e);
-        return null;
+        ret.complete(MoveResult.FAIL_UNEXPECTED_ERROR);
+        pendingMoves.remove(containerInfo.containerID());
       }
-      return Pair.of(ret, new MoveDataNodePair(src, tgt));
-    });
+    } else {
+      // A move for this container is already scheduled, so we cannot schedule
+      // another one. Failing this move.
+      ret.complete(MoveResult.FAIL_CONTAINER_ALREADY_BEING_MOVED);
+    }
   }
 
   /**
