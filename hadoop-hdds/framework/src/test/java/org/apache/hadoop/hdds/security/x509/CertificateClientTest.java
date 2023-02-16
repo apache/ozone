@@ -57,8 +57,7 @@ public class CertificateClientTest implements CertificateClient {
       throws Exception {
     secConfig = new SecurityConfig(conf);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory fact
-        = CertificateCodec.getCertFactory();
+    CertificateFactory fact = CertificateCodec.getCertFactory();
     X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
     certPath = fact.engineGenerateCertPath(ImmutableList.of(singleCert));
