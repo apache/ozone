@@ -190,7 +190,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             try {
               CertPath allCertificates =
                   certificateCodec.getCertPath(file.getName());
-              X509Certificate cert = getTargetCertificate(allCertificates);
+              X509Certificate cert = firstCertificateFrom(allCertificates);
               if (cert != null && cert.getSerialNumber() != null) {
                 if (cert.getSerialNumber().toString().equals(certSerialId)) {
                   this.certPath = allCertificates;
@@ -304,7 +304,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (currentCertPath == null || currentCertPath.getCertificates() == null) {
       return null;
     }
-    return (X509Certificate) currentCertPath.getCertificates().get(0);
+    return firstCertificateFrom(currentCertPath);
   }
 
   /**
@@ -342,7 +342,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (caCertPath == null || caCertPath.getCertificates() == null) {
       return null;
     }
-    return (X509Certificate) caCertPath.getCertificates().get(0);
+    return firstCertificateFrom(caCertPath);
   }
 
   @Override
@@ -366,8 +366,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Check if it is in cache.
     if (certificateMap.containsKey(certId) &&
         certificateMap.get(certId).getCertificates() != null) {
-      return (X509Certificate) certificateMap.get(certId)
-          .getCertificates().get(0);
+      return firstCertificateFrom(certificateMap.get(certId));
     }
     // Try to get it from SCM.
     return this.getCertificateFromScm(certId);
@@ -653,8 +652,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     try {
       CertPath certificatePath =
           CertificateCodec.getCertPathFromPemEncodedString(pemEncodedCert);
-      X509Certificate cert =
-          (X509Certificate) certificatePath.getCertificates().get(0);
+      X509Certificate cert = firstCertificateFrom(certificatePath);
 
       String certName = String.format(CERT_FILE_NAME_FORMAT,
           caType.getFileNamePrefix() + cert.getSerialNumber().toString());
@@ -818,8 +816,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return handleCase(init);
   }
 
-  private X509Certificate getTargetCertificate(CertPath certificatePath) {
-    return (X509Certificate) certificatePath.getCertificates().get(0);
+  private X509Certificate firstCertificateFrom(CertPath certificatePath) {
+    return CertificateCodec.firstCertificateFrom(certificatePath);
   }
 
   /**
@@ -1008,8 +1006,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public synchronized X509Certificate getRootCACertificate() {
     if (rootCaCertId != null) {
-      return (X509Certificate) certificateMap.get(rootCaCertId)
-          .getCertificates().get(0);
+      return firstCertificateFrom(certificateMap.get(rootCaCertId));
     }
     return null;
   }
@@ -1181,7 +1178,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (!force) {
       synchronized (this) {
         Preconditions.checkArgument(
-            timeBeforeExpiryGracePeriod(getTargetCertificate(certPath))
+            timeBeforeExpiryGracePeriod(firstCertificateFrom(certPath))
                 .isZero());
       }
     }
@@ -1416,7 +1413,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Schedule task to refresh certificate before it expires
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     long timeBeforeGracePeriod =
-        timeBeforeExpiryGracePeriod(getTargetCertificate(certPath)).toMillis();
+        timeBeforeExpiryGracePeriod(firstCertificateFrom(certPath)).toMillis();
     // At least three chances to renew the certificate before it expires
     long interval =
         Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));

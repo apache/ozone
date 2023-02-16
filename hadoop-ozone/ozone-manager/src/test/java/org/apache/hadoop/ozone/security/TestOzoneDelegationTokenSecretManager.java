@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -161,7 +162,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public X509Certificate getCertificate(String serialId) {
-        return (X509Certificate) certPath.getCertificates().get(0);
+        return CertificateCodec.firstCertificateFrom(certPath);
       }
     };
   }

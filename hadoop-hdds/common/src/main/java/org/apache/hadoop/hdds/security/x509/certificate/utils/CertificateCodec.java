@@ -175,6 +175,10 @@ public class CertificateCodec {
     }
   }
 
+  public static X509Certificate firstCertificateFrom(CertPath certificatePath) {
+    return (X509Certificate) certificatePath.getCertificates().get(0);
+  }
+
   /**
    * Get Certificate location.
    *
@@ -321,8 +325,7 @@ public class CertificateCodec {
   public X509CertificateHolder getTargetCertHolder(Path path,
       String fileName) throws CertificateException, IOException {
     CertPath certPath = getCertPath(path, fileName);
-    X509Certificate certificate =
-        (X509Certificate) certPath.getCertificates().get(0);
+    X509Certificate certificate = firstCertificateFrom(certPath);
     return getCertificateHolder(certificate);
   }
 

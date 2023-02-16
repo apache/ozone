@@ -212,7 +212,7 @@ public final class HASecurityUtils {
       //note: this does exactly the same as store certificate
       persistSubCACertificate(config, client, pemEncodedCert);
       X509Certificate cert =
-          (X509Certificate) subSCMCertHolderList.getCertificates().get(0);
+          CertificateCodec.firstCertificateFrom(subSCMCertHolderList);
       X509CertificateHolder subSCMCertHolder =
           CertificateCodec.getCertificateHolder(cert);
 

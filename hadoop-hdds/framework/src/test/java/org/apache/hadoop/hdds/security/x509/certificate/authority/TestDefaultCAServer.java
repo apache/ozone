@@ -251,7 +251,7 @@ public class TestDefaultCAServer {
         csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get().getCertificates().get(0));
+    assertNotNull(CertificateCodec.firstCertificateFrom(holder.get()));
   }
 
   @Test
@@ -285,7 +285,7 @@ public class TestDefaultCAServer {
         csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
 
     X509Certificate certificate =
-        (X509Certificate) holder.get().getCertificates().get(0);
+        CertificateCodec.firstCertificateFrom(holder.get());
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
@@ -497,8 +497,8 @@ public class TestDefaultCAServer {
     Future<CertPath> holder = rootCA.requestCertificate(csr,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     assertTrue(holder.isDone());
-    X509Certificate certificate = (X509Certificate) holder.get()
-        .getCertificates().get(0);
+    X509Certificate certificate =
+        CertificateCodec.firstCertificateFrom(holder.get());
     X509CertificateHolder certificateHolder =
         CertificateCodec.getCertificateHolder(certificate);
 

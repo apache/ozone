@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
@@ -80,7 +81,7 @@ public class CertificateClientTest implements CertificateClient {
   @Override
   public X509Certificate getCertificate(String certSerialId)
       throws CertificateException {
-    return (X509Certificate) certPath.getCertificates().get(0);
+    return CertificateCodec.firstCertificateFrom(certPath);
   }
 
   @Override
@@ -90,12 +91,12 @@ public class CertificateClientTest implements CertificateClient {
 
   @Override
   public X509Certificate getCertificate() {
-    return (X509Certificate) certPath.getCertificates().get(0);
+    return CertificateCodec.firstCertificateFrom(certPath);
   }
 
   @Override
   public X509Certificate getCACertificate() {
-    return (X509Certificate) certPath.getCertificates().get(0);
+    return CertificateCodec.firstCertificateFrom(certPath);
   }
 
   @Override
@@ -211,7 +212,7 @@ public class CertificateClientTest implements CertificateClient {
 
   @Override
   public X509Certificate getRootCACertificate() {
-    return (X509Certificate) certPath.getCertificates().get(0);
+    return CertificateCodec.firstCertificateFrom(certPath);
   }
 
   @Override
