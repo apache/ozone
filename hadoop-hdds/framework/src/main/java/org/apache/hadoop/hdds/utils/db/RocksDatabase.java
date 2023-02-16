@@ -77,8 +77,8 @@ public final class RocksDatabase {
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
-  private static List<ColumnFamilyHandle> columnFamilyHandles =
-      new ArrayList<>();
+  private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
+      new HashMap<>();
 
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
@@ -148,7 +148,7 @@ public final class RocksDatabase {
         db = ManagedRocksDB.open(dbOptions, dbFile.getAbsolutePath(),
             descriptors, handles);
       }
-      columnFamilyHandles = handles;
+      dbNameToCfHandleMap.put(db.get().getName(), handles);
       // init a column family map.
       AtomicLong counter = new AtomicLong(0);
       for (ColumnFamilyHandle h : handles) {
@@ -553,9 +553,10 @@ public final class RocksDatabase {
 
   private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
       throws IOException {
-    for (ColumnFamilyHandle cf : getColumnFamilyHandles()) {
+    for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
       try {
-        if (cfName.equals(new String(cf.getName(), StandardCharsets.UTF_8))) {
+        String table = new String(cf.getName(), StandardCharsets.UTF_8);
+        if (cfName.equals(table)) {
           return cf;
         }
       } catch (RocksDBException e) {
@@ -857,8 +858,8 @@ public final class RocksDatabase {
     }
   }
 
-  public static List<ColumnFamilyHandle> getColumnFamilyHandles() {
-    return columnFamilyHandles;
+  public static Map<String, List<ColumnFamilyHandle>> getCfHandleMap() {
+    return dbNameToCfHandleMap;
   }
 
 

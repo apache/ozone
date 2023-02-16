@@ -577,7 +577,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE =
       "ozone.scm.ha.ratis.server.leaderelection.pre-vote";
   public static final boolean
-      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";

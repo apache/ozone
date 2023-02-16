@@ -1207,25 +1207,29 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
 
     RpcClient client = new RpcClient(cluster.getConf(), null);
-    String directoryName1 = UUID.randomUUID().toString();
-    String directoryName2 = UUID.randomUUID().toString();
+    try {
+      String directoryName1 = UUID.randomUUID().toString();
+      String directoryName2 = UUID.randomUUID().toString();
 
-    client.createDirectory(volumeName, bucketName, directoryName1);
-    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
-    // Test create a directory twice will not increase usedNamespace twice
-    client.createDirectory(volumeName, bucketName, directoryName2);
-    Assert.assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
-    client.deleteKey(volumeName, bucketName,
-        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName1), false);
-    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
-    client.deleteKey(volumeName, bucketName,
-        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName2), false);
-    Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+      client.createDirectory(volumeName, bucketName, directoryName1);
+      Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+      // Test create a directory twice will not increase usedNamespace twice
+      client.createDirectory(volumeName, bucketName, directoryName2);
+      Assert.assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+      client.deleteKey(volumeName, bucketName,
+          OzoneFSUtils.addTrailingSlashIfNeeded(directoryName1), false);
+      Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+      client.deleteKey(volumeName, bucketName,
+          OzoneFSUtils.addTrailingSlashIfNeeded(directoryName2), false);
+      Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
 
-    String multiComponentsDir = "dir1/dir2/dir3/dir4";
-    client.createDirectory(volumeName, bucketName, multiComponentsDir);
-    Assert.assertEquals(OzoneFSUtils.getFileCount(multiComponentsDir),
-        getBucketUsedNamespace(volumeName, bucketName));
+      String multiComponentsDir = "dir1/dir2/dir3/dir4";
+      client.createDirectory(volumeName, bucketName, multiComponentsDir);
+      Assert.assertEquals(OzoneFSUtils.getFileCount(multiComponentsDir),
+          getBucketUsedNamespace(volumeName, bucketName));
+    } finally {
+      client.close();
+    }
   }
 
   @ParameterizedTest
@@ -1674,6 +1678,8 @@ public abstract class TestOzoneRpcClientAbstract {
       RpcClient client = new RpcClient(configuration, null);
       try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
         is.read(new byte[100]);
+      } finally {
+        client.close();
       }
       if (verifyChecksum) {
         fail("Reading corrupted data should fail, as verify checksum is " +

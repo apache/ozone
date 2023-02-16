@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -91,28 +92,32 @@ public class RatisUnderReplicationHandler
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated Ratis container {}", containerInfo);
 
-    RatisContainerReplicaCount replicaCount =
+    RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
-            minHealthyForMaintenance);
+            minHealthyForMaintenance, true);
+
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+            minHealthyForMaintenance, false);
 
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
-    if (!verifyUnderReplication(replicaCount)) {
+    if (!verifyUnderReplication(withUnhealthy, withoutUnhealthy)) {
       return Collections.emptySet();
     }
 
     // find sources that can provide replicas
     List<DatanodeDetails> sourceDatanodes =
-        getSources(replicaCount, pendingOps);
+        getSources(withUnhealthy, pendingOps);
     if (sourceDatanodes.isEmpty()) {
-      LOG.warn("Cannot replicate container {} because no healthy replicas " +
-          "were found.", containerInfo);
+      LOG.warn("Cannot replicate container {} because no CLOSED, QUASI_CLOSED" +
+          " or UNHEALTHY replicas were found.", containerInfo);
       return Collections.emptySet();
     }
 
     // find targets to send replicas to
     List<DatanodeDetails> targetDatanodes =
-        getTargets(replicaCount, pendingOps);
+        getTargets(withUnhealthy, pendingOps);
     if (targetDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no eligible targets " +
           "were found.", containerInfo);
@@ -128,27 +133,38 @@ public class RatisUnderReplicationHandler
    * pending adds. Note that the container might be under replicated but
    * unrecoverable (no replicas), in which case this returns false.
    *
-   * @param replicaCount RatisContainerReplicaCount object to check
+   * @param withUnhealthy RatisContainerReplicaCount object to check with
+   * considerHealthy flag true
+   * @param withoutUnhealthy RatisContainerReplicaCount object to check with
+   * considerHealthy flag false
    * @return true if the container is under replicated, false if the
    * container is sufficiently replicated or unrecoverable.
    */
   private boolean verifyUnderReplication(
-      RatisContainerReplicaCount replicaCount) {
-    if (replicaCount.isSufficientlyReplicated()) {
+      RatisContainerReplicaCount withUnhealthy,
+      RatisContainerReplicaCount withoutUnhealthy) {
+    if (withoutUnhealthy.isSufficientlyReplicated()) {
       LOG.info("The container {} state changed and it's not under " +
-          "replicated any more.", replicaCount.getContainer().containerID());
+          "replicated any more.", withUnhealthy.getContainer().containerID());
       return false;
     }
-    if (replicaCount.isSufficientlyReplicated(true)) {
+    if (withoutUnhealthy.isSufficientlyReplicated(true)) {
       LOG.info("Container {} with replicas {} will be sufficiently " +
               "replicated after pending replicas are created.",
-          replicaCount.getContainer().getContainerID(),
-          replicaCount.getReplicas());
+          withoutUnhealthy.getContainer().getContainerID(),
+          withoutUnhealthy.getReplicas());
       return false;
     }
-    if (replicaCount.getReplicas().isEmpty()) {
+    if (withUnhealthy.getReplicas().isEmpty()) {
       LOG.warn("Container {} does not have any replicas and is unrecoverable" +
-          ".", replicaCount.getContainer());
+          ".", withUnhealthy.getContainer());
+      return false;
+    }
+    if (withUnhealthy.isSufficientlyReplicated(true) &&
+        withUnhealthy.getHealthyReplicaCount() == 0) {
+      LOG.info("Container {} with only UNHEALTHY replicas [{}] will be " +
+              "sufficiently replicated after pending adds are created.",
+          withUnhealthy.getContainer(), withUnhealthy.getReplicas());
       return false;
     }
     return true;
@@ -161,7 +177,8 @@ public class RatisUnderReplicationHandler
    * @param replicaCount RatisContainerReplicaCount object for this container
    * @param pendingOps List of pending ContainerReplicaOp
    * @return List of healthy datanodes that have closed/quasi-closed replicas
-   * and are not pending replica deletion. Sorted in descending order of
+   * (or UNHEALTHY replicas if they're the only ones available) and are not
+   * pending replica deletion. Sorted in descending order of
    * sequence id.
    */
   private List<DatanodeDetails> getSources(
@@ -175,14 +192,21 @@ public class RatisUnderReplicationHandler
       }
     }
 
+    Predicate<ContainerReplica> predicate;
+    if (replicaCount.getHealthyReplicaCount() == 0) {
+      predicate = replica -> replica.getState() == State.UNHEALTHY;
+    } else {
+      predicate = replica -> replica.getState() == State.CLOSED ||
+          replica.getState() == State.QUASI_CLOSED;
+    }
+
     /*
-     * Return healthy datanodes that have closed/quasi-closed replicas and
-     * are not pending replica deletion. Sorted in descending order of
-     * sequence id.
+     * Return healthy datanodes which have a replica that satisfies the
+     * predicate and is not pending replica deletion. Sorted in descending
+     * order of sequence id.
      */
     return replicaCount.getReplicas().stream()
-        .filter(r -> r.getState() == State.QUASI_CLOSED ||
-            r.getState() == State.CLOSED)
+        .filter(predicate)
         .filter(r -> ReplicationManager.getNodeStatus(r.getDatanodeDetails(),
             nodeManager).isHealthy())
         .filter(r -> !pendingDeletion.contains(r.getDatanodeDetails()))
