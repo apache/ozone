@@ -75,7 +75,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER
 /**
  * Tests the EC recovery and over replication processing.
  */
-@Flaky("HDDS-7617")
 public class TestECContainerRecovery {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
