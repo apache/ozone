@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -48,7 +47,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 /**
  * A class which schedules, tracks and completes moves scheduled by the
@@ -246,7 +244,7 @@ public final class MoveManagerImpl implements MoveManager,
     }
     startMove(containerInfo, src, tgt, ret);
     LOG.debug("Processed a move request for container {}, from {} to {}",
-        cid, src.getUuid(), tgt.getUuid());
+        cid, src.getUuidString(), tgt.getUuidString());
     return ret;
   }
 
@@ -322,8 +320,11 @@ public final class MoveManagerImpl implements MoveManager,
     final DatanodeDetails src = movePair.getSrc();
     Set<ContainerReplica> currentReplicas = containerManager
         .getContainerReplicas(cid);
-    if (currentReplicas.stream()
-        .noneMatch(r -> r.getDatanodeDetails().equals(src))) {
+
+    Set<ContainerReplica> futureReplicas = new HashSet<>(currentReplicas);
+    boolean found = futureReplicas.removeIf(
+        r -> r.getDatanodeDetails().equals(src));
+    if (!found) {
       // if the target is present but source disappears somehow,
       // we can consider move is successful.
       completeMove(cid, MoveResult.COMPLETED);
@@ -340,10 +341,6 @@ public final class MoveManagerImpl implements MoveManager,
       completeMove(cid, MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
       return;
     }
-
-    Set<ContainerReplica> futureReplicas = currentReplicas.stream()
-        .filter(r -> !r.getDatanodeDetails().equals(src))
-        .collect(Collectors.toSet());
 
     final ContainerInfo containerInfo = containerManager.getContainer(cid);
     ContainerHealthResult healthResult = replicationManager
@@ -371,19 +368,11 @@ public final class MoveManagerImpl implements MoveManager,
       }
     }
     if (srcReplica == null) {
-      throw new RuntimeException("The source replica is not present");
+      throw new IllegalArgumentException("The source replica is not present");
     }
     replicas.remove(srcReplica);
-    replicas.add(ContainerReplica.newBuilder()
+    replicas.add(srcReplica.toBuilder()
         .setDatanodeDetails(tgt)
-        .setContainerID(containerInfo.containerID())
-        .setContainerState(StorageContainerDatanodeProtocolProtos
-            .ContainerReplicaProto.State.CLOSED)
-        .setOriginNodeId(srcReplica.getOriginDatanodeId())
-        .setSequenceId(srcReplica.getSequenceId())
-        .setBytesUsed(srcReplica.getBytesUsed())
-        .setKeyCount(srcReplica.getKeyCount())
-        .setReplicaIndex(srcReplica.getReplicaIndex())
         .build());
     return replicas;
   }
