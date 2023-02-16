@@ -56,9 +56,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
             .toArray(new String[0]);
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-            CsiServer.class, originalArgs, LOG,
-            ozoneConfiguration.getAllPropertiesByPrefix(
-                    "ozone.csi").toString());
+            CsiServer.class, originalArgs, LOG, ozoneConfiguration);
     CsiConfig csiConfig = ozoneConfiguration.getObject(CsiConfig.class);
 
     OzoneClient rpcClient = OzoneClientFactory.getRpcClient(ozoneConfiguration);

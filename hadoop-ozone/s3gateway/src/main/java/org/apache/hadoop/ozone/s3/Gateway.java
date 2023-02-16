@@ -89,9 +89,7 @@ public class Gateway extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        Gateway.class, originalArgs, LOG,
-            ozoneConfiguration.getAllPropertiesByTag(
-                    ConfigTag.S3GATEWAY.name()).toString());
+        Gateway.class, originalArgs, LOG, ozoneConfiguration);
 
     LOG.info("Starting Ozone S3 gateway");
     HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");

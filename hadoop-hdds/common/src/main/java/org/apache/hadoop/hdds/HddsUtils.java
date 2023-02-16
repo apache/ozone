@@ -34,13 +34,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Properties;
+import java.util.TreeMap;
 
+import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -775,5 +779,23 @@ public final class HddsUtils {
     }
 
     return msg;
+  }
+
+  /**
+   * Redacts sensitive configuration and
+   * sorts all config properties by key name
+   *
+   * @param conf OzoneConfiguration object to be printed.
+   * @return Sorted Map of properties
+   */
+  public static Map<String, String> processForLogging(OzoneConfiguration conf) {
+    Properties props = conf.getAllProperties();
+    ConfigRedactor redactor = new ConfigRedactor(conf);
+    Map<String, String> configMap = new TreeMap<>();
+    for (String name : props.stringPropertyNames()) {
+      String value = redactor.redact(name, props.getProperty(name));
+      configMap.put(name, value);
+    }
+    return configMap;
   }
 }

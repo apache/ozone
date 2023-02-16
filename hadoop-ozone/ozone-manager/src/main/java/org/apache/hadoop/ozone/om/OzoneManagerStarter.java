@@ -174,8 +174,7 @@ public class OzoneManagerStarter extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        OzoneManager.class, originalArgs, LOG,
-            conf.getAllPropertiesByTag(ConfigTag.OM.name()).toString());
+        OzoneManager.class, originalArgs, LOG, conf);
   }
 
   /**

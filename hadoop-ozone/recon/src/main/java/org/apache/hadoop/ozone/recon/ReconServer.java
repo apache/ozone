@@ -95,9 +95,7 @@ public class ReconServer extends GenericCli {
 
     configuration = createOzoneConfiguration();
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-            ReconServer.class, originalArgs, LOG,
-            configuration.getAllPropertiesByTag(
-                    ConfigTag.RECON.name()).toString());
+            ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
     injector = Guice.createInjector(new ReconControllerModule(),

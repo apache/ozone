@@ -275,19 +275,8 @@ public class OzoneConfiguration extends Configuration
     return props;
   }
 
-  public Properties getAllPropertiesByPrefix(
-          String keyPrefix) {
-    Properties updatedProps = getProps();
-    Properties props = new Properties();
-    for (String name : updatedProps.stringPropertyNames()) {
-      if (name.startsWith(keyPrefix)) {
-        String value = get(name);
-        if (value != null) {
-          props.put(name, value);
-        }
-      }
-    }
-    return props;
+  public Properties getAllProperties() {
+    return getProps();
   }
 
   @Override
