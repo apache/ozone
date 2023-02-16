@@ -291,7 +291,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       try {
         publicKey = keyCodec.readPublicKey();
       } catch (InvalidKeySpecException | NoSuchAlgorithmException
-               | IOException e) {
+          | IOException e) {
         getLogger().error("Error while getting public key.", e);
       }
     }
