@@ -653,7 +653,8 @@ public class TestOmSnapshot {
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
     Assert.assertEquals(4, getKeyTableSstFiles().size());
     SnapshotDiffReport diff1 =
-        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2);
+        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2, null, 0)
+            .getSnapshotDiffReport();
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
