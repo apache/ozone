@@ -267,12 +267,12 @@ public class TestHddsUtils {
     conf.set("fs.s3a.secret.key", ORIGINAL_VALUE);
     /* Non-Sensitive properties */
     conf.set("normal.config", ORIGINAL_VALUE);
-    Map<String, String> processed_conf = processForLogging(conf);
+    Map<String, String> processedConf = processForLogging(conf);
 
     /* Verify that sensitive properties are redacted */
-    assertEquals(processed_conf.get("test.password"),REDACTED_TEXT);
-    assertEquals(processed_conf.get("fs.s3a.secret.key"),REDACTED_TEXT);
+    assertEquals(processedConf.get("test.password"), REDACTED_TEXT);
+    assertEquals(processedConf.get("fs.s3a.secret.key"), REDACTED_TEXT);
     /* Verify that non-sensitive properties retain their value */
-    assertEquals(processed_conf.get("normal.config"),ORIGINAL_VALUE);
+    assertEquals(processedConf.get("normal.config"), ORIGINAL_VALUE);
   }
 }
