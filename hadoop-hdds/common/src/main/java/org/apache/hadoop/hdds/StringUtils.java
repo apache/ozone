@@ -26,7 +26,6 @@ import java.util.Map;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.SignalLogger;
 import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.net.NetUtils;

@@ -782,8 +782,8 @@ public final class HddsUtils {
   }
 
   /**
-   * Redacts sensitive configuration and
-   * sorts all config properties by key name
+   * Redacts sensitive configuration.
+   * Sorts all properties by key name
    *
    * @param conf OzoneConfiguration object to be printed.
    * @return Sorted Map of properties
