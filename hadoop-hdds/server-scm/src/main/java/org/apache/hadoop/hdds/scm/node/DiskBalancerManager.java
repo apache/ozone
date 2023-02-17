@@ -166,7 +166,7 @@ public class DiskBalancerManager {
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
             threshold, bandwidthInMB, parallelThread);
         DiskBalancerCommand command = new DiskBalancerCommand(
-            HddsProtos.DiskBalancerOpType.start, updateConf);
+            HddsProtos.DiskBalancerOpType.START, updateConf);
         sendCommand(dn, command);
       } catch (Exception e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
@@ -194,7 +194,7 @@ public class DiskBalancerManager {
     for (DatanodeDetails dn : dns) {
       try {
         DiskBalancerCommand command = new DiskBalancerCommand(
-            HddsProtos.DiskBalancerOpType.stop, null);
+            HddsProtos.DiskBalancerOpType.STOP, null);
         sendCommand(dn, command);
       } catch (Exception e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
@@ -234,7 +234,7 @@ public class DiskBalancerManager {
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
             threshold, bandwidthInMB, parallelThread);
         DiskBalancerCommand command = new DiskBalancerCommand(
-            HddsProtos.DiskBalancerOpType.update, updateConf);
+            HddsProtos.DiskBalancerOpType.UPDATE, updateConf);
         sendCommand(dn, command);
       } catch (Exception e) {
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
