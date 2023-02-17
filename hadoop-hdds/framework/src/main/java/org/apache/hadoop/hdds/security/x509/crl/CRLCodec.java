@@ -21,8 +21,10 @@ package org.apache.hadoop.hdds.security.x509.crl;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,8 +39,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.security.cert.CRLException;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -123,14 +123,13 @@ public class CRLCodec {
    * @param pemEncodedString - PEM encoded String.
    * @return X509CRL  - Crl.
    * @throws CRLException - Thrown on Failure.
-   * @throws CertificateException - Thrown on Failure.
-   * @throws IOException          - Thrown on Failure.
+   * @throws IOException  - Thrown on Failure.
    */
   public static X509CRL getX509CRL(String pemEncodedString)
-      throws CRLException, CertificateException, IOException {
-    CertificateFactory fact = CertificateFactory.getInstance("X.509");
+      throws CRLException, IOException {
+    CertificateFactory fact = CertificateCodec.getCertFactory();
     try (InputStream input = IOUtils.toInputStream(pemEncodedString, UTF_8)) {
-      return (X509CRL) fact.generateCRL(input);
+      return (X509CRL) fact.engineGenerateCRL(input);
     }
   }
 

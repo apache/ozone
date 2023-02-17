@@ -22,6 +22,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
@@ -106,7 +107,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     try {
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
@@ -117,16 +118,19 @@ public class DNCertificateClient extends DefaultCertificateClient {
       if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         CertificateCodec certCodec = new CertificateCodec(
-            getSecurityConfig(), certPath);
+            getSecurityConfig(), certificatePath);
         // Certs will be added to cert map after reloadAllCertificate called
-        storeCertificate(pemEncodedCert, true, false, false, certCodec, false);
-        storeCertificate(response.getX509CACertificate(), true, true,
-            false, certCodec, false);
+        storeCertificate(pemEncodedCert, CAType.NONE,
+            certCodec,
+            false);
+        storeCertificate(response.getX509CACertificate(),
+            CAType.SUBORDINATE,
+            certCodec, false);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(), true, false,
-              true, certCodec, false);
+          storeCertificate(response.getX509RootCACertificate(),
+              CAType.ROOT, certCodec, false);
         }
         // Return the default certificate ID
         String dnCertSerialId = getX509Certificate(pemEncodedCert).

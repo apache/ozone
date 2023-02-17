@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
@@ -96,7 +97,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     try {
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
       HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
@@ -113,15 +114,18 @@ public class ReconCertificateClient  extends CommonCertificateClient {
       if (response.hasX509CACertificate()) {
         String pemEncodedCert = response.getX509Certificate();
         CertificateCodec certCodec = new CertificateCodec(
-            getSecurityConfig(), certPath);
-        storeCertificate(pemEncodedCert, true, false, false, certCodec, false);
-        storeCertificate(response.getX509CACertificate(), true, true,
-            false, certCodec, false);
+            getSecurityConfig(), certificatePath);
+        storeCertificate(pemEncodedCert, CAType.NONE,
+            certCodec,
+            false);
+        storeCertificate(response.getX509CACertificate(),
+            CAType.SUBORDINATE,
+            certCodec, false);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              true, false, true, certCodec, false);
+              CAType.ROOT, certCodec, false);
         }
         return getX509Certificate(pemEncodedCert).getSerialNumber().toString();
       } else {
