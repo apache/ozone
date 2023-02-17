@@ -206,8 +206,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       LOG.debug("Re-fetching pipeline for block {}", blockID);
       Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
       if (newPipeline == null || newPipeline.sameDatanodes(pipeline)) {
-        LOG.warn("No new pipeline for block {}", blockID);
-        throw cause;
+        LOG.debug("No new pipeline for block {}", blockID);
       } else {
         LOG.debug("New pipeline got for block {}", blockID);
         this.pipeline = newPipeline;

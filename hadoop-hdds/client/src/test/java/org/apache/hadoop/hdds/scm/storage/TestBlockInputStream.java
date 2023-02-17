@@ -287,20 +287,29 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
-  public void testRefreshOnReadFailure(IOException ex) throws Exception {
+  void refreshesPipelineOnReadFailure(IOException ex) throws Exception {
     // GIVEN
-    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+
+    testRefreshesPipelineOnReadFailure(ex, pipeline, id -> newPipeline);
+    testRefreshesPipelineOnReadFailure(ex, pipeline, id -> pipeline);
+    testRefreshesPipelineOnReadFailure(ex, pipeline, id -> null);
+  }
+
+  private void testRefreshesPipelineOnReadFailure(IOException ex,
+      Pipeline pipeline, Function<BlockID, Pipeline> refreshFunction)
+      throws Exception {
+
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
 
     final int len = 200;
     final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
-    when(refreshPipeline.apply(blockID))
-        .thenReturn(newPipeline);
+    when(refreshPipeline.apply(any()))
+        .thenAnswer(inv -> refreshFunction.apply(blockID));
 
-    BlockInputStream subject = createSubject(blockID, pipeline, stream);
-    try {
+    try (BlockInputStream subject = createSubject(blockID, pipeline, stream)) {
       subject.initialize();
 
       // WHEN
@@ -311,7 +320,7 @@ public class TestBlockInputStream {
       Assert.assertEquals(len, bytesRead);
       verify(refreshPipeline).apply(blockID);
     } finally {
-      subject.close();
+      reset(refreshPipeline);
     }
   }
 
@@ -321,40 +330,6 @@ public class TestBlockInputStream {
         Arguments.of(new OzoneChecksumException("checksum missing")),
         Arguments.of(new IOException("Some random exception."))
     );
-  }
-
-  @ParameterizedTest
-  @MethodSource("exceptionsTriggersRefresh")
-  void onlyRetriesIfPipelineRefreshed(IOException ex)
-      throws Exception {
-    onlyRetriesIfPipelineRefreshed(ex, true);
-    onlyRetriesIfPipelineRefreshed(ex, false);
-  }
-
-  private void onlyRetriesIfPipelineRefreshed(IOException ex,
-      boolean samePipeline) throws Exception {
-    // GIVEN
-    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-
-    final int len = 200;
-    final ChunkInputStream stream = throwingChunkInputStream(ex, len, samePipeline);
-
-    when(refreshPipeline.apply(blockID))
-        .thenReturn(samePipeline ? pipeline : null);
-
-    try (BlockInputStream subject = createSubject(blockID, pipeline, stream)) {
-      subject.initialize();
-
-      // WHEN
-      Assertions.assertThrows(ex.getClass(),
-          () -> subject.read(new byte[len], 0, len));
-
-      // THEN
-      verify(refreshPipeline).apply(blockID);
-    } finally {
-      reset(refreshPipeline);
-    }
   }
 
   private static ChunkInputStream throwingChunkInputStream(IOException ex,
