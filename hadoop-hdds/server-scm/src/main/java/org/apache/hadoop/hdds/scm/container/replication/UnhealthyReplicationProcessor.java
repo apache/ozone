@@ -27,6 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -80,6 +82,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     int failed = 0;
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
             Maps.newHashMap();
+    List<HealthResult> failedOnes = new LinkedList<>();
     while (true) {
       if (!replicationManager.shouldRun()) {
         break;
@@ -99,9 +102,13 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
                    "container {}", healthResult.getClass(),
                 healthResult.getContainerInfo(), e);
         failed++;
-        requeueHealthResultFromQueue(replicationManager, healthResult);
+        failedOnes.add(healthResult);
       }
     }
+
+    failedOnes.forEach(result ->
+        requeueHealthResultFromQueue(replicationManager, result));
+
     LOG.info("Processed {} containers with health state counts {}," +
              "failed processing {}", processed, healthStateCntMap, failed);
   }
