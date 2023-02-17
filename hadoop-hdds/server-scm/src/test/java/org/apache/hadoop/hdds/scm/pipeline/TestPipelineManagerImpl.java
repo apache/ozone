@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.base.Supplier;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,12 +30,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
@@ -85,6 +88,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCAT
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -125,6 +129,10 @@ public class TestPipelineManagerImpl {
         GenericTestUtils.getRandomizedTempPath());
     scm = HddsTestUtils.getScm(conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    // Mock Node Manager is not able to correctly set up things for the EC
+    // placement policy (Rack Scatter), so just use the random one.
+    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
+        SCMContainerPlacementRandom.class.getName());
     dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 20);
     maxPipelineCount = nodeManager.getNodeCount(
@@ -151,7 +159,7 @@ public class TestPipelineManagerImpl {
       throws IOException {
     return PipelineManagerImpl.newPipelineManager(conf,
         SCMHAManagerStub.getInstance(isLeader),
-        new MockNodeManager(true, 20),
+        nodeManager,
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         scmContext,
@@ -163,7 +171,7 @@ public class TestPipelineManagerImpl {
       boolean isLeader, SCMHADBTransactionBuffer buffer) throws IOException {
     return PipelineManagerImpl.newPipelineManager(conf,
         SCMHAManagerStub.getInstance(isLeader, buffer),
-        new MockNodeManager(true, 20),
+        nodeManager,
         SCMDBDefinition.PIPELINES.getTable(dbStore),
         new EventQueue(),
         SCMContext.emptyContext(),
@@ -341,7 +349,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testRemovePipeline() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     // Create a pipeline
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
@@ -391,7 +398,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testClosePipelineShouldFailOnFollower() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     Assertions.assertEquals(1, pipelineManager.getPipelines().size());
@@ -413,7 +419,6 @@ public class TestPipelineManagerImpl {
   @Test
   public void testPipelineReport() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
             new EventQueue(), serviceManager, scmContext);
@@ -571,7 +576,6 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline allocatedPipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
@@ -629,12 +633,35 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testScrubOpenWithUnregisteredNodes() throws Exception {
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+    Pipeline pipeline = pipelineManager
+        .createPipeline(new ECReplicationConfig(3, 2));
+    pipelineManager.openPipeline(pipeline.getId());
+
+    // Scrubbing the pipelines should not affect this pipeline
+    pipelineManager.scrubPipelines();
+    pipeline = pipelineManager.getPipeline(pipeline.getId());
+    Assertions.assertEquals(Pipeline.PipelineState.OPEN,
+        pipeline.getPipelineState());
+
+    // Now, "unregister" one of the nodes in the pipeline
+    DatanodeDetails firstDN = nodeManager.getNodeByUuid(
+        pipeline.getNodes().get(0).getUuidString());
+    nodeManager.getClusterNetworkTopologyMap().remove(firstDN);
+
+    pipelineManager.scrubPipelines();
+    pipeline = pipelineManager.getPipeline(pipeline.getId());
+    Assertions.assertEquals(Pipeline.PipelineState.CLOSED,
+        pipeline.getPipelineState());
+  }
+
+  @Test
   public void testScrubPipelinesShouldFailOnFollower() throws Exception {
     conf.setTimeDuration(
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
@@ -736,7 +763,7 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
-  public void testAddContainerWithClosedPipeline() throws Exception {
+  public void testAddContainerWithClosedPipelineScmStart() throws Exception {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
             captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
     SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
@@ -761,11 +788,31 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testAddContainerWithClosedPipeline() throws Exception {
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
+    PipelineManagerImpl pipelineManager =
+        createPipelineManager(true, buffer);
+    Table<PipelineID, Pipeline> pipelineStore =
+        SCMDBDefinition.PIPELINES.getTable(dbStore);
+    Pipeline pipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.THREE));
+    PipelineID pipelineID = pipeline.getId();
+    pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
+    pipelineManager.getStateManager().updatePipelineState(
+        pipelineID.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
+    buffer.flush();
+    Assertions.assertTrue(pipelineStore.get(pipelineID).isClosed());
+    assertThrows(InvalidPipelineStateException.class,
+        () -> pipelineManager.addContainerToPipeline(pipelineID,
+        ContainerID.valueOf(2)));
+  }
+
+  @Test
   public void testPipelineCloseFlow() throws IOException, TimeoutException {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
             .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    pipelineManager.setScmContext(scmContext);
     Pipeline pipeline = pipelineManager.createPipeline(
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE));

@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
@@ -32,6 +33,8 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -243,10 +246,56 @@ public final class ContainerUtils {
   }
 
   /**
+   * Get the chunk directory from the containerData.
+   *
+   * @param containerData {@link ContainerData}
+   * @return the file of chunk directory
+   * @throws StorageContainerException
+   */
+  public static File getChunkDir(ContainerData containerData)
+      throws StorageContainerException {
+    Preconditions.checkNotNull(containerData, "Container data can't be null");
+
+    String chunksPath = containerData.getChunksPath();
+    if (chunksPath == null) {
+      LOG.error("Chunks path is null in the container data");
+      throw new StorageContainerException("Unable to get Chunks directory.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+
+    File chunksDir = new File(chunksPath);
+    if (!chunksDir.exists()) {
+      LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
+      throw new StorageContainerException("Chunks directory " +
+          chunksDir.getAbsolutePath() + " does not exist.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    return chunksDir;
+  }
+
+  /**
    * ContainerID can be decoded from the container base directory name.
    */
   public static long getContainerID(File containerBaseDir) {
     return Long.parseLong(containerBaseDir.getName());
   }
 
+  public static String getContainerTarName(long containerId) {
+    return "container-" + containerId + ".tar";
+  }
+
+  public static long retrieveContainerIdFromTarName(String tarName)
+      throws IOException {
+    assert tarName != null;
+    Pattern pattern = Pattern.compile("container-(\\d+).tar");
+    // Now create matcher object.
+    Matcher m = pattern.matcher(tarName);
+
+    if (m.find()) {
+      return Long.parseLong(m.group(1));
+    } else {
+      throw new IOException("Illegal container tar gz file " +
+          tarName);
+    }
+  }
 }

@@ -60,12 +60,18 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
     collector.addRecord(SOURCE)
         .addGauge(Interns.info("numInFlightReplications",
             "Number of pending replications(including queued replications"),
-            supervisor.getInFlightReplications())
+            supervisor.getTotalInFlightReplications())
         .addGauge(Interns.info("numQueuedReplications",
             "Number of replications in queue"),
             supervisor.getQueueSize())
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
-            supervisor.getReplicationRequestCount());
+            supervisor.getReplicationRequestCount())
+        .addGauge(Interns.info("numTimeoutReplications",
+            "Number of replication requests timed out before being processed"),
+            supervisor.getReplicationTimeoutCount())
+        .addGauge(Interns.info("numSkippedReplications",
+            "Number of replication requests skipped as the container is "
+            + "already present"), supervisor.getReplicationSkippedCount());
   }
 }

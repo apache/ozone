@@ -57,6 +57,8 @@ public class FullTableCache<CACHEKEY extends CacheKey,
 
   private final ReadWriteLock lock;
 
+  private final CacheStatsRecorder statsRecorder;
+
 
   public FullTableCache() {
     // As for full table cache only we need elements to be inserted in sorted
@@ -78,13 +80,17 @@ public class FullTableCache<CACHEKEY extends CacheKey,
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("FullTableCache Cleanup Thread - %d").build();
     executorService = Executors.newSingleThreadExecutor(build);
+
+    statsRecorder = new CacheStatsRecorder();
   }
 
   @Override
   public CACHEVALUE get(CACHEKEY cachekey) {
     try {
       lock.readLock().lock();
-      return cache.get(cachekey);
+      CACHEVALUE cachevalue = cache.get(cachekey);
+      statsRecorder.recordValue(cachevalue);
+      return cachevalue;
     } finally {
       lock.readLock().unlock();
     }
@@ -123,6 +129,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
 
   @Override
   public Iterator<Map.Entry<CACHEKEY, CACHEVALUE>> iterator() {
+    statsRecorder.recordIteration();
     return cache.entrySet().iterator();
   }
 
@@ -155,7 +162,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
               if (v.getCacheValue() == null && v.getEpoch() == currentEpoch) {
                 if (LOG.isDebugEnabled()) {
                   LOG.debug("CacheKey {} with epoch {} is removed from cache",
-                          k.getCacheKey(), currentEpoch);
+                      k.getCacheKey(), currentEpoch);
                 }
                 return null;
               }
@@ -175,6 +182,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
 
     CACHEVALUE cachevalue = cache.get(cachekey);
+    statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
       return new CacheResult<>(CacheResult.CacheStatus.NOT_EXIST, null);
     } else {
@@ -195,4 +203,8 @@ public class FullTableCache<CACHEKEY extends CacheKey,
     return epochEntries;
   }
 
+  @Override
+  public CacheStats getStats() {
+    return statsRecorder.snapshot();
+  }
 }

@@ -280,7 +280,6 @@ public class TestDeleteContainerHandler {
             .setBucketName(bucketName)
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setKeyName(keyName)
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =

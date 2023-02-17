@@ -75,6 +75,11 @@ public class VolumeInfoMetrics {
     return volume.getLayoutVersion();
   }
 
+  @Metric("Returns the Volume State")
+  public String getVolumeState() {
+    return volume.getStorageState().name();
+  }
+
   @Metric("Returns the Volume Type")
   public String getVolumeType() {
     return volume.getType().name();

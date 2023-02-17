@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
  * Class to encapsulate the Key information needed for the Recon container DB.
  * Currently, it is the containerId and the whole key + key version.
@@ -66,6 +68,13 @@ public class ContainerKeyPrefix {
 
   public void setKeyVersion(long keyVersion) {
     this.keyVersion = keyVersion;
+  }
+
+  public KeyPrefixContainer toKeyPrefixContainer() {
+    if (StringUtils.isNotEmpty(keyPrefix)) {
+      return new KeyPrefixContainer(keyPrefix, keyVersion, containerId);
+    }
+    return null;
   }
 
   @Override

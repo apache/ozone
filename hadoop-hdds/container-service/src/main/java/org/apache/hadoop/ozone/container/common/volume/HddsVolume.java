@@ -29,13 +29,18 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
@@ -108,7 +113,8 @@ public class HddsVolume extends StorageVolume {
 
     if (!b.getFailedVolume()) {
       this.setState(VolumeState.NOT_INITIALIZED);
-      this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr());
+      this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr(),
+          this.getStorageDir().toString());
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       this.committedBytes = new AtomicLong(0);
@@ -122,7 +128,7 @@ public class HddsVolume extends StorageVolume {
       // HddsVolume Object.
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
-      volumeInfoMetrics = null;
+      volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       committedBytes = null;
     }
 
@@ -162,9 +168,6 @@ public class HddsVolume extends StorageVolume {
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
-    if (volumeInfoMetrics != null) {
-      volumeInfoMetrics.unregister();
-    }
     closeDbStore();
   }
 
@@ -178,6 +181,25 @@ public class HddsVolume extends StorageVolume {
       volumeInfoMetrics.unregister();
     }
     closeDbStore();
+  }
+
+  @Override
+  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    VolumeCheckResult result = super.check(unused);
+    if (!isDbLoaded()) {
+      return result;
+    }
+    DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
+    if (result != VolumeCheckResult.HEALTHY ||
+        !df.getContainerSchemaV3Enabled() || !df.autoCompactionSmallSstFile()) {
+      return result;
+    }
+    // Calculate number of files per level and size per level
+    RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
+        new File(dbParentDir, CONTAINER_DB_NAME).getAbsolutePath(), getConf());
+    rawDB.getStore().compactionIfNeeded();
+
+    return VolumeCheckResult.HEALTHY;
   }
 
   /**
@@ -215,7 +237,7 @@ public class HddsVolume extends StorageVolume {
     return dbLoaded.get();
   }
 
-  public void loadDbStore() throws IOException {
+  public void loadDbStore(boolean readOnly) throws IOException {
     // DN startup for the first time, not registered yet,
     // so the DbVolume is not formatted.
     if (!getStorageState().equals(VolumeState.NORMAL)) {
@@ -251,7 +273,7 @@ public class HddsVolume extends StorageVolume {
 
     String containerDBPath = containerDBFile.getAbsolutePath();
     try {
-      initPerDiskDBStore(containerDBPath, getConf());
+      initPerDiskDBStore(containerDBPath, getConf(), readOnly);
     } catch (IOException e) {
       throw new IOException("Can't init db instance under path "
           + containerDBPath + " for volume " + getStorageID(), e);
@@ -304,7 +326,7 @@ public class HddsVolume extends StorageVolume {
     String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
         .getAbsolutePath();
     try {
-      HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf());
+      HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf(), false);
       dbLoaded.set(true);
       LOG.info("SchemaV3 db is created and loaded at {} for volume {}",
           containerDBPath, getStorageID());

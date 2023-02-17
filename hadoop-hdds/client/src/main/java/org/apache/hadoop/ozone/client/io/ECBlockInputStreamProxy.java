@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -117,6 +118,10 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   private void createBlockReader() {
+    if (reconstructionReader) {
+      XceiverClientManager.getXceiverClientMetrics()
+          .incECReconstructionTotal();
+    }
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
         failedLocations, repConfig, blockInfo, verifyChecksum,
         xceiverClientFactory, refreshFunction);
@@ -162,6 +167,8 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         // If we get an error from the reconstruction reader, there
         // is nothing left to try. It will re-try until it has insufficient
         // locations internally, so if an error comes here, just re-throw it.
+        XceiverClientManager.getXceiverClientMetrics()
+            .incECReconstructionFailsTotal();
         throw e;
       }
       if (e instanceof BadDataLocationException) {
@@ -175,7 +182,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         }
 
         failoverToReconstructionRead(
-            ((BadDataLocationException) e).getFailedLocation(), lastPosition);
+            ((BadDataLocationException) e).getFailedLocations(), lastPosition);
         buf.reset();
         totalRead += read(buf);
       } else {
@@ -186,9 +193,10 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   private synchronized void failoverToReconstructionRead(
-      DatanodeDetails badLocation, long lastPosition) throws IOException {
-    if (badLocation != null) {
-      failedLocations.add(badLocation);
+      List<DatanodeDetails> badLocations, long lastPosition)
+      throws IOException {
+    if (badLocations != null) {
+      failedLocations.addAll(badLocations);
     }
     blockReader.close();
     reconstructionReader = true;
@@ -213,7 +221,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   }
 
   @Override
-  public synchronized long getPos() throws IOException {
+  public synchronized long getPos() {
     return blockReader != null ? blockReader.getPos() : 0;
   }
 

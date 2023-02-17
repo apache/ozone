@@ -1,7 +1,6 @@
 {
   "/api/v1/*": "/$1",
   "/containers/:id/keys": "/keys",
-  "/containers/missing": "/missingContainers",
   "/utilization/fileCount": "/fileSizeCounts",
   "/namespace/du?path=/&files=true": "/root",
   "/namespace/du?path=/vol:id&files=true": "/volume",
@@ -22,5 +21,7 @@
   "/namespace/du?path=/vol1/bucket1/empty&files=true": "/empty",
   "/namespace/du?path=/clunky&files=true": "/clunky",
   "/namespace/summary?path=*": "/metadata",
-  "/namespace/quota?path=*": "/quota"
+  "/namespace/quota?path=*": "/quota",
+  "/task/status": "/taskStatus",
+  "/containers/unhealthy": "/unhealthyContainers"
 }

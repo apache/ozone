@@ -507,30 +507,31 @@ public class OzoneListStatusHelper {
 
       omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+      try {
+        // Initialize all the iterators
+        iterators.add(EntryType.DIR_CACHE.ordinal(),
+            new CacheIter<>(EntryType.DIR_CACHE,
+                omMetadataManager.getDirectoryTable().cacheIterator(),
+                startKey, prefixKey));
 
-      // Initialize all the iterators
-      iterators.add(EntryType.DIR_CACHE.ordinal(),
-          new CacheIter<>(EntryType.DIR_CACHE,
-              omMetadataManager.getDirectoryTable().cacheIterator(),
-              startKey, prefixKey));
+        iterators.add(EntryType.FILE_CACHE.ordinal(),
+            new CacheIter<>(EntryType.FILE_CACHE,
+                omMetadataManager.getKeyTable(bucketLayout).cacheIterator(),
+                startKey, prefixKey));
 
-      iterators.add(EntryType.FILE_CACHE.ordinal(),
-          new CacheIter<>(EntryType.FILE_CACHE,
-              omMetadataManager.getKeyTable(bucketLayout).cacheIterator(),
-              startKey, prefixKey));
+        iterators.add(EntryType.RAW_DIR_DB.ordinal(),
+            new RawIter<>(EntryType.RAW_DIR_DB,
+                omMetadataManager.getDirectoryTable(),
+                prefixKey, startKey));
 
-      iterators.add(EntryType.RAW_DIR_DB.ordinal(),
-          new RawIter<>(EntryType.RAW_DIR_DB,
-              omMetadataManager.getDirectoryTable(),
-              prefixKey, startKey));
-
-      iterators.add(EntryType.RAW_FILE_DB.ordinal(),
-          new RawIter<>(EntryType.RAW_FILE_DB,
-              omMetadataManager.getKeyTable(bucketLayout),
-              prefixKey, startKey));
-
-      omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
+        iterators.add(EntryType.RAW_FILE_DB.ordinal(),
+            new RawIter<>(EntryType.RAW_FILE_DB,
+                omMetadataManager.getKeyTable(bucketLayout),
+                prefixKey, startKey));
+      } finally {
+        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
 
       // Insert the element from each of the iterator
       for (Iterator<HeapEntry> iter : iterators) {

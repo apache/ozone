@@ -76,6 +76,17 @@ public interface ReplicationConfig {
     return parse(null, replication, config);
   }
 
+  static ReplicationConfig resolve(ReplicationConfig replicationConfig,
+      ReplicationConfig bucketReplicationConfig, ConfigurationSource conf) {
+    if (replicationConfig == null) {
+      replicationConfig = bucketReplicationConfig;
+    }
+    if (replicationConfig == null) {
+      replicationConfig = getDefault(conf);
+    }
+    return replicationConfig;
+  }
+
   /**
    * Helper method to serialize from proto.
    * <p>
@@ -195,8 +206,8 @@ public interface ReplicationConfig {
       replicationConfig = new ECReplicationConfig(replication);
       break;
     default:
-      throw new RuntimeException("Replication type " + type + " can not "
-          + "be parsed.");
+      throw new IllegalArgumentException("Replication type " + type +
+              " can not be parsed.");
     }
 
     ReplicationConfigValidator validator =

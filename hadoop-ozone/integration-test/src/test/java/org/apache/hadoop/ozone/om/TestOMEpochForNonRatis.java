@@ -146,7 +146,7 @@ public class TestOMEpochForNonRatis {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setRefreshPipeline(true).build());
+        .build());
     long keyTrxnIndex = OmUtils.getTxIdFromObjectId(
         omKeyInfo.getObjectID());
     Assert.assertEquals(3, keyTrxnIndex);

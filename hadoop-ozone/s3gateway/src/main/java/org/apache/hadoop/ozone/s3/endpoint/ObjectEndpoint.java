@@ -31,9 +31,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
@@ -46,11 +48,9 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.OptionalLong;
 
 import org.apache.commons.lang3.StringUtils;
@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -84,6 +85,7 @@ import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.annotations.VisibleForTesting;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
 import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
@@ -97,6 +99,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEF
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
@@ -128,19 +132,25 @@ public class ObjectEndpoint extends EndpointBase {
       LoggerFactory.getLogger(ObjectEndpoint.class);
 
   @Context
+  private ContainerRequestContext context;
+
+  @Context
   private HttpHeaders headers;
 
-
-  private List<String> customizableGetHeaders = new ArrayList<>();
+  /*FOR the feature Overriding Response Header
+  https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
+  private Map<String, String> overrideQueryParameter;
   private int bufferSize;
 
   public ObjectEndpoint() {
-    customizableGetHeaders.add("Content-Type");
-    customizableGetHeaders.add("Content-Language");
-    customizableGetHeaders.add("Expires");
-    customizableGetHeaders.add("Cache-Control");
-    customizableGetHeaders.add("Content-Disposition");
-    customizableGetHeaders.add("Content-Encoding");
+    overrideQueryParameter = ImmutableMap.<String, String>builder()
+        .put("Content-Type", "response-content-type")
+        .put("Content-Language", "response-content-language")
+        .put("Expires", "response-expires")
+        .put("Cache-Control", "response-cache-control")
+        .put("Content-Disposition", "response-content-disposition")
+        .put("Content-Encoding", "response-content-encoding")
+        .build();
   }
 
   @Inject
@@ -169,6 +179,7 @@ public class ObjectEndpoint extends EndpointBase {
       InputStream body) throws IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.CREATE_KEY;
+
     boolean auditSuccess = true;
 
     OzoneOutputStream output = null;
@@ -202,13 +213,29 @@ public class ObjectEndpoint extends EndpointBase {
             "Connection", "close").build();
       }
 
+      if (length == 0 &&
+          ozoneConfiguration
+              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
+          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        s3GAction = S3GAction.CREATE_DIRECTORY;
+        // create directory
+        getClientProtocol()
+            .createDirectory(volume.getName(), bucketName, keyPath);
+        return Response.ok().status(HttpStatus.SC_OK).build();
+      }
+
+      // Normal put object
+      Map<String, String> customMetadata =
+          getCustomMetadataFromHeaders(headers.getRequestHeaders());
+
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
       }
 
       output = getClientProtocol().createKey(volume.getName(), bucketName,
-          keyPath, length, replicationConfig, new HashMap<>());
+          keyPath, length, replicationConfig, customMetadata);
       IOUtils.copy(body, output);
 
       getMetrics().incCreateKeySuccess();
@@ -230,10 +257,12 @@ public class ObjectEndpoint extends EndpointBase {
             " considered as Unix Paths. Path has Violated FS Semantics " +
             "which caused put operation to fail.");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.FILE_ALREADY_EXISTS) {
+        throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
       }
       throw ex;
     } catch (Exception ex) {
@@ -286,10 +315,8 @@ public class ObjectEndpoint extends EndpointBase {
             partMarker, maxParts);
       }
 
-      OzoneVolume volume = getVolume();
-
-      OzoneKeyDetails keyDetails = getClientProtocol().getKeyDetails(
-          volume.getName(), bucketName, keyPath);
+      OzoneKeyDetails keyDetails = getClientProtocol()
+          .getS3KeyDetails(bucketName, keyPath);
 
       long length = keyDetails.getDataSize();
 
@@ -335,7 +362,8 @@ public class ObjectEndpoint extends EndpointBase {
           }
         };
         responseBuilder = Response
-            .ok(output)
+            .status(Status.PARTIAL_CONTENT)
+            .entity(output)
             .header(CONTENT_LENGTH, copyLength);
 
         String contentRangeVal = RANGE_HEADER_SUPPORTED_UNIT + " " +
@@ -346,10 +374,28 @@ public class ObjectEndpoint extends EndpointBase {
       }
       responseBuilder.header(ACCEPT_RANGE_HEADER,
           RANGE_HEADER_SUPPORTED_UNIT);
-      for (String responseHeader : customizableGetHeaders) {
-        String headerValue = headers.getHeaderString(responseHeader);
+
+      // if multiple query parameters having same name,
+      // Only the first parameters will be recognized
+      // eg:
+      // http://localhost:9878/bucket/key?response-expires=1&response-expires=2
+      // only response-expires=1 is valid
+      MultivaluedMap<String, String> queryParams = context
+          .getUriInfo().getQueryParameters();
+
+      for (Map.Entry<String, String> entry :
+          overrideQueryParameter.entrySet()) {
+        String headerValue = headers.getHeaderString(entry.getKey());
+
+        /* "Overriding Response Header" by query parameter, See:
+        https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html
+        */
+        String queryValue = queryParams.getFirst(entry.getValue());
+        if (queryValue != null) {
+          headerValue = queryValue;
+        }
         if (headerValue != null) {
-          responseBuilder.header(responseHeader, headerValue);
+          responseBuilder.header(entry.getKey(), headerValue);
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
@@ -367,7 +413,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
@@ -415,9 +461,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
-      OzoneVolume volume = getVolume();
-      key = getClientProtocol().headObject(volume.getName(),
-          bucketName, keyPath);
+      key = getClientProtocol().headS3Object(bucketName, keyPath);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
@@ -426,7 +470,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
@@ -444,6 +488,7 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
+    addCustomMetadataHeaders(response, key);
     getMetrics().incHeadKeySuccess();
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters()));
@@ -524,7 +569,7 @@ public class ObjectEndpoint extends EndpointBase {
         // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
         // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else {
         throw ex;
@@ -587,7 +632,7 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditWriteFailure(s3GAction, ex);
       getMetrics().incInitMultiPartUploadFailure();
-      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
       }
       throw ex;
@@ -777,7 +822,7 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().incCreateMultipartKeyFailure();
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
       }
       throw ex;
@@ -834,7 +879,7 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().incListPartsFailure();
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             bucket + "/" + key + "/" + uploadID, ex);
       }
@@ -849,12 +894,19 @@ public class ObjectEndpoint extends EndpointBase {
     this.headers = headers;
   }
 
+  @VisibleForTesting
+  public void setContext(ContainerRequestContext context) {
+    this.context = context;
+  }
+
   void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
       String destKey, String destBucket,
-      ReplicationConfig replication) throws IOException {
-    try (OzoneOutputStream dest = getClientProtocol().createKey(
+      ReplicationConfig replication,
+            Map<String, String> metadata) throws IOException {
+    try (OzoneOutputStream dest =
+                 getClientProtocol().createKey(
         volume.getName(), destBucket, destKey, srcKeyLen,
-        replication, new HashMap<>())) {
+        replication, metadata)) {
       IOUtils.copy(src, dest);
     }
   }
@@ -905,7 +957,8 @@ public class ObjectEndpoint extends EndpointBase {
 
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
-        copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig);
+        copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig,
+                sourceKeyDetails.getMetadata());
       }
 
       final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
@@ -921,7 +974,7 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             destBucket + "/" + destkey, ex);
       }

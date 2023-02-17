@@ -31,7 +31,9 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,6 +105,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   @Override
+  void cleanup(boolean invalidateClient) {
+    if (isInitialized()) {
+      IOUtils.close(LOG, blockOutputStreams);
+      blockOutputStreams = null;
+    }
+  }
+
+  @Override
   public OutputStream getOutputStream() {
     if (!isInitialized()) {
       return null;
@@ -131,7 +141,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   public void markFailed(Exception e) {
-    if (blockOutputStreams[currentStreamIdx] != null) {
+    if (isInitialized() && blockOutputStreams[currentStreamIdx] != null) {
       blockOutputStreams[currentStreamIdx].setIoException(e);
     }
   }
@@ -261,16 +271,19 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         .build();
   }
 
-  void executePutBlock(boolean isClose, long blockGroupLength) {
+  void executePutBlock(boolean isClose, long blockGroupLength,
+      ByteString checksum) {
     if (!isInitialized()) {
       return;
     }
+
     for (ECBlockOutputStream stream : blockOutputStreams) {
       if (stream == null) {
         continue;
       }
       try {
-        stream.executePutBlock(isClose, true, blockGroupLength);
+        // Set checksum only for 1st node and parity nodes
+        stream.executePutBlock(isClose, true, blockGroupLength, checksum);
       } catch (Exception e) {
         stream.setIoException(e);
       }
@@ -375,13 +388,43 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   private Stream<ECBlockOutputStream> blockStreams() {
-    return Arrays.stream(blockOutputStreams).filter(Objects::nonNull);
+    return isInitialized()
+        ? Arrays.stream(blockOutputStreams).filter(Objects::nonNull)
+        : Stream.empty();
   }
 
   private Stream<ECBlockOutputStream> dataStreams() {
-    return Arrays.stream(blockOutputStreams)
-        .limit(replicationConfig.getData())
-        .filter(Objects::nonNull);
+    return isInitialized()
+        ? Arrays.stream(blockOutputStreams)
+            .limit(replicationConfig.getData())
+            .filter(Objects::nonNull)
+        : Stream.empty();
+  }
+
+  public ByteString calculateChecksum() throws IOException {
+    if (blockOutputStreams == null) {
+      throw new IOException("Block Output Stream is null");
+    }
+
+    List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>();
+    // First chunk should always have the additional chunks in a partial stripe.
+    int currentIdx = blockOutputStreams[0]
+        .getContainerBlockData().getChunksCount();
+    for (ECBlockOutputStream stream: blockOutputStreams) {
+      if (stream.getContainerBlockData().getChunksCount() > currentIdx - 1) {
+        chunkInfos.add(stream.getContainerBlockData()
+            .getChunksList().get(currentIdx - 1));
+      }
+    }
+
+    ByteString checksum = ByteString.EMPTY;
+    for (ContainerProtos.ChunkInfo info : chunkInfos) {
+      for (ByteString byteString : info.getChecksumData().getChecksumsList()) {
+        checksum = checksum.concat(byteString);
+      }
+    }
+
+    return checksum;
   }
 
   /**

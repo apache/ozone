@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.shell.keys;
 import java.io.IOException;
 import java.util.Iterator;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -28,18 +29,18 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.bucket.BucketHandler;
+import org.apache.hadoop.ozone.shell.snapshot.BucketSnapshotHandler;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * Executes List Keys.
+ * Executes List Keys for a bucket or snapshot.
  */
 @Command(name = "list",
     aliases = "ls",
-    description = "list all keys in a given bucket")
-public class ListKeyHandler extends BucketHandler {
+    description = "list all keys in a given bucket or snapshot")
+public class ListKeyHandler extends BucketSnapshotHandler {
 
   @CommandLine.Mixin
   private ListOptions listOptions;
@@ -50,11 +51,25 @@ public class ListKeyHandler extends BucketHandler {
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
+    String snapshotNameWithIndicator = address.getSnapshotNameWithIndicator();
+    String keyPrefix = "";
+
+    if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
+      keyPrefix += snapshotNameWithIndicator;
+
+      if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
+        keyPrefix += "/";
+      }
+    }
+
+    if (!Strings.isNullOrEmpty(listOptions.getPrefix())) {
+      keyPrefix += listOptions.getPrefix();
+    }
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(
-        listOptions.getPrefix(), listOptions.getStartItem());
+        keyPrefix, listOptions.getStartItem());
 
     int maxKeyLimit = listOptions.getLimit();
     int counter = printAsJsonArray(keyIterator, maxKeyLimit);
@@ -64,8 +79,18 @@ public class ListKeyHandler extends BucketHandler {
       out().println("Listing first " + maxKeyLimit + " entries of the " +
           "result. Use --length (-l) to override max returned keys.");
     } else if (isVerbose()) {
-      out().printf("Found : %d keys for bucket %s in volume : %s ",
-          counter, bucketName, volumeName);
+      if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
+        // snapshotValues[0] = ".snapshot"
+        // snapshotValues[1] = snapshot name
+        String[] snapshotValues = snapshotNameWithIndicator.split("/");
+
+        out().printf("Found : %d keys for snapshot %s " +
+                "under bucket %s in volume : %s ",
+            counter, snapshotValues[1], bucketName, volumeName);
+      } else {
+        out().printf("Found : %d keys for bucket %s in volume : %s ",
+            counter, bucketName, volumeName);
+      }
     }
   }
 

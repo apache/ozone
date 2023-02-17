@@ -217,7 +217,6 @@ public class TestFailureHandlingByClientFlushDelay {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 

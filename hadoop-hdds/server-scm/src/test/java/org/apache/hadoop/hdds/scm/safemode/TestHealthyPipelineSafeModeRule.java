@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +45,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.Assertions;
@@ -88,7 +88,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -143,7 +143,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -242,7 +242,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,

@@ -20,14 +20,21 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
@@ -39,7 +46,7 @@ import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes
  * Certificate client provides and interface to certificate operations that
  * needs to be performed by all clients in the Ozone eco-system.
  */
-public interface CertificateClient {
+public interface CertificateClient extends Closeable {
 
   /**
    * Returns the private key of the specified component if it exists on the
@@ -68,15 +75,32 @@ public interface CertificateClient {
       throws CertificateException;
 
   /**
-   * Returns the certificate  of the specified component if it exists on the
-   * local system.
+   * Returns the full certificate path of the specified component if it
+   * exists on the local system.
    *
    * @return certificate or Null if there is no data.
+   */
+  CertPath getCertPath();
+
+  /**
+   * Returns the certificate used by the specified component if it exists
+   * on the local system.
+   *
+   * @return the target certificate or null if there is no data.
    */
   X509Certificate getCertificate();
 
   /**
+   * Returns the full certificate path for the CA certificate known to the
+   * client.
+   *
+   * @return latest ca certificate path known to the client
+   */
+  CertPath getCACertPath();
+
+  /**
    * Return the latest CA certificate known to the client.
+   *
    * @return latest ca certificate known to the client.
    */
   X509Certificate getCACertificate();
@@ -87,6 +111,12 @@ public interface CertificateClient {
    * @return true if it trusted, false otherwise.
    */
   boolean verifyCertificate(X509Certificate certificate);
+
+  /**
+   * Set the serial ID of default certificate for the specified component.
+   * @param certSerialId - certificate ID.
+   * */
+  void setCertificateId(String certSerialId);
 
   /**
    * Creates digital signature over the data stream using the components private
@@ -130,7 +160,35 @@ public interface CertificateClient {
    *
    * @return CertificateSignRequest.Builder
    */
-  CertificateSignRequest.Builder getCSRBuilder() throws CertificateException;
+   CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+       throws IOException;
+
+  /**
+   * Returns a CSR builder that can be used to create a Certificate sigining
+   * request.
+   *
+   * @return CertificateSignRequest.Builder
+   */
+  CertificateSignRequest.Builder getCSRBuilder()
+      throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException;
+
+  /**
+   * Send request to SCM to sign the certificate and save certificates returned
+   * by SCM to PEM files on disk.
+   *
+   * @return the serial ID of the new certificate
+   */
+  String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException;
 
   /**
    * Get the certificate of well-known entity from SCM.
@@ -145,25 +203,21 @@ public interface CertificateClient {
    * Stores the Certificate  for this client. Don't use this api to add
    * trusted certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
+   * @param pemEncodedCert - pem encoded X509 Certificate
    * @throws CertificateException - on Error.
-   *
    */
-  void storeCertificate(String pemEncodedCert, boolean force)
+  void storeCertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**
    * Stores the Certificate  for this client. Don't use this api to add
    * trusted certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
-   * @param caCert                - Is CA certificate.
+   * @param pemEncodedCert - pem encoded X509 Certificate
+   * @param caType         - Is CA certificate.
    * @throws CertificateException - on Error.
-   *
    */
-  void storeCertificate(String pemEncodedCert, boolean force, boolean caCert)
+  void storeCertificate(String pemEncodedCert, CAType caType)
       throws CertificateException;
 
   /**
@@ -203,7 +257,8 @@ public interface CertificateClient {
     SUCCESS,
     FAILURE,
     GETCERT,
-    RECOVER
+    RECOVER,
+    REINIT
   }
 
   /**
@@ -232,11 +287,11 @@ public interface CertificateClient {
 
   /**
    * Store RootCA certificate.
+   *
    * @param pemEncodedCert
-   * @param force
    * @throws CertificateException
    */
-  void storeRootCACertificate(String pemEncodedCert, boolean force)
+  void storeRootCACertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**
@@ -313,4 +368,20 @@ public interface CertificateClient {
    */
   boolean processCrl(CRLInfo crl);
 
+  /**
+   * Return the store factory for key manager and trust manager for server.
+   */
+  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
+
+  /**
+   * Return the store factory for key manager and trust manager for client.
+   */
+  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+
+  /**
+   * Register a receiver that will be called after the certificate renewed.
+   *
+   * @param receiver
+   */
+  void registerNotificationReceiver(CertificateNotification receiver);
 }

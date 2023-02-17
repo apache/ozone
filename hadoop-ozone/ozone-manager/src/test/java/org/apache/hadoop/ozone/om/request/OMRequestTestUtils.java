@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
@@ -125,6 +127,18 @@ public final class OMRequestTestUtils {
             omMetadataManager.getBucketKey(volumeName, bucketName))) {
       addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
     }
+  }
+
+  public static void addVolumeAndBucketToDB(
+      String volumeName, OMMetadataManager omMetadataManager,
+      OmBucketInfo.Builder builder)
+      throws Exception {
+    if (!omMetadataManager.getVolumeTable().isExist(
+        omMetadataManager.getVolumeKey(volumeName))) {
+      addVolumeToDB(volumeName, omMetadataManager);
+    }
+
+    addBucketToDB(omMetadataManager, builder);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -337,6 +351,44 @@ public final class OMRequestTestUtils {
   }
 
   /**
+   * Add snapshot entry to DB.
+   */
+  public static void addSnapshotToTable(
+      String volumeName, String bucketName, String snapshotName,
+      OMMetadataManager omMetadataManager) throws IOException {
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
+        bucketName, snapshotName, UUID.randomUUID().toString());
+    addSnapshotToTable(false, 0L, snapshotInfo, omMetadataManager);
+  }
+
+  /**
+   * Add snapshot entry to snapshot table cache.
+   */
+  public static void addSnapshotToTableCache(
+      String volumeName, String bucketName, String snapshotName,
+      OMMetadataManager omMetadataManager) throws IOException {
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+        snapshotName, UUID.randomUUID().toString());
+    addSnapshotToTable(true, 0L, snapshotInfo, omMetadataManager);
+  }
+
+  /**
+   * Add snapshot entry to snapshotInfoTable. If addToCache flag set true,
+   * add it to cache table, else add it to DB.
+   */
+  public static void addSnapshotToTable(
+      Boolean addToCache, long txnID, SnapshotInfo snapshotInfo,
+      OMMetadataManager omMetadataManager) throws IOException {
+    String key = snapshotInfo.getTableKey();
+    if (addToCache) {
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+          new CacheKey<>(key),
+          new CacheValue<>(Optional.of(snapshotInfo), txnID));
+    }
+    omMetadataManager.getSnapshotInfoTable().put(key, snapshotInfo);
+  }
+
+  /**
    * Create OmKeyInfo.
    */
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
@@ -544,6 +596,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCreateBucketRequest(req)
+        .setVersion(ClientVersion.CURRENT_VERSION)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString()).build();
   }
@@ -566,6 +619,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCreateBucketRequest(req)
+            .setVersion(ClientVersion.CURRENT_VERSION)
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setClientId(UUID.randomUUID().toString()).build();
   }
@@ -1057,6 +1111,53 @@ public final class OMRequestTestUtils {
     return OMRequest.newBuilder()
         .setGetS3VolumeContextRequest(requestBuilder)
         .setCmdType(Type.GetS3VolumeContext)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  /**
+   * Create OMRequest for Create Snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
+   */
+  public static OMRequest createSnapshotRequest(String volumeName,
+                                                String bucketName,
+                                                String snapshotName) {
+    OzoneManagerProtocolProtos.CreateSnapshotRequest createSnapshotRequest =
+        OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotId(UUID.randomUUID().toString())
+            .setSnapshotName(snapshotName)
+            .build();
+
+    return OMRequest.newBuilder()
+        .setCreateSnapshotRequest(createSnapshotRequest)
+        .setCmdType(Type.CreateSnapshot)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  /**
+   * Create OMRequest for Delete Snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   */
+  public static OMRequest deleteSnapshotRequest(String volumeName,
+      String bucketName, String snapshotName) {
+    OzoneManagerProtocolProtos.DeleteSnapshotRequest deleteSnapshotRequest =
+        OzoneManagerProtocolProtos.DeleteSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotName(snapshotName)
+            .setDeletionTime(Time.now())
+            .build();
+
+    return OMRequest.newBuilder()
+        .setDeleteSnapshotRequest(deleteSnapshotRequest)
+        .setCmdType(Type.DeleteSnapshot)
         .setClientId(UUID.randomUUID().toString())
         .build();
   }

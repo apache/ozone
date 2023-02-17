@@ -388,17 +388,14 @@ public class TestOzoneShellHA {
 
   @Test
   public void testRATISTypeECReplication() {
-    for (ReplicationType type : new ReplicationType[]{
-        ReplicationType.RATIS, ReplicationType.STAND_ALONE}) {
-      String[] args = new String[]{"bucket", "create", "/vol/bucket",
-          "--type=" + type, "--replication=rs-3-2-1024k"};
-      Throwable t = assertThrows(ExecutionException.class,
-          () -> execute(ozoneShell, args));
-      Throwable c = t.getCause();
-      assertTrue(c instanceof IllegalArgumentException);
-      assertEquals("rs-3-2-1024k is not supported for " +
-              type + " replication type", c.getMessage());
-    }
+    String[] args = new String[]{"bucket", "create", "/vol/bucket",
+        "--type=" + ReplicationType.RATIS, "--replication=rs-3-2-1024k"};
+    Throwable t = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args));
+    Throwable c = t.getCause();
+    assertTrue(c instanceof IllegalArgumentException);
+    assertEquals("rs-3-2-1024k is not supported for " +
+            ReplicationType.RATIS + " replication type", c.getMessage());
   }
 
   /**
@@ -584,19 +581,23 @@ public class TestOzoneShellHA {
         getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
     FileSystem fs = FileSystem.get(clientConf);
-    final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    String ofsPrefix = hostPrefix + "/volumed2t/bucket1";
+    String dir1 = "/dir1";
+    final String strDir1 = ofsPrefix + dir1;
     // Note: CURRENT is also privately defined in TrashPolicyDefault
     final Path trashCurrent = new Path("Current");
 
     final String strKey1 = strDir1 + "/key1";
     final Path pathKey1 = new Path(strKey1);
-    final Path trashPathKey1 = Path.mergePaths(new Path(
-        new OFSPath(strKey1).getTrashRoot(), trashCurrent), pathKey1);
+    final Path trashPathKey1 = Path.mergePaths(
+        new Path(new OFSPath(strKey1, clientConf).getTrashRoot(),
+            trashCurrent), new Path(dir1, "key1"));
 
     final String strKey2 = strDir1 + "/key2";
     final Path pathKey2 = new Path(strKey2);
-    final Path trashPathKey2 = Path.mergePaths(new Path(
-        new OFSPath(strKey2).getTrashRoot(), trashCurrent), pathKey2);
+    final Path trashPathKey2 = Path.mergePaths(
+        new Path(new OFSPath(strKey2, clientConf).getTrashRoot(),
+            trashCurrent), new Path(dir1, "key2"));
 
     int res;
     try {
@@ -662,7 +663,8 @@ public class TestOzoneShellHA {
 
     // create volume: vol1 with bucket: bucket1
     final String testVolBucket = "/vol1/bucket1";
-    final String testKey = testVolBucket + "/key1";
+    String keyName = "/key1";
+    final String testKey = testVolBucket + keyName;
 
     final String[] volBucketArgs = new String[] {"-mkdir", "-p", testVolBucket};
     final String[] keyArgs = new String[] {"-touch", testKey};
@@ -692,8 +694,8 @@ public class TestOzoneShellHA {
     final String[] rmTrashArgs = new String[] {"-rm", "-R",
                                                testVolBucket + "/.Trash"};
     final Path trashPathKey1 = Path.mergePaths(new Path(
-            new OFSPath(testKey).getTrashRoot(), new Path("Current")),
-            new Path(testKey));
+            new OFSPath(testKey, clientConf).getTrashRoot(),
+            new Path("Current")), new Path(keyName));
     FileSystem fs = FileSystem.get(clientConf);
 
     try {
@@ -818,12 +820,22 @@ public class TestOzoneShellHA {
             .getQuotaInNamespace());
 
     // Test clrquota option.
+    args = new String[]{"volume", "clrquota", "vol4"};
+    executeWithError(ozoneShell, args, "At least one of the quota clear" +
+        " flag is required");
+    out.reset();
+    
     args = new String[]{"volume", "clrquota", "vol4", "--space-quota",
         "--namespace-quota"};
     execute(ozoneShell, args);
     assertEquals(-1, objectStore.getVolume("vol4").getQuotaInBytes());
     assertEquals(-1,
         objectStore.getVolume("vol4").getQuotaInNamespace());
+    out.reset();
+
+    args = new String[]{"bucket", "clrquota", "vol4/buck4"};
+    executeWithError(ozoneShell, args, "At least one of the quota clear" +
+        " flag is required");
     out.reset();
 
     args = new String[]{"bucket", "clrquota", "vol4/buck4",
@@ -850,23 +862,6 @@ public class TestOzoneShellHA {
         "Invalid values for namespace quota",
         () -> execute(ozoneShell, volumeArgs2));
     out.reset();
-
-    // Test set volume spaceQuota or nameSpaceQuota to normal value.
-    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
-        "--space-quota", "1000B"};
-    execute(ozoneShell, volumeArgs3);
-    out.reset();
-    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
-    assertEquals(-1,
-        objectStore.getVolume("vol4").getQuotaInNamespace());
-
-    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
-        "--namespace-quota", "100"};
-    execute(ozoneShell, volumeArgs4);
-    out.reset();
-    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
-    assertEquals(100,
-        objectStore.getVolume("vol4").getQuotaInNamespace());
 
     // Test set bucket quota to 0.
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -912,6 +907,35 @@ public class TestOzoneShellHA {
     assertEquals(100, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInNamespace());
 
+    // Test set volume quota without quota flag
+    String[] bucketArgs6 = new String[]{"bucket", "setquota", "vol4/buck4"};
+    executeWithError(ozoneShell, bucketArgs6,
+        "At least one of the quota set flag is required");
+    out.reset();
+
+    // Test set volume spaceQuota or nameSpaceQuota to normal value.
+    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "1000B"};
+    execute(ozoneShell, volumeArgs3);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(-1,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+
+    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota", "100"};
+    execute(ozoneShell, volumeArgs4);
+    out.reset();
+    assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
+    assertEquals(100,
+        objectStore.getVolume("vol4").getQuotaInNamespace());
+
+    // Test set volume quota without quota flag
+    String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4"};
+    executeWithError(ozoneShell, volumeArgs5,
+        "At least one of the quota set flag is required");
+    out.reset();
+    
     objectStore.getVolume("vol").deleteBucket("buck");
     objectStore.deleteVolume("vol");
     objectStore.getVolume("vol1").deleteBucket("buck1");
@@ -1009,7 +1033,7 @@ public class TestOzoneShellHA {
     }
 
     args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
-        "STAND_ALONE", "-r", "ONE"};
+        "RATIS", "-r", "THREE"};
     execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {

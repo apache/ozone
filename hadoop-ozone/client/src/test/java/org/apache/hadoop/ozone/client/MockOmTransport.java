@@ -18,10 +18,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -39,6 +36,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -129,6 +128,9 @@ public class MockOmTransport implements OmTransport {
     case AllocateBlock:
       return response(payload, r -> r.setAllocateBlockResponse(
           allocateBlock(payload.getAllocateBlockRequest())));
+    case GetKeyInfo:
+      return response(payload, r -> r.setGetKeyInfoResponse(
+          getKeyInfo(payload.getGetKeyInfoRequest())));
     default:
       throw new IllegalArgumentException(
           "Mock version of om call " + payload.getCmdType()
@@ -162,6 +164,15 @@ public class MockOmTransport implements OmTransport {
   private LookupKeyResponse lookupKey(LookupKeyRequest lookupKeyRequest) {
     final KeyArgs keyArgs = lookupKeyRequest.getKeyArgs();
     return LookupKeyResponse.newBuilder()
+        .setKeyInfo(
+            keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
+                .get(keyArgs.getKeyName()))
+        .build();
+  }
+
+  private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request) {
+    final KeyArgs keyArgs = request.getKeyArgs();
+    return GetKeyInfoResponse.newBuilder()
         .setKeyInfo(
             keys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
                 .get(keyArgs.getKeyName()))
@@ -271,20 +282,11 @@ public class MockOmTransport implements OmTransport {
     BucketInfo bucketInfo = buckets.get(infoBucketRequest.getVolumeName())
         .get(infoBucketRequest.getBucketName());
     if (!bucketInfo.hasDefaultReplicationConfig()) {
-      final ReplicationConfig replicationConfig = ReplicationConfig
-          .getDefault(new OzoneConfiguration());
-
-      bucketInfo = bucketInfo.toBuilder().setDefaultReplicationConfig(
-          new DefaultReplicationConfig(
-              ReplicationType.fromProto(replicationConfig.getReplicationType()),
-              replicationConfig
-                  .getReplicationType() != HddsProtos.ReplicationType.EC ?
-                  ReplicationFactor
-                      .valueOf(replicationConfig.getRequiredNodes()) :
-                  null, replicationConfig
-              .getReplicationType() == HddsProtos.ReplicationType.EC ?
-              (ECReplicationConfig) replicationConfig :
-              null).toProto()).build();
+      bucketInfo = bucketInfo.toBuilder()
+          .setDefaultReplicationConfig(new DefaultReplicationConfig(
+              ReplicationConfig.getDefault(new OzoneConfiguration())).toProto()
+          )
+          .build();
     }
     return InfoBucketResponse.newBuilder()
         .setBucketInfo(bucketInfo)

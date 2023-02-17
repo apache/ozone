@@ -152,12 +152,13 @@ public final class NSSummaryCLIUtils {
     }
   }
 
-  public static void printFSOReminder() {
+  public static void printBucketReminder() {
     printNewLines(1);
     System.out.println(
-        "[Warning] Namespace CLI is only designed for FSO mode.\n" +
-            "Bucket being accessed must be of type FILE_SYSTEM_OPTIMIZED" +
-            " bucket layout.");
+        "[Warning] Namespace CLI is not designed for OBS bucket layout.\n" +
+            "Bucket being accessed must be of type FILE_SYSTEM_OPTIMIZED " +
+            "bucket layout or \nLEGACY bucket layout with " +
+            "'ozone.om.enable.filesystem.paths' set to true.");
     printNewLines(1);
   }
 

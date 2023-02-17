@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -199,8 +198,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
               .getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -212,8 +213,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager, volumeId,
-              bucketId, trxnLogIndex, Optional.of(missingParentInfos),
-              Optional.absent());
+              bucketId, trxnLogIndex, missingParentInfos, null);
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.

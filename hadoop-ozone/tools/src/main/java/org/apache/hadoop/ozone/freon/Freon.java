@@ -52,6 +52,7 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
+        S3BucketGenerator.class,
         DatanodeChunkGenerator.class,
         DatanodeChunkValidator.class,
         DatanodeBlockPutter.class,
@@ -67,6 +68,9 @@ import picocli.CommandLine.Option;
         OmBucketReadWriteFileOps.class,
         OmBucketReadWriteKeyOps.class,
         OmRPCLoadGenerator.class,
+        OzoneClientKeyReadWriteOps.class,
+        RangeKeysGenerator.class,
+        DatanodeSimulator.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)

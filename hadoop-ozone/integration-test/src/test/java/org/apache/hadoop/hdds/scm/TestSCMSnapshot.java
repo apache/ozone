@@ -23,13 +23,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
@@ -43,7 +42,7 @@ public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
@@ -76,25 +75,22 @@ public class TestSCMSnapshot {
     long snapshotInfo2 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();
 
-    Assert.assertTrue(
-        String.format("Snapshot index 2 {} should greater than Snapshot " +
-            "index 1 {}", snapshotInfo2, snapshotInfo1),
-        snapshotInfo2 > snapshotInfo1);
+    Assertions.assertTrue(snapshotInfo2 > snapshotInfo1,
+        String.format("Snapshot index 2 %d should greater than Snapshot " +
+            "index 1 %d", snapshotInfo2, snapshotInfo1));
 
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo();
-    Assert.assertTrue(
+    Assertions.assertTrue(
         trxInfoAfterRestart.getTransactionIndex() >= snapshotInfo2);
-    try {
-      pipelineManager.getPipeline(ratisPipeline1.getId());
-      pipelineManager.getPipeline(ratisPipeline2.getId());
-    } catch (PipelineNotFoundException e) {
-      Assert.fail("Should not see a PipelineNotFoundException");
-    }
+    Assertions.assertDoesNotThrow(() ->
+        pipelineManager.getPipeline(ratisPipeline1.getId()));
+    Assertions.assertDoesNotThrow(() ->
+        pipelineManager.getPipeline(ratisPipeline2.getId()));
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws Exception {
     if (cluster != null) {
       cluster.shutdown();

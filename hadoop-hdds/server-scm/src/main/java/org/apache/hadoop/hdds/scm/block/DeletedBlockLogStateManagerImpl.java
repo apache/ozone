@@ -43,9 +43,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
-
 /**
  * {@link DeletedBlockLogStateManager} implementation
  * based on {@link DeletedBlocksTransaction}.
@@ -59,15 +56,12 @@ public class DeletedBlockLogStateManagerImpl
   private Table<Long, DeletedBlocksTransaction> deletedTable;
   private ContainerManager containerManager;
   private final DBTransactionBuffer transactionBuffer;
-  private final int maxRetry;
   private final Set<Long> deletingTxIDs;
   private final Set<Long> skippingRetryTxIDs;
 
   public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
              Table<Long, DeletedBlocksTransaction> deletedTable,
              ContainerManager containerManager, DBTransactionBuffer txBuffer) {
-    this.maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
-        OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
@@ -78,7 +72,7 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
-      DeletedBlocksTransaction>> getReadOnlyIterator() {
+      DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
     return new TableIterator<Long, TypedTable.KeyValue<Long,
         DeletedBlocksTransaction>>() {
 

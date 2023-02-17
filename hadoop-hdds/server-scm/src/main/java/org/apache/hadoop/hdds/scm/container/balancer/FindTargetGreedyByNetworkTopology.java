@@ -25,8 +25,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -75,4 +78,22 @@ public class FindTargetGreedyByNetworkTopology
         return compareByUsage(da, db);
       });
   }
+
+  /**
+   * Resets the collection of target datanode usage info that will be
+   * considered for balancing. Gets the latest usage info from node manager.
+   * @param targets collection of target {@link DatanodeDetails} that
+   *                containers can move to
+   */
+  @Override
+  public void resetPotentialTargets(
+      @NotNull Collection<DatanodeDetails> targets) {
+    // create DatanodeUsageInfo from DatanodeDetails
+    List<DatanodeUsageInfo> usageInfos = new ArrayList<>(targets.size());
+    targets.forEach(datanodeDetails -> usageInfos.add(
+        getNodeManager().getUsageInfo(datanodeDetails)));
+
+    super.resetTargets(usageInfos);
+  }
+
 }

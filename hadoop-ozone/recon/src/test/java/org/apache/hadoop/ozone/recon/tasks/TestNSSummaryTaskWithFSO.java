@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -50,6 +51,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 
 /**
  * Test for NSSummaryTaskWithFSO.
@@ -64,6 +66,8 @@ public final class TestNSSummaryTaskWithFSO {
   private static OMMetadataManager omMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+
+  private static OzoneConfiguration ozoneConfiguration;
 
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
@@ -117,6 +121,9 @@ public final class TestNSSummaryTaskWithFSO {
 
   @BeforeClass
   public static void setUp() throws Exception {
+    ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        10);
     omMetadataManager = initializeNewOmMetadataManager(
             TEMPORARY_FOLDER.newFolder());
     OzoneManagerServiceProvider ozoneManagerServiceProvider =
@@ -134,7 +141,6 @@ public final class TestNSSummaryTaskWithFSO {
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
-
     NSSummary nonExistentSummary =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
     Assert.assertNull(nonExistentSummary);
@@ -142,7 +148,8 @@ public final class TestNSSummaryTaskWithFSO {
     populateOMDB();
 
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration);
   }
 
   /**
@@ -165,7 +172,11 @@ public final class TestNSSummaryTaskWithFSO {
 
       // Verify commit
       Assert.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+
+      // reinit Recon RocksDB's namespace CF.
+      reconNamespaceSummaryManager.clearNSSummaryTable();
+
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
       Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
@@ -273,8 +284,8 @@ public final class TestNSSummaryTaskWithFSO {
     private static OMDBUpdateEvent keyEvent7;
     @BeforeClass
     public static void setUp() throws IOException {
-      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
-      nSSummaryTaskWithFso.process(processEventBatch());
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+      nSSummaryTaskWithFso.processWithFSO(processEventBatch());
     }
 
     private static OMUpdateEventBatch processEventBatch() throws IOException {

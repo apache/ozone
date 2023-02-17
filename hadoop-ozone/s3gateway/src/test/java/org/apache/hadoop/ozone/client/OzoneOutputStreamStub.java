@@ -41,7 +41,7 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
    * @param name - partName
    */
   public OzoneOutputStreamStub(OutputStream outputStream, String name) {
-    super(outputStream);
+    super(outputStream, null);
     this.partName = name;
   }
 

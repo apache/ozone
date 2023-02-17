@@ -210,7 +210,7 @@ public class BaseFreonGenerator {
   }
 
   private void shutdown() {
-    if (failureCounter.get() > 0 && !failAtEnd) {
+    if (failureCounter.get() > 0) {
       progressBar.terminate();
     } else {
       progressBar.shutdown();
