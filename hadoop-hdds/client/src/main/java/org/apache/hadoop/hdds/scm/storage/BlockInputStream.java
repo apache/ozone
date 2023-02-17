@@ -205,10 +205,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
     if (refreshPipelineFunction != null) {
       LOG.debug("Re-fetching pipeline for block {}", blockID);
       Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
-      if (newPipeline == null || newPipeline.sameDatanodes(pipeline)) {
+      if (newPipeline == null) {
         LOG.debug("No new pipeline for block {}", blockID);
       } else {
-        LOG.debug("New pipeline got for block {}", blockID);
+        LOG.debug("New pipeline for block {}: {}", blockID, newPipeline);
         this.pipeline = newPipeline;
       }
     } else {
