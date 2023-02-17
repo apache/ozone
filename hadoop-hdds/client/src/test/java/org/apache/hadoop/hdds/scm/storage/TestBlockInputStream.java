@@ -43,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.mockito.stubbing.OngoingStubbing;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -64,6 +66,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -291,23 +294,12 @@ public class TestBlockInputStream {
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
 
     final int len = 200;
-    final ChunkInputStream stream = mock(ChunkInputStream.class);
-    when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(ex)
-        .thenReturn(len);
-    when(stream.getRemaining())
-        .thenReturn((long) len);
+    final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
     when(refreshPipeline.apply(blockID))
         .thenReturn(newPipeline);
 
-    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
-        pipeline, null, false, null, refreshPipeline, chunks, null) {
-      @Override
-      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-        return stream;
-      }
-    };
+    BlockInputStream subject = createSubject(blockID, pipeline, stream);
     try {
       subject.initialize();
 
@@ -330,6 +322,66 @@ public class TestBlockInputStream {
         Arguments.of(new IOException("Some random exception."))
     );
   }
+
+  @ParameterizedTest
+  @MethodSource("exceptionsTriggersRefresh")
+  void onlyRetriesIfPipelineRefreshed(IOException ex)
+      throws Exception {
+    onlyRetriesIfPipelineRefreshed(ex, true);
+    onlyRetriesIfPipelineRefreshed(ex, false);
+  }
+
+  private void onlyRetriesIfPipelineRefreshed(IOException ex,
+      boolean samePipeline) throws Exception {
+    // GIVEN
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+
+    final int len = 200;
+    final ChunkInputStream stream = throwingChunkInputStream(ex, len, samePipeline);
+
+    when(refreshPipeline.apply(blockID))
+        .thenReturn(samePipeline ? pipeline : null);
+
+    try (BlockInputStream subject = createSubject(blockID, pipeline, stream)) {
+      subject.initialize();
+
+      // WHEN
+      Assertions.assertThrows(ex.getClass(),
+          () -> subject.read(new byte[len], 0, len));
+
+      // THEN
+      verify(refreshPipeline).apply(blockID);
+    } finally {
+      reset(refreshPipeline);
+    }
+  }
+
+  private static ChunkInputStream throwingChunkInputStream(IOException ex,
+      int len, boolean succeedOnRetry) throws IOException {
+    final ChunkInputStream stream = mock(ChunkInputStream.class);
+    OngoingStubbing<Integer> stubbing =
+        when(stream.read(any(), anyInt(), anyInt()))
+            .thenThrow(ex);
+    if (succeedOnRetry) {
+      stubbing.thenReturn(len);
+    }
+    when(stream.getRemaining())
+        .thenReturn((long) len);
+    return stream;
+  }
+
+  private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
+      ChunkInputStream stream) {
+    return new DummyBlockInputStream(blockID, blockSize, pipeline, null, false,
+        null, refreshPipeline, chunks, null) {
+      @Override
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        return stream;
+      }
+    };
+  }
+
   @ParameterizedTest
   @MethodSource("exceptionsNotTriggerRefresh")
   public void testReadNotRetriedOnOtherException(IOException ex)
@@ -338,32 +390,18 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
 
-    final int len = 200;
-    final ChunkInputStream stream = mock(ChunkInputStream.class);
-    when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(ex);
-    when(stream.getRemaining())
-        .thenReturn((long) len);
+    final int len = ThreadLocalRandom.current().nextInt(100, 300);
+    final ChunkInputStream stream = throwingChunkInputStream(ex, len, false);
 
-    BlockInputStream subject = new DummyBlockInputStream(blockID, blockSize,
-        pipeline, null, false, null, refreshPipeline, chunks, null) {
-      @Override
-      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-        return stream;
-      }
-    };
-
-    try {
+    try (BlockInputStream subject = createSubject(blockID, pipeline, stream)) {
       subject.initialize();
 
       // WHEN
-      byte[] b = new byte[len];
       Assertions.assertThrows(ex.getClass(),
-          () -> subject.read(b, 0, len));
+          () -> subject.read(new byte[len], 0, len));
+
       // THEN
       verify(refreshPipeline, never()).apply(blockID);
-    } finally {
-      subject.close();
     }
   }
 
@@ -387,12 +425,7 @@ public class TestBlockInputStream {
         .thenReturn(client);
 
     final int len = 200;
-    final ChunkInputStream stream = mock(ChunkInputStream.class);
-    when(stream.read(any(), anyInt(), anyInt()))
-        .thenThrow(ex)
-        .thenReturn(len);
-    when(stream.getRemaining())
-        .thenReturn((long) len);
+    final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
     when(refreshPipeline.apply(blockID))
         .thenReturn(newPipeline);
