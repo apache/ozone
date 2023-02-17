@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
@@ -33,6 +34,7 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
@@ -73,15 +75,32 @@ public interface CertificateClient extends Closeable {
       throws CertificateException;
 
   /**
-   * Returns the certificate  of the specified component if it exists on the
-   * local system.
+   * Returns the full certificate path of the specified component if it
+   * exists on the local system.
    *
    * @return certificate or Null if there is no data.
+   */
+  CertPath getCertPath();
+
+  /**
+   * Returns the certificate used by the specified component if it exists
+   * on the local system.
+   *
+   * @return the target certificate or null if there is no data.
    */
   X509Certificate getCertificate();
 
   /**
+   * Returns the full certificate path for the CA certificate known to the
+   * client.
+   *
+   * @return latest ca certificate path known to the client
+   */
+  CertPath getCACertPath();
+
+  /**
    * Return the latest CA certificate known to the client.
+   *
    * @return latest ca certificate known to the client.
    */
   X509Certificate getCACertificate();
@@ -184,25 +203,21 @@ public interface CertificateClient extends Closeable {
    * Stores the Certificate  for this client. Don't use this api to add
    * trusted certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
+   * @param pemEncodedCert - pem encoded X509 Certificate
    * @throws CertificateException - on Error.
-   *
    */
-  void storeCertificate(String pemEncodedCert, boolean force)
+  void storeCertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**
    * Stores the Certificate  for this client. Don't use this api to add
    * trusted certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
-   * @param caCert                - Is CA certificate.
+   * @param pemEncodedCert - pem encoded X509 Certificate
+   * @param caType         - Is CA certificate.
    * @throws CertificateException - on Error.
-   *
    */
-  void storeCertificate(String pemEncodedCert, boolean force, boolean caCert)
+  void storeCertificate(String pemEncodedCert, CAType caType)
       throws CertificateException;
 
   /**
@@ -272,11 +287,11 @@ public interface CertificateClient extends Closeable {
 
   /**
    * Store RootCA certificate.
+   *
    * @param pemEncodedCert
-   * @param force
    * @throws CertificateException
    */
-  void storeRootCACertificate(String pemEncodedCert, boolean force)
+  void storeRootCACertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**
@@ -365,6 +380,7 @@ public interface CertificateClient extends Closeable {
 
   /**
    * Register a receiver that will be called after the certificate renewed.
+   *
    * @param receiver
    */
   void registerNotificationReceiver(CertificateNotification receiver);

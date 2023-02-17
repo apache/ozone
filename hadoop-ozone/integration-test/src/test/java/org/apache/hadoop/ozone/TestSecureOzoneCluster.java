@@ -848,7 +848,8 @@ public final class TestSecureOzoneCluster {
       validateCertificate(certificate);
       String pemEncodedCACert =
           scm.getSecurityProtocolServer().getCACertificate();
-      X509Certificate caCert = CertificateCodec.getX509Cert(pemEncodedCACert);
+      X509Certificate caCert =
+          CertificateCodec.getX509Certificate(pemEncodedCACert);
       X509Certificate caCertStored = om.getCertificateClient()
           .getCertificate(caCert.getSerialNumber().toString());
       assertEquals(caCert, caCertStored);
@@ -1262,9 +1263,7 @@ public final class TestSecureOzoneCluster {
     assertTrue(cert.getIssuerDN().toString().contains(clusterId));
 
     // Verify that certificate matches the public key.
-    String encodedKey1 = cert.getPublicKey().toString();
-    String encodedKey2 = om.getCertificateClient().getPublicKey().toString();
-    assertEquals(encodedKey1, encodedKey2);
+    assertEquals(cert.getPublicKey(), om.getCertificateClient().getPublicKey());
   }
 
   private void initializeOmStorage(OMStorage omStorage) throws IOException {

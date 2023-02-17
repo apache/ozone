@@ -24,13 +24,16 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -53,6 +56,8 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -128,13 +133,16 @@ public class TestOzoneDelegationTokenSecretManager {
    * */
   private CertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    X509Certificate cert = KeyStoreTestUtil
+    CertificateFactory fact = CertificateCodec.getCertFactory();
+    X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    CertPath certPath = fact.engineGenerateCertPath(
+        ImmutableList.of(singleCert));
 
     return new OMCertificateClient(securityConfig) {
       @Override
-      public X509Certificate getCertificate() {
-        return cert;
+      public CertPath getCertPath() {
+        return certPath;
       }
 
       @Override
@@ -149,7 +157,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public X509Certificate getCertificate(String serialId) {
-        return cert;
+        return CertificateCodec.firstCertificateFrom(certPath);
       }
     };
   }
