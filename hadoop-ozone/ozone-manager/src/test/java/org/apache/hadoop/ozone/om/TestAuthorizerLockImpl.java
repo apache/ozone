@@ -174,10 +174,8 @@ public class TestAuthorizerLockImpl {
     // When a write lock is held, optimistic read should time out trying to get
     // a stamp.
     long writeStamp = authorizerLock.tryWriteLockThrowOnTimeout();
-    try {
-      authorizerLock.tryOptimisticReadThrowOnTimeout();
-      Assert.fail("Expected time out trying to get read stamp.");
-    } catch (IOException expected) { }
+    Assert.assertThrows(IOException.class,
+        authorizerLock::tryOptimisticReadThrowOnTimeout);
     authorizerLock.unlockWrite(writeStamp);
 
     // When a write lock is acquired after the optimistic read stamp, the read
