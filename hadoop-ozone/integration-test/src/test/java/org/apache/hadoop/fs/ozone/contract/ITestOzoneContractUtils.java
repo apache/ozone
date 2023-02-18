@@ -29,7 +29,7 @@ public final class ITestOzoneContractUtils {
 
   private ITestOzoneContractUtils() { }
 
-  private static List<Object> fsoCombinations = Arrays.asList(new Object[] {
+  private static final List<Boolean> fsoCombinations = Arrays.asList(
       // FSO configuration is a cluster level server side configuration.
       // If the cluster is configured with SIMPLE metadata layout,
       // non-FSO bucket will created.
@@ -45,9 +45,9 @@ public final class ITestOzoneContractUtils {
       // and new buckets will be operated on
       false // Server is configured with old layout (SIMPLE)
       // and old buckets will be operated on
-  });
+  );
 
-  static List<Object> getFsoCombinations() {
+  static List<Boolean> getFsoCombinations() {
     return fsoCombinations;
   }
 

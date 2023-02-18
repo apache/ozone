@@ -61,7 +61,7 @@ public class ITestOzoneContractCreate extends AbstractContractCreateTest {
   }
 
   @Parameterized.Parameters
-  public static Collection data() {
+  public static Collection<Boolean> data() {
     return ITestOzoneContractUtils.getFsoCombinations();
   }
 }
