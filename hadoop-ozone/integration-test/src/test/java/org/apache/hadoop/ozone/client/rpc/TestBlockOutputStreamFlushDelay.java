@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -115,6 +116,7 @@ public class TestBlockOutputStreamFlushDelay {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.close(null, client);
     if (cluster != null) {
       cluster.shutdown();
     }
