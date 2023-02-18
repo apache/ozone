@@ -85,8 +85,7 @@ class OzoneContract extends AbstractFSContract {
 
   @Override
   public Path getTestPath() {
-    Path path = new Path("/test");
-    return path;
+    return new Path("/test");
   }
 
   public static void initOzoneConfiguration(boolean fsoServer) {
