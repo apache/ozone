@@ -18,7 +18,7 @@
 
 package org.apache.ozone.lib.service.scheduler;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.lang.RunnableCallable;
 import org.apache.ozone.lib.server.BaseService;
 import org.apache.ozone.lib.server.Server;

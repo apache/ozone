@@ -17,7 +17,7 @@
  */
 package org.apache.ozone.lib.wsrs;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import java.util.ArrayList;
 import java.util.List;

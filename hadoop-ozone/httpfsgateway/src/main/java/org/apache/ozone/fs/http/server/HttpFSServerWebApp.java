@@ -18,13 +18,13 @@
 
 package org.apache.ozone.fs.http.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.ozone.fs.http.server.metrics.HttpFSServerMetrics;
 import org.apache.ozone.lib.server.ServerException;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.servlet.ServerWebApp;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.util.JvmPauseMonitor;
 

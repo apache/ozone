@@ -18,7 +18,7 @@
 
 package org.apache.ozone.lib.servlet;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.slf4j.MDC;
 
 import javax.servlet.Filter;

@@ -19,7 +19,7 @@
 package org.apache.ozone.fs.http.server;
 
 import com.sun.jersey.api.container.ContainerException;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.service.FileSystemAccessException;
 import org.apache.ozone.lib.wsrs.ExceptionProvider;
 import org.slf4j.Logger;

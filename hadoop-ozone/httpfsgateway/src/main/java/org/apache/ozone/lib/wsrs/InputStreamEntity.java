@@ -18,7 +18,7 @@
 
 package org.apache.ozone.lib.wsrs;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.fs.http.server.FSOperations;
 import org.apache.ozone.fs.http.server.HttpFSServerWebApp;
 import org.apache.ozone.fs.http.server.metrics.HttpFSServerMetrics;
