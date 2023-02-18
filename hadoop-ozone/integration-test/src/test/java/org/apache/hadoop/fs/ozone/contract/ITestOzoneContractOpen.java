@@ -61,6 +61,6 @@ public class ITestOzoneContractOpen extends AbstractContractOpenTest {
 
   @Parameterized.Parameters
   public static Collection<Boolean> data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
+    return OzoneContract.getFsoCombinations();
   }
 }

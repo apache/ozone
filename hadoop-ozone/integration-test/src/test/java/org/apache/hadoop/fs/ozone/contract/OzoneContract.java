@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,6 +46,23 @@ import org.junit.Assert;
  */
 class OzoneContract extends AbstractFSContract {
 
+  private static final List<Boolean> fsoCombinations = Arrays.asList(
+      // FSO configuration is a cluster level server side configuration.
+      // If the cluster is configured with SIMPLE metadata layout,
+      // non-FSO bucket will created.
+      // If the cluster is configured with PREFIX metadata layout,
+      // FSO bucket will be created.
+      // Presently, OzoneClient checks bucketMetadata then invokes FSO or
+      // non-FSO specific code and it makes no sense to add client side
+      // configs now. Once the specific client API to set FSO or non-FSO
+      // bucket is provided the contract test can be refactored to include
+      // another parameter (fsoClient) which sets/unsets the client side
+      // configs.
+      true, // Server is configured with new layout (PREFIX)
+      // and new buckets will be operated on
+      false // Server is configured with old layout (SIMPLE)
+      // and old buckets will be operated on
+  );
   private static MiniOzoneCluster cluster;
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
@@ -53,6 +72,10 @@ class OzoneContract extends AbstractFSContract {
     super(conf);
     //insert the base features
     addConfResource(CONTRACT_XML);
+  }
+
+  static List<Boolean> getFsoCombinations() {
+    return fsoCombinations;
   }
 
   @Override

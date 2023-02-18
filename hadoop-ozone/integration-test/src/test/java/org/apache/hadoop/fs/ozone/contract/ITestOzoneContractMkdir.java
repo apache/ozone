@@ -61,6 +61,6 @@ public class ITestOzoneContractMkdir extends AbstractContractMkdirTest {
 
   @Parameterized.Parameters
   public static Collection<Boolean> data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
+    return OzoneContract.getFsoCombinations();
   }
 }

@@ -62,7 +62,7 @@ public class ITestOzoneContractRootDir extends
 
   @Parameterized.Parameters
   public static Collection<Boolean> data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
+    return OzoneContract.getFsoCombinations();
   }
 
 }
