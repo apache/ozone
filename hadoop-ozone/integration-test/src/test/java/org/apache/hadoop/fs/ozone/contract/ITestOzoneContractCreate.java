@@ -35,19 +35,18 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public class ITestOzoneContractCreate extends AbstractContractCreateTest {
 
-  private static boolean fsOptimizedServer;
-
-  public ITestOzoneContractCreate(boolean fsoServer)
-      throws IOException {
-    if (fsOptimizedServer != fsoServer) {
-      setFsOptimizedServer(fsoServer);
-      ITestOzoneContractUtils.restartCluster(
-          fsOptimizedServer);
-    }
+  public ITestOzoneContractCreate(boolean fso) {
+    // Actual init done in initParam().
   }
 
-  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
-    ITestOzoneContractCreate.fsOptimizedServer = fsOptimizedServer;
+  @Parameterized.BeforeParam
+  public static void initParam(boolean fso) throws IOException {
+    OzoneContract.createCluster(fso);
+  }
+
+  @Parameterized.AfterParam
+  public static void teardownParam() throws IOException {
+    OzoneContract.destroyCluster();
   }
 
   @AfterClass
