@@ -115,16 +115,9 @@ class OzoneContract extends AbstractFSContract {
 
     conf.addResource(CONTRACT_XML);
 
-    if (fsOptimizedServer) {
-      // Default bucket layout is set to FSO in case of FSO server.
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
-    } else {
-      // Default bucket layout is set to LEGACY to support Hadoop compatible
-      // FS operations that are incompatible with OBS (default config value).
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          BucketLayout.LEGACY.name());
-    }
+    BucketLayout bucketLayout = fsOptimizedServer
+        ? BucketLayout.FILE_SYSTEM_OPTIMIZED : BucketLayout.LEGACY;
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
