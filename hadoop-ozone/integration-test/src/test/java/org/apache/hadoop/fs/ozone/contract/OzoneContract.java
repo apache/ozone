@@ -46,7 +46,7 @@ import org.junit.Assert;
  */
 class OzoneContract extends AbstractFSContract {
 
-  private static final List<Boolean> fsoCombinations = Arrays.asList(
+  private static final List<Boolean> FSO_COMBINATIONS = Arrays.asList(
       // FSO configuration is a cluster level server side configuration.
       // If the cluster is configured with SIMPLE metadata layout,
       // non-FSO bucket will created.
@@ -75,7 +75,7 @@ class OzoneContract extends AbstractFSContract {
   }
 
   static List<Boolean> getFsoCombinations() {
-    return fsoCombinations;
+    return FSO_COMBINATIONS;
   }
 
   @Override
