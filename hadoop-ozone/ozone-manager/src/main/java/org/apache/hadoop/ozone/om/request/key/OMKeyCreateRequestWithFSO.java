@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -201,7 +200,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
               volumeId, bucketId, trxnLogIndex,
-              Optional.of(missingParentInfos), Optional.absent());
+              missingParentInfos, null);
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.

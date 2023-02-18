@@ -552,4 +552,12 @@ public final class OzoneConsts {
    * tenant.
    */
   public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
+
+  public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
+  public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
+
+  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
 }

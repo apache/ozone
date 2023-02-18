@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.tenant;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -45,17 +46,20 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
 
   private String principal, accessId;
   private OmDBUserPrincipalInfo omDBUserPrincipalInfo;
+  private S3SecretManager s3SecretManager;
 
   @SuppressWarnings("checkstyle:parameternumber")
   public OMTenantRevokeUserAccessIdResponse(@Nonnull OMResponse omResponse,
       @Nonnull String accessId,
       @Nonnull String principal,
-      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo
+      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo,
+      @Nonnull S3SecretManager s3SecretManager
   ) {
     super(omResponse);
     this.principal = principal;
     this.accessId = accessId;
     this.omDBUserPrincipalInfo = omDBUserPrincipalInfo;
+    this.s3SecretManager = s3SecretManager;
   }
 
   /**
@@ -74,8 +78,11 @@ public class OMTenantRevokeUserAccessIdResponse extends OMClientResponse {
     assert (accessId != null);
     // TODO: redundant check? Is status always OK when addToDBBatch is called
     if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      omMetadataManager.getS3SecretTable().deleteWithBatch(batchOperation,
-          accessId);
+      if (s3SecretManager.isBatchSupported()) {
+        s3SecretManager.batcher().deleteWithBatch(batchOperation, accessId);
+      } else {
+        s3SecretManager.revokeSecret(accessId);
+      }
     }
 
     omMetadataManager.getTenantAccessIdTable().deleteWithBatch(

@@ -42,26 +42,25 @@ public class GrpcContainerUploader implements ContainerUploader {
 
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
-  private final CopyContainerCompression compression;
 
   public GrpcContainerUploader(
       ConfigurationSource conf, CertificateClient certClient) {
     this.certClient = certClient;
     securityConfig = new SecurityConfig(conf);
-    compression = CopyContainerCompression.getConf(conf);
   }
 
   @Override
   public OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback) throws IOException {
+      CompletableFuture<Void> callback, CopyContainerCompression compression)
+      throws IOException {
     GrpcReplicationClient client =
         new GrpcReplicationClient(target.getIpAddress(),
             target.getPort(Port.Name.REPLICATION).getValue(),
-            securityConfig, certClient, compression.toString());
+            securityConfig, certClient, compression);
     StreamObserver<SendContainerRequest> requestStream = client.upload(
         new SendContainerResponseStreamObserver(containerId, target, callback));
     return new SendContainerOutputStream(requestStream, containerId,
-        GrpcReplicationService.BUFFER_SIZE);
+        GrpcReplicationService.BUFFER_SIZE, compression);
   }
 
   /**

@@ -101,10 +101,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <failIfNoTests>false</failIfNoTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <jetty.version>9.4.49.v20220914</jetty.version>
-    <jetbrains.kotlin.version>1.6.21</jetbrains.kotlin.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
-    <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
-    <apache.curator>4.2.0</apache.curator>
+    <curator.version>4.2.0</curator.version>
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
 
@@ -179,7 +177,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <disruptor.version>3.4.2</disruptor.version>
     <reload4j.version>1.2.22</reload4j.version>
 
-    <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.6.21</kotlin.version>
     <metainf-services.version>1.8</metainf-services.version>
     <picocli.version>4.6.1</picocli.version>
@@ -201,15 +198,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jakarta.activation.version>1.2.2</jakarta.activation.version>
     <okhttp3.version>4.9.3</okhttp3.version>
     <stax2.version>4.2.1</stax2.version>
-    <nimbus.version>9.8.1</nimbus.version>
-    <checker.version>3.12.0</checker.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.annotation.version>1.3.5</jakarta.annotation.version>
     <joda.time.version>2.10.6</joda.time.version>
-    <commons.lang.version>2.6</commons.lang.version>
-    <zookeeper.version>3.5.6</zookeeper.version>
-    <snappy.java.version>1.1.8.2</snappy.java.version>
-      
+
     <compile-testing.version>0.19</compile-testing.version>
     <errorprone-annotations.version>2.2.0</errorprone-annotations.version>
     <guava.version>31.1-jre</guava.version>
@@ -269,7 +261,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-source-plugin.version>2.3</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.2</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.5</maven-remote-resources-plugin.version>
-    <maven-enforcer-plugin.version>3.0.0-M1</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.2.1</maven-enforcer-plugin.version>
     <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.4.2</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.12</apache-rat-plugin.version>
@@ -299,6 +291,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
+    <awaitility.version>4.2.0</awaitility.version>
   </properties>
 
 
@@ -756,6 +749,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore</artifactId>
+        <version>${httpcore.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore-nio</artifactId>
         <version>${httpcore.version}</version>
       </dependency>
       <dependency>
@@ -1335,6 +1333,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${dropwizard-metrics.version}</version>
       </dependency>
       <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${io.grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
         <groupId>io.jaegertracing</groupId>
         <artifactId>jaeger-client</artifactId>
         <version>${jaeger.version}</version>
@@ -1425,11 +1430,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
 
       <dependency>
-        <groupId>org.apache.kerby</groupId>
-        <artifactId>kerb-simplekdc</artifactId>
-        <version>${kerby.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
         <version>${snakeyaml.version}</version>
@@ -1479,6 +1479,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${sqlite.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.awaitility</groupId>
+        <artifactId>awaitility</artifactId>
+        <version>${awaitility.version}</version>
+      </dependency>
+      <dependency>
         <groupId>jakarta.activation</groupId>
         <artifactId>jakarta.activation-api</artifactId>
         <version>${jakarta.activation.version}</version>
@@ -1492,16 +1497,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.codehaus.woodstox</groupId>
         <artifactId>stax2-api</artifactId>
         <version>${stax2.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.nimbusds</groupId>
-        <artifactId>nimbus-jose-jwt</artifactId>
-        <version>${nimbus.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.checkerframework</groupId>
-        <artifactId>checker-qual</artifactId>
-        <version>${checker.version}</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
@@ -1529,44 +1524,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${joda.time.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-mapper-asl</artifactId>
-        <version>${codehaus.jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-core-asl</artifactId>
-        <version>${codehaus.jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-jaxrs</artifactId>
-        <version>${codehaus.jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>${commons.lang.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.zookeeper</groupId>
-        <artifactId>zookeeper</artifactId>
-        <version>${zookeeper.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-framework</artifactId>
-        <version>${apache.curator}</version>
+        <version>${curator.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-client</artifactId>
-        <version>${apache.curator}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.xerial.snappy</groupId>
-        <artifactId>snappy-java</artifactId>
-        <version>${snappy.java.version}</version>
+        <version>${curator.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -1785,6 +1750,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <allowedImport>org.rocksdb.StatsLevel</allowedImport>
                       <allowedImport>org.rocksdb.TransactionLogIterator.BatchResult</allowedImport>
                       <allowedImport>org.rocksdb.TickerType</allowedImport>
+                      <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
 
                       <!-- Allow RocksObjects whose native pointer is managed by RocksDB. -->
                       <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>

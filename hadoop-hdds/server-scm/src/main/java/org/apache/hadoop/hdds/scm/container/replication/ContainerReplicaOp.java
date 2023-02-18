@@ -34,7 +34,7 @@ public class ContainerReplicaOp {
   private PendingOpType opType;
   private DatanodeDetails target;
   private int replicaIndex;
-  private long scheduledEpochMillis;
+  private long deadlineEpochMillis;
 
   public static ContainerReplicaOp create(PendingOpType opType,
       DatanodeDetails target, int replicaIndex) {
@@ -43,11 +43,11 @@ public class ContainerReplicaOp {
   }
 
   public ContainerReplicaOp(PendingOpType opType,
-      DatanodeDetails target, int replicaIndex, long scheduledTime) {
+      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
     this.opType = opType;
     this.target = target;
     this.replicaIndex = replicaIndex;
-    this.scheduledEpochMillis = scheduledTime;
+    this.deadlineEpochMillis = deadlineEpochMillis;
   }
 
   public PendingOpType getOpType() {
@@ -62,8 +62,8 @@ public class ContainerReplicaOp {
     return replicaIndex;
   }
 
-  public long getScheduledEpochMillis() {
-    return scheduledEpochMillis;
+  public long getDeadlineEpochMillis() {
+    return deadlineEpochMillis;
   }
 
 }

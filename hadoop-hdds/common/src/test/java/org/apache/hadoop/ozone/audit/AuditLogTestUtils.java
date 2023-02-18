@@ -17,14 +17,15 @@
  */
 package org.apache.hadoop.ozone.audit;
 
-import java.io.BufferedReader;
+import org.apache.commons.io.FileUtils;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.concurrent.TimeoutException;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 
 /**
  * Utility class to read audit logs.
@@ -47,33 +48,34 @@ public final class AuditLogTestUtils {
    * Searches for the given action in the audit log file.
    */
   public static void verifyAuditLog(AuditAction action,
-                                    AuditEventStatus eventStatus) {
-    Path file = Paths.get(AUDITLOG_FILENAME);
-    try (BufferedReader br = Files.newBufferedReader(file,
-            StandardCharsets.UTF_8)) {
-      String line;
-      while ((line = br.readLine()) != null) {
-        if (line.contains(action.getAction()) &&
-                line.contains(eventStatus.getStatus())) {
-          return;
-        }
-      }
-    } catch (Exception e) {
-      throw new AssertionError(e);
-    } finally {
-      truncateAuditLogFile();
-    }
-    throw new AssertionError("Audit log file doesn't contain " +
-            "the message with params  event=" + action.getAction() +
-            " result=" + eventStatus.getStatus());
+      AuditEventStatus eventStatus)
+      throws InterruptedException, TimeoutException {
+    waitFor(
+        () -> auditLogContains(action.getAction(), eventStatus.getStatus()),
+        1000, 10000);
   }
 
-  private static void truncateAuditLogFile() {
-    File auditLogFile = new File(AUDITLOG_FILENAME);
+  public static boolean auditLogContains(String... strings) {
+    File file = new File(AUDITLOG_FILENAME);
     try {
-      new FileOutputStream(auditLogFile).getChannel().truncate(0).close();
+      String contents = FileUtils.readFileToString(file, UTF_8);
+      for (String s : strings) {
+        if (!contents.contains(s)) {
+          return false;
+        }
+      }
+      return true;
     } catch (IOException e) {
-      System.out.println("Failed to truncate file: " + AUDITLOG_FILENAME);
+      return false;
     }
+  }
+
+  public static void truncateAuditLogFile() throws IOException {
+    File auditLogFile = new File(AUDITLOG_FILENAME);
+    new FileOutputStream(auditLogFile).getChannel().truncate(0).close();
+  }
+
+  public static void deleteAuditLogFile() {
+    FileUtils.deleteQuietly(new File(AUDITLOG_FILENAME));
   }
 }

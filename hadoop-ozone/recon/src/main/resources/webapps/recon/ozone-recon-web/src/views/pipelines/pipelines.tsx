@@ -111,7 +111,15 @@ const COLUMNS = [
     dataIndex: 'datanodes',
     key: 'datanodes',
     isSearchable: true,
-    render: (datanodes: string[]) => <div>{datanodes.map(datanode => <div key={datanode}>{datanode}</div>)}</div>
+    render: (datanodes: string[]) => <div> {datanodes && datanodes.map(datanode =>
+      <div key={datanode.hostName}>
+        <div className='uuidtooltip'>
+          <Tooltip placement='top' title={`UUID: ${datanode && datanode.uuid}`} getPopupContainer={(triggerNode) => triggerNode}>
+            {datanode && datanode.hostName}
+          </Tooltip>
+        </div>
+      </div>)}
+    </div>
   },
   {
     title: 'Leader',

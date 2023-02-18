@@ -226,7 +226,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
           .build();
     }
     acquireClient();
-    boolean success = false;
     List<ChunkInfo> chunks;
     try {
       if (LOG.isDebugEnabled()) {
@@ -247,18 +246,17 @@ public class BlockInputStream extends BlockExtendedInputStream {
           .getBlock(xceiverClient, blkIDBuilder.build(), token);
 
       chunks = response.getBlockData().getChunksList();
-      success = true;
     } finally {
-      if (!success) {
-        xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
-      }
+      releaseClient();
     }
 
     return chunks;
   }
 
   protected void acquireClient() throws IOException {
-    xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+    if (xceiverClientFactory != null && xceiverClient == null) {
+      xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+    }
   }
 
   /**
@@ -448,7 +446,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClient(xceiverClient, false);
+      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       xceiverClient = null;
     }
   }

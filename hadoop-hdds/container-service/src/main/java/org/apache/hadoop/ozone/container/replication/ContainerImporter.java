@@ -54,17 +54,15 @@ public class ContainerImporter {
   private static final String CONTAINER_COPY_TMP_DIR = "tmp";
   private final ContainerSet containerSet;
   private final ContainerController controller;
-  private final TarContainerPacker packer;
   private final MutableVolumeSet volumeSet;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long containerSize;
 
   public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
-      ContainerController controller, TarContainerPacker tarContainerPacker,
+      ContainerController controller,
       MutableVolumeSet volumeSet) {
     this.containerSet = containerSet;
     this.controller = controller;
-    this.packer = tarContainerPacker;
     this.volumeSet = volumeSet;
     try {
       volumeChoosingPolicy = conf.getClass(
@@ -79,7 +77,8 @@ public class ContainerImporter {
   }
 
   public void importContainer(long containerID, Path tarFilePath,
-      HddsVolume hddsVolume) throws IOException {
+      HddsVolume hddsVolume, CopyContainerCompression compression)
+      throws IOException {
 
     HddsVolume targetVolume = hddsVolume;
     if (targetVolume == null) {
@@ -87,6 +86,8 @@ public class ContainerImporter {
     }
     try {
       KeyValueContainerData containerData;
+
+      TarContainerPacker packer = new TarContainerPacker(compression);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
         byte[] containerDescriptorYaml =

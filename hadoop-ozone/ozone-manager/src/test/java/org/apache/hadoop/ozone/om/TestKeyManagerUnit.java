@@ -125,7 +125,7 @@ public class TestKeyManagerUnit {
     metadataManager = omTestManagers.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
-    startDate = Instant.now();
+    startDate = Instant.ofEpochMilli(Time.now());
   }
 
   @After

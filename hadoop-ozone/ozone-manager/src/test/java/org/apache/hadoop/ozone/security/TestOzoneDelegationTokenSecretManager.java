@@ -24,19 +24,24 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretCache;
+import org.apache.hadoop.ozone.om.S3SecretLockedManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -51,6 +56,8 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -64,6 +71,9 @@ import org.mockito.Mockito;
  */
 public class TestOzoneDelegationTokenSecretManager {
 
+  private static final long TOKEN_MAX_LIFETIME = 1000 * 20;
+  private static final long TOKEN_REMOVER_SCAN_INTERVAL = 1000 * 20;
+
   private OzoneManager om;
   private OzoneDelegationTokenSecretManager secretManager;
   private SecurityConfig securityConfig;
@@ -72,10 +82,7 @@ public class TestOzoneDelegationTokenSecretManager {
   private Text serviceRpcAdd;
   private OzoneConfiguration conf;
   private static final Text TEST_USER = new Text("testUser");
-  private long tokenMaxLifetime = 1000 * 20;
-  private long tokenRemoverScanInterval = 1000 * 20;
   private S3SecretManager s3SecretManager;
-  private String s3Secret = "dbaksbzljandlkandlsd";
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -88,28 +95,19 @@ public class TestOzoneDelegationTokenSecretManager {
     certificateClient.init();
     expiryTime = Time.monotonicNow() + 60 * 60 * 24;
     serviceRpcAdd = new Text("localhost");
-    final Map<String, String> s3Secrets = new HashMap<>();
-    s3Secrets.put("testuser1", s3Secret);
-    s3Secrets.put("abc", "djakjahkd");
+    final Map<String, S3SecretValue> s3Secrets = new HashMap<>();
+    s3Secrets.put("testuser1",
+        new S3SecretValue("testuser1", "dbaksbzljandlkandlsd"));
+    s3Secrets.put("abc",
+        new S3SecretValue("abc", "djakjahkd"));
     om = Mockito.mock(OzoneManager.class);
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf);
-    s3SecretManager = new S3SecretManagerImpl(conf, metadataManager) {
-      @Override
-      public S3SecretValue getS3Secret(String kerberosID) {
-        if (s3Secrets.containsKey(kerberosID)) {
-          return new S3SecretValue(kerberosID, s3Secrets.get(kerberosID));
-        }
-        return null;
-      }
-
-      @Override
-      public String getS3UserSecretString(String awsAccessKey) {
-        if (s3Secrets.containsKey(awsAccessKey)) {
-          return s3Secrets.get(awsAccessKey);
-        }
-        return null;
-      }
-    };
+    Mockito.when(om.getMetadataManager()).thenReturn(metadataManager);
+    s3SecretManager = new S3SecretLockedManager(
+        new S3SecretManagerImpl(new S3SecretStoreMap(s3Secrets),
+            Mockito.mock(S3SecretCache.class)),
+        metadataManager.getLock()
+    );
   }
 
   private OzoneConfiguration createNewTestPath() throws IOException {
@@ -135,13 +133,16 @@ public class TestOzoneDelegationTokenSecretManager {
    * */
   private CertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    X509Certificate cert = KeyStoreTestUtil
+    CertificateFactory fact = CertificateCodec.getCertFactory();
+    X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    CertPath certPath = fact.engineGenerateCertPath(
+        ImmutableList.of(singleCert));
 
     return new OMCertificateClient(securityConfig) {
       @Override
-      public X509Certificate getCertificate() {
-        return cert;
+      public CertPath getCertPath() {
+        return certPath;
       }
 
       @Override
@@ -156,7 +157,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public X509Certificate getCertificate(String serialId) {
-        return cert;
+        return CertificateCodec.firstCertificateFrom(certPath);
       }
     };
   }
@@ -168,8 +169,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testLeadershipCheckinRetrievePassword() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     Mockito.doThrow(new OMNotLeaderException("Not leader"))
         .when(om).checkLeaderStatus();
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
@@ -201,8 +202,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testCreateToken() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
@@ -219,14 +220,14 @@ public class TestOzoneDelegationTokenSecretManager {
   private void restartSecretManager() throws IOException {
     secretManager.stop();
     secretManager = null;
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
   }
 
   private void testRenewTokenSuccessHelper(boolean restartSecretManager)
       throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
@@ -256,8 +257,8 @@ public class TestOzoneDelegationTokenSecretManager {
    */
   @Test
   public void testRenewTokenFailure() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
@@ -273,7 +274,7 @@ public class TestOzoneDelegationTokenSecretManager {
   @Test
   public void testRenewTokenFailureMaxTime() throws Exception {
     secretManager = createSecretManager(conf, 100,
-        100, tokenRemoverScanInterval);
+        100, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
@@ -291,7 +292,7 @@ public class TestOzoneDelegationTokenSecretManager {
   @Test
   public void testRenewTokenFailureRenewalTime() throws Exception {
     secretManager = createSecretManager(conf, 1000 * 10,
-        10, tokenRemoverScanInterval);
+        10, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
@@ -304,8 +305,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testCreateIdentifier() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     OzoneTokenIdentifier identifier = secretManager.createIdentifier();
     // Check basic details.
@@ -316,8 +317,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testCancelTokenSuccess() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
@@ -326,8 +327,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testCancelTokenFailure() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
@@ -340,8 +341,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testVerifySignatureSuccess() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     id.setOmCertSerialId(certificateClient.getCertificate()
@@ -354,8 +355,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testVerifySignatureFailure() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     // set invalid om cert serial id
@@ -367,8 +368,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testValidateS3AUTHINFOSuccess() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
 
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
@@ -386,8 +387,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testValidateS3AUTHINFOFailure() throws Exception {
-    secretManager = createSecretManager(conf, tokenMaxLifetime,
-        expiryTime, tokenRemoverScanInterval);
+    secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+        expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);
 
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();

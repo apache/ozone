@@ -180,6 +180,8 @@ public class TestBlockDeletion {
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(DeleteBlocksCommandHandler.LOG);
 
     String value = RandomStringUtils.random(1024 * 1024);
     store.createVolume(volumeName);
@@ -284,6 +286,12 @@ public class TestBlockDeletion {
         metrics.getNumBlockDeletionTransactionFailure() +
             metrics.getNumBlockDeletionTransactionSuccess());
     LOG.info(metrics.toString());
+
+    // Datanode should receive retried requests with continuous retry counts.
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(0)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(1)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(2)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(3)"));
   }
 
   @Test
