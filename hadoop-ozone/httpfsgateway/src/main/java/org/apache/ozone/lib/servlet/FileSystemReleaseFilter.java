@@ -18,8 +18,8 @@
 
 package org.apache.ozone.lib.servlet;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.service.FileSystemAccess;
 
 import javax.servlet.Filter;

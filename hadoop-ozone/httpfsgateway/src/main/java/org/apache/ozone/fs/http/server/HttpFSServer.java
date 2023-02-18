@@ -18,7 +18,6 @@
 
 package org.apache.ozone.fs.http.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.XAttrCodec;
@@ -54,6 +53,7 @@ import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrNameParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrSetFlagParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrValueParam;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.http.JettyUtils;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.service.FileSystemAccessException;

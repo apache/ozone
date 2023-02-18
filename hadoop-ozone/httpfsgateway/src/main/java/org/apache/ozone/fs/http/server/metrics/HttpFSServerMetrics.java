@@ -19,8 +19,8 @@ package org.apache.ozone.fs.http.server.metrics;
 
 import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;

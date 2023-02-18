@@ -18,7 +18,7 @@
 
 package org.apache.ozone.lib.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
  * Service interface for components to be managed by the {@link Server} class.

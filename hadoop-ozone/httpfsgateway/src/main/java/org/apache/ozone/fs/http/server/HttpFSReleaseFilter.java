@@ -18,7 +18,7 @@
 
 package org.apache.ozone.fs.http.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.servlet.FileSystemReleaseFilter;
 

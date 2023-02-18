@@ -17,8 +17,8 @@
  */
 package org.apache.ozone.fs.http.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.hdfs.web.WebHdfsConstants;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.util.RandomSignerSecretProvider;

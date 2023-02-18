@@ -27,8 +27,8 @@ import java.net.URL;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
