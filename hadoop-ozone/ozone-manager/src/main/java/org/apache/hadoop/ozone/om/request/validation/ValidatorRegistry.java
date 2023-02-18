@@ -98,11 +98,10 @@ public class ValidatorRegistry {
       return Collections.emptyList();
     }
 
-    Set<Method> returnValue =
-        new HashSet<>(validationsFor(conditions.get(0), requestType, phase));
+    Set<Method> returnValue = new HashSet<>();
 
-    for (int i = 1; i < conditions.size(); i++) {
-      returnValue.addAll(validationsFor(conditions.get(i), requestType, phase));
+    for (ValidationCondition condition: conditions) {
+      returnValue.addAll(validationsFor(condition, requestType, phase));
     }
     return new ArrayList<>(returnValue);
   }

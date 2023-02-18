@@ -29,13 +29,18 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
@@ -176,6 +181,25 @@ public class HddsVolume extends StorageVolume {
       volumeInfoMetrics.unregister();
     }
     closeDbStore();
+  }
+
+  @Override
+  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    VolumeCheckResult result = super.check(unused);
+    if (!isDbLoaded()) {
+      return result;
+    }
+    DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
+    if (result != VolumeCheckResult.HEALTHY ||
+        !df.getContainerSchemaV3Enabled() || !df.autoCompactionSmallSstFile()) {
+      return result;
+    }
+    // Calculate number of files per level and size per level
+    RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
+        new File(dbParentDir, CONTAINER_DB_NAME).getAbsolutePath(), getConf());
+    rawDB.getStore().compactionIfNeeded();
+
+    return VolumeCheckResult.HEALTHY;
   }
 
   /**

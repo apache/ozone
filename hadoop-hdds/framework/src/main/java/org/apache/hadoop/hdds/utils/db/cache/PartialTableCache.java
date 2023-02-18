@@ -54,6 +54,7 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   private final Map<CACHEKEY, CACHEVALUE> cache;
   private final NavigableMap<Long, Set<CACHEKEY>> epochEntries;
   private ExecutorService executorService;
+  private final CacheStatsRecorder statsRecorder;
 
 
   public PartialTableCache() {
@@ -78,11 +79,15 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("PartialTableCache Cleanup Thread - %d").build();
     executorService = Executors.newSingleThreadExecutor(build);
+
+    statsRecorder = new CacheStatsRecorder();
   }
 
   @Override
   public CACHEVALUE get(CACHEKEY cachekey) {
-    return cache.get(cachekey);
+    CACHEVALUE value = cache.get(cachekey);
+    statsRecorder.recordValue(value);
+    return value;
   }
 
   @Override
@@ -109,6 +114,7 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
 
   @Override
   public Iterator<Map.Entry<CACHEKEY, CACHEVALUE>> iterator() {
+    statsRecorder.recordIteration();
     return cache.entrySet().iterator();
   }
 
@@ -155,6 +161,7 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
 
     CACHEVALUE cachevalue = cache.get(cachekey);
+    statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
       return new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST,
             null);
@@ -174,4 +181,8 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     return epochEntries;
   }
 
+  @Override
+  public CacheStats getStats() {
+    return statsRecorder.snapshot();
+  }
 }

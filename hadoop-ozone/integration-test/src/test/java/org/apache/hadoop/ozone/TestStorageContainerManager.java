@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -30,7 +31,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -41,6 +44,8 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -52,10 +57,17 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.server.ContainerReportQueue;
 import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -106,6 +118,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -247,7 +261,7 @@ public class TestStorageContainerManager {
 
   private void verifyPermissionDeniedException(Exception e, String userName) {
     String expectedErrorMessage = "Access denied for user "
-        + userName + ". " + "Superuser privilege is required.";
+        + userName + ". " + "SCM superuser privilege is required.";
     Assert.assertTrue(e instanceof IOException);
     Assert.assertEquals(expectedErrorMessage, e.getMessage());
   }
@@ -828,6 +842,147 @@ public class TestStorageContainerManager {
     } finally {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void testContainerReportQueueWithDrop() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+        queues = new ArrayList<>();
+    for (int i = 0; i < 1; ++i) {
+      queues.add(new ContainerReportQueue());
+    }
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .build();
+    ContainerReportFromDatanode dndata
+        = new ContainerReportFromDatanode(dn, report);
+    ContainerReportHandler containerReportHandler =
+        Mockito.mock(ContainerReportHandler.class);
+    Mockito.doAnswer((inv) -> {
+      Thread.currentThread().sleep(500);
+      return null;
+    }).when(containerReportHandler).onMessage(dndata, eventQueue);
+    List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
+        .initializeExecutorPool(queues);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
+    EventExecutor<ContainerReportFromDatanode>
+        containerReportExecutors =
+        new FixedThreadPoolWithAffinityExecutor<>(
+            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+                containerReportHandler),
+            containerReportHandler, queues, eventQueue,
+            ContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
+    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
+        containerReportHandler);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
+    Assert.assertTrue(containerReportExecutors.droppedEvents() > 1);
+    Thread.currentThread().sleep(1000);
+    Assert.assertEquals(containerReportExecutors.droppedEvents()
+            + containerReportExecutors.scheduledEvents(),
+        containerReportExecutors.queuedEvents());
+    containerReportExecutors.close();
+  }
+
+  @Test
+  public void testContainerReportQueueTakingMoreTime() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+        queues = new ArrayList<>();
+    for (int i = 0; i < 1; ++i) {
+      queues.add(new ContainerReportQueue());
+    }
+
+    ContainerReportHandler containerReportHandler =
+        Mockito.mock(ContainerReportHandler.class);
+    Mockito.doAnswer((inv) -> {
+      Thread.currentThread().sleep(1000);
+      return null;
+    }).when(containerReportHandler).onMessage(Mockito.any(),
+        Mockito.eq(eventQueue));
+    List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
+        .initializeExecutorPool(queues);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
+    FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
+        SCMDatanodeHeartbeatDispatcher.ContainerReport>
+        containerReportExecutors =
+        new FixedThreadPoolWithAffinityExecutor<>(
+            EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
+                containerReportHandler),
+            containerReportHandler, queues, eventQueue,
+            ContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
+    containerReportExecutors.setQueueWaitThreshold(1000);
+    containerReportExecutors.setExecWaitThreshold(1000);
+    
+    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
+        containerReportHandler);
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .build();
+    ContainerReportFromDatanode dndata1
+        = new ContainerReportFromDatanode(dn, report);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
+    dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .build();
+    ContainerReportFromDatanode dndata2
+        = new ContainerReportFromDatanode(dn, report);
+    eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata2);
+    Thread.currentThread().sleep(3000);
+    Assert.assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
+    Assert.assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
+    containerReportExecutors.close();
+  }
+
+  @Test
+  public void testIncrementalContainerReportQueue() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
+        queues = new ArrayList<>();
+    for (int i = 0; i < 1; ++i) {
+      queues.add(new ContainerReportQueue());
+    }
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        .build();
+    IncrementalContainerReportProto report
+        = IncrementalContainerReportProto.getDefaultInstance();
+    IncrementalContainerReportFromDatanode dndata
+        = new IncrementalContainerReportFromDatanode(dn, report);
+    IncrementalContainerReportHandler icr =
+        mock(IncrementalContainerReportHandler.class);
+    Mockito.doAnswer((inv) -> {
+      Thread.currentThread().sleep(500);
+      return null;
+    }).when(icr).onMessage(dndata, eventQueue);
+    List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
+        .initializeExecutorPool(queues);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
+    EventExecutor<IncrementalContainerReportFromDatanode>
+        containerReportExecutors =
+        new FixedThreadPoolWithAffinityExecutor<>(
+            EventQueue.getExecutorName(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
+                icr),
+            icr, queues, eventQueue,
+            IncrementalContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
+    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
+        containerReportExecutors, icr);
+    eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
+    eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
+    eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
+    eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
+    Assert.assertTrue(containerReportExecutors.droppedEvents() == 0);
+    Thread.currentThread().sleep(3000);
+    Assert.assertEquals(containerReportExecutors.scheduledEvents(),
+        containerReportExecutors.queuedEvents());
+    containerReportExecutors.close();
   }
 
   private void addTransactions(StorageContainerManager scm,

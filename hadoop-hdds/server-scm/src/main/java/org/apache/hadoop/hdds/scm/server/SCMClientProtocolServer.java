@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfigurat
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
@@ -763,9 +762,9 @@ public class SCMClientProtocolServer implements
         // In case, there is no ratis, there is no ratis role.
         // This will just print the hostname with ratis port as the default
         // behaviour.
-        String adddress = scm.getSCMHANodeDetails().getLocalNodeDetails()
+        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
             .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(adddress));
+        builder.setRatisPeerRoles(Arrays.asList(address));
       }
       return builder.build();
     } catch (Exception ex) {
@@ -1048,18 +1047,8 @@ public class SCMClientProtocolServer implements
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
       DatanodeDetails node, int clientVersion) {
-    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
-
-    long capacity = stat.getCapacity().get();
-    long used = stat.getScmUsed().get();
-    long remaining = stat.getRemaining().get();
-
-    return HddsProtos.DatanodeUsageInfoProto.newBuilder()
-        .setCapacity(capacity)
-        .setUsed(used)
-        .setRemaining(remaining)
-        .setNode(node.toProto(clientVersion))
-        .build();
+    DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
+    return usageInfo.toProto(clientVersion);
   }
 
   /**
@@ -1121,6 +1110,20 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     return scm.getContainerManager().getContainers().size();
+  }
+
+  @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(state).size();
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(
+        ContainerID.valueOf(startContainerID), count, state);
   }
 
   /**

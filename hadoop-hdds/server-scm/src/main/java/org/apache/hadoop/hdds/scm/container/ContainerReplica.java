@@ -163,6 +163,18 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return new ContainerReplicaBuilder();
   }
 
+  public ContainerReplicaBuilder toBuilder() {
+    return newBuilder()
+        .setBytesUsed(bytesUsed)
+        .setContainerID(containerID)
+        .setContainerState(state)
+        .setDatanodeDetails(datanodeDetails)
+        .setKeyCount(keyCount)
+        .setOriginNodeId(placeOfBirth)
+        .setReplicaIndex(replicaIndex)
+        .setSequenceId(sequenceId);
+  }
+
   @Override
   public String toString() {
     return "ContainerReplica{" +

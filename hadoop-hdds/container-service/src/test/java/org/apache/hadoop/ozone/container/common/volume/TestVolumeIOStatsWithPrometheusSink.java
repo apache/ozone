@@ -42,7 +42,7 @@ public class TestVolumeIOStatsWithPrometheusSink {
   public void init() {
     metrics = DefaultMetricsSystem.instance();
     metrics.init("test");
-    sink = new PrometheusMetricsSink();
+    sink = new PrometheusMetricsSink("random");
     metrics.register("Prometheus", "Prometheus", sink);
   }
 

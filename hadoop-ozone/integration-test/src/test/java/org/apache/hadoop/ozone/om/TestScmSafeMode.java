@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -316,8 +315,6 @@ public class TestScmSafeMode {
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());
     final List<ContainerInfo> containers = scm.getContainerManager()
         .getContainers();
-    scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SCMSafeModeManager.SafeModeStatus(true, true));
     GenericTestUtils.waitFor(() -> {
       return clientProtocolServer.getSafeModeStatus();
     }, 50, 1000 * 30);
