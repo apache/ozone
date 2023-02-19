@@ -1191,6 +1191,10 @@ public class KeyManagerImpl implements KeyManager {
       if (keyValue != null && keyValue.getKey().startsWith(targetKey) &&
           !Objects.equals(keyValue.getKey(), targetKey)) {
         fakeDirKeyInfo = createDirectoryKey(keyValue.getValue(), dirKey);
+        LOG.debug("Returning fake dir {} for {} -> {}",
+            dirKey, targetKey, keyValue.getKey());
+      } else {
+        LOG.debug("No fake dir {} needed for {}", dirKey, targetKey);
       }
     }
 
