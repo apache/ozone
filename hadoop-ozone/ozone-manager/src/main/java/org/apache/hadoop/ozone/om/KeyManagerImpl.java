@@ -1176,7 +1176,6 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
       String keyName, BucketLayout layout) throws IOException {
-    OmKeyInfo fakeDirKeyInfo = null;
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     String targetKey = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volume, bucket, keyName));
