@@ -1188,7 +1188,8 @@ public class KeyManagerImpl implements KeyManager {
       // past the target, we should check the full dbKeyName.
       // For example, seeking "/vol1/bucket1/dir2/" may return a key
       // in different volume/bucket, such as "/vol1/bucket2/dir2/key2".
-      if (keyValue != null && keyValue.getKey().startsWith(targetKey)) {
+      if (keyValue != null && keyValue.getKey().startsWith(targetKey) &&
+          !Objects.equals(keyValue.getKey(), targetKey)) {
         fakeDirKeyInfo = createDirectoryKey(keyValue.getValue(), dirKey);
       }
     }
