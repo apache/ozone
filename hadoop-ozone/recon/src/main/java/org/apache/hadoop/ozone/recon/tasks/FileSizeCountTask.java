@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -123,77 +122,50 @@ public class FileSizeCountTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ?> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
       if (!taskTables.contains(omdbUpdateEvent.getTable())) {
         continue;
       }
-      OMDBUpdateEvent.OMDBUpdateAction event = omdbUpdateEvent.getAction();
       String updatedKey = omdbUpdateEvent.getKey();
-      Object omKeyInfo = omdbUpdateEvent.getValue();
-      Object oldOmKeyInfo = omdbUpdateEvent.getOldValue();
+      Object value = omdbUpdateEvent.getValue();
 
-      List<OmKeyInfo> omKeyInfoList, oldOmKeyInfoList;
-      if (omKeyInfo instanceof RepeatedOmKeyInfo) {
-        // Handle RepeatedOmKeyInfo object
-        RepeatedOmKeyInfo repeatedKeyInfo = (RepeatedOmKeyInfo) omKeyInfo;
-        RepeatedOmKeyInfo repeatedOldKeyInfo = (RepeatedOmKeyInfo) oldOmKeyInfo;
-        omKeyInfoList = repeatedKeyInfo.getOmKeyInfoList();
-        oldOmKeyInfoList = repeatedOldKeyInfo.getOmKeyInfoList();
-        int size = Math.min(omKeyInfoList.size(), oldOmKeyInfoList.size());
-        for (int i = 0; i < size; i++) {
-          OmKeyInfo keyInfo = omKeyInfoList.get(i);
-          OmKeyInfo oldKeyInfo = oldOmKeyInfoList.get(i);
-          if (!processEvent(updatedKey, keyInfo, oldKeyInfo, event,
-              fileSizeCountMap)) {
-            return new ImmutablePair<>(getTaskName(), false);
+      if (value instanceof OmKeyInfo) {
+        OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+
+        try {
+          switch (omdbUpdateEvent.getAction()) {
+          case PUT:
+            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            break;
+
+          case DELETE:
+            handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
+            break;
+
+          case UPDATE:
+            handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue(),
+                fileSizeCountMap);
+            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            break;
+
+          default:
+            LOG.trace("Skipping DB update event : {}",
+                omdbUpdateEvent.getAction());
           }
-        }
-      } else {
-        // Handle OmKeyInfo object
-        OmKeyInfo keyInfo = (OmKeyInfo) omKeyInfo;
-        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldOmKeyInfo;
-        if (!processEvent(updatedKey, keyInfo, oldKeyInfo, event,
-            fileSizeCountMap)) {
+        } catch (Exception e) {
+          LOG.error("Unexpected exception while processing key {}.",
+              updatedKey, e);
           return new ImmutablePair<>(getTaskName(), false);
         }
+      } else {
+        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+            value.getClass().getName(), updatedKey);
       }
     }
     writeCountsToDB(false, fileSizeCountMap);
     LOG.info("Completed a 'process' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
-  }
-
-  public boolean processEvent(String updatedKey, OmKeyInfo keyInfo,
-                              OmKeyInfo oldKeyInfo,
-                              OMDBUpdateEvent.OMDBUpdateAction event,
-                              Map<FileSizeCountKey, Long> fileSizeCountMap) {
-    try {
-      switch (event) {
-      case PUT:
-        handlePutKeyEvent(keyInfo, fileSizeCountMap);
-        break;
-
-      case DELETE:
-        handleDeleteKeyEvent(updatedKey, keyInfo, fileSizeCountMap);
-        break;
-
-      case UPDATE:
-        handleDeleteKeyEvent(updatedKey, oldKeyInfo,
-            fileSizeCountMap);
-        handlePutKeyEvent(keyInfo, fileSizeCountMap);
-        break;
-
-      default:
-        LOG.trace("Skipping DB update event : {}",
-            event);
-      }
-    } catch (Exception e) {
-      LOG.error("Unexpected exception while processing key {}.",
-          updatedKey, e);
-      return false;
-    }
-    return true;
   }
 
   /**
