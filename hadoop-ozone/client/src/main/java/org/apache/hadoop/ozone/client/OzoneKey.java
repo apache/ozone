@@ -65,7 +65,7 @@ public class OzoneKey {
   /**
    * Indicator if key is a file.
    */
-  private final boolean file;
+  private final boolean isFile;
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -101,7 +101,7 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean file) {
+      boolean isFile) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -109,7 +109,7 @@ public class OzoneKey {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
-    this.file = file;
+    this.isFile = isFile;
   }
 
   @SuppressWarnings("parameternumber")
@@ -125,9 +125,9 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      Map<String, String> metadata, boolean file) {
+      Map<String, String> metadata, boolean isFile) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, file);
+        modificationTime, replicationConfig, isFile);
     this.metadata.putAll(metadata);
   }
 
@@ -221,7 +221,7 @@ public class OzoneKey {
    * @return file
    */
   public boolean isFile() {
-    return file;
+    return isFile;
   }
 
   public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
