@@ -802,6 +802,11 @@ public class MockNodeManager implements NodeManager {
     return nodeInfo;
   }
 
+  @Override
+  public Map<String, List<String>> getNodeStatusInfo() {
+    return null;
+  }
+
   /**
    * Makes it easy to add a container.
    *

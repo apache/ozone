@@ -28,25 +28,54 @@
     </tbody>
 </table>
 
-<h2>Node counts</h2>
-
-<table class="table table-bordered table-striped" class="col-md-6">
+<h2>Node Status</h2>
+<div class="row">
+    <div class="col-md-6 text-left">
+        <label>Show: </label>
+        <select class="form-select" ng-model="RecordsToDisplay" ng-change="UpdateRecordsToShow()">
+            <option value="2" ng-selected="{true}">2</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="All">All</option>
+        </select>
+    </div>
+    <div class="col-md-6 text-right">
+        <label>Search: </label> <input type="text" ng-model="search">
+    </div>
+</div>
+<table class="table table-bordered table-striped col-md-6">
     <thead>
-    <tr>
-        <th class="col-md-3"></th>
-        <th>HEALTHY</th>
-        <th>STALE</th>
-        <th>DEAD</th>
-        <th>HEALTHY_READONLY</th>
-    </tr>
+        <tr>
+            <th ng-click = "columnSort('hostname')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">HostName</th>
+            <th ng-click = "columnSort('opstate')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">Operational State</th>
+            <th ng-click = "columnSort('comstate')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">Commisioned State</th>
+        </tr>
     </thead>
     <tbody>
-    <tr ng-repeat="nodeOpState in $ctrl.nodemanagermetrics.NodeCount | orderBy:'key':false:$ctrl.nodeOpStateOrder">
-        <td>{{nodeOpState.key}}</td>
-        <td ng-repeat="nodeState in nodeOpState.value | orderBy:'key':false:$ctrl.nodeStateOrder">{{nodeState.value}}</td>
-    </tr>
+        <tr ng-repeat="typestat in nodeStatus|filter:search|orderBy:columnName:reverse">
+            <td>{{typestat.hostname}}</td>
+            <td>{{typestat.opstate}}</td>
+            <td>{{typestat.comstate}}</td>
+        </tr>
     </tbody>
 </table>
+<div>
+    <nav aria-label="...">
+        <ul class="pagination">
+            <li class="page-item" ng-class="{disabled:currentPage==1}"
+                ng-click="handlePagination(currentPage-1,(currentPage==1))">
+                <span class="page-link" tabindex="-1">Previous</span>
+            </li>
+            <li class="page-item active">
+                <span class="page-link">{{currentPage}} </span>
+            </li>
+            <li class="page-item" ng-class="{disabled:lastIndex==currentPage}"
+                ng-click="handlePagination(currentPage+1, (lastIndex==currentPage))">
+                <span class="page-link" tabindex="-1">Next</span>
+            </li>
+        </ul>
+    </nav>
+</div>
 
 <h2>Status</h2>
 <table class="table table-bordered table-striped" class="col-md-6">
