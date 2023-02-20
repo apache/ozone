@@ -146,6 +146,7 @@ public class TestObjectStoreWithLegacyFS {
       Table<String, OmKeyInfo> keyTable,
       String dbKey, int expectedCnt, String keyName) {
     int countKeys = 0;
+    int matchingKeys = 0;
     try {
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           itr = keyTable.iterator();
@@ -157,16 +158,20 @@ public class TestObjectStoreWithLegacyFS {
           break;
         }
         countKeys++;
-        Assert.assertTrue(keyValue.getKey().endsWith(keyName));
+        matchingKeys += keyValue.getKey().endsWith(keyName) ? 1 : 0;
       }
     } catch (IOException ex) {
       LOG.info("Test failed with: " + ex.getMessage(), ex);
       Assert.fail("Test failed with: " + ex.getMessage());
     }
-    if (countKeys != expectedCnt) {
+    if (countKeys > expectedCnt) {
+      Assert.fail("Test failed with: too many keys found, expected "
+          + expectedCnt + " keys, found " + countKeys + " keys");
+    }
+    if (matchingKeys != expectedCnt) {
       LOG.info("Couldn't find KeyName:{} in KeyTable, retrying...", keyName);
     }
-    return countKeys == expectedCnt;
+    return countKeys == expectedCnt && matchingKeys == expectedCnt;
   }
 
   @Test
