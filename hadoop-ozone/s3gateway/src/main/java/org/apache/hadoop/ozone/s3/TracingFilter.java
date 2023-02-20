@@ -61,8 +61,8 @@ public class TracingFilter implements ContainerRequestFilter,
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
-    // HDDS-7064: Span of GET request with StreamingOutput response should
-    // only be closed once the StreamingOutput callback has completely
+    // HDDS-7064: Operation performed while writing StreamingOutput response
+    // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
     if (!responseContext.hasEntity() ||
         !(responseContext.getEntity() instanceof StreamingOutput)) {
