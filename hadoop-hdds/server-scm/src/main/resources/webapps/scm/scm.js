@@ -29,7 +29,7 @@
             $scope.reverse = true;
             $scope.columnName = "";
             let nodeStatusCopy = [];
-            $scope.RecordsToDisplay = "2";
+            $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
 
