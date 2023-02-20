@@ -23,6 +23,7 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.ext.Provider;
 
 import io.opentracing.Scope;
@@ -60,19 +61,24 @@ public class TracingFilter implements ContainerRequestFilter,
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
-    Scope scope = (Scope)requestContext.getProperty(TRACING_SCOPE);
-    if (scope != null) {
-      scope.close();
+    // HDDS-7064: Span of GET request with StreamingOutput response should
+    // only be closed once the StreamingOutput callback has completely
+    // written the data to the destination
+    if (!responseContext.hasEntity() ||
+        !(responseContext.getEntity() instanceof StreamingOutput)) {
+      Scope scope = (Scope) requestContext.getProperty(TRACING_SCOPE);
+      if (scope != null) {
+        scope.close();
+      }
+      Span span = (Span) requestContext.getProperty(TRACING_SPAN);
+      if (span != null) {
+        span.finish();
+      }
+      finishAndCloseActiveSpan();
     }
-    Span span = (Span) requestContext.getProperty(TRACING_SPAN);
-    if (span != null) {
-      span.finish();
-    }
-
-    finishAndCloseActiveSpan();
   }
 
-  private void finishAndCloseActiveSpan() {
+  public static void finishAndCloseActiveSpan() {
     ScopeManager scopeManager = GlobalTracer.get().scopeManager();
     if (scopeManager != null && scopeManager.activeSpan() != null) {
       scopeManager.activeSpan().finish();

@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.TracingFilter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -341,6 +342,8 @@ public class ObjectEndpoint extends EndpointBase {
         StreamingOutput output = dest -> {
           try (OzoneInputStream key = keyDetails.getContent()) {
             IOUtils.copy(key, dest);
+          } finally {
+            TracingFilter.finishAndCloseActiveSpan();
           }
         };
         responseBuilder = Response
@@ -359,6 +362,8 @@ public class ObjectEndpoint extends EndpointBase {
             ozoneInputStream.seek(startOffset);
             IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
+          } finally {
+            TracingFilter.finishAndCloseActiveSpan();
           }
         };
         responseBuilder = Response
