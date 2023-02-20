@@ -23,13 +23,16 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
-import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.ext.Provider;
 
 import io.opentracing.Scope;
 import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+
+import java.io.FilterOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * Filter used to add jaeger tracing span.
@@ -61,24 +64,36 @@ public class TracingFilter implements ContainerRequestFilter,
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
+    final Scope scope = (Scope) requestContext.getProperty(TRACING_SCOPE);
+    final Span span = (Span) requestContext.getProperty(TRACING_SPAN);
     // HDDS-7064: Operation performed while writing StreamingOutput response
     // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
-    if (!responseContext.hasEntity() ||
-        !(responseContext.getEntity() instanceof StreamingOutput)) {
-      Scope scope = (Scope) requestContext.getProperty(TRACING_SCOPE);
-      if (scope != null) {
-        scope.close();
-      }
-      Span span = (Span) requestContext.getProperty(TRACING_SPAN);
-      if (span != null) {
-        span.finish();
-      }
-      finishAndCloseActiveSpan();
+    OutputStream out = responseContext.getEntityStream();
+    if (out != null) {
+      responseContext.setEntityStream(new FilterOutputStream(out) {
+        @Override
+        public void close() throws IOException {
+          super.close();
+          finishAndClose(scope, span);
+        }
+      });
+    } else {
+      finishAndClose(scope, span);
     }
   }
 
-  public static void finishAndCloseActiveSpan() {
+  private static void finishAndClose(Scope scope, Span span) {
+    if (scope != null) {
+      scope.close();
+    }
+    if (span != null) {
+      span.finish();
+    }
+    finishAndCloseActiveSpan();
+  }
+
+  private static void finishAndCloseActiveSpan() {
     ScopeManager scopeManager = GlobalTracer.get().scopeManager();
     if (scopeManager != null && scopeManager.activeSpan() != null) {
       scopeManager.activeSpan().finish();
