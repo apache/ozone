@@ -254,7 +254,6 @@ public class TestObjectGet {
                 objectEndpoint.get(bucketName, keyPath, null, 1000, "1", null));
 
     // THEN
-    System.out.println("hello");
     Assertions.assertEquals("NoSuchKey", ex.getCode());
     Assertions.assertEquals("The specified key does not exist",
         ex.getErrorMessage());

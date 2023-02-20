@@ -126,12 +126,14 @@ public class TestObjectHead {
     // WHEN
     when(ozoneClient.getProxy()).thenReturn(clientProtocol);
     when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneKey.isFile()).thenReturn(false);
+    when(ozoneKey.getModificationTime())
+        .thenReturn(Instant.ofEpochMilli(System.currentTimeMillis()));
+    when(ozoneKey.isFile()).thenReturn(true);
 
     final Response response = objectEndpoint.head(bucketName, keyPath);
 
     // THEN
-    Assertions.assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
+    Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
   }
 
   @Test
@@ -150,14 +152,12 @@ public class TestObjectHead {
     // WHEN
     when(ozoneClient.getProxy()).thenReturn(clientProtocol);
     when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneKey.isFile()).thenReturn(true);
-    when(ozoneKey.getModificationTime())
-        .thenReturn(Instant.ofEpochMilli(System.currentTimeMillis()));
+    when(ozoneKey.isFile()).thenReturn(false);
 
     final Response response = objectEndpoint.head(bucketName, keyPath);
 
     // THEN
-    Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    Assertions.assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
   }
 
   @Test
