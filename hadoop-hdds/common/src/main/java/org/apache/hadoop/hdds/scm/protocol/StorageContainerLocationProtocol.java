@@ -309,6 +309,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
   ScmInfo getScmInfo() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param newLeaderId  the newLeaderId of the target expected leader
+   * @throws IOException
+   */
+  void transferLeadership(String newLeaderId) throws IOException;
+
+  /**
    * Reset the expired deleted block retry count.
    *
    * @param txIDs transactionId list to be reset

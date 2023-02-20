@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -49,6 +50,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -76,6 +80,9 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.thirdparty.com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -778,6 +785,47 @@ public class SCMClientProtocolServer implements
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
+      }
+    }
+  }
+
+  @Override
+  public void transferLeadership(String newLeaderId)
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
+      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
+    }
+    boolean auditSuccess = true;
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("newLeaderId", newLeaderId);
+    try {
+      SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
+      RaftGroup group = scmRatisServer.getDivision().getGroup();
+      RaftPeerId targetPeerId;
+      if (newLeaderId.isEmpty()) {
+        RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager()
+            .getRatisServer()).getLeader();
+        targetPeerId = group.getPeers()
+            .stream()
+            .filter(a -> !a.equals(curLeader)).findFirst()
+            .map(RaftPeer::getId)
+            .orElseThrow(() -> new IOException("Cannot" +
+                " find a new leader to transfer leadership."));
+      } else {
+        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+      }
+      RatisHelper.transferRatisLeadership(scm.getConfiguration(), group,
+          targetPeerId);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.TRANSFER_LEADERSHIP, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            SCMAction.TRANSFER_LEADERSHIP, auditMap));
       }
     }
   }
