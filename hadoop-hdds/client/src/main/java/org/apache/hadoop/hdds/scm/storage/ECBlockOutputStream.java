@@ -117,7 +117,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
         continue;
       }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.get(0).hasStripeChecksum()) {
+      if (chunks != null && chunks.size() > 0 && chunks.get(0)
+          .hasStripeChecksum()) {
         checksumBlockData = bd;
         break;
       }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -29,13 +30,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.AfterClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.Timeout;
-
-import java.util.concurrent.ThreadLocalRandom;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
@@ -46,39 +44,32 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Ozone file system tests with Streaming.
  */
+@Timeout(value = 300)
 public class TestOzoneFileSystemWithStreaming {
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
 
-  private final OzoneConfiguration conf = new OzoneConfiguration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
-  {
-    try {
-      init();
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
-  }
-
-  private void init() throws Exception {
+  @BeforeAll
+  public static void init() throws Exception {
     final int chunkSize = 16 << 10;
     final int flushSize = 2 * chunkSize;
     final int maxFlushSize = 2 * flushSize;
     final int blockSize = 2 * maxFlushSize;
     final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-    conf.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
-    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    CONF.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
+    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
         .setBlockSize(blockSize)
@@ -96,7 +87,7 @@ public class TestOzoneFileSystemWithStreaming {
     bucket = TestDataUtil.createVolumeAndBucket(cluster, layout);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -108,11 +99,11 @@ public class TestOzoneFileSystemWithStreaming {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final Path file = new Path("/file");
 
-    try (FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(CONF)) {
       runTestCreateFile(fs, file);
     }
   }
@@ -121,14 +112,14 @@ public class TestOzoneFileSystemWithStreaming {
   public void testOfsCreateFile() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
     final Path file = new Path(dir, "file");
 
-    try (FileSystem fs = FileSystem.get(conf)) {
+    try (FileSystem fs = FileSystem.get(CONF)) {
       runTestCreateFile(fs, file);
     }
   }
@@ -148,11 +139,11 @@ public class TestOzoneFileSystemWithStreaming {
           break;
         }
         for (int i = 0; i < n; i++) {
-          Assertions.assertEquals(bytes[offset + i], buffer[i]);
+          assertEquals(bytes[offset + i], buffer[i]);
         }
         offset += n;
       }
     }
-    Assertions.assertEquals(bytes.length, offset);
+    assertEquals(bytes.length, offset);
   }
 }

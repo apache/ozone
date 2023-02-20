@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.security;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -45,13 +46,16 @@ public class OMSetSecretResponse extends OMClientResponse {
 
   private String accessId;
   private S3SecretValue s3SecretValue;
+  private S3SecretManager secretManager;
 
   public OMSetSecretResponse(@Nullable String accessId,
                              @Nullable S3SecretValue s3SecretValue,
+                             @Nonnull S3SecretManager secretManager,
                              @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.accessId = accessId;
     this.s3SecretValue = s3SecretValue;
+    this.secretManager = secretManager;
   }
 
   /**
@@ -72,8 +76,12 @@ public class OMSetSecretResponse extends OMClientResponse {
 
     if (s3SecretValue != null) {
       LOG.debug("Updating TenantAccessIdTable");
-      omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
-          accessId, s3SecretValue);
+      if (secretManager.isBatchSupported()) {
+        secretManager.batcher().addWithBatch(batchOperation,
+            accessId, s3SecretValue);
+      } else {
+        secretManager.storeSecret(accessId, s3SecretValue);
+      }
     }
   }
 }

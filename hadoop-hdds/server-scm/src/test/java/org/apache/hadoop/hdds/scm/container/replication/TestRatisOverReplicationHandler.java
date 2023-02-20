@@ -145,6 +145,15 @@ public class TestRatisOverReplicationHandler {
         RATIS_REPLICATION_CONFIG);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0, 0, 0);
+    /*
+     Even an unhealthy replica shouldn't be deleted if it has a unique
+     origin. It might be possible to close this replica in the future.
+     */
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0,
+            HddsProtos.NodeOperationalState.IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
@@ -258,7 +267,7 @@ public class TestRatisOverReplicationHandler {
    *                          handler
    * @param expectNumCommands number of commands expected to be created by
    *                          the handler
-   * @return map of commands
+   * @return set of commands
    */
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> testProcessing(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,

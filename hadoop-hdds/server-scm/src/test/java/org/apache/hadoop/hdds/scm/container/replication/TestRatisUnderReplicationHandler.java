@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -49,6 +50,7 @@ import java.util.Set;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 
 /**
@@ -198,6 +200,44 @@ public class TestRatisUnderReplicationHandler {
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
   }
 
+  @Test
+  public void testUnhealthyReplicasAreReplicatedWhenHealthyAreUnavailable()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
+        1);
+  }
+
+  @Test
+  public void onlyHealthyReplicasShouldBeReplicatedWhenAvailable()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0);
+    ContainerReplica closedReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.CLOSED);
+    replicas.add(closedReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 1);
+    Assert.assertEquals(1, commands.size());
+    // only 1 command is present, get it and cast it to
+    // ReplicateContainerCommandProto
+    ReplicateContainerCommandProto command =
+        (ReplicateContainerCommandProto) commands.stream().findFirst().get()
+            .getValue().getProto();
+
+    // assert that the only source DN is the DN that hosts closedReplica
+    Assert.assertEquals(1, command.getSourcesCount());
+    Assert.assertEquals(closedReplica.getDatanodeDetails().getUuidString(),
+        command.getSources(0).getUuid());
+  }
+
   /**
    * Tests whether the specified expectNumCommands number of commands are
    * created by the handler.
@@ -211,7 +251,7 @@ public class TestRatisUnderReplicationHandler {
    * @param expectNumCommands number of commands expected to be created by
    *                          the handler
    */
-  private void testProcessing(
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> testProcessing(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult healthResult,
       int minHealthyForMaintenance, int expectNumCommands) throws IOException {
@@ -223,6 +263,7 @@ public class TestRatisUnderReplicationHandler {
         handler.processAndCreateCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
     Assert.assertEquals(expectNumCommands, commands.size());
+    return commands;
   }
 
   private UnderReplicatedHealthResult getUnderReplicatedHealthResult() {

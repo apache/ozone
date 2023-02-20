@@ -177,17 +177,17 @@ public final class TestHelper {
   public static void validateData(String keyName, byte[] data,
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
-    byte[] readData = new byte[data.length];
-    OzoneInputStream is =
+    try (OzoneInputStream is =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .readKey(keyName);
-    is.read(readData);
-    MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
-    sha1.update(data);
-    MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
-    sha2.update(readData);
-    Assert.assertTrue(Arrays.equals(sha1.digest(), sha2.digest()));
-    is.close();
+            .readKey(keyName)) {
+      byte[] readData = new byte[data.length];
+      is.read(readData);
+      MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
+      sha1.update(data);
+      MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
+      sha2.update(readData);
+      Assert.assertTrue(Arrays.equals(sha1.digest(), sha2.digest()));
+    }
   }
 
   public static void waitForContainerClose(OzoneOutputStream outputStream,
