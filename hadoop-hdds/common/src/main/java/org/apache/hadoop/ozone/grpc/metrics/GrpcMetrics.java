@@ -19,8 +19,13 @@
 package org.apache.hadoop.ozone.grpc.metrics;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
@@ -35,18 +40,27 @@ import org.slf4j.LoggerFactory;
  * Class which maintains metrics related to using GRPC.
  */
 @Metrics(about = "GRPC Metrics", context = OzoneConsts.OZONE)
-public class GrpcMetrics {
+public class GrpcMetrics implements MetricsSource {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcMetrics.class);
+
+  private static final MetricsInfo LATEST_REQUEST_TYPE = Interns
+      .info(
+          "LatestRequestType",
+          "Latest type of request for " +
+              "which metrics were captured");
+
   private static final String SOURCE_NAME =
       GrpcMetrics.class.getSimpleName();
 
   private final MetricsRegistry registry;
   private final boolean grpcQuantileEnable;
+  private String requestType;
 
   public GrpcMetrics(Configuration conf) {
-    registry = new MetricsRegistry("grpc");
+    this.registry = new MetricsRegistry("grpc");
+    this.requestType = "NoRequest";
     int[] intervals = conf.getInts(
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY);
     grpcQuantileEnable = (intervals.length > 0);
@@ -86,6 +100,22 @@ public class GrpcMetrics {
    */
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+  }
+
+  @Override
+  public synchronized void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
+
+    recordBuilder.tag(LATEST_REQUEST_TYPE, requestType);
+
+    sentBytes.snapshot(recordBuilder, all);
+    receivedBytes.snapshot(recordBuilder, all);
+    unknownMessagesSent.snapshot(recordBuilder, all);
+    unknownMessagesReceived.snapshot(recordBuilder, all);
+    grpcQueueTime.snapshot(recordBuilder, all);
+    grpcProcessingTime.snapshot(recordBuilder, all);
+    numOpenClientConnections.snapshot(recordBuilder, all);
+    recordBuilder.endRecord();
   }
 
   @Metric("Number of sent bytes")
@@ -189,5 +219,13 @@ public class GrpcMetrics {
 
   public long getNumActiveClientConnections() {
     return numOpenClientConnections.value();
+  }
+
+  public void setRequestType(String requestType) {
+    this.requestType = requestType;
+  }
+
+  public String getRequestType() {
+    return requestType;
   }
 }

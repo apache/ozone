@@ -65,6 +65,16 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
         }
 
         grpcMetrics.incrReceivedBytes(messageSize);
+
+        String[] messageFields = message.toString()
+            .split(System.lineSeparator());
+        // messageFields[0] should be in the format
+        // cmdType: "type"
+        String[] cmdTypeLine = messageFields[0].split(":");
+
+        // Get only the type and remove any leading spaces
+        grpcMetrics.setRequestType(cmdTypeLine[1].trim());
+
         super.onMessage(message);
       }
 
