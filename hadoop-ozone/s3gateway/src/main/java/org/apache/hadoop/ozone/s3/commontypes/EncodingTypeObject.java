@@ -17,33 +17,37 @@
  */
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import javax.annotation.Nullable;
 
 /**
- * Directory name ("key prefix") in case of listing.
+ * A converter to encode string if needed.
  */
-@XmlAccessorType(XmlAccessType.FIELD)
-public class CommonPrefix {
+public final class EncodingTypeObject {
+  private final String encodingType;
+  private final String name;
 
-  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
-  @XmlElement(name = "Prefix")
-  private EncodingTypeObject prefix;
-
-  public CommonPrefix(EncodingTypeObject prefix) {
-    this.prefix = prefix;
+  private EncodingTypeObject(String name, @Nullable String encodingType) {
+    this.encodingType = encodingType;
+    this.name = name;
   }
 
-  public CommonPrefix() {
+  @Nullable public String getEncodingType() {
+    return encodingType;
   }
 
-  public EncodingTypeObject getPrefix() {
-    return prefix;
+  public String getName() {
+    return name;
   }
 
-  public void setPrefix(EncodingTypeObject prefix) {
-    this.prefix = prefix;
+  /**
+   * Create a EncodingTypeObject Object, if the parameter name is null.
+   * @return If name is null return null else return a EncodingTypeObject object
+   */
+  @Nullable public static EncodingTypeObject createNullable(
+      @Nullable String name, @Nullable String encodingType) {
+    if (name == null) {
+      return null;
+    }
+    return new EncodingTypeObject(name, encodingType);
   }
 }
