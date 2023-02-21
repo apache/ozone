@@ -63,7 +63,7 @@ public class TestOzoneFsSnapshot {
   private static OzoneManager ozoneManager;
   private static OzoneFsShell shell;
   private static final String VOLUME =
-      "vol-" + RandomStringUtils.randomNumeric(5);
+      "vol-" + RandomStringUtils.randomNumeric(5);;
   private static final String BUCKET =
       "buck-" + RandomStringUtils.randomNumeric(5);
   private static final String KEY =

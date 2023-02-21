@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
@@ -1896,7 +1897,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-    String leaderId = "";
     RaftPeer leader = null;
     try {
       leader = omRatisServer.getLeader();
@@ -1905,11 +1905,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           "Ratis server leader.", ex);
     }
     if (Objects.nonNull(leader)) {
-      leaderId = leader.getId().toString();
+      String leaderId = leader.getId().toString();
+
+      // If leaderId is empty, then leader is undefined
+      // and current OM is neither leader nor follower.
+      // OMHAMetrics shouldn't be registered in that case.
+      if (!Strings.isNullOrEmpty(leaderId)) {
+        omHAMetricsInit(leaderId);
+      }
     }
-    // If leaderId is empty, then for some reason there is
-    // no leader and all OMs will present as followers.
-    omHAMetricsInit(leaderId);
   }
 
   /**

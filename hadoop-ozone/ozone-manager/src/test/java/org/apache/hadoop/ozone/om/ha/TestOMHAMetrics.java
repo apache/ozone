@@ -58,14 +58,4 @@ public class TestOMHAMetrics {
     Assertions.assertEquals(0,
         omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
   }
-
-  @Test
-  public void testGetMetricsWithEmptyLeaderId() {
-    leaderId = "";
-    omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
-
-    omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
-    Assertions.assertEquals(0,
-        omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
-  }
 }
