@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -305,30 +306,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // metadata constructor for snapshots
-  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName)
-      throws IOException {
+  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
+      boolean isSnapshotInCache) throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     String snapshotDir = OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    setStore(loadDB(conf, new File(snapshotDir),
-        OM_DB_NAME + snapshotDirName, true));
+    File metaDir = new File(snapshotDir);
+    String dbName = OM_DB_NAME + snapshotDirName;
+    // The check is only to prevent every snapshot read to perform a disk IO
+    // and check if a checkpoint dir exists. If entry is present in cache,
+    // it is most likely DB entries will get flushed in this wait time.
+    if (isSnapshotInCache) {
+      File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
+      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+    }
+    setStore(loadDB(conf, metaDir, dbName, true));
     initializeOmTables(false);
-  }
-
-  /**
-   * Factory method for creating snapshot metadata manager.
-   *
-   * @param conf - ozone configuration
-   * @param snapshotDirName - the UUID that identifies the snapshot
-   * @return the metadata manager representing the snapshot
-   * @throws IOException
-   */
-  public static OmMetadataManagerImpl createSnapshotMetadataManager(
-      OzoneConfiguration conf, String snapshotDirName) throws IOException {
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
-        snapshotDirName);
-    return smm;
   }
 
   @Override
@@ -913,7 +907,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     return false;
   }
-
   /**
    * Checks if a key starts with the given prefix is present in the table.
    *
