@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -94,6 +95,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
+        boolean isSnapshotInCache =
+            ozoneManager.getMetadataManager().getSnapshotInfoTable()
+                .getCacheValue(new CacheKey<>(snapshotTableKey)) != null;
+
         // read in the snapshot
         OzoneConfiguration conf = ozoneManager.getConfiguration();
         OMMetadataManager snapshotMetadataManager;
@@ -102,9 +107,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         // RocksDB instance, creating an OmMetadataManagerImpl instance based on
         // that
         try {
-          snapshotMetadataManager = OmMetadataManagerImpl
-              .createSnapshotMetadataManager(
-              conf, snapshotInfo.getCheckpointDirName());
+          snapshotMetadataManager = new OmMetadataManagerImpl(conf,
+                  snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}, {}", snapshotTableKey, e);
           throw e;
@@ -155,6 +159,9 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final DBCheckpoint dbCheckpoint = store.getSnapshot(
         snapshotInfo.getCheckpointDirName());
+
+    LOG.info("Created checkpoint : {} for snapshot {}",
+        dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
 
     final RocksDBCheckpointDiffer dbCpDiffer =
         store.getRocksDBCheckpointDiffer();
