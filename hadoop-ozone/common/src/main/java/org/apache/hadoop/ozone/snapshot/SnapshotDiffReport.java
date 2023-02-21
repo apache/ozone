@@ -186,7 +186,8 @@ public class SnapshotDiffReport {
   /**
    * subsequent token for the diff report.
    */
-  private final String token = null; //TODO: will set it properly in HDDS-7548
+  // TODO: [SNAPSHOT] will set it properly in HDDS-7548
+  private final String token = null;
 
   public SnapshotDiffReport(final String volumeName,
                             final String bucketName,
