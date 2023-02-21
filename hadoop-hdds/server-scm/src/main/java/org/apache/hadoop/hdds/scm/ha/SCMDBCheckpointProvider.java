@@ -66,7 +66,7 @@ public class SCMDBCheckpointProvider {
       }
 
       Instant start = Instant.now();
-      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream);
+      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream, null);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();

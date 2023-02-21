@@ -31,10 +31,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -52,9 +58,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 import org.junit.After;
-import org.junit.Assert;
-
-import static org.junit.Assert.assertNotNull;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -62,6 +65,9 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -191,14 +197,14 @@ public class TestOMDbCheckpointServlet {
 
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
 
-    Assert.assertTrue(tempFile.length() > 0);
-    Assert.assertTrue(
+    assertTrue(tempFile.length() > 0);
+    assertTrue(
         omMetrics.getDBCheckpointMetrics().
             getLastCheckpointCreationTimeTaken() > 0);
-    Assert.assertTrue(
+    assertTrue(
         omMetrics.getDBCheckpointMetrics().
             getLastCheckpointStreamingTimeTaken() > 0);
-    Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
+    assertTrue(omMetrics.getDBCheckpointMetrics().
         getNumCheckpoints() > initialCheckpointCount);
   }
 
@@ -253,7 +259,7 @@ public class TestOMDbCheckpointServlet {
 
     // Recon user should be able to access the servlet and download the
     // snapshot
-    Assert.assertTrue(tempFile.length() > 0);
+    assertTrue(tempFile.length() > 0);
   }
 
   @Test
@@ -276,11 +282,60 @@ public class TestOMDbCheckpointServlet {
 
     File outputFile =
         new File(Paths.get(testDirName, "output_file.tar").toString());
-    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-        checkpoint.toPath());
+    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(checkpoint.toPath());
     writeDBCheckpointToStream(dbCheckpoint,
-        new FileOutputStream(outputFile));
+        new FileOutputStream(outputFile), new ArrayList<>());
     assertNotNull(outputFile);
+  }
+
+  @Test
+  public void testWriteIncrementalCheckpointToOutputStream() throws Exception {
+
+    File testRootDir = folder.newFolder();
+    File testDir = new File(testRootDir, "checkpoint");
+    assertTrue(testDir.mkdir());
+
+    File file1 = new File(testDir, "1.sst");
+    OutputStreamWriter writer = new OutputStreamWriter(
+        new FileOutputStream(file1), StandardCharsets.UTF_8);
+    writer.write("Test data 1");
+    writer.close();
+
+    File file2 = new File(testDir, "2.sst");
+    writer = new OutputStreamWriter(
+        new FileOutputStream(file2), StandardCharsets.UTF_8);
+    writer.write("Test data 2");
+    writer.close();
+
+    File file3 = new File(testDir, "3.sst");
+    writer = new OutputStreamWriter(
+        new FileOutputStream(file3), StandardCharsets.UTF_8);
+    writer.write("Test data 3");
+    writer.close();
+
+    File outputFile = new File(testRootDir, "output_file.tar");
+    TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
+        testDir.toPath());
+
+    // exclude file2 as existing SST
+    FileOutputStream outputStream = new FileOutputStream(outputFile);
+    List<String> receivedSstList = new ArrayList<>();
+    receivedSstList.add(file2.getName());
+    List<String> excludedSstList = writeDBCheckpointToStream(dbCheckpoint,
+        outputStream, receivedSstList);
+    assertEquals(file2.getName(), excludedSstList.get(0));
+    assertTrue(outputFile.exists());
+
+    // the files in outputStream should only contain file1 and file3
+    File untarredDbDir = new File(testRootDir, "untar.db");
+    FileUtil.unTar(outputFile, untarredDbDir);
+    String[] untarredfiles = untarredDbDir.list();
+    List<String> expectedFiles = new ArrayList<>();
+    expectedFiles.add(file1.getName());
+    expectedFiles.add(file3.getName());
+    assertNotNull(untarredfiles);
+    assertEquals(new HashSet<>(expectedFiles),
+        Arrays.stream(untarredfiles).collect(Collectors.toSet()));
   }
 }
 

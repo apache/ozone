@@ -25,7 +25,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -33,8 +37,9 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 
 import org.apache.commons.lang3.StringUtils;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -134,12 +139,23 @@ public class DBCheckpointServlet extends HttpServlet {
 
     DBCheckpoint checkpoint = null;
     try {
-
       boolean flush = false;
       String flushParam =
           request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
       if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.valueOf(flushParam);
+        flush = Boolean.parseBoolean(flushParam);
+      }
+
+      List<String> receivedSstList = new ArrayList<>();
+      String[] sstParam = request.getParameterValues(
+          OZONE_DB_CHECKPOINT_REQUEST_SST);
+      if (sstParam != null) {
+        receivedSstList.addAll(
+            Arrays.stream(sstParam)
+            .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+            .distinct()
+            .collect(Collectors.toList()));
+        LOG.info("Received excluding SST {}", receivedSstList);
       }
 
       checkpoint = dbStore.getCheckpoint(flush);
@@ -162,15 +178,23 @@ public class DBCheckpointServlet extends HttpServlet {
                file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDBCheckpointToStream(checkpoint,
-          response.getOutputStream());
+      List<String> excluded = HddsServerUtil.writeDBCheckpointToStream(
+          checkpoint, response.getOutputStream(), receivedSstList);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
+      if (!excluded.isEmpty()) {
+        LOG.info("Excluded SST {} from the latest checkpoint.", excluded);
+        dbMetrics.incNumIncrementalCheckpoint();
+        dbMetrics.setLastCheckpointStreamingNumSSTExcluded(excluded.size());
+      } else {
+        dbMetrics.incNumCheckpoints();
+        dbMetrics.setLastCheckpointStreamingNumSSTExcluded(0);
+      }
       dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
-      dbMetrics.incNumCheckpoints();
+
     } catch (Exception e) {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
@@ -187,5 +211,4 @@ public class DBCheckpointServlet extends HttpServlet {
       }
     }
   }
-
 }

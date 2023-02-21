@@ -40,8 +40,10 @@ public class DBCheckpointMetrics {
   // Metrics to track checkpoint statistics from last run.
   private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
   private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
+  private @Metric MutableGaugeLong lastCheckpointStreamingNumSSTExcluded;
   private @Metric MutableCounterLong numCheckpoints;
   private @Metric MutableCounterLong numCheckpointFails;
+  private @Metric MutableCounterLong numIncrementalCheckpoints;
 
   public DBCheckpointMetrics() {
   }
@@ -63,6 +65,10 @@ public class DBCheckpointMetrics {
     this.lastCheckpointStreamingTimeTaken.set(val);
   }
 
+  public void setLastCheckpointStreamingNumSSTExcluded(long val) {
+    this.lastCheckpointStreamingNumSSTExcluded.set(val);
+  }
+
   @VisibleForTesting
   public void incNumCheckpoints() {
     numCheckpoints.incr();
@@ -71,6 +77,11 @@ public class DBCheckpointMetrics {
   @VisibleForTesting
   public void incNumCheckpointFails() {
     numCheckpointFails.incr();
+  }
+
+  @VisibleForTesting
+  public void incNumIncrementalCheckpoint() {
+    numIncrementalCheckpoints.incr();
   }
 
   @VisibleForTesting
@@ -84,6 +95,11 @@ public class DBCheckpointMetrics {
   }
 
   @VisibleForTesting
+  public long getNumIncrementalCheckpoints() {
+    return numIncrementalCheckpoints.value();
+  }
+
+  @VisibleForTesting
   public long getNumCheckpointFails() {
     return numCheckpointFails.value();
   }
@@ -91,5 +107,9 @@ public class DBCheckpointMetrics {
   @VisibleForTesting
   public long getLastCheckpointStreamingTimeTaken() {
     return lastCheckpointStreamingTimeTaken.value();
+  }
+
+  public long getLastCheckpointStreamingNumSSTExcluded() {
+    return lastCheckpointStreamingNumSSTExcluded.value();
   }
 }
