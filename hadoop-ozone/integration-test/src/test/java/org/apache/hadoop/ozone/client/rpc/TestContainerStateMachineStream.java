@@ -124,7 +124,7 @@ public class TestContainerStateMachineStream {
         MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
             .setHbInterval(200)
-            .setDataStreamMinPacketSize(1024)
+            .setDataStreamMinPacketSize(1) // 1MB
             .setBlockSize(BLOCK_SIZE)
             .setChunkSize(CHUNK_SIZE)
             .setStreamBufferFlushSize(FLUSH_SIZE)
