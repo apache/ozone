@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.tracing;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -138,6 +139,24 @@ public final class TracingUtil {
     return conf.getBoolean(
         ScmConfigKeys.HDDS_TRACING_ENABLED,
         ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
+  }
+
+  /**
+   * Call {@code callee} in a new active span.
+   */
+  public static <T> T executeInNewSpan(String spanName,
+      Callable<T> callee)
+      throws Exception {
+    Span span = GlobalTracer.get()
+        .buildSpan(spanName).start();
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+      return callee.call();
+    } catch (Exception ex) {
+      span.setTag("failed", true);
+      throw ex;
+    } finally {
+      span.finish();
+    }
   }
 
   /**

@@ -54,6 +54,46 @@ scrape_configs:
          - "127.0.0.1:9876" 
 ```
 
+## Grafana
+
+Once Prometheus is up and running, Grana can be configured to monitor and visualize Ozone metrics.
+
+### Add Prometheus as a data source
+
+In the Grafana web UI, go to `Add Data Sources` and then select `Prometheus`.
+
+Enter the Prometheus hostname/port in the `HTTP`. For example, http://localhost:9094 (verify the port used by looking at Prometheus command line flags `-web.listen-address`. The port can also be found from Prometheus web UI → Status → Command-Line Flags.)
+
+Choose Prometheus type: `Prometheus`
+
+Choose Prometheus version: `2.37.x`
+
+Finish the setup by clicking on `Save and Test`.
+
+### Import a Grafana dashboard for Ozone
+
+Apache Ozone comes with a default Grafana dashboard. Follow the instructions below to import it:
+
+Download dashboard json:
+
+```shell
+wget https://raw.githubusercontent.com/apache/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20Overall%20Metrics.json
+```
+
+Open Grafana portal and click on Dashboards on the left and select `Import`.
+
+Click at `Upload JSON file` and select the file `Ozone - Overall Metrics.json` that was just downloaded.
+
+The dashboard is now imported.
+
+![Overall dashboard](GrafanaOzoneOverall.png)
+
+Repeat the same for [Object Metrics](https://raw.githubusercontent.com/Xushaohong/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20Object%20Metrics.json) dashboard and [RPC Metrics](https://raw.githubusercontent.com/Xushaohong/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20RPC%20Metrics.json) dashboard.
+
+![Object dashboard](GrafanaOzoneObjectMetrics.png)
+
+![RPC dashboard](GrafanaOzoneRPCMetrics.png)
+
 ## Distributed tracing
 
 Distributed tracing can help to understand performance bottleneck with visualizing end-to-end performance.

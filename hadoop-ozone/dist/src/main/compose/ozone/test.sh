@@ -50,8 +50,6 @@ execute_robot_test scm recon
 
 execute_robot_test scm om-ratis
 
-execute_robot_test scm snapshot/basic.robot
-
 execute_robot_test scm freon
 
 execute_robot_test scm cli
@@ -63,6 +61,8 @@ execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozo
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
 
 execute_robot_test scm ec/basic.robot
+
+execute_robot_test scm snapshot
 
 stop_docker_env
 

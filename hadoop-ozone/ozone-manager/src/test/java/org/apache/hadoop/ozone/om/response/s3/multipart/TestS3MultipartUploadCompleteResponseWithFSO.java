@@ -133,6 +133,91 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             omMetadataManager.getDeletedTable()));
   }
 
+
+
+  @Test
+  // similar to testAddDBToBatch(), but omBucketInfo is null
+  public void testAddDBToBatchWithNullBucketInfo() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    String multipartUploadID = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+
+    long txnId = 150;
+    long objectId = parentID + 1;
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+    String dbMultipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+    String dbMultipartOpenKey = omMetadataManager.getMultipartKey(volumeId,
+        bucketId, parentID, fileName, multipartUploadID);
+    long clientId = Time.now();
+
+    // add MPU entry to OpenFileTable
+    List<OmDirectoryInfo> parentDirInfos = new ArrayList<>();
+    S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponseFSO =
+        createS3InitiateMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, parentDirInfos, volumeId, bucketId);
+
+    s3InitiateMultipartUploadResponseFSO.addToDBBatch(omMetadataManager,
+        batchOperation);
+
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+        parentID, fileName, clientId);
+    String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+        parentID, fileName);
+    OmKeyInfo omKeyInfoFSO =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
+            Time.now());
+
+    // add key to openFileTable
+    omKeyInfoFSO.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(true, false,
+        fileName, omKeyInfoFSO, clientId, omKeyInfoFSO.getObjectID(),
+        omMetadataManager);
+
+    addS3MultipartUploadCommitPartResponseFSO(volumeName, bucketName, keyName,
+        multipartUploadID, dbOpenKey);
+
+    Assert.assertNotNull(
+        omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
+    Assert.assertNotNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartOpenKey));
+
+    // S3MultipartUploadCompleteResponseWithFSO should accept null bucketInfo
+    List<OmKeyInfo> unUsedParts = new ArrayList<>();
+    S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
+        createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
+            keyName, multipartUploadID, omKeyInfoFSO,
+            OzoneManagerProtocolProtos.Status.OK, unUsedParts,
+            null, null);
+
+    s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
+        batchOperation);
+
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    Assert.assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
+    Assert.assertNull(
+        omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
+    Assert.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbMultipartOpenKey));
+
+    // As no parts are created, so no entries should be there in delete table.
+    Assert.assertEquals(0, omMetadataManager.countRowsInTable(
+        omMetadataManager.getDeletedTable()));
+  }
+
   @Test
   public void testAddDBToBatchWithParts() throws Exception {
 

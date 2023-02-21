@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -95,12 +96,11 @@ public class RatisOverReplicationHandler
     Set<ContainerReplica> healthyReplicas = replicas.stream()
         .filter(r -> ReplicationManager.getNodeStatus(
             r.getDatanodeDetails(), nodeManager).isHealthy()
-        )
-        .collect(Collectors.toSet());
+        ).collect(Collectors.toSet());
 
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(containerInfo, healthyReplicas,
-            pendingOps, minHealthyForMaintenance);
+            pendingOps, minHealthyForMaintenance, true);
 
     // verify that this container is actually over replicated
     if (!verifyOverReplication(replicaCount)) {
@@ -152,30 +152,21 @@ public class RatisOverReplicationHandler
    * @param replicaCount ContainerReplicaCount object for the container
    * @param pendingOps Pending adds and deletes
    * @return List of ContainerReplica sorted using
-   * {@link RatisOverReplicationHandler#sortReplicas(Collection)}
+   * {@link RatisOverReplicationHandler#sortReplicas(Collection, boolean)}
    */
   private List<ContainerReplica> getEligibleReplicas(
-      ContainerReplicaCount replicaCount, List<ContainerReplicaOp> pendingOps) {
+      RatisContainerReplicaCount replicaCount,
+      List<ContainerReplicaOp> pendingOps) {
     // sort replicas so that they can be selected in a deterministic way
     List<ContainerReplica> eligibleReplicas =
-        sortReplicas(replicaCount.getReplicas());
+        sortReplicas(replicaCount.getReplicas(),
+            replicaCount.getHealthyReplicaCount() == 0);
 
     // retain one replica per unique origin datanode if the container is not
     // closed
-    final Map<UUID, ContainerReplica> uniqueReplicas =
-        new LinkedHashMap<>();
     if (replicaCount.getContainer().getState() !=
         HddsProtos.LifeCycleState.CLOSED) {
-      eligibleReplicas.stream()
-          // get replicas with state that matches container state
-          .filter(r -> ReplicationManager.compareState(
-              replicaCount.getContainer().getState(),
-              r.getState()))
-          .forEach(r -> uniqueReplicas
-              .putIfAbsent(r.getOriginDatanodeId(), r));
-
-      // note that this preserves order of the List
-      eligibleReplicas.removeAll(uniqueReplicas.values());
+      saveReplicasWithUniqueOrigins(eligibleReplicas);
     }
 
     Set<DatanodeDetails> pendingDeletion = new HashSet<>();
@@ -188,7 +179,6 @@ public class RatisOverReplicationHandler
 
     // replicas that are not on IN_SERVICE nodes or are already pending
     // delete are not eligible
-    // TODO what about nodes that are not healthy?
     eligibleReplicas.removeIf(
         replica -> replica.getDatanodeDetails().getPersistedOpState() !=
             HddsProtos.NodeOperationalState.IN_SERVICE ||
@@ -198,13 +188,56 @@ public class RatisOverReplicationHandler
   }
 
   /**
+   * This method will remove the replicas that need to be saved from the
+   * specified list, so the remaining replicas are eligible to be deleted.
+   * Removes one replica per unique origin node UUID. Prefers saving healthy
+   * replicas over UNHEALTHY ones. Maintains order of the specified replicas
+   * list.
+   * @param eligibleReplicas List of replicas that are eligible to be deleted
+   * and from which replicas with unique origin node ID need to be saved
+   */
+  private void saveReplicasWithUniqueOrigins(
+      List<ContainerReplica> eligibleReplicas) {
+    final Map<UUID, ContainerReplica> uniqueOrigins = new LinkedHashMap<>();
+    eligibleReplicas.stream()
+        // get unique origin nodes of healthy replicas
+        .filter(r -> r.getState() != ContainerReplicaProto.State.UNHEALTHY)
+        .forEach(r -> uniqueOrigins.putIfAbsent(r.getOriginDatanodeId(), r));
+
+    /*
+     Now that we've checked healthy replicas, see if some unhealthy replicas
+     need to be saved. For example, in the case of {QUASI_CLOSED,
+     QUASI_CLOSED, QUASI_CLOSED, UNHEALTHY}, if both the first and last
+     replicas have the same origin node ID (and no other replicas have it), we
+     prefer saving the QUASI_CLOSED replica and deleting the UNHEALTHY one.
+     */
+    for (ContainerReplica replica : eligibleReplicas) {
+      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        uniqueOrigins.putIfAbsent(replica.getOriginDatanodeId(), replica);
+      }
+    }
+
+    // note that this preserves order of the List
+    eligibleReplicas.removeAll(uniqueOrigins.values());
+  }
+
+  /**
    * Sorts replicas using {@link ContainerReplica#hashCode()} (ContainerID and
-   * DatanodeDetails).
+   * DatanodeDetails). If allUnhealthy is true, sorts using sequence ID.
    * @param replicas replicas to sort
+   * @param allUnhealthy should be true if all replicas are UNHEALTHY
    * @return sorted List
    */
   private List<ContainerReplica> sortReplicas(
-      Collection<ContainerReplica> replicas) {
+      Collection<ContainerReplica> replicas, boolean allUnhealthy) {
+    if (allUnhealthy) {
+      // prefer deleting replicas with lower sequence IDs
+      return replicas.stream()
+          .sorted(Comparator.comparingLong(ContainerReplica::getSequenceId)
+              .reversed())
+          .collect(Collectors.toList());
+    }
+
     return replicas.stream()
         .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
         .collect(Collectors.toList());
@@ -216,11 +249,11 @@ public class RatisOverReplicationHandler
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
 
     /*
-    Over replication means we have enough healthy replicas, so unhealthy
-    replicas can be deleted. This might make the container violate placement
-    policy.
+    Being in the over replication queue means we have enough replicas that
+    match the container's state, so unhealthy or mismatched replicas can be
+    deleted. This might make the container violate placement policy.
      */
-    List<ContainerReplica> unhealthyReplicas = new ArrayList<>();
+    List<ContainerReplica> replicasRemoved = new ArrayList<>();
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
         return commands;
@@ -229,11 +262,11 @@ public class RatisOverReplicationHandler
           containerInfo.getState(), replica.getState())) {
         commands.add(Pair.of(replica.getDatanodeDetails(),
             createDeleteCommand(containerInfo)));
-        unhealthyReplicas.add(replica);
+        replicasRemoved.add(replica);
         excess--;
       }
     }
-    replicas.removeAll(unhealthyReplicas);
+    replicas.removeAll(replicasRemoved);
 
     /*
     Remove excess replicas if that does not make the container mis replicated.
