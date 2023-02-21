@@ -163,11 +163,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     LOG.info("Created checkpoint : {} for snapshot {}",
         dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
 
-    // Write snapshot generation (latest sequence number) to compaction log.
-    // This will be used for DAG reconstruction as snapshotGeneration.
-    dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-        snapshotInfo.getSnapshotID(),
-        snapshotInfo.getCreationTime());
     final RocksDBCheckpointDiffer dbCpDiffer =
         store.getRocksDBCheckpointDiffer();
 
