@@ -1525,7 +1525,8 @@ public class RpcClient implements ClientProtocol {
         key.getDataSize(),
         key.getCreationTime(),
         key.getModificationTime(),
-        key.getReplicationConfig()))
+        key.getReplicationConfig(),
+        key.isFile()))
         .collect(Collectors.toList());
   }
 

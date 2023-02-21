@@ -87,18 +87,6 @@ public class OzoneKey {
    */
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig) {
-    this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, true);
-  }
-
-  /**
-   * Constructs OzoneKey from OmKeyInfo.
-   *
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
       boolean isFile) {
@@ -110,15 +98,6 @@ public class OzoneKey {
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata) {
-    this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, true);
   }
 
   @SuppressWarnings("parameternumber")
