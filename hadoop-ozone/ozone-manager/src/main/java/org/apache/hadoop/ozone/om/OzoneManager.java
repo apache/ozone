@@ -1912,6 +1912,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // OMHAMetrics shouldn't be registered in that case.
       if (!Strings.isNullOrEmpty(leaderId)) {
         omHAMetricsInit(leaderId);
+      } else {
+        // unregister, to get rid of stale metrics
+        OMHAMetrics.unRegister();
       }
     }
   }
