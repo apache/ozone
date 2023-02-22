@@ -167,6 +167,8 @@ public class TestOMSnapshotCreateRequest {
             "snap75795657617173401188448010125899089001363595171500499231286";
     String name64 =
             "snap156808943643007724443266605711479126926050896107709081166294";
+    String name2 = "s1";
+    String name3 = "sn1";
 
     // name length = 63
     when(ozoneManager.isOwner(any(), any())).thenReturn(true);
@@ -181,6 +183,20 @@ public class TestOMSnapshotCreateRequest {
     LambdaTestUtils.intercept(OMException.class,
             "Invalid snapshot name: " + name64,
             () -> doPreExecute(omRequest2));
+
+    // name length = 3
+    when(ozoneManager.isOwner(any(), any())).thenReturn(true);
+    OMRequest omRequest3 = OMRequestTestUtils.createSnapshotRequest(
+            volumeName, bucketName, name3);
+    // should not throw any error
+    doPreExecute(omRequest3);
+
+    // name length = 2
+    OMRequest omRequest4 = OMRequestTestUtils.createSnapshotRequest(
+            volumeName, bucketName, name2);
+    LambdaTestUtils.intercept(OMException.class,
+            "Invalid snapshot name: " + name2,
+            () -> doPreExecute(omRequest4));
   }
 
   @Test
