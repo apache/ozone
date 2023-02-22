@@ -57,60 +57,61 @@ public class TestChunkInputStream extends TestInputStreamBase {
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
     byte[] inputData = writeRandomBytes(keyName, dataLength);
 
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
 
-    BlockInputStream block0Stream =
-        (BlockInputStream)keyInputStream.getPartStreams().get(0);
-    block0Stream.initialize();
+      BlockInputStream block0Stream =
+          (BlockInputStream)keyInputStream.getPartStreams().get(0);
+      block0Stream.initialize();
 
-    ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
+      ChunkInputStream chunk0Stream = block0Stream.getChunkStreams().get(0);
 
-    // To read 1 byte of chunk data, ChunkInputStream should get one full
-    // checksum boundary worth of data from Container and store it in buffers.
-    chunk0Stream.read(new byte[1]);
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
-        BYTES_PER_CHECKSUM);
+      // To read 1 byte of chunk data, ChunkInputStream should get one full
+      // checksum boundary worth of data from Container and store it in buffers.
+      chunk0Stream.read(new byte[1]);
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+          BYTES_PER_CHECKSUM);
 
-    // Read > checksum boundary of data from chunk0
-    int readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
-    byte[] readData = readDataFromChunk(chunk0Stream, 0, readDataLen);
-    validateData(inputData, 0, readData);
+      // Read > checksum boundary of data from chunk0
+      int readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
+      byte[] readData = readDataFromChunk(chunk0Stream, 0, readDataLen);
+      validateData(inputData, 0, readData);
 
-    // The first checksum boundary size of data was already existing in the
-    // ChunkStream buffers. Once that data is read, the next checksum
-    // boundary size of data will be fetched again to read the remaining data.
-    // Hence there should be 1 checksum boundary size of data stored in the
-    // ChunkStreams buffers at the end of the read.
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
-        BYTES_PER_CHECKSUM);
+      // The first checksum boundary size of data was already existing in the
+      // ChunkStream buffers. Once that data is read, the next checksum
+      // boundary size of data will be fetched again to read the remaining data.
+      // Hence there should be 1 checksum boundary size of data stored in the
+      // ChunkStreams buffers at the end of the read.
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
+          BYTES_PER_CHECKSUM);
 
-    // Seek to a position in the third checksum boundary (so that current
-    // buffers do not have the seeked position) and read > BYTES_PER_CHECKSUM
-    // bytes of data. This should result in 2 * BYTES_PER_CHECKSUM amount of
-    // data being read into the buffers. There should be 2 buffers in the
-    // stream but the the first buffer should be released after it is read
-    // and the second buffer should have BYTES_PER_CHECKSUM capacity.
-    readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
-    int offset = 2 * BYTES_PER_CHECKSUM + 1;
-    readData = readDataFromChunk(chunk0Stream, offset, readDataLen);
-    validateData(inputData, offset, readData);
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 2, 1,
-        BYTES_PER_CHECKSUM);
+      // Seek to a position in the third checksum boundary (so that current
+      // buffers do not have the seeked position) and read > BYTES_PER_CHECKSUM
+      // bytes of data. This should result in 2 * BYTES_PER_CHECKSUM amount of
+      // data being read into the buffers. There should be 2 buffers in the
+      // stream but the the first buffer should be released after it is read
+      // and the second buffer should have BYTES_PER_CHECKSUM capacity.
+      readDataLen = BYTES_PER_CHECKSUM + (BYTES_PER_CHECKSUM / 2);
+      int offset = 2 * BYTES_PER_CHECKSUM + 1;
+      readData = readDataFromChunk(chunk0Stream, offset, readDataLen);
+      validateData(inputData, offset, readData);
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 2, 1,
+          BYTES_PER_CHECKSUM);
 
 
-    // Read the full chunk data - 1 and verify that all chunk data is read into
-    // buffers. We read CHUNK_SIZE - 1 as otherwise all the buffers will be
-    // released once all chunk data is read.
-    readData = readDataFromChunk(chunk0Stream, 0, CHUNK_SIZE - 1);
-    validateData(inputData, 0, readData);
-    int expectedNumBuffers = CHUNK_SIZE / BYTES_PER_CHECKSUM;
-    checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(),
-        expectedNumBuffers, expectedNumBuffers - 1, BYTES_PER_CHECKSUM);
+      // Read the full chunk data -1 and verify that all chunk data is read into
+      // buffers. We read CHUNK_SIZE - 1 as otherwise all the buffers will be
+      // released once all chunk data is read.
+      readData = readDataFromChunk(chunk0Stream, 0, CHUNK_SIZE - 1);
+      validateData(inputData, 0, readData);
+      int expectedNumBuffers = CHUNK_SIZE / BYTES_PER_CHECKSUM;
+      checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(),
+          expectedNumBuffers, expectedNumBuffers - 1, BYTES_PER_CHECKSUM);
 
-    // Read the last byte of chunk and verify that the buffers are released.
-    chunk0Stream.read(new byte[1]);
-    Assert.assertNull("ChunkInputStream did not release buffers after " +
-        "reaching EOF.", chunk0Stream.getCachedBuffers());
+      // Read the last byte of chunk and verify that the buffers are released.
+      chunk0Stream.read(new byte[1]);
+      Assert.assertNull("ChunkInputStream did not release buffers after " +
+          "reaching EOF.", chunk0Stream.getCachedBuffers());
+    }
   }
 
   private void testCloseReleasesBuffers() throws Exception {

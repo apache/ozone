@@ -30,6 +30,8 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -303,6 +305,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         EchoRPCResponse echoRPCResponse =
             echoRPC(request.getEchoRPCRequest());
         responseBuilder.setEchoRPCResponse(echoRPCResponse);
+        break;
+      case TransferLeadership:
+        responseBuilder.setTransferOmLeadershipResponse(transferLeadership(
+            request.getTransferOmLeadershipRequest()));
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -1249,5 +1256,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             .collect(Collectors.toList());
     return OzoneManagerProtocolProtos.ListSnapshotResponse.newBuilder()
         .addAllSnapshotInfo(snapshotInfoList).build();
+  }
+
+  private TransferLeadershipResponseProto transferLeadership(
+      TransferLeadershipRequestProto req) throws IOException {
+    String newLeaderId = req.getNewLeaderId();
+    impl.transferLeadership(newLeaderId);
+    return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

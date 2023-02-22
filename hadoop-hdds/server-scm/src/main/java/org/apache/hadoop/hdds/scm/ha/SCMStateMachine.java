@@ -34,6 +34,8 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -136,7 +138,20 @@ public class SCMStateMachine extends BaseStateMachine {
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
-      applyTransactionFuture.complete(process(request));
+
+      try {
+        applyTransactionFuture.complete(process(request));
+      } catch (SCMException ex) {
+        // For SCM exceptions while applying a transaction, if the error
+        // code indicate a FATAL issue, let it crash SCM.
+        if (ex.getResult() == ResultCodes.INTERNAL_ERROR
+            || ex.getResult() == ResultCodes.IO_EXCEPTION) {
+          throw ex;
+        }
+        // Otherwise, it's considered as a logical rejection and is returned to
+        // Ratis client, leaving SCM intact.
+        applyTransactionFuture.completeExceptionally(ex);
+      }
 
       // After previous term transactions are applied, still in safe mode,
       // perform refreshAndValidate to update the safemode rule state.

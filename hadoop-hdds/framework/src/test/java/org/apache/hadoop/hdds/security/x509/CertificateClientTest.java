@@ -22,20 +22,25 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
@@ -45,15 +50,17 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 public class CertificateClientTest implements CertificateClient {
   private KeyPair keyPair;
-  private X509Certificate x509Certificate;
+  private CertPath certPath;
   private SecurityConfig secConfig;
 
   public CertificateClientTest(OzoneConfiguration conf)
       throws Exception {
     secConfig = new SecurityConfig(conf);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    x509Certificate = KeyStoreTestUtil.generateCertificate("CN=OzoneMaster",
-        keyPair, 30, "SHA256withRSA");
+    CertificateFactory fact = CertificateCodec.getCertFactory();
+    X509Certificate singleCert = KeyStoreTestUtil
+        .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    certPath = fact.engineGenerateCertPath(ImmutableList.of(singleCert));
   }
 
   @Override
@@ -75,17 +82,27 @@ public class CertificateClientTest implements CertificateClient {
   @Override
   public X509Certificate getCertificate(String certSerialId)
       throws CertificateException {
-    return x509Certificate;
+    return CertificateCodec.firstCertificateFrom(certPath);
+  }
+
+  @Override
+  public CertPath getCertPath() {
+    return certPath;
   }
 
   @Override
   public X509Certificate getCertificate() {
-    return x509Certificate;
+    return CertificateCodec.firstCertificateFrom(certPath);
   }
 
   @Override
   public X509Certificate getCACertificate() {
-    return x509Certificate;
+    return CertificateCodec.firstCertificateFrom(certPath);
+  }
+
+  @Override
+  public CertPath getCACertPath() {
+    return certPath;
   }
 
   @Override
@@ -133,7 +150,7 @@ public class CertificateClientTest implements CertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     return null;
   }
 
@@ -149,12 +166,12 @@ public class CertificateClientTest implements CertificateClient {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force)
+  public void storeCertificate(String cert)
       throws CertificateException {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force, boolean caCert)
+  public void storeCertificate(String cert, CAType caType)
       throws CertificateException {
   }
 
@@ -196,11 +213,11 @@ public class CertificateClientTest implements CertificateClient {
 
   @Override
   public X509Certificate getRootCACertificate() {
-    return x509Certificate;
+    return CertificateCodec.firstCertificateFrom(certPath);
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert, boolean force) {
+  public void storeRootCACertificate(String pemEncodedCert) {
 
   }
 
@@ -264,7 +281,8 @@ public class CertificateClientTest implements CertificateClient {
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
 
     keyPair = newKeyPair;
-    x509Certificate = newCert;
+    CertificateFactory fact = CertificateCodec.getCertFactory();
+    certPath = fact.engineGenerateCertPath(ImmutableList.of(newCert));
   }
 
   @Override

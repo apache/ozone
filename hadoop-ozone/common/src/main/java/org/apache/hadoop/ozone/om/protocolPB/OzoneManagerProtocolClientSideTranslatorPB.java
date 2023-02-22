@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -1573,6 +1574,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()),
         resp.getCaCertificate(), resp.getCaCertsList());
   }
+
+  @Override
+  public void transferLeadership(String newLeaderId)
+      throws IOException {
+    TransferLeadershipRequestProto.Builder builder =
+        TransferLeadershipRequestProto.newBuilder();
+    builder.setNewLeaderId(newLeaderId);
+    OMRequest omRequest = createOMRequest(Type.TransferLeadership)
+        .setTransferOmLeadershipRequest(builder.build())
+        .build();
+    handleError(submitRequest(omRequest));
+  }
+
 
   @Override
   public boolean triggerRangerBGSync(boolean noWait) throws IOException {

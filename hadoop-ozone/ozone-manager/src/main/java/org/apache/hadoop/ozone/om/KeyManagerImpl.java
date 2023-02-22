@@ -1176,27 +1176,51 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
       String keyName, BucketLayout layout) throws IOException {
-    OmKeyInfo fakeDirKeyInfo = null;
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
-      Table.KeyValue<String, OmKeyInfo> keyValue =
-          keyTblItr
-              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+    String targetKey = OzoneFSUtils.addTrailingSlashIfNeeded(
+        metadataManager.getOzoneKey(volume, bucket, keyName));
 
-      if (keyValue != null) {
-        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
-        Path subPath = Paths.get(dirKey);
-        OmKeyInfo omKeyInfo = keyValue.getValue();
-        if (fullPath.startsWith(subPath)) {
-          // create fake directory
-          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIterator =
+        keyTable.cacheIterator();
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> cacheEntry =
+          cacheIterator.next();
+      String cacheKey = cacheEntry.getKey().getCacheKey();
+      CacheValue<OmKeyInfo> cacheValue = cacheEntry.getValue();
+      boolean exists = cacheValue != null && cacheValue.getCacheValue() != null;
+      if (exists
+          && cacheKey.startsWith(targetKey)
+          && !Objects.equals(cacheKey, targetKey)) {
+        LOG.debug("Fake dir {} required for {}", targetKey, cacheKey);
+        return createDirectoryKey(cacheValue.getCacheValue(), dirKey);
+      }
+    }
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        keyTblItr = keyTable.iterator(targetKey)) {
+      while (keyTblItr.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
+        if (keyValue != null) {
+          String key = keyValue.getKey();
+          // HDDS-7871: RocksIterator#seek() may position at the key
+          // past the target, we should check the full dbKeyName.
+          // For example, seeking "/vol1/bucket1/dir2/" may return a key
+          // in different volume/bucket, such as "/vol1/bucket2/dir2/key2".
+          if (key.startsWith(targetKey)) {
+            if (!Objects.equals(key, targetKey)
+                && !isKeyDeleted(key, keyTable)) {
+              LOG.debug("Fake dir {} required for {}", targetKey, key);
+              return createDirectoryKey(keyValue.getValue(), dirKey);
+            }
+          } else {
+            break;
+          }
         }
       }
     }
 
-    return fakeDirKeyInfo;
+    return null;
   }
 
 

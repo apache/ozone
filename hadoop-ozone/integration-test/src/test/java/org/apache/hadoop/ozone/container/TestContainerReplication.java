@@ -101,14 +101,6 @@ public class TestContainerReplication {
         Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMContainerPlacementRackAware.LOG,
         Level.DEBUG);
-    OzoneConfiguration conf = createConfiguration();
-    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
-
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
-    cluster.waitForClusterToBeReady();
-
-    client = OzoneClientFactory.getRpcClient(conf);
-    createTestData();
   }
 
   @After
@@ -120,6 +112,13 @@ public class TestContainerReplication {
 
   @Test
   public void testContainerReplication() throws Exception {
+    OzoneConfiguration conf = createConfiguration();
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
+    cluster.waitForClusterToBeReady();
+    client = OzoneClientFactory.getRpcClient(conf);
+    createTestData();
+
     List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
     assertFalse(keyLocations.isEmpty());
 
@@ -128,6 +127,41 @@ public class TestContainerReplication {
     waitForContainerClose(cluster, containerID);
 
     cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
+    waitForReplicaCount(containerID, 2, cluster);
+
+    waitForReplicaCount(containerID, 3, cluster);
+  }
+
+  @Test
+  public void testContainerReplicationWithLegacyReplicationManagerDisabled()
+      throws Exception {
+    OzoneConfiguration conf = createConfiguration();
+
+    /*
+    Disable LegacyReplicationManager so that ReplicationManager handles Ratis
+     containers.
+     */
+    ReplicationManagerConfiguration repConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    repConf.setEnableLegacy(false);
+    repConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
+    conf.setFromObject(repConf);
+
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
+    cluster.waitForClusterToBeReady();
+    client = OzoneClientFactory.getRpcClient(conf);
+    createTestData();
+
+    List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
+    assertFalse(keyLocations.isEmpty());
+
+    OmKeyLocationInfo keyLocation = keyLocations.get(0);
+    long containerID = keyLocation.getContainerID();
+    waitForContainerClose(cluster, containerID);
+
+    cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
+    waitForReplicaCount(containerID, 2, cluster);
 
     waitForReplicaCount(containerID, 3, cluster);
   }
