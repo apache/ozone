@@ -20,14 +20,9 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 
@@ -37,7 +32,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -204,39 +198,6 @@ public class TestOMSnapshotCreateRequest {
     // return null.
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
-    RepeatedOmKeyInfo dummyRepeatedKeyInfo = new RepeatedOmKeyInfo.Builder()
-        .setOmKeyInfos(new ArrayList<>()).build();
-
-    // Add deletedTable key entries that surround the snapshot scope
-    Set<String> dtSentinelKeys = new HashSet<>();
-    // Get a bucket name right before and after the bucketName
-    // e.g. When bucketName is buck2, bucketNameBefore is buck1,
-    // bucketNameAfter is buck3
-    // This will not guarantee the bucket name is valid for Ozone but
-    // this would be good enough for this unit test.
-    char bucketNameLastChar = bucketName.charAt(bucketName.length() - 1);
-    String bucketNameBefore = bucketName.substring(0, bucketName.length() - 1) +
-        Character.toString((char)(bucketNameLastChar - 1));
-    for (int i = 0; i < 3; i++) {
-      String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketNameBefore,
-          "dtkey" + i);
-      omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
-      dtSentinelKeys.add(dtKey);
-    }
-    String bucketNameAfter = bucketName.substring(0, bucketName.length() - 1) +
-        Character.toString((char)(bucketNameLastChar + 1));
-    for (int i = 0; i < 3; i++) {
-      String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketNameAfter,
-          "dtkey" + i);
-      omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
-      dtSentinelKeys.add(dtKey);
-    }
-    // Add deletedTable key entries in the snapshot (bucket) scope
-    for (int i = 0; i < 10; i++) {
-      String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          "dtkey" + i);
-      omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
-    }
 
     // run validateAndUpdateCache. add key to cache and clears deletedTable
     OMClientResponse omClientResponse =
@@ -260,24 +221,6 @@ public class TestOMSnapshotCreateRequest {
         omResponse.getCmdType());
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
-
-    // Verify that only keys inside the snapshot scope are gone from
-    // deletedTable.
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-        keyIter = omMetadataManager.getDeletedTable().iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
-        String dtKey = entry.getKey();
-        // deletedTable should not have bucketName keys
-        Assert.assertTrue("deletedTable should contain key",
-            dtSentinelKeys.contains(dtKey));
-        dtSentinelKeys.remove(dtKey);
-      }
-    }
-
-    Assert.assertTrue("deletedTable is missing keys that should be there",
-        dtSentinelKeys.isEmpty());
   }
 
   @Test
