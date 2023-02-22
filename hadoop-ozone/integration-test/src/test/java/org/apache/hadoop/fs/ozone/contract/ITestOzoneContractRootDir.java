@@ -36,19 +36,18 @@ import org.junit.runners.Parameterized;
 public class ITestOzoneContractRootDir extends
     AbstractContractRootDirectoryTest {
 
-  private static boolean fsOptimizedServer;
-
-  public ITestOzoneContractRootDir(boolean fsoServer)
-      throws IOException {
-    if (fsOptimizedServer != fsoServer) {
-      setFsOptimizedServer(fsoServer);
-      ITestOzoneContractUtils.restartCluster(
-          fsOptimizedServer);
-    }
+  public ITestOzoneContractRootDir(boolean fso) {
+    // Actual init done in initParam().
   }
 
-  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
-    ITestOzoneContractRootDir.fsOptimizedServer = fsOptimizedServer;
+  @Parameterized.BeforeParam
+  public static void initParam(boolean fso) throws IOException {
+    OzoneContract.createCluster(fso);
+  }
+
+  @Parameterized.AfterParam
+  public static void teardownParam() throws IOException {
+    OzoneContract.destroyCluster();
   }
 
   @AfterClass
@@ -62,8 +61,8 @@ public class ITestOzoneContractRootDir extends
   }
 
   @Parameterized.Parameters
-  public static Collection data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
+  public static Collection<Boolean> data() {
+    return OzoneContract.getFsoCombinations();
   }
 
 }
