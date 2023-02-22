@@ -527,7 +527,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       return;
     }
     if (!ozoneManager.isLeaderReady()) {
-      throw new OMNotLeaderException("This OM is no longer the leader. Abort");
+      throw new OMNotLeaderException(
+          ozoneManager.getOmRatisServer().getRaftPeerId());
     }
   }
 
