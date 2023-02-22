@@ -661,34 +661,35 @@ public class ReplicationManager implements SCMService {
   protected void processContainer(ContainerInfo containerInfo,
       ReplicationQueue repQueue, ReplicationManagerReport report)
       throws ContainerNotFoundException {
+    synchronized (containerInfo) {
+      ContainerID containerID = containerInfo.containerID();
+      Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+          containerID);
+      List<ContainerReplicaOp> pendingOps =
+          containerReplicaPendingOps.getPendingOps(containerID);
 
-    ContainerID containerID = containerInfo.containerID();
-    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
-        containerID);
-    List<ContainerReplicaOp> pendingOps =
-        containerReplicaPendingOps.getPendingOps(containerID);
-
-    // There is a different config for EC and Ratis maintenance
-    // minimum replicas, so we must pass through the correct one.
-    int maintRedundancy = maintenanceRedundancy;
-    if (containerInfo.getReplicationType() == RATIS) {
-      maintRedundancy = ratisMaintenanceMinReplicas;
-    }
-    ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
-        .setContainerInfo(containerInfo)
-        .setContainerReplicas(replicas)
-        .setMaintenanceRedundancy(maintRedundancy)
-        .setReport(report)
-        .setPendingOps(pendingOps)
-        .setReplicationQueue(repQueue)
-        .build();
-    // This will call the chain of container health handlers in turn which
-    // will issue commands as needed, update the report and perhaps add
-    // containers to the over and under replicated queue.
-    boolean handled = containerCheckChain.handleChain(checkRequest);
-    if (!handled) {
-      LOG.debug("Container {} had no actions after passing through the " +
-          "check chain", containerInfo.containerID());
+      // There is a different config for EC and Ratis maintenance
+      // minimum replicas, so we must pass through the correct one.
+      int maintRedundancy = maintenanceRedundancy;
+      if (containerInfo.getReplicationType() == RATIS) {
+        maintRedundancy = ratisMaintenanceMinReplicas;
+      }
+      ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
+          .setContainerInfo(containerInfo)
+          .setContainerReplicas(replicas)
+          .setMaintenanceRedundancy(maintRedundancy)
+          .setReport(report)
+          .setPendingOps(pendingOps)
+          .setReplicationQueue(repQueue)
+          .build();
+      // This will call the chain of container health handlers in turn which
+      // will issue commands as needed, update the report and perhaps add
+      // containers to the over and under replicated queue.
+      boolean handled = containerCheckChain.handleChain(checkRequest);
+      if (!handled) {
+        LOG.debug("Container {} had no actions after passing through the " +
+            "check chain", containerInfo.containerID());
+      }
     }
   }
 
@@ -1114,7 +1115,7 @@ public class ReplicationManager implements SCMService {
     return ReplicationManager.class.getSimpleName();
   }
 
-  public synchronized ReplicationManagerMetrics getMetrics() {
+  public ReplicationManagerMetrics getMetrics() {
     return metrics;
   }
 
