@@ -369,8 +369,11 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
-    return new File(hddsVolume.getStorageDir(), hddsVolume.getClusterID())
-        .toPath().resolve(DISK_BALANCER_TMP_DIR).resolve(DISK_BALANCER_DIR);
+    File tmpDirParent = hddsVolume.getClusterID() == null ?
+        hddsVolume.getStorageDir() : new File(hddsVolume.getStorageDir(),
+        hddsVolume.getClusterID());
+    return tmpDirParent.toPath()
+        .resolve(DISK_BALANCER_TMP_DIR).resolve(DISK_BALANCER_DIR);
   }
 
   public boolean isBalancingContainer(long containerId) {
