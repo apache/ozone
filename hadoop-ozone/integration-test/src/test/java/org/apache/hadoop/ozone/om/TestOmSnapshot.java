@@ -434,7 +434,7 @@ public class TestOmSnapshot {
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> createSnapshot(nullstr, bucket));
-    }
+  }
 
   @Test
   public void testBucketDeleteIfSnapshotExists() throws Exception {
