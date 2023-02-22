@@ -1897,13 +1897,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-    RaftPeer leader = null;
-    try {
-      leader = omRatisServer.getLeader();
-    } catch (IOException ex) {
-      LOG.error("IOException while getting the " +
-          "Ratis server leader.", ex);
-    }
+    RaftPeer leader = omRatisServer.getLeader();
     if (Objects.nonNull(leader)) {
       String leaderId = leader.getId().toString();
 
