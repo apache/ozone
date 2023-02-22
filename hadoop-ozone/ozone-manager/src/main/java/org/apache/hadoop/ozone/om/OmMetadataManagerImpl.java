@@ -1389,21 +1389,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
             // Skip the key if it exists in the previous snapshot (of the same
-            // scope) so that its blocks won't be reclaimed.
-            // TODO: Further optimization that skip all snapshotted keys
-            //  altogether
+            // scope) as in this case its blocks should not be reclaimed
 
-            // TODO: Wait for HDDS-7740 merge to reuse the util methods
-//            if (previousSnapshot != null) {
-//              // TODO: For efficient lookup, the addition in design doc
-//              //  4.b)1.b. is crucial.
-//              if (prev snapshot keyTable has key objId info.getObjectID()) {
-//                continue;
-//              }
-//            }
-
-            // TODO: Double check if only some of the keys in the list is
-            //  reclaimed, whether deletedTable would be updated correctly.
+            // TODO:
+            //  1. If previous snapshot keyTable has key info.getObjectID(),
+            //  skip it. Pending HDDS-7740 merge to reuse the util methods to
+            //  check previousSnapshot.
+            //  2. For efficient lookup, the addition in design doc 4.b)1.b
+            //  is critical.
+            //  3. It is possible only some of the keys in the
+            //  RepeatedOmKeyInfo list can be reclaimed, make sure to
+            //  deletedTable accordingly.
+            //  4. Further optimization: Skip all snapshotted keys altogether
+            //  e.g. by prefixing all unreclaimable keys, then calling seek
 
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :

@@ -198,8 +198,7 @@ public class TestOMSnapshotCreateRequest {
     // return null.
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
-
-    // run validateAndUpdateCache. add key to cache and clears deletedTable
+    // run validateAndUpdateCache. add key to cache
     OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);

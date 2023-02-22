@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 /**
  * Response for OMSnapshotCreateRequest.
  */
-@CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE, DELETED_TABLE})
+@CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
   private SnapshotInfo snapshotInfo;
