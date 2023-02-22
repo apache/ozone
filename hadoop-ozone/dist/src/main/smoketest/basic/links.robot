@@ -70,6 +70,7 @@ ACL verified on source bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
 Create link loop
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
                         Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
                         Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
                         Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
