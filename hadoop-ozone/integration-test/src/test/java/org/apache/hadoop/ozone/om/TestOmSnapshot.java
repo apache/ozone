@@ -703,7 +703,7 @@ public class TestOmSnapshot {
     // Delete snapshot with non-existent url
     LambdaTestUtils.intercept(OMException.class,
                  "BUCKET_NOT_FOUND",
-                 () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
+                () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
   }
 
   @Test
