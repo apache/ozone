@@ -1896,10 +1896,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-    if (Objects.nonNull(omRatisServer.getLeader())) {
+    RaftPeer leader = omRatisServer.getLeader();
+    if (Objects.nonNull(leader)) {
       // If we have any leader information, its id cannot be null.
-      String leaderId = omRatisServer
-          .getLeader().getId().toString();
+      String leaderId = leader.getId().toString();
       omHAMetricsInit(leaderId);
     } else {
       LOG.error("OzoneManagerRatisServer leader is null, " +
