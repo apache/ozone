@@ -270,4 +270,42 @@ public class TestMismatchedReplicasHandler {
         .sendCloseContainerReplicaCommand(
             containerInfo, mismatch3.getDatanodeDetails(), false);
   }
+
+  @Test
+  public void testQuasiClosedReplicaOfClosedContainer() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, CLOSED);
+    ContainerReplica sameSeqID = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.QUASI_CLOSED,
+        containerInfo.getSequenceId());
+
+    ContainerReplica differentSeqID =
+        ReplicationTestUtil.createContainerReplica(containerInfo.containerID(),
+            0, HddsProtos.NodeOperationalState.IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED,
+            containerInfo.getSequenceId() + 1);
+
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(sameSeqID);
+    containerReplicas.add(differentSeqID);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    // this handler always returns false so other handlers can fix issues
+    // such as under replication
+    Assertions.assertFalse(handler.handle(request));
+
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(
+            containerInfo, sameSeqID.getDatanodeDetails(), true);
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(containerInfo,
+            differentSeqID.getDatanodeDetails(), true);
+  }
 }

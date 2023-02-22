@@ -368,6 +368,28 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    /*
+    Now, check when there are less than replication factor UNHEALTHY replicas.
+    The handler should still return false.
+     */
+    replicas =
+        createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    result = (UnderReplicatedHealthResult) healthCheck.checkHealth(
+        requestBuilder.build());
+
+    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    Assert.assertEquals(0, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    Assert.assertFalse(result.underReplicatedDueToDecommission());
+
+    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -406,9 +428,9 @@ public class TestRatisReplicationCheckHandler {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.QUASI_CLOSED, 0, 0);
-    Set<ContainerReplica> unhealthyReplicas =
+    Set<ContainerReplica> misMatchedReplicas =
         createReplicas(container.containerID(), State.CLOSING, 0, 0);
-    replicas.addAll(unhealthyReplicas);
+    replicas.addAll(misMatchedReplicas);
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
 

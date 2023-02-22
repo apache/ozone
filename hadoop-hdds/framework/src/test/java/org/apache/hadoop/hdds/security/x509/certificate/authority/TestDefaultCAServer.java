@@ -19,12 +19,14 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
@@ -39,7 +41,7 @@ import org.apache.ozone.test.LambdaTestUtils;
 
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,8 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.cert.CertPath;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
@@ -70,8 +74,6 @@ import java.util.function.Consumer;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.INTERMEDIARY_CA;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer.CAType.SELF_SIGNED_CA;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
@@ -104,11 +106,11 @@ public class TestDefaultCAServer {
         RandomStringUtils.randomAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
-    testCA.init(securityConfig, SELF_SIGNED_CA);
+    testCA.init(securityConfig, CAType.ROOT);
     X509CertificateHolder first = testCA.getCACertificate();
     assertNotNull(first);
     //Init is idempotent.
-    testCA.init(securityConfig, SELF_SIGNED_CA);
+    testCA.init(securityConfig, CAType.ROOT);
     X509CertificateHolder second = testCA.getCACertificate();
     assertEquals(first, second);
   }
@@ -123,7 +125,8 @@ public class TestDefaultCAServer {
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
-        DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE, SELF_SIGNED_CA);
+            DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE,
+            CAType.ROOT);
     try {
 
       caInitializer.accept(securityConfig);
@@ -145,7 +148,7 @@ public class TestDefaultCAServer {
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
-            DefaultCAServer.VerificationStatus.MISSING_KEYS, SELF_SIGNED_CA);
+            DefaultCAServer.VerificationStatus.MISSING_KEYS, CAType.ROOT);
     try {
 
       caInitializer.accept(securityConfig);
@@ -170,9 +173,9 @@ public class TestDefaultCAServer {
   @Test
   public void testRequestCertificate() throws IOException,
       ExecutionException, InterruptedException,
-      NoSuchProviderException, NoSuchAlgorithmException {
-    String scmId =  RandomStringUtils.randomAlphabetic(4);
-    String clusterId =  RandomStringUtils.randomAlphabetic(4);
+      NoSuchProviderException, NoSuchAlgorithmException, CertificateException {
+    String scmId = RandomStringUtils.randomAlphabetic(4);
+    String clusterId = RandomStringUtils.randomAlphabetic(4);
     KeyPair keyPair =
         new HDDSKeyGenerator(conf).generateKey();
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
@@ -195,13 +198,24 @@ public class TestDefaultCAServer {
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(new SecurityConfig(conf),
-        SELF_SIGNED_CA);
+        CAType.ROOT);
 
-    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
+    Future<CertPath> holder = testCA.requestCertificate(
+        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get());
+    //Test that the cert path returned contains the CA certificate in proper
+    // place
+    List<? extends Certificate> certBundle = holder.get().getCertificates();
+    X509Certificate caInReturnedBundle = (X509Certificate) certBundle.get(1);
+    assertEquals(caInReturnedBundle,
+        CertificateCodec.getX509Certificate(testCA.getCACertificate()));
+    X509Certificate signedCert =
+        CertificateCodec.firstCertificateFrom(holder.get());
+    //Test that the ca has signed of the returned certificate
+    assertEquals(caInReturnedBundle.getSubjectX500Principal(),
+        signedCert.getIssuerX500Principal());
+
   }
 
   /**
@@ -239,13 +253,13 @@ public class TestDefaultCAServer {
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(new SecurityConfig(conf),
-        SELF_SIGNED_CA);
+        CAType.ROOT);
 
-    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+    Future<CertPath> holder = testCA.requestCertificate(
+        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
-    assertNotNull(holder.get());
+    assertNotNull(CertificateCodec.firstCertificateFrom(holder.get()));
   }
 
   @Test
@@ -259,7 +273,7 @@ public class TestDefaultCAServer {
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(new SecurityConfig(conf),
-        SELF_SIGNED_CA);
+        CAType.ROOT);
 
     KeyPair keyPair =
         new HDDSKeyGenerator(conf).generateKey();
@@ -275,11 +289,11 @@ public class TestDefaultCAServer {
     // Let us convert this to a string to mimic the common use case.
     String csrString = CertificateSignRequest.getEncodedString(csr);
 
-    Future<X509CertificateHolder> holder = testCA.requestCertificate(csrString,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+    Future<CertPath> holder = testCA.requestCertificate(
+        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
 
     X509Certificate certificate =
-        new JcaX509CertificateConverter().getCertificate(holder.get());
+        CertificateCodec.firstCertificateFrom(holder.get());
     List<BigInteger> serialIDs = new ArrayList<>();
     serialIDs.add(certificate.getSerialNumber());
     Future<Optional<Long>> revoked = testCA.revokeCertificates(serialIDs,
@@ -324,12 +338,12 @@ public class TestDefaultCAServer {
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(new SecurityConfig(conf),
-        SELF_SIGNED_CA);
+        CAType.ROOT);
 
     LambdaTestUtils.intercept(ExecutionException.class, "ScmId and " +
             "ClusterId in CSR subject are incorrect",
         () -> {
-          Future<X509CertificateHolder> holder =
+          Future<CertPath> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
           holder.get();
@@ -345,7 +359,7 @@ public class TestDefaultCAServer {
         new DefaultProfile(), Paths.get("scm").toString());
 
     assertThrows(IllegalStateException.class,
-        () -> scmCA.init(new SecurityConfig(conf), INTERMEDIARY_CA));
+        () -> scmCA.init(new SecurityConfig(conf), CAType.SUBORDINATE));
   }
 
   @Test
@@ -369,7 +383,7 @@ public class TestDefaultCAServer {
         scmCertificateClient.getComponentName());
 
     certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
-        CertificateCodec.getPEMEncodedString(externalCert), true);
+        CertificateCodec.getPEMEncodedString(externalCert));
 
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
@@ -377,13 +391,13 @@ public class TestDefaultCAServer {
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     //When initializing a CA server with external cert
-    testCA.init(securityConfig, SELF_SIGNED_CA);
+    testCA.init(securityConfig, CAType.ROOT);
     //Then the external cert is set as CA cert for the server.
     assertEquals(externalCert, testCA.getCACertificate());
   }
 
   private void setExternalPathsInConfig(Path tempDir,
-                                        String externalCaCertFileName) {
+      String externalCaCertFileName) {
     String externalCaCertPart = Paths.get(tempDir.toString(),
         externalCaCertFileName).toString();
     String privateKeyPath = Paths.get(tempDir.toString(),
@@ -400,6 +414,62 @@ public class TestDefaultCAServer {
   }
 
   @Test
+  public void testInitWithCertChain(@TempDir Path tempDir) throws Exception {
+    String externalCaCertFileName = "CaCert.pem";
+    setExternalPathsInConfig(tempDir, externalCaCertFileName);
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    CertificateApprover approver = new DefaultApprover(new DefaultCAProfile(),
+        securityConfig);
+    SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf));
+    String scmId = RandomStringUtils.randomAlphabetic(4);
+    String clusterId = RandomStringUtils.randomAlphabetic(4);
+    KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
+    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    keyPEMWriter.writeKey(tempDir, keyPair, true);
+    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
+    LocalDate endDate =
+        LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .addIpAddress("8.8.8.8")
+        .addServiceName("OzoneMarketingCluster002")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("Ozone Cluster")
+        .setConfiguration(conf)
+        .setKey(keyPair)
+        .build();
+    X509CertificateHolder externalCert = generateExternalCert(keyPair);
+    X509CertificateHolder signedCert = approver.sign(securityConfig,
+        keyPair.getPrivate(), externalCert,
+        java.sql.Date.valueOf(beginDate), java.sql.Date.valueOf(endDate), csr,
+        scmId, clusterId);
+    CertificateFactory certFactory = new CertificateFactory();
+    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+        scmCertificateClient.getComponentName());
+
+    CertPath certPath = certFactory.engineGenerateCertPath(
+        ImmutableList.of(CertificateCodec.getX509Certificate(signedCert),
+            CertificateCodec.getX509Certificate(externalCert)));
+    certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
+        CertificateCodec.getPEMEncodedString(certPath));
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        RandomStringUtils.randomAlphabetic(4),
+        RandomStringUtils.randomAlphabetic(4), caStore,
+        new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    //When initializing a CA server with external cert
+    testCA.init(securityConfig, CAType.ROOT);
+    //Then the external cert is set as CA cert for the server.
+    assertEquals(signedCert, testCA.getCACertificate());
+  }
+
+  @Test
   public void testIntermediaryCA() throws Exception {
 
     conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
@@ -411,7 +481,7 @@ public class TestDefaultCAServer {
         clusterId, scmId, caStore, new DefaultProfile(),
         Paths.get("scm", "ca").toString());
 
-    rootCA.init(new SecurityConfig(conf), SELF_SIGNED_CA);
+    rootCA.init(new SecurityConfig(conf), CAType.ROOT);
 
 
     SCMCertificateClient scmCertificateClient =
@@ -432,12 +502,13 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    Future<X509CertificateHolder> holder = rootCA.requestCertificate(csr,
+    Future<CertPath> holder = rootCA.requestCertificate(csr,
         CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
     assertTrue(holder.isDone());
-
-    X509CertificateHolder certificateHolder = holder.get();
-
+    X509Certificate certificate =
+        CertificateCodec.firstCertificateFrom(holder.get());
+    X509CertificateHolder certificateHolder =
+        CertificateCodec.getCertificateHolder(certificate);
 
     assertNotNull(certificateHolder);
     LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
@@ -449,11 +520,12 @@ public class TestDefaultCAServer {
     X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 
     scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(rootCertHolder), true, true);
+        CertificateCodec.getPEMEncodedString(rootCertHolder),
+        CAType.SUBORDINATE);
 
     // Write to the location where Default CA Server reads from.
     scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(certificateHolder), true);
+        CertificateCodec.getPEMEncodedString(certificateHolder));
 
     CertificateCodec certCodec =
         new CertificateCodec(new SecurityConfig(conf),
@@ -467,7 +539,7 @@ public class TestDefaultCAServer {
         scmCertificateClient.getComponentName());
 
     try {
-      scmCA.init(new SecurityConfig(conf), INTERMEDIARY_CA);
+      scmCA.init(new SecurityConfig(conf), CAType.SUBORDINATE);
     } catch (Exception e) {
       fail("testIntermediaryCA failed during init");
     }

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -176,7 +175,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
-            Optional.of(missingParentInfos), Optional.of(dirInfo));
+            missingParentInfos, dirInfo);
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =

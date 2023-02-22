@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.DeletedObject;
@@ -158,15 +159,31 @@ public class BucketEndpoint extends EndpointBase {
       throw ex;
     }
 
+    // The valid encodingType Values is "url"
+    if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
+    }
+
+    // If you specify the encoding-type request parameter,should return
+    // encoded key name values in the following response elements:
+    //   Delimiter, Prefix, Key, and StartAfter.
+    //
+    // For detail refer:
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
+    // #AmazonS3-ListObjectsV2-response-EncodingType
+    //
     ListObjectResponse response = new ListObjectResponse();
-    response.setDelimiter(delimiter);
+    response.setDelimiter(
+        EncodingTypeObject.createNullable(delimiter, encodingType));
     response.setName(bucketName);
-    response.setPrefix(prefix);
+    response.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
     response.setMarker(marker == null ? "" : marker);
     response.setMaxKeys(maxKeys);
-    response.setEncodingType(ENCODING_TYPE);
+    response.setEncodingType(encodingType);
     response.setTruncated(false);
     response.setContinueToken(continueToken);
+    response.setStartAfter(
+        EncodingTypeObject.createNullable(startAfter, encodingType));
 
     String prevDir = null;
     if (continueToken != null) {
@@ -186,14 +203,16 @@ public class BucketEndpoint extends EndpointBase {
           String dirName = relativeKeyName.substring(0, relativeKeyName
               .indexOf(delimiter));
           if (!dirName.equals(prevDir)) {
-            response.addPrefix(prefix + dirName + delimiter);
+            response.addPrefix(EncodingTypeObject.createNullable(
+                prefix + dirName + delimiter, encodingType));
             prevDir = dirName;
             count++;
           }
         } else if (relativeKeyName.endsWith(delimiter)) {
           // means or key is same as prefix with delimiter at end and ends with
           // delimiter. ex: dir/, where prefix is dir and delimiter is /
-          response.addPrefix(relativeKeyName);
+          response.addPrefix(
+              EncodingTypeObject.createNullable(relativeKeyName, encodingType));
           count++;
         } else {
           // means our key is matched with prefix if prefix is given and it
@@ -648,7 +667,8 @@ public class BucketEndpoint extends EndpointBase {
 
   private void addKey(ListObjectResponse response, OzoneKey next) {
     KeyMetadata keyMetadata = new KeyMetadata();
-    keyMetadata.setKey(next.getName());
+    keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
+        response.getEncodingType()));
     keyMetadata.setSize(next.getDataSize());
     keyMetadata.setETag("" + next.getModificationTime());
     if (next.getReplicationType().toString().equals(ReplicationType

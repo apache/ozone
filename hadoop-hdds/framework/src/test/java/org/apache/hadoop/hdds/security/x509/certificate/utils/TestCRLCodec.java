@@ -41,7 +41,6 @@ import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.time.LocalDateTime;
 import java.util.Date;
@@ -57,6 +56,7 @@ import org.bouncycastle.cert.X509CRLEntryHolder;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,8 +159,8 @@ public class TestCRLCodec {
 
     byte[] crlBytes = TMP_CRL_ENTRY.getBytes(UTF_8);
     try (InputStream inStream = new ByteArrayInputStream(crlBytes)) {
-      CertificateFactory cf = CertificateFactory.getInstance("X.509");
-      X509CRL crl = (X509CRL)cf.generateCRL(inStream);
+      CertificateFactory cf = CertificateCodec.getCertFactory();
+      X509CRL crl = (X509CRL) cf.engineGenerateCRL(inStream);
 
       CRLCodec crlCodec = new CRLCodec(securityConfig);
       crlCodec.writeCRL(crl);
@@ -168,7 +168,7 @@ public class TestCRLCodec {
       // verify file generated or not
       File crlFile =
           Paths.get(crlCodec.getLocation().toString(),
-                    this.securityConfig.getCrlName()).toFile();
+              this.securityConfig.getCrlName()).toFile();
 
       assertTrue(crlFile.exists());
     }
@@ -271,7 +271,7 @@ public class TestCRLCodec {
       assertTrue(basePath.mkdirs());
     }
     codec.writeCertificate(basePath.toPath(), TMP_CERT_FILE_NAME,
-                           pemString, false);
+        pemString);
   }
 
   private X509CertificateHolder readTempCert()
@@ -281,7 +281,7 @@ public class TestCRLCodec {
         new CertificateCodec(securityConfig, COMPONENT);
 
     X509CertificateHolder x509CertHolder =
-        codec.readCertificate(basePath.toPath(), TMP_CERT_FILE_NAME);
+        codec.getTargetCertHolder(basePath.toPath(), TMP_CERT_FILE_NAME);
 
     assertNotNull(x509CertHolder);
 
