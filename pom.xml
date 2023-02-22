@@ -147,7 +147,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jaxb-api.version>2.3.0</jaxb-api.version>
     <jaxb-runtime.version>2.3.0.1</jaxb-runtime.version>
     <jsch.version>0.1.54</jsch.version>
-    <cdi-api.version>1.2</cdi-api.version>
+    <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <glassfish-servlet.version>3.1</glassfish-servlet.version>
     <jsp-api.version>2.1</jsp-api.version>
@@ -232,7 +232,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <rocksdb.version>7.7.3</rocksdb.version>
     <sqlite.version>3.25.2</sqlite.version>
-    <weld-servlet.version>2.4.7.Final</weld-servlet.version>
+    <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -1442,7 +1442,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.jboss.weld.servlet</groupId>
-        <artifactId>weld-servlet</artifactId>
+        <artifactId>weld-servlet-shaded</artifactId>
         <version>${weld-servlet.version}</version>
       </dependency>
       <dependency>
