@@ -1391,15 +1391,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             // Skip the key if it exists in the previous snapshot (of the same
             // scope) as in this case its blocks should not be reclaimed
 
-            // TODO:
+            // TODO: HDDS-7968
             //  1. If previous snapshot keyTable has key info.getObjectID(),
             //  skip it. Pending HDDS-7740 merge to reuse the util methods to
             //  check previousSnapshot.
             //  2. For efficient lookup, the addition in design doc 4.b)1.b
             //  is critical.
-            //  3. It is possible only some of the keys in the
-            //  RepeatedOmKeyInfo list can be reclaimed, make sure to
-            //  deletedTable accordingly.
+            //  3. With snapshot it is possible that only some of the keys in
+            //  the DB key's RepeatedOmKeyInfo list can be reclaimed,
+            //  make sure to update deletedTable accordingly in this case.
             //  4. Further optimization: Skip all snapshotted keys altogether
             //  e.g. by prefixing all unreclaimable keys, then calling seek
 
