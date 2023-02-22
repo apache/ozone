@@ -3616,8 +3616,8 @@
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
-      This default value, in combination with hdds.secret.key.rotate.duration=1d, result in that 7 secret keys for the
-      last 7 days will are kept valid at any point of time.
+      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 7 secret keys (for the
+      last 7 days) are kept valid at any point of time.
     </description>
   </property>
   <property>
@@ -3645,7 +3645,8 @@
     <tag>SCM, SECURITY</tag>
     <description>
       The algorithm that SCM uses to generate symmetric secret keys.
-      The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
+      A valid algorithm is the one supported by KeyGenerator, as described at
+      https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
     </description>
   </property>
 </configuration>

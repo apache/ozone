@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -38,8 +37,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 
 /**
@@ -51,6 +48,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   private final SCMContext scmContext;
   private final SecretKeyManager secretKeyManager;
+  private final SecretKeyConfig secretKeyConfig;
 
 
   /**
@@ -59,7 +57,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
   private final Lock serviceLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
 
-  private final Duration rotationCheckDuration;
   private final ScheduledExecutorService scheduler;
 
   @SuppressWarnings("parameternumber")
@@ -68,7 +65,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
                                  SCMRatisServer ratisServer) {
     this.scmContext = scmContext;
 
-    SecretKeyConfig secretKeyConfig = new SecretKeyConfig(conf,
+    secretKeyConfig = new SecretKeyConfig(conf,
         SCM_CA_CERT_STORAGE_DIR);
     SecretKeyStore secretKeyStore = new LocalSecretKeyStore(
         secretKeyConfig.getLocalSecretKeyFile());
@@ -83,11 +80,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat(getServiceName())
             .build());
-
-    long rotationCheckInMs = conf.getTimeDuration(
-        HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
-        HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
-    rotationCheckDuration = Duration.ofMillis(rotationCheckInMs);
 
     start();
   }
@@ -135,14 +127,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
     }
 
     try {
-      boolean rotated = secretKeyManager.checkAndRotate();
-      if (rotated) {
-        LOG.info("SecretKeys have been updated.");
-      } else {
-        LOG.info("SecretKeys have not been updated.");
-      }
+      secretKeyManager.checkAndRotate();
     } catch (TimeoutException e) {
-      LOG.error("Error occurred when updating SecretKeys", e);
+      LOG.error("Error occurred when updating SecretKeys.", e);
     }
   }
 
@@ -153,9 +140,10 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   @Override
   public void start() {
-    LOG.info("Scheduling rotation checker with interval {} seconds",
-        rotationCheckDuration.toMillis() / 1000);
-    scheduler.scheduleAtFixedRate(this, 0, rotationCheckDuration.toMillis(),
+    LOG.info("Scheduling rotation checker with interval {}",
+        secretKeyConfig.getRotationCheckDuration());
+    scheduler.scheduleAtFixedRate(this, 0,
+        secretKeyConfig.getRotationCheckDuration().toMillis(),
         TimeUnit.MILLISECONDS);
   }
 

@@ -34,6 +34,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURAT
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -46,6 +48,7 @@ public class SecretKeyConfig {
   private final Duration rotateDuration;
   private final Duration expiryDuration;
   private final String algorithm;
+  private final Duration rotationCheckDuration;
 
   public SecretKeyConfig(ConfigurationSource conf, String component) {
     String metadataDir = conf.get(HDDS_METADATA_DIR_NAME,
@@ -67,6 +70,11 @@ public class SecretKeyConfig {
 
     this.algorithm = conf.get(HDDS_SECRET_KEY_ALGORITHM,
         HDDS_SECRET_KEY_ALGORITHM_DEFAULT);
+
+    long rotationCheckInMs = conf.getTimeDuration(
+        HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
+        HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
+    this.rotationCheckDuration = Duration.ofMillis(rotationCheckInMs);
   }
 
   public Path getLocalSecretKeyFile() {
@@ -83,5 +91,9 @@ public class SecretKeyConfig {
 
   public String getAlgorithm() {
     return algorithm;
+  }
+
+  public Duration getRotationCheckDuration() {
+    return rotationCheckDuration;
   }
 }

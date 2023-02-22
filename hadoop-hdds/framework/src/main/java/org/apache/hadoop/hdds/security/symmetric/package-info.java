@@ -57,6 +57,7 @@
  * </ul>
  *
  * <p/>
- * The overall design is documented <a href=http://surl.li/epvkc>here</a>.
+ * The original overall design can be found at
+ * <a href=https://issues.apache.org/jira/browse/HDDS-7733>HDDS-7733</a>.
  */
 package org.apache.hadoop.hdds.security.symmetric;
