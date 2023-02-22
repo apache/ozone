@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -29,11 +27,8 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -155,82 +150,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           .addCacheEntry(new CacheKey<>(key),
             new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
 
-      // Create the snapshot checkpoint
-      OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
-          snapshotInfo);
-
-      // TODO: Check HDDS-7906.
-      //  Move the logic below inside of createOmSnapshotCheckpoint?
-
-      // Acquire deletedTable write lock first
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-          .writeLock().lock();
-      // Clean up active DB's deletedTable now that snapshot checkpoint is taken
-      // Note that BUCKET_LOCK and SNAPSHOT_LOCK write locks are still acquired
-
-      // TODO: Can abstract this operation into a method in Table class
-      //  Table#deleteKeysWithPrefix()
-
-      // Range delete start key (inclusive)
-      String beginKey =
-          omMetadataManager.getOzoneKey(volumeName, bucketName, "");
-
-      // Range delete end key (exclusive) to be found
-      String endKey;
-
-      // TODO: Start timer for perf tracking
-      try (TableIterator<String,
-          ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-          keyIter = omMetadataManager.getDeletedTable().iterator()) {
-
-        keyIter.seek(beginKey);
-        // Continue only when there are entries of snapshot (bucket) scope
-        // in deletedTable in the first place
-        if (!keyIter.hasNext()) {
-          // Use null as a marker. No need to do deleteRange() at all.
-          endKey = null;
-        } else {
-          // Remember the last key with a matching prefix
-          endKey = keyIter.next().getKey();
-
-          // Loop until prefix mismatches.
-          // TODO: Room for optimization? Seek next predicted bucket name.
-          while (keyIter.hasNext()) {
-            Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
-            String dbKey = entry.getKey();
-            if (dbKey.startsWith(beginKey)) {
-              endKey = dbKey;
-            }
-          }
-        }
-      }
-      // TODO: End timer. Print time elapsed to debug log
-
-      if (endKey != null) {
-        // Clean up deletedTable
-        omMetadataManager.getDeletedTable().deleteRange(beginKey, endKey);
-
-        // Remove range end key itself
-        omMetadataManager.getDeletedTable().delete(endKey);
-      }
-
-      // Note: We do not need to invalidate deletedTable cache since entries
-      // are not added to its table cache in the first place.
-      // See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
-
-      // This makes the table clean up efficient as we only need one
-      // deleteRange() operation. No need to invalidate cache entries
-      // one by one.
-
-      // Release deletedTable lock. TODO: Release in finally.
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-          .writeLock().unlock();
-
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
-          omResponse.build(), volumeName, bucketName, snapshotName);
+          omResponse.build(), snapshotInfo);
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(

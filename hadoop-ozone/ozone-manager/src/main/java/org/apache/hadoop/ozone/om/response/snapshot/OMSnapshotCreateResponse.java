@@ -28,18 +28,22 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
  * Response for OMSnapshotCreateRequest.
  */
-@CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
+@CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE, DELETED_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
+  private SnapshotInfo snapshotInfo;
+
   public OMSnapshotCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull String volumeName, @Nonnull String bucketName,
-                                  @Nonnull String snapshotName) {
+      @Nonnull SnapshotInfo snapshotInfo) {
     super(omResponse);
+    this.snapshotInfo = snapshotInfo;
   }
 
   /**
@@ -55,11 +59,8 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    SnapshotInfo snapshotInfo =
-        SnapshotInfo.getFromProtobuf(
-        getOMResponse().getCreateSnapshotResponse().getSnapshotInfo());
-
     // Create the snapshot checkpoint
+    // Also cleans up deletedTable
     OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
         snapshotInfo);
 

@@ -30,11 +30,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
@@ -61,12 +64,14 @@ public final class OmSnapshotManager implements AutoCloseable {
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
   private final OzoneManager ozoneManager;
+  private final OMMetadataManager omMetadataManager;
   private final SnapshotDiffManager snapshotDiffManager;
   private final LoadingCache<String, OmSnapshot> snapshotCache;
   private final ManagedRocksDB snapshotDiffDb;
 
   OmSnapshotManager(OzoneManager ozoneManager) {
     this.ozoneManager = ozoneManager;
+    this.omMetadataManager = ozoneManager.getMetadataManager();
 
     // Pass in the differ
     final RocksDBCheckpointDiffer differ = ozoneManager
@@ -157,8 +162,23 @@ public final class OmSnapshotManager implements AutoCloseable {
       throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
 
-    final DBCheckpoint dbCheckpoint = store.getSnapshot(
-        snapshotInfo.getCheckpointDirName());
+    final DBCheckpoint dbCheckpoint;
+
+    // Acquire deletedTable write lock
+    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
+        .writeLock().lock();
+    try {
+      // Create DB checkpoint for snapshot
+      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+      // Clean up active DB's deletedTable right after checkpoint is taken,
+      // with table write lock held
+      deleteKeysInSnapshotScopeFromDTableInternal(omMetadataManager,
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+    } finally {
+      // Release deletedTable write lock
+      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
+          .writeLock().unlock();
+    }
 
     LOG.info("Created checkpoint : {} for snapshot {}",
         dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
@@ -184,6 +204,99 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     return dbCheckpoint;
+  }
+
+  /**
+   * Helper method to delete keys in the snapshot scope from active DB's
+   * deletedTable.
+   * <p>
+   * Holds deletedTable write lock during the process.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   */
+  public void deleteKeysInSnapshotScopeFromDTable(
+      String volumeName, String bucketName) throws IOException {
+
+    // Acquire deletedTable write lock first
+    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
+        .writeLock().lock();
+    // Clean up active DB's deletedTable now that snapshot checkpoint is taken
+    // Note that BUCKET_LOCK and SNAPSHOT_LOCK write locks are still acquired
+
+    try {
+      deleteKeysInSnapshotScopeFromDTableInternal(omMetadataManager,
+          volumeName, bucketName);
+    } finally {
+      // Release deletedTable lock
+      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
+          .writeLock().unlock();
+    }
+  }
+
+  /**
+   * Helper method to delete keys in the snapshot scope from active DB's
+   * deletedTable.
+   *
+   * @param omMetadataManager OMMetadataManager instance
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   */
+  private static void deleteKeysInSnapshotScopeFromDTableInternal(
+      OMMetadataManager omMetadataManager,
+      String volumeName,
+      String bucketName) throws IOException {
+
+    // Range delete start key (inclusive)
+    String beginKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+
+    // Range delete end key (exclusive) to be found
+    String endKey;
+
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+        keyIter = omMetadataManager.getDeletedTable().iterator()) {
+
+      // TODO: Start timer for perf tracking
+      keyIter.seek(beginKey);
+      // Continue only when there are entries of snapshot (bucket) scope
+      // in deletedTable in the first place
+      if (!keyIter.hasNext()) {
+        // Use null as a marker. No need to do deleteRange() at all.
+        endKey = null;
+      } else {
+        // Remember the last key with a matching prefix
+        endKey = keyIter.next().getKey();
+
+        // Loop until prefix mismatches.
+        // TODO: Room for optimization? Seek next predicted bucket name.
+        while (keyIter.hasNext()) {
+          Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
+          String dbKey = entry.getKey();
+          if (dbKey.startsWith(beginKey)) {
+            endKey = dbKey;
+          }
+        }
+      }
+    }
+    // TODO: End timer. Print time elapsed to debug log
+
+    if (endKey != null) {
+      // Clean up deletedTable
+      omMetadataManager.getDeletedTable().deleteRange(beginKey, endKey);
+
+      // Remove range end key itself
+      omMetadataManager.getDeletedTable().delete(endKey);
+    }
+
+    // Note: We do not need to invalidate deletedTable cache since entries
+    // are not added to its table cache in the first place.
+    // See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
+
+    // This makes the table clean up efficient as we only need one
+    // deleteRange() operation. No need to invalidate cache entries
+    // one by one.
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator

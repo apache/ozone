@@ -45,7 +45,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
-
 /**
  * This class tests OMSnapshotCreateResponse.
  */
@@ -98,7 +97,7 @@ public class TestOMSnapshotCreateResponse {
             .setCreateSnapshotResponse(
                 CreateSnapshotResponse.newBuilder()
                 .setSnapshotInfo(snapshotInfo.getProtobuf())
-                .build()).build(), volumeName, bucketName, snapshotName);
+                .build()).build(), snapshotInfo);
     omSnapshotCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
