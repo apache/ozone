@@ -209,34 +209,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   /**
    * Helper method to delete keys in the snapshot scope from active DB's
    * deletedTable.
-   * <p>
-   * Holds deletedTable write lock during the process.
-   *
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   */
-  public void deleteKeysInSnapshotScopeFromDTable(
-      String volumeName, String bucketName) throws IOException {
-
-    // Acquire deletedTable write lock first
-    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-        .writeLock().lock();
-    // Clean up active DB's deletedTable now that snapshot checkpoint is taken
-    // Note that BUCKET_LOCK and SNAPSHOT_LOCK write locks are still acquired
-
-    try {
-      deleteKeysInSnapshotScopeFromDTableInternal(omMetadataManager,
-          volumeName, bucketName);
-    } finally {
-      // Release deletedTable lock
-      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
-          .writeLock().unlock();
-    }
-  }
-
-  /**
-   * Helper method to delete keys in the snapshot scope from active DB's
-   * deletedTable.
    *
    * @param omMetadataManager OMMetadataManager instance
    * @param volumeName volume name
