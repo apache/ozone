@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
@@ -82,6 +83,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -347,6 +349,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneAdmins s3OzoneAdmins;
 
   private final OMMetrics metrics;
+  private OMHAMetrics omhaMetrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       omClientProtocolMetrics;
   private OzoneManagerHttpServer httpServer;
@@ -1894,6 +1897,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
+    RaftPeer leader = null;
+    try {
+      leader = omRatisServer.getLeader();
+    } catch (IOException ex) {
+      LOG.error("IOException while getting the " +
+          "Ratis server leader.", ex);
+    }
+    if (Objects.nonNull(leader)) {
+      String leaderId = leader.getId().toString();
+
+      // If leaderId is empty, then leader is undefined
+      // and current OM is neither leader nor follower.
+      // OMHAMetrics shouldn't be registered in that case.
+      if (!Strings.isNullOrEmpty(leaderId)) {
+        omHAMetricsInit(leaderId);
+      } else {
+        // unregister, to get rid of stale metrics
+        OMHAMetrics.unRegister();
+      }
+    }
   }
 
   /**
@@ -2160,6 +2183,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisServer != null) {
         omRatisServer.stop();
         omRatisServer = null;
+        OMHAMetrics.unRegister();
       }
       isOmRpcServerRunning = false;
       if (isOmGrpcServerEnabled) {
@@ -2909,6 +2933,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       return "Ratis-Disabled";
     }
+  }
+
+  /**
+   * Create OMHAMetrics instance.
+   */
+  private void omHAMetricsInit(String leaderId) {
+    // unregister, in case metrics already exist
+    // so that the metric tags will get updated.
+    OMHAMetrics.unRegister();
+    omhaMetrics = OMHAMetrics
+        .create(getOMNodeId(), leaderId);
+  }
+
+  @VisibleForTesting
+  public OMHAMetrics getOmhaMetrics() {
+    return omhaMetrics;
   }
 
   public String getRatisLogDirectory() {
