@@ -126,22 +126,6 @@ public final class DiskBalancerConfiguration {
     this.diskBalancerTimeout = duration.toMillis();
   }
 
-  @Config(key = "version",
-      defaultValue = "ONE",
-      type = ConfigType.STRING,
-      tags = { DATANODE, ConfigTag.DISKBALANCER},
-      description = "The version of the disk balancer service"
-  )
-  private String diskBalancerVersion = "ONE";
-
-  public String getDiskBalancerVersion() {
-    return diskBalancerVersion;
-  }
-
-  public void setDiskBalancerVersion(String version) {
-    this.diskBalancerVersion = version;
-  }
-
   public DiskBalancerConfiguration() {
   }
 

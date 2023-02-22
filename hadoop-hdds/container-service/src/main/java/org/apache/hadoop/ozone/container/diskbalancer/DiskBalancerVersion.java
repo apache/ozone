@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 
 import java.util.List;
 
@@ -63,20 +61,6 @@ public enum DiskBalancerVersion {
       }
     }
     return null;
-  }
-
-  /**
-   * @return the latest version.
-   */
-  public static DiskBalancerVersion getConfiguredVersion(
-      ConfigurationSource conf) {
-    try {
-      return getDiskBalancerVersion(
-          conf.getObject(DiskBalancerConfiguration.class).
-              getDiskBalancerVersion());
-    } catch (IllegalArgumentException e) {
-      return DEFAULT_VERSION;
-    }
   }
 
   /**

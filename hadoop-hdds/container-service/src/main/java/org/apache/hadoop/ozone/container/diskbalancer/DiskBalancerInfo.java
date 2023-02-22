@@ -51,8 +51,7 @@ public class DiskBalancerInfo {
     this.threshold = diskBalancerConf.getThreshold();
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
     this.parallelThread = diskBalancerConf.getParallelThread();
-    this.version = DiskBalancerVersion.getDiskBalancerVersion(
-        diskBalancerConf.getDiskBalancerVersion());
+    this.version = DiskBalancerVersion.DEFAULT_VERSION;
   }
 
   public void updateFromConf(DiskBalancerConfiguration diskBalancerConf) {

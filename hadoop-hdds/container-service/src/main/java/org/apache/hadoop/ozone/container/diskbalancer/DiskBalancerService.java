@@ -62,6 +62,8 @@ public class DiskBalancerService extends BackgroundService {
 
   public static final String DISK_BALANCER_DIR = "diskBalancer";
 
+  private static final String DISK_BALANCER_TMP_DIR = "tmp";
+
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
 
@@ -367,7 +369,8 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
-    return hddsVolume.getTmpDir().toPath().resolve(DISK_BALANCER_DIR);
+    return new File(hddsVolume.getStorageDir(), hddsVolume.getClusterID())
+        .toPath().resolve(DISK_BALANCER_TMP_DIR).resolve(DISK_BALANCER_DIR);
   }
 
   public boolean isBalancingContainer(long containerId) {
