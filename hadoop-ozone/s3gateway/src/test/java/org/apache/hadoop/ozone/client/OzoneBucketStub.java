@@ -447,4 +447,17 @@ public class OzoneBucketStub extends OzoneBucket {
   public ReplicationConfig getReplicationConfig() {
     return this.replicationConfig;
   }
+
+  @Override
+  public void createDirectory(String keyName) throws IOException {
+    keyDetails.put(keyName, new OzoneKeyDetails(
+        getVolumeName(),
+        getName(),
+        keyName,
+        0,
+        System.currentTimeMillis(),
+        System.currentTimeMillis(),
+        new ArrayList<>(), replicationConfig, new HashMap<>(), null,
+        () -> readKey(keyName), false));
+  }
 }

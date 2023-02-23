@@ -33,10 +33,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.commons.io.IOUtils;
@@ -47,9 +45,10 @@ import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.when;
 
 /**
  * Test get object.
@@ -233,31 +232,21 @@ public class TestObjectGet {
   public void testGetWhenKeyIsNotAFileAndDoesNotEndWithASlash()
       throws IOException {
     // GIVEN
-    final String bucketName = "bucket";
-    final String keyPath = "key";
-    final ObjectEndpoint objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    final OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
-    objectEndpoint.setClient(ozoneClient);
-    final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
-    final OzoneKeyDetails ozoneKeyDetails = Mockito.mock(OzoneKeyDetails.class);
+    final String bucketName = "b1";
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    rest.setOzoneConfiguration(config);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(bucketName);
+    bucket.createDirectory(keyPath);
 
     // WHEN
-    when(ozoneClient.getProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.getS3KeyDetails(bucketName, keyPath))
-        .thenReturn(ozoneKeyDetails);
-    when(ozoneKeyDetails.isFile()).thenReturn(false);
-
     final OS3Exception ex =
         Assertions.assertThrows(OS3Exception.class,
-            () ->
-                objectEndpoint.get(bucketName, keyPath, null, 1000, "1", null));
+            () -> rest.get(bucketName, keyPath, null, 0, null, body));
 
     // THEN
-    Assertions.assertEquals("NoSuchKey", ex.getCode());
-    Assertions.assertEquals("The specified key does not exist",
-        ex.getErrorMessage());
-    Assertions.assertEquals("key", ex.getResource());
-
+    Assertions.assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
+    bucket.deleteKey(keyPath);
   }
 }

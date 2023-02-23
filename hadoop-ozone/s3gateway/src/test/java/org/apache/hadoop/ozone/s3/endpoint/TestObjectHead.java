@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 
@@ -32,14 +31,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.mockito.Mockito.when;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.http.HttpStatus;
@@ -47,7 +44,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.mockito.Mockito;
 
 /**
  * Test head object.
@@ -112,77 +108,61 @@ public class TestObjectHead {
 
   @Test
   public void testHeadWhenKeyIsAFileAndKeyPathDoesNotEndWithASlash()
-      throws IOException,
-      OS3Exception {
+      throws IOException, OS3Exception {
     // GIVEN
-    final String keyPath = "dir";
-    final ObjectEndpoint objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    final OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
-    objectEndpoint.setClient(ozoneClient);
-    final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
-    final OzoneKey ozoneKey = Mockito.mock(OzoneKey.class);
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    String keyContent = "content";
+    OzoneOutputStream out = bucket.createKey(keyPath,
+        keyContent.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), new HashMap<>());
+    out.write(keyContent.getBytes(UTF_8));
+    out.close();
 
     // WHEN
-    when(ozoneClient.getProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneKey.getModificationTime())
-        .thenReturn(Instant.ofEpochMilli(System.currentTimeMillis()));
-    when(ozoneKey.isFile()).thenReturn(true);
-
-    final Response response = objectEndpoint.head(bucketName, keyPath);
+    final Response response = keyEndpoint.head(bucketName, keyPath);
 
     // THEN
     Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    bucket.deleteKey(keyPath);
   }
 
   @Test
   public void testHeadWhenKeyIsNotAFileAndKeyPathDoesNotEndWithASlash()
-      throws IOException,
-      OS3Exception {
+      throws IOException, OS3Exception {
     // GIVEN
-    final String keyPath = "dir";
-    final ObjectEndpoint objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    final OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
-    objectEndpoint.setClient(ozoneClient);
-    final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
-    final OzoneKey ozoneKey = Mockito.mock(OzoneKey.class);
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    bucket.createDirectory(keyPath);
 
     // WHEN
-    when(ozoneClient.getProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneKey.isFile()).thenReturn(false);
-
-    final Response response = objectEndpoint.head(bucketName, keyPath);
+    final Response response = keyEndpoint.head(bucketName, keyPath);
 
     // THEN
     Assertions.assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
+    bucket.deleteKey(keyPath);
   }
 
   @Test
   public void testHeadWhenKeyIsNotAFileAndKeyPathEndsWithASlash()
-      throws IOException,
-      OS3Exception {
+      throws IOException, OS3Exception {
     // GIVEN
-    final String keyPath = "dir/";
-    final ObjectEndpoint objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    final OzoneClient ozoneClient = Mockito.mock(OzoneClient.class);
-    objectEndpoint.setClient(ozoneClient);
-    final ClientProtocol clientProtocol = Mockito.mock(ClientProtocol.class);
-    final OzoneKey ozoneKey = Mockito.mock(OzoneKey.class);
+    final String keyPath = "keyDir/";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    bucket.createDirectory(keyPath);
 
     // WHEN
-    when(ozoneClient.getProxy()).thenReturn(clientProtocol);
-    when(clientProtocol.headS3Object(bucketName, keyPath)).thenReturn(ozoneKey);
-    when(ozoneKey.isFile()).thenReturn(false);
-    when(ozoneKey.getModificationTime())
-        .thenReturn(Instant.ofEpochMilli(System.currentTimeMillis()));
-
-    final Response response = objectEndpoint.head(bucketName, keyPath);
+    final Response response = keyEndpoint.head(bucketName, keyPath);
 
     // THEN
     Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    bucket.deleteKey(keyPath);
   }
 }
