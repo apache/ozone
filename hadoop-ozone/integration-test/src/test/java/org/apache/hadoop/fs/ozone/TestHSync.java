@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.StorageUnit;
@@ -39,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -130,18 +133,57 @@ public class TestHSync {
     }
   }
 
-  private void runTestHSync(FileSystem fs, Path file) throws Exception {
-    final byte[] data = new byte[1 << 20];
-    ThreadLocalRandom.current().nextBytes(data);
-
-    try (FSDataOutputStream stream = fs.create(file, true)) {
-      stream.write(data);
-      stream.hsync();
+  static void runTestHSync(FileSystem fs, Path file) throws Exception {
+    try (StreamWithLength out = new StreamWithLength(
+        fs.create(file, true))) {
+      runTestHSync(fs, file, out, 1);
+      for (int i = 1; i < 5; i++) {
+        for (int j = -1; j <= 1; j++) {
+          int dataSize = (1 << (i * 5)) + j;
+          runTestHSync(fs, file, out, dataSize);
+        }
+      }
     }
+  }
+
+  private static class StreamWithLength implements Closeable {
+    private final FSDataOutputStream out;
+    private long length = 0;
+
+    StreamWithLength(FSDataOutputStream out) {
+      this.out = out;
+    }
+
+    long getLength() {
+      return length;
+    }
+
+    void writeAndHsync(byte[] data) throws IOException {
+      out.write(data);
+      out.hsync();
+      length += data.length;
+    }
+
+    @Override
+    public void close() throws IOException {
+      out.close();
+    }
+  }
+
+  static void runTestHSync(FileSystem fs, Path file,
+      StreamWithLength out, int dataSize)
+      throws Exception {
+    final long length = out.getLength();
+    final byte[] data = new byte[dataSize];
+    ThreadLocalRandom.current().nextBytes(data);
+    out.writeAndHsync(data);
 
     final byte[] buffer = new byte[4 << 10];
     int offset = 0;
     try (FSDataInputStream in = fs.open(file)) {
+      final long skipped = in.skip(length);
+      Assertions.assertEquals(length, skipped);
+
       for (; ;) {
         final int n = in.read(buffer, 0, buffer.length);
         if (n <= 0) {
