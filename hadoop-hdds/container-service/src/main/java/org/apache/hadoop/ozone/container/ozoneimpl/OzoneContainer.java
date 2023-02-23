@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
+import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -87,6 +88,8 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
@@ -127,6 +130,7 @@ public class OzoneContainer {
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private final DiskBalancerService diskBalancerService;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
@@ -260,9 +264,17 @@ public class OzoneContainer {
             datanodeDetails.threadNamePrefix(),
             context.getParent().getReconfigurationHandler());
 
+    Duration diskBalancerSvcInterval = conf.getObject(
+        DiskBalancerConfiguration.class).getDiskBalancerInterval();
+    Duration diskBalancerSvcTimeout = conf.getObject(
+        DiskBalancerConfiguration.class).getDiskBalancerTimeout();
+    diskBalancerService =
+        new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
+            diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
+            config);
+
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
-
     long recoveringContainerScrubbingServiceTimeout = config
         .getTimeDuration(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
             OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT,
@@ -509,6 +521,7 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     blockDeletingService.start();
+    diskBalancerService.start();
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
@@ -539,6 +552,7 @@ public class OzoneContainer {
       dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
+    diskBalancerService.shutdown();
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
@@ -656,7 +670,14 @@ public class OzoneContainer {
   }
 
   public DiskBalancerReportProto getDiskBalancerReport() {
-    // TODO: Return real disk balancer report
-    return null;
+    return diskBalancerService.getDiskBalancerReportProto();
+  }
+
+  public DiskBalancerInfo getDiskBalancerInfo() {
+    return diskBalancerService.getDiskBalancerInfo();
+  }
+
+  public DiskBalancerService getDiskBalancerService() {
+    return diskBalancerService;
   }
 }

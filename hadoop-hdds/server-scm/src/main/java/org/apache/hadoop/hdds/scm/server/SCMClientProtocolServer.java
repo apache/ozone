@@ -1339,6 +1339,7 @@ public class SCMClientProtocolServer implements
         ContainerID.valueOf(startContainerID), count, state);
   }
 
+  @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count, int clientVersion) throws IOException {
     // check admin authorisation
@@ -1374,15 +1375,27 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
       Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
       Optional<List<String>> hosts) throws IOException {
-    // TODO: Send message to datanodes
-    return new ArrayList<DatanodeAdminError>();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+    } catch (IOException e) {
+      LOG.error("Authorization failed", e);
+      throw e;
+    }
+
+    return scm.getDiskBalancerManager()
+        .startDiskBalancer(threshold, bandwidthInMB, parallelThread, hosts);
   }
 
   @Override
   public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
-    // TODO: Send message to datanodes
-    return new ArrayList<DatanodeAdminError>();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+    } catch (IOException e) {
+      LOG.error("Authorization failed", e);
+      throw e;
+    }
+    return scm.getDiskBalancerManager().stopDiskBalancer(hosts);
   }
 
 
@@ -1391,8 +1404,15 @@ public class SCMClientProtocolServer implements
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread, Optional<List<String>> hosts)
       throws IOException {
-    // TODO: Send message to datanodes
-    return new ArrayList<DatanodeAdminError>();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+    } catch (IOException e) {
+      LOG.error("Authorization failed", e);
+      throw e;
+    }
+
+    return scm.getDiskBalancerManager().updateDiskBalancerConfiguration(
+        threshold, bandwidthInMB, parallelThread, hosts);
   }
 
   /**

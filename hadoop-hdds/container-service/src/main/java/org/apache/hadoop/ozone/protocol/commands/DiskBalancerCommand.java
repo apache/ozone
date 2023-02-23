@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 
@@ -29,12 +30,12 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
  */
 public class DiskBalancerCommand extends SCMCommand<DiskBalancerCommandProto> {
 
-  private final boolean shouldRun;
+  private final HddsProtos.DiskBalancerOpType opType;
   private final DiskBalancerConfiguration diskBalancerConfiguration;
 
-  public DiskBalancerCommand(final boolean shouldRun,
+  public DiskBalancerCommand(final HddsProtos.DiskBalancerOpType opType,
       final DiskBalancerConfiguration diskBalancerConfiguration) {
-    this.shouldRun = shouldRun;
+    this.opType = opType;
     this.diskBalancerConfiguration = diskBalancerConfiguration;
   }
 
@@ -50,22 +51,26 @@ public class DiskBalancerCommand extends SCMCommand<DiskBalancerCommandProto> {
 
   @Override
   public DiskBalancerCommandProto getProto() {
-    return DiskBalancerCommandProto.newBuilder()
-        .setShouldRun(shouldRun)
-        .setDiskBalancerConf(diskBalancerConfiguration.toProtobufBuilder())
-        .build();
+    DiskBalancerCommandProto.Builder builder = DiskBalancerCommandProto
+        .newBuilder().setOpType(opType);
+    // Stop command don't have diskBalancerConf
+    if (diskBalancerConfiguration != null) {
+      builder.setDiskBalancerConf(
+          diskBalancerConfiguration.toProtobufBuilder());
+    }
+    return builder.build();
   }
 
   public static DiskBalancerCommand getFromProtobuf(DiskBalancerCommandProto
       diskbalancerCommandProto, ConfigurationSource configuration) {
     Preconditions.checkNotNull(diskbalancerCommandProto);
-    return new DiskBalancerCommand(diskbalancerCommandProto.getShouldRun(),
+    return new DiskBalancerCommand(diskbalancerCommandProto.getOpType(),
         DiskBalancerConfiguration.fromProtobuf(
             diskbalancerCommandProto.getDiskBalancerConf(), configuration));
   }
 
-  public boolean isShouldRun() {
-    return shouldRun;
+  public HddsProtos.DiskBalancerOpType getOpType() {
+    return opType;
   }
 
   public DiskBalancerConfiguration getDiskBalancerConfiguration() {
