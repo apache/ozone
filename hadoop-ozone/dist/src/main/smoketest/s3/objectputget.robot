@@ -35,10 +35,10 @@ Put object to s3
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/key=value/
                         Should contain             ${result}         f1
 
-                        Execute                    touch -f /tmp/zerobyte
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --body /tmp/zerobyte
+                        Execute                    touch -f /tmp/zero-byte
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zero-byte --body /tmp/zero-byte
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/key=value/
-                        Should contain             ${result}         zerobyte
+                        Should contain             ${result}         zero-byte
 
 #This test depends on the previous test case. Can't be executes alone
 Get object from s3
