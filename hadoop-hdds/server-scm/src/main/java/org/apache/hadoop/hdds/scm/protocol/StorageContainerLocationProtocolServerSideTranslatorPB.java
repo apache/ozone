@@ -1258,21 +1258,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     List<DatanodeAdminError> errors;
     switch (request.getOpType()) {
-    case start:
+    case START:
       errors = impl.startDiskBalancer(
           Optional.of(request.getConf().getThreshold()),
           Optional.of(request.getConf().getDiskBandwidthInMB()),
           Optional.of(request.getConf().getParallelThread()),
           Optional.of(request.getHostsList()));
       break;
-    case update:
+    case UPDATE:
       errors = impl.updateDiskBalancerConfiguration(
           Optional.of(request.getConf().getThreshold()),
           Optional.of(request.getConf().getDiskBandwidthInMB()),
           Optional.of(request.getConf().getParallelThread()),
           Optional.of(request.getHostsList()));
       break;
-    case stop:
+    case STOP:
       errors = impl.stopDiskBalancer(Optional.of(request.getHostsList()));
       break;
     default:

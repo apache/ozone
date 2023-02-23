@@ -16,14 +16,20 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -56,7 +62,38 @@ public class DiskBalancerCommandHandler implements CommandHandler {
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
     invocationCount.incrementAndGet();
-    // TODO: Do start/stop/update operation
+    final long startTime = Time.monotonicNow();
+    DiskBalancerCommand diskBalancerCommand = (DiskBalancerCommand) command;
+
+    final HddsProtos.DiskBalancerOpType opType =
+        diskBalancerCommand.getOpType();
+    final DiskBalancerConfiguration diskBalancerConf =
+        diskBalancerCommand.getDiskBalancerConfiguration();
+
+    DiskBalancerInfo diskBalancerInfo = ozoneContainer.getDiskBalancerInfo();
+
+    try {
+      switch (opType) {
+      case START:
+        diskBalancerInfo.setShouldRun(true);
+        diskBalancerInfo.updateFromConf(diskBalancerConf);
+        break;
+      case STOP:
+        diskBalancerInfo.setShouldRun(false);
+        break;
+      case UPDATE:
+        diskBalancerInfo.updateFromConf(diskBalancerConf);
+        break;
+      default:
+        throw new IOException("Unexpected type " + opType);
+      }
+      ozoneContainer.getDiskBalancerService().refresh(diskBalancerInfo);
+    } catch (IOException e) {
+      LOG.error("Can't handle command type: {}", opType, e);
+    } finally {
+      long endTime = Time.monotonicNow();
+      totalTime += endTime - startTime;
+    }
   }
 
   /**

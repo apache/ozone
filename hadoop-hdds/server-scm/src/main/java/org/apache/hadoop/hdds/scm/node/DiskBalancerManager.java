@@ -24,10 +24,15 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,6 +131,118 @@ public class DiskBalancerManager {
     }
   }
 
+  /**
+   * Send startDiskBalancer command to datanodes.
+   * If hosts is not specified, send commands to all healthy datanodes.
+   * @param threshold new configuration of threshold
+   * @param bandwidthInMB new configuration of bandwidthInMB
+   * @param parallelThread new configuration of parallelThread
+   * @param hosts Datanodes that command will apply on
+   * @return Possible errors
+   * @throws IOException
+   */
+  public List<DatanodeAdminError> startDiskBalancer(
+      Optional<Double> threshold, Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread, Optional<List<String>> hosts)
+      throws IOException {
+    List<DatanodeDetails> dns;
+    if (hosts.isPresent()) {
+      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+          useHostnames);
+    } else {
+      dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    }
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeDetails dn : dns) {
+      try {
+        if (nodeManager.getNodeStatus(dn).isHealthy()) {
+          errors.add(new DatanodeAdminError(dn.getHostName(),
+              "Datanode not in healthy state"));
+          continue;
+        }
+        // If command doesn't have configuration change, then we reuse the
+        // latest configuration reported from Datnaodes
+        DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
+            threshold, bandwidthInMB, parallelThread);
+        DiskBalancerCommand command = new DiskBalancerCommand(
+            HddsProtos.DiskBalancerOpType.START, updateConf);
+        sendCommand(dn, command);
+      } catch (Exception e) {
+        errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
+      }
+    }
+    return errors;
+  }
+
+  /**
+   * Send stopDiskBalancer command to datanodes
+   * If hosts is not specified, send commands to all datanodes.
+   * @param hosts Datanodes that command will apply on
+   * */
+  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException {
+    List<DatanodeDetails> dns;
+    if (hosts.isPresent()) {
+      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+          useHostnames);
+    } else {
+      dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    }
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeDetails dn : dns) {
+      try {
+        DiskBalancerCommand command = new DiskBalancerCommand(
+            HddsProtos.DiskBalancerOpType.STOP, null);
+        sendCommand(dn, command);
+      } catch (Exception e) {
+        errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
+      }
+    }
+    return errors;
+  }
+
+
+  /**
+   * Send update DiskBalancerConf command to datanodes.
+   * If hosts is not specified, send commands to all healthy datanodes.
+   * @param threshold new configuration of threshold
+   * @param bandwidthInMB new configuration of bandwidthInMB
+   * @param parallelThread new configuration of parallelThread
+   * @param hosts Datanodes that command will apply on
+   * @return Possible errors
+   * @throws IOException
+   */
+  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold, Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread, Optional<List<String>> hosts)
+      throws IOException {
+    List<DatanodeDetails> dns;
+    if (hosts.isPresent()) {
+      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+          useHostnames);
+    } else {
+      dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    }
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeDetails dn : dns) {
+      try {
+        // If command doesn't have configuration change, then we reuse the
+        // latest configuration reported from Datnaodes
+        DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
+            threshold, bandwidthInMB, parallelThread);
+        DiskBalancerCommand command = new DiskBalancerCommand(
+            HddsProtos.DiskBalancerOpType.UPDATE, updateConf);
+        sendCommand(dn, command);
+      } catch (Exception e) {
+        errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
+      }
+    }
+    return errors;
+  }
+
   private boolean shouldReturnDatanode(
       HddsProtos.DiskBalancerRunningStatus status,
       DatanodeDetails datanodeDetails) {
@@ -216,6 +333,30 @@ public class DiskBalancerManager {
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }
+  }
+
+  private DiskBalancerConfiguration attachDiskBalancerConf(
+      DatanodeDetails dn, Optional<Double> threshold,
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread) {
+    DiskBalancerConfiguration baseConf = statusMap.containsKey(dn) ?
+        statusMap.get(dn).getDiskBalancerConfiguration() :
+        new DiskBalancerConfiguration();
+    threshold.ifPresent(baseConf::setThreshold);
+    bandwidthInMB.ifPresent(baseConf::setDiskBandwidthInMB);
+    parallelThread.ifPresent(baseConf::setParallelThread);
+    return baseConf;
+  }
+
+  private void sendCommand(DatanodeDetails dn, DiskBalancerCommand command) {
+    try {
+      command.setTerm(scmContext.getTermOfLeader());
+    } catch (NotLeaderException nle) {
+      LOG.warn("Skip sending DiskBalancerCommand for Datanode {}," +
+          " since not leader SCM.", dn.getUuidString());
+      return;
+    }
+    scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+        new CommandForDatanode<>(dn.getUuid(), command));
   }
 
   @VisibleForTesting
