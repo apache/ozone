@@ -51,7 +51,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
@@ -1899,17 +1898,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     RaftPeer leader = omRatisServer.getLeader();
     if (Objects.nonNull(leader)) {
+      // If we have any leader information, its id cannot be null.
       String leaderId = leader.getId().toString();
-
-      // If leaderId is empty, then leader is undefined
-      // and current OM is neither leader nor follower.
-      // OMHAMetrics shouldn't be registered in that case.
-      if (!Strings.isNullOrEmpty(leaderId)) {
-        omHAMetricsInit(leaderId);
-      } else {
-        // unregister, to get rid of stale metrics
-        OMHAMetrics.unRegister();
-      }
+      omHAMetricsInit(leaderId);
+    } else {
+      LOG.error("OzoneManagerRatisServer leader is null, " +
+          "unregistering OMHAMetrics.");
+      // Unregister, to get rid of stale metrics
+      OMHAMetrics.unRegister();
     }
   }
 
