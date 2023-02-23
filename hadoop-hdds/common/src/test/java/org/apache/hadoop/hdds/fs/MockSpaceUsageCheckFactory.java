@@ -50,6 +50,22 @@ public final class MockSpaceUsageCheckFactory {
     }
   }
 
+  /**
+   * An implementation that never checks space usage but reports basically
+   * 512G free space.  Neither does it persist space usage info.
+   */
+  public static class HalfTera implements SpaceUsageCheckFactory {
+    @Override
+    public SpaceUsageCheckParams paramsFor(File dir) {
+      return new SpaceUsageCheckParams(dir,
+          MockSpaceUsageSource.fixed(512L * 1024 * 1024 * 1024,
+              512L * 1024 * 1024 * 1024),
+          Duration.ZERO,
+          SpaceUsagePersistence.None.INSTANCE
+      );
+    }
+  }
+
   private MockSpaceUsageCheckFactory() {
     throw new UnsupportedOperationException("no instances");
   }
