@@ -452,7 +452,7 @@ message DatanodeDetailsAndReplicaIndexProto {
 This command asks the datanode to update diskBalancer status
  */
 message DiskBalancerCommandProto {
-  required bool shouldRun = 1;
+  required DiskBalancerOpType opType = 1;
   optional DiskBalancerConfigurationProto diskBalancerConf = 2;
 }
 

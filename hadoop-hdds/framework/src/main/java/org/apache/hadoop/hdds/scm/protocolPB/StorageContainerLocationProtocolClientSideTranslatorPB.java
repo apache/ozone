@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
@@ -1166,7 +1165,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
-            .setOpType(DatanodeDiskBalancerOpType.start)
+            .setOpType(HddsProtos.DiskBalancerOpType.START)
             .setConf(confBuilder);
     hosts.ifPresent(requestBuilder::addAllHosts);
 
@@ -1188,7 +1187,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       throws IOException {
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
-            .setOpType(DatanodeDiskBalancerOpType.stop);
+            .setOpType(HddsProtos.DiskBalancerOpType.STOP);
     hosts.ifPresent(requestBuilder::addAllHosts);
 
     DatanodeDiskBalancerOpResponseProto response =
@@ -1217,7 +1216,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
-            .setOpType(DatanodeDiskBalancerOpType.update)
+            .setOpType(HddsProtos.DiskBalancerOpType.UPDATE)
             .setConf(confBuilder);
     hosts.ifPresent(requestBuilder::addAllHosts);
 
