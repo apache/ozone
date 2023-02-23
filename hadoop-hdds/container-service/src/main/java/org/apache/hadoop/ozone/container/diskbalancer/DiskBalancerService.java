@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -369,10 +370,7 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
-    File tmpDirParent = hddsVolume.getClusterID() == null ?
-        hddsVolume.getStorageDir() : new File(hddsVolume.getStorageDir(),
-        hddsVolume.getClusterID());
-    return tmpDirParent.toPath()
+    return Paths.get(hddsVolume.getVolumeRootDir())
         .resolve(DISK_BALANCER_TMP_DIR).resolve(DISK_BALANCER_DIR);
   }
 
