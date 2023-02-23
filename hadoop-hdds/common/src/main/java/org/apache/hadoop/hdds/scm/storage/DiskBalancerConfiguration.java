@@ -28,6 +28,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.util.Optional;
+
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+
 /**
  * This class contains configuration values for the DiskBalancer.
  */
@@ -35,6 +40,17 @@ import org.slf4j.LoggerFactory;
 public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
+
+  @Config(key = "info.dir", type = ConfigType.STRING,
+      defaultValue = "", tags = {ConfigTag.DISKBALANCER},
+      description = "The path where datanode diskBalancer's conf is to be " +
+          "written to. if this property is not defined, ozone will fall " +
+          "back to use metadata directory instead.")
+  private String infoDir;
+
+  public String getDiskBalancerInfoDir() {
+    return infoDir;
+  }
 
   @Config(key = "volume.density.threshold", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
@@ -54,6 +70,72 @@ public final class DiskBalancerConfiguration {
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
       description = "The max parallel balance thread count.")
   private int parallelThread = 5;
+
+  @Config(key = "should.run.default",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description =
+          "If DiskBalancer fails to get information from diskbalancer.info, " +
+              "it will choose this value to decide if this service should be " +
+              "running."
+  )
+  private boolean diskBalancerShouldRun = false;
+
+  public boolean getDiskBalancerShouldRun() {
+    return diskBalancerShouldRun;
+  }
+
+  public void setDiskBalancerShouldRun(boolean shouldRun) {
+    this.diskBalancerShouldRun = shouldRun;
+  }
+
+  @Config(key = "service.interval",
+      defaultValue = "60s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description = "Time interval of the Datanode DiskBalancer service. " +
+          "The Datanode will check the service periodically and update " +
+          "the config and running status for DiskBalancer service. " +
+          "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long diskBalancerInterval = Duration.ofSeconds(60).toMillis();
+
+  public Duration getDiskBalancerInterval() {
+    return Duration.ofMillis(diskBalancerInterval);
+  }
+
+  public void setDiskBalancerInterval(Duration duration) {
+    this.diskBalancerInterval = duration.toMillis();
+  }
+
+  @Config(key = "service.timeout",
+      defaultValue = "300s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DISKBALANCER},
+      description = "Timeout for the Datanode DiskBalancer service. "
+          + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long diskBalancerTimeout = Duration.ofSeconds(300).toMillis();
+
+  public Duration getDiskBalancerTimeout() {
+    return Duration.ofMillis(diskBalancerTimeout);
+  }
+
+  public void setDiskBalancerTimeout(Duration duration) {
+    this.diskBalancerTimeout = duration.toMillis();
+  }
+
+  public DiskBalancerConfiguration() {
+  }
+
+  public DiskBalancerConfiguration(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread) {
+    threshold.ifPresent(aDouble -> this.threshold = aDouble);
+    bandwidthInMB.ifPresent(aLong -> this.diskBandwidthInMB = aLong);
+    parallelThread.ifPresent(integer -> this.parallelThread = integer);
+  }
 
   /**
    * Gets the threshold value for DiskBalancer.
@@ -86,7 +168,8 @@ public final class DiskBalancerConfiguration {
    *
    * @return max disk bandwidth per second
    */
-  public double getDiskBandwidthInMB() {
+
+  public long getDiskBandwidthInMB() {
     return diskBandwidthInMB;
   }
 
