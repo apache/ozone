@@ -64,7 +64,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private final BlockID blockID;
   private final long length;
   private Pipeline pipeline;
-  private final Token<OzoneBlockTokenIdentifier> token;
+  private Token<OzoneBlockTokenIdentifier> token;
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
@@ -103,19 +103,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
   // can be reset if a new position is seeked.
   private int chunkIndexOfPrevPosition;
 
-  private final Function<BlockID, Pipeline> refreshPipelineFunction;
+  private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory,
-      Function<BlockID, Pipeline> refreshPipelineFunction) {
+      Function<BlockID, BlockLocationInfo> refreshFunction) {
     this.blockID = blockId;
     this.length = blockLen;
     this.pipeline = pipeline;
     this.token = token;
     this.verifyChecksum = verifyChecksum;
     this.xceiverClientFactory = xceiverClientFactory;
-    this.refreshPipelineFunction = refreshPipelineFunction;
+    this.refreshFunction = refreshFunction;
   }
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
@@ -150,12 +150,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
-        refreshPipeline(ex);
+        refreshBlockInfo(ex);
         catchEx = ex;
       } catch (IOException ex) {
         LOG.debug("Retry to get chunk info fail", ex);
         if (isConnectivityIssue(ex)) {
-          refreshPipeline(ex);
+          refreshBlockInfo(ex);
         }
         catchEx = ex;
       }
@@ -199,17 +199,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
   }
 
-  private void refreshPipeline(IOException cause) throws IOException {
+  private void refreshBlockInfo(IOException cause) throws IOException {
     LOG.info("Unable to read information for block {} from pipeline {}: {}",
         blockID, pipeline.getId(), cause.getMessage());
-    if (refreshPipelineFunction != null) {
-      LOG.debug("Re-fetching pipeline for block {}", blockID);
-      Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
-      if (newPipeline == null) {
-        LOG.debug("No new pipeline for block {}", blockID);
+    if (refreshFunction != null) {
+      LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
+      BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
+      if (blockLocationInfo == null) {
+        LOG.debug("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New pipeline for block {}: {}", blockID, newPipeline);
-        this.pipeline = newPipeline;
+        LOG.debug("New block location info for block {}: {}",
+            blockID, blockLocationInfo);
+        this.pipeline = blockLocationInfo.getPipeline();
+        this.token = blockLocationInfo.getToken();
       }
     } else {
       throw cause;
@@ -526,7 +528,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     }
 
-    refreshPipeline(cause);
+    refreshBlockInfo(cause);
   }
 
   @VisibleForTesting
