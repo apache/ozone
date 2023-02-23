@@ -103,7 +103,6 @@ services:
   httpfs:
     <<: *common-config
     environment:
-      OZONE_CLASSPATH: "/opt/hadoop/share/ozone/lib/ozone-filesystem-hadoop3-${ozone.version}.jar"
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       <<: *replication
     ports:
