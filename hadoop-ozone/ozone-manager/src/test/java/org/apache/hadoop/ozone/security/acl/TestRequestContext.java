@@ -81,15 +81,13 @@ public class TestRequestContext {
   @Test
   public void testSnapshotName() {
     RequestContext context = getUserRequestContext("om",
-            IAccessAuthorizer.ACLType.CREATE,"volume1",
-            "snapshotName");
+            IAccessAuthorizer.ACLType.CREATE, "volume1", "snapshotName");
 
     Assert.assertTrue("Wrongly sets snapshotName value",
             "snapshotName".equals(context.getSnapshotName()));
 
     context = getUserRequestContext("om",
-            IAccessAuthorizer.ACLType.CREATE,"volume1",
-            null);
+            IAccessAuthorizer.ACLType.CREATE, "volume1", null);
 
     Assert.assertNull("Wrongly sets snapshotName value",
             context.getSnapshotName());

@@ -62,6 +62,7 @@ public class RequestContext {
             snapshotName, false);
   }
 
+  @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
                         UserGroupInformation clientUgi, String serviceId,
                         ACLIdentityType aclType, ACLType aclRights,
