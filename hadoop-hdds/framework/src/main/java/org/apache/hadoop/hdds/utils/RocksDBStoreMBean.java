@@ -72,6 +72,9 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
   public static final String ROCKSDB_PROPERTY_PREFIX = "rocksdb.";
 
   // RocksDB properties
+  // Column1: rocksDB property original name
+  // Column2: aggregate or not all CF value to get a summed value
+  // Column2: converted rocksDB property name based on Prometheus naming rule
   private final String[][] cfPros = {
       // 1 if a memtable flush is pending; otherwise, returns 0
       {"mem-table-flush-pending", "false", ""},
