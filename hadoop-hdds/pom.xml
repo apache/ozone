@@ -48,6 +48,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>config</module>
     <module>test-utils</module>
     <module>erasurecode</module>
+    <module>rocks-native</module>
   </modules>
 
   <repositories>

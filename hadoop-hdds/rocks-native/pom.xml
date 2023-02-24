@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>hdds</artifactId>
+        <groupId>org.apache.ozone</groupId>
+        <version>1.4.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <name>Apache Ozone HDDS Rocks</name>
+    <artifactId>hdds-rocks-native</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.ozone</groupId>
+            <artifactId>hdds-server-framework</artifactId>
+        </dependency>
+    </dependencies>
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <cmake.standards>23</cmake.standards>
+        <sstDump.include>true</sstDump.include>
+    </properties>
+
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.googlecode.maven-download-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>rocksdb source download</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.version}.tar.gz</url>
+                            <outputFileName>rocksdb-v${rocksdb.version}.tar.gz</outputFileName>
+                            <outputDirectory>${project.build.directory}/rocksdb</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>zlib source download</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://zlib.net/zlib-${zlib.version}.tar.gz</url>
+                            <outputFileName>zlib-${zlib.version}.tar.gz</outputFileName>
+                            <outputDirectory>${project.build.directory}/zlib</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>bzip2 source download</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://sourceware.org/pub/bzip2/bzip2-${bzip2.version}.tar.gz</url>
+                            <outputFileName>bzip2-v${bzip2.version}.tar.gz</outputFileName>
+                            <outputDirectory>${project.build.directory}/bzip2</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unzip-artifact</id>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <tasks>
+                                <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
+                                <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
+                                <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>build-zlib</id>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <tasks>
+                                <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
+                                <exec executable="${shell-executable}" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
+                                    <arg line="./configure"/>
+                                </exec>
+                                <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>build-bzip2</id>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <tasks>
+                                <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true"/>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>build-rocksjava</id>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <tasks>
+                                <exec executable="chmod" failonerror="true">
+                                    <arg line="-R"/>
+                                    <arg line="775"/>
+                                    <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                                </exec>
+                                <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                                    <arg line="-j16"/>
+                                    <arg line="tools"/>
+                                </exec>>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>javah</goal>
+                        </goals>
+                        <configuration>
+                            <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
+                            <javahClassNames>
+                                <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
+                            </javahClassNames>
+                            <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-maven-plugins</artifactId>
+                <executions>
+                    <execution>
+                        <id>cmake-compile</id>
+                        <phase>compile</phase>
+                        <goals><goal>cmake-compile</goal></goals>
+                        <configuration>
+                            <source>${basedir}/src</source>
+                            <vars>
+                                <GENERATED_JAVAH>${project.build.directory}/native/javah</GENERATED_JAVAH>
+                                <NATIVE_DIR>${basedir}/src/main/native</NATIVE_DIR>
+                                <SST_DUMP_INCLUDE>${sstDump.include}</SST_DUMP_INCLUDE>
+                                <CMAKE_STANDARDS>${cmake.standards}</CMAKE_STANDARDS>
+                                <ROCKSDB_HEADERS>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include</ROCKSDB_HEADERS>
+                                <ROCKSDB_LIB>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}</ROCKSDB_LIB>
+                                <ZLIB_LIB>${project.build.directory}/zlib/zlib-${zlib.version}</ZLIB_LIB>
+                                <BZIP2_LIB>${project.build.directory}/bzip2/bzip2-${bzip2.version}</BZIP2_LIB>
+                            </vars>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-lib-file</id>
+                        <phase>prepare-package</phase>
+                        <configuration>
+                            <tasks>
+                                <copy toDir="${project.build.outputDirectory}">
+                                    <fileset dir="${project.build.directory}/native" includes="**/lib*.*" />
+                                </copy>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*.class</include>
+                        <include>**/lib*.dylib</include>
+                        <include>**/lib*.so</include>
+                        <include>**/lib*.jnilib</include>
+                        <include>**/lib*.dll</include>
+                    </includes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+
+
+</project>
