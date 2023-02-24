@@ -156,7 +156,7 @@ public final class HASecurityUtils {
         String pemEncodedRootCert = response.getX509CACertificate();
         client.storeCertificate(
             pemEncodedRootCert, CAType.SUBORDINATE);
-        client.storeCertificate(pemEncodedCert);
+        client.storeCertificate(pemEncodedCert, CAType.NONE);
         //note: this does exactly the same as store certificate
         persistSubCACertificate(config, client,
             pemEncodedCert);
@@ -207,7 +207,7 @@ public final class HASecurityUtils {
 
       client.storeCertificate(
           pemEncodedRootCert, CAType.SUBORDINATE);
-      client.storeCertificate(pemEncodedCert);
+      client.storeCertificate(pemEncodedCert, CAType.NONE);
       //note: this does exactly the same as store certificate
       persistSubCACertificate(config, client, pemEncodedCert);
       X509Certificate cert =

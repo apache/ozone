@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -121,7 +120,8 @@ public class CertificateClientTestImpl implements CertificateClient {
     // Generate normal certificate, signed by RootCA certificate
     approver = new DefaultApprover(new DefaultProfile(), securityConfig);
 
-    CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+    CertificateSignRequest.Builder csrBuilder =
+        new CertificateSignRequest.Builder();
     // Get host name.
     csrBuilder.setKey(keyPair)
         .setConfiguration(config)
@@ -243,25 +243,9 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
-    return null;
-  }
-
-  @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request)
       throws CertificateException {
     return null;
-  }
-
-  @Override
-  public X509Certificate queryCertificate(String query) {
-    return null;
-  }
-
-  @Override
-  public void storeCertificate(String cert)
-      throws CertificateException {
   }
 
   @Override
@@ -300,7 +284,8 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   public void renewKey() throws Exception {
     KeyPair newKeyPair = keyGen.generateKey();
-    CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+    CertificateSignRequest.Builder csrBuilder =
+        new CertificateSignRequest.Builder();
     // Get host name.
     csrBuilder.setKey(newKeyPair)
         .setConfiguration(config)

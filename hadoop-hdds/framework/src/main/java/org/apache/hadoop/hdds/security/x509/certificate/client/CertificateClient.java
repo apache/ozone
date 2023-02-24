@@ -28,7 +28,6 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
@@ -143,35 +142,7 @@ public interface CertificateClient extends Closeable {
    *
    * @return the serial ID of the new certificate
    */
-  String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException;
-
-  /**
-   * Send request to SCM to sign the certificate and save certificates returned
-   * by SCM to PEM files on disk.
-   *
-   * @return the serial ID of the new certificate
-   */
   String signAndStoreCertificate(PKCS10CertificationRequest request)
-      throws CertificateException;
-
-  /**
-   * Get the certificate of well-known entity from SCM.
-   *
-   * @param query - String Query, please see the implementation for the
-   * discussion on the query formats.
-   * @return X509Certificate or null if not found.
-   */
-  X509Certificate queryCertificate(String query);
-
-  /**
-   * Stores the Certificate  for this client. Don't use this api to add
-   * trusted certificates of others.
-   *
-   * @param pemEncodedCert - pem encoded X509 Certificate
-   * @throws CertificateException - on Error.
-   */
-  void storeCertificate(String pemEncodedCert)
       throws CertificateException;
 
   /**

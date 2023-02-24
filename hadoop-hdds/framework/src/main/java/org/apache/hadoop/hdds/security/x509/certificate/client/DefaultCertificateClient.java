@@ -382,7 +382,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         certId);
     try {
       String pemEncodedCert = getScmSecureClient().getCertificate(certId);
-      this.storeCertificate(pemEncodedCert);
+      this.storeCertificate(pemEncodedCert, CAType.NONE);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception e) {
       getLogger().error("Error while getting Certificate with " +
@@ -496,32 +496,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           e, CSR_ERROR);
     }
     return builder;
-  }
-
-  /**
-   * Get the certificate of well-known entity from SCM.
-   *
-   * @param query - String Query, please see the implementation for the
-   * discussion on the query formats.
-   * @return X509Certificate or null if not found.
-   */
-  @Override
-  public X509Certificate queryCertificate(String query) {
-    // TODO:
-    throw new UnsupportedOperationException("Operation not supported");
-  }
-
-  /**
-   * Stores the Certificate  for this client. Don't use this api to add trusted
-   * certificates of others.
-   *
-   * @param pemEncodedCert - pem encoded X509 Certificate
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeCertificate(String pemEncodedCert)
-      throws CertificateException {
-    this.storeCertificate(pemEncodedCert, CAType.NONE);
   }
 
   /**
@@ -1216,8 +1190,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return (OzoneConfiguration)securityConfig.getConfiguration();
   }
 
-  @Override
-  public abstract String signAndStoreCertificate(
+  protected abstract String signAndStoreCertificate(
       PKCS10CertificationRequest request, Path certificatePath)
       throws CertificateException;
 

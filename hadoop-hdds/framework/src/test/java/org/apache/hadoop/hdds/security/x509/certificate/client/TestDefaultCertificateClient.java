@@ -262,13 +262,6 @@ public class TestDefaultCertificateClient {
   }
 
   @Test
-  public void queryCertificate() throws Exception {
-    LambdaTestUtils.intercept(UnsupportedOperationException.class,
-        "Operation not supported",
-        () -> dnCertClient.queryCertificate(""));
-  }
-
-  @Test
   public void testCertificateLoadingOnInit() throws Exception {
     KeyPair keyPair = keyGenerator.generateKey();
     X509Certificate cert1 = generateX509Cert(keyPair);
@@ -319,9 +312,9 @@ public class TestDefaultCertificateClient {
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
 
-    dnCertClient.storeCertificate(getPEMEncodedString(cert1));
-    dnCertClient.storeCertificate(getPEMEncodedString(cert2));
-    dnCertClient.storeCertificate(getPEMEncodedString(cert3));
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1), CAType.NONE);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2), CAType.NONE);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3), CAType.NONE);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
         .toString()));

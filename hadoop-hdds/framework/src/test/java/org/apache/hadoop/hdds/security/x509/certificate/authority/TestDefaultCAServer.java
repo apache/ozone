@@ -525,7 +525,7 @@ public class TestDefaultCAServer {
 
     // Write to the location where Default CA Server reads from.
     scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(certificateHolder));
+        CertificateCodec.getPEMEncodedString(certificateHolder), CAType.NONE);
 
     CertificateCodec certCodec =
         new CertificateCodec(new SecurityConfig(conf),
