@@ -28,9 +28,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Path;
-import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
