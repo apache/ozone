@@ -293,23 +293,6 @@ public class CertificateClientTestImpl implements CertificateClient {
       throws CertificateException {
   }
 
-  /**
-   * Stores the trusted chain of certificates for a specific component.
-   *
-   * @param keyStore - Cert Store.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeTrustChain(CertStore keyStore) throws CertificateException {
-
-  }
-
-  @Override
-  public void storeTrustChain(List<X509Certificate> certificates)
-      throws CertificateException {
-
-  }
-
   @Override
   public InitResponse init() throws CertificateException {
     return null;

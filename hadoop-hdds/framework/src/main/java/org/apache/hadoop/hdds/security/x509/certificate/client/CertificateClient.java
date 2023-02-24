@@ -214,24 +214,6 @@ public interface CertificateClient extends Closeable {
       throws CertificateException;
 
   /**
-   * Stores the trusted chain of certificates.
-   *
-   * @param certStore - Cert Store.
-   * @throws CertificateException - on Error.
-   */
-  void storeTrustChain(CertStore certStore) throws CertificateException;
-
-  /**
-   * Stores the trusted chain of certificates.
-   *
-   * @param certificates - List of Certificates.
-
-   * @throws CertificateException - on Error.
-   */
-  void storeTrustChain(List<X509Certificate> certificates)
-      throws CertificateException;
-
-  /**
    * Initialize certificate client.
    *
    * */

@@ -659,31 +659,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
-   * Stores the trusted chain of certificates for a specific .
-   *
-   * @param ks - Key Store.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeTrustChain(CertStore ks)
-      throws CertificateException {
-    throw new UnsupportedOperationException("Operation not supported.");
-  }
-
-
-  /**
-   * Stores the trusted chain of certificates for a specific .
-   *
-   * @param certificates - List of Certificates.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeTrustChain(List<X509Certificate> certificates)
-      throws CertificateException {
-    throw new UnsupportedOperationException("Operation not supported.");
-  }
-
-  /**
    * Defines 8 cases of initialization.
    * Each case specifies objects found.
    * 0. NONE                  Keypair as well as certificate not found.
