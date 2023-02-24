@@ -313,30 +313,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     return null;
   }
 
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    return Collections.emptyList();
-  }
-
-  @Override
-  public long getLatestCrlId() throws IOException {
-    return 0;
-  }
-
-  @Override
-  public long getLocalCrlId() {
-    return 0;
-  }
-
-  @Override
-  public void setLocalCrlId(long crlId) {
-  }
-
-  @Override
-  public boolean processCrl(CRLInfo crl) {
-    return false;
-  }
-
   public void renewKey() throws Exception {
     KeyPair newKeyPair = keyGen.generateKey();
     CertificateSignRequest.Builder csrBuilder = getCSRBuilder();

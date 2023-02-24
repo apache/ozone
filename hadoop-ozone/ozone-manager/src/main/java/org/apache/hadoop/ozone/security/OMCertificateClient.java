@@ -60,12 +60,10 @@ public class OMCertificateClient extends CommonCertificateClient {
   @SuppressWarnings("parameternumber")
   public OMCertificateClient(SecurityConfig secConfig, String scmId,
       String clusterId, HddsProtos.OzoneManagerDetailsProto omDetails,
-      String certSerialId, String localCrlId,
+      String certSerialId,
       Consumer<String> persistCertIdCallback, Runnable shutdownCallback) {
     super(secConfig, LOG, certSerialId, COMPONENT_NAME, persistCertIdCallback,
         shutdownCallback);
-    this.setLocalCrlId(localCrlId != null ?
-        Long.parseLong(localCrlId) : 0);
     this.scmID = scmId;
     this.clusterID = clusterId;
     this.omInfo = omDetails;
@@ -78,7 +76,7 @@ public class OMCertificateClient extends CommonCertificateClient {
         OzoneManager.getOmDetailsProto(
             (OzoneConfiguration) secConfig.getConfiguration(),
             omStorage.getOmId()),
-        omStorage.getOmCertSerialId(), null,
+        omStorage.getOmCertSerialId(),
         saveCertIdCallback, shutdownCallback);
   }
 
@@ -88,15 +86,15 @@ public class OMCertificateClient extends CommonCertificateClient {
         OzoneManager.getOmDetailsProto(
             (OzoneConfiguration) secConfig.getConfiguration(),
             omStorage.getOmId()),
-        omStorage.getOmCertSerialId(), null, null, null);
+        omStorage.getOmCertSerialId(), null, null);
   }
 
   public OMCertificateClient(SecurityConfig secConfig) {
-    this(secConfig, null, null, null, null, null, null, null);
+    this(secConfig, null, null, null, null, null, null);
   }
 
   public OMCertificateClient(SecurityConfig secConfig, String certSerialId) {
-    this(secConfig, null, null, null, certSerialId, null, null, null);
+    this(secConfig, null, null, null, certSerialId, null, null);
   }
 
   /**

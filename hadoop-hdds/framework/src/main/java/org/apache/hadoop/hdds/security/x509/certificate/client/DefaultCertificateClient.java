@@ -373,29 +373,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return this.getCertificateFromScm(certId);
   }
 
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    try {
-      return getScmSecureClient().getCrls(crlIds);
-    } catch (Exception e) {
-      getLogger().error("Error while getting CRL with " +
-          "CRL ids:{} from scm.", crlIds, e);
-      throw new CertificateException("Error while getting CRL with " +
-          "CRL ids:" + crlIds, e);
-    }
-  }
-
-  @Override
-  public long getLatestCrlId() throws IOException {
-    try {
-      return getScmSecureClient().getLatestCrlId();
-    } catch (Exception e) {
-      getLogger().error("Error while getting latest CRL id from scm.", e);
-      throw new CertificateException("Error while getting latest CRL id from" +
-          " scm.", e);
-    }
-  }
-
   /**
    * Get certificate from SCM and store it in local file system.
    * @param certId
@@ -962,16 +939,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  @Override
-  public boolean processCrl(CRLInfo crl) {
-    List<String> certIds2Remove = new ArrayList();
-    crl.getX509CRL().getRevokedCertificates().forEach(
-        cert -> certIds2Remove.add(cert.getSerialNumber().toString()));
-    boolean reinitCert = removeCertificates(certIds2Remove);
-    setLocalCrlId(crl.getCrlSequenceID());
-    return reinitCert;
-  }
-
   private synchronized boolean removeCertificates(List<String> certIds) {
     boolean reInitCert = false;
 
@@ -1005,18 +972,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
     }
     return reInitCert;
-  }
-
-  public long getLocalCrlId() {
-    return this.localCrlId;
-  }
-
-  /**
-   * Set Local CRL id.
-   * @param crlId
-   */
-  public void setLocalCrlId(long crlId) {
-    this.localCrlId = crlId;
   }
 
   @Override

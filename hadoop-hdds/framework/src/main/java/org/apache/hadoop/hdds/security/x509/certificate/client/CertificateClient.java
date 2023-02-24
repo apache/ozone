@@ -271,21 +271,6 @@ public interface CertificateClient extends Closeable {
    */
   List<String> updateCAList() throws IOException;
 
-  /**
-   * Get the CRLInfo based on the CRL Ids from SCM.
-   * @param crlIds - list of crl ids
-   * @return list of CRLInfo
-   * @throws IOException
-   */
-  List<CRLInfo> getCrls(List<Long> crlIds) throws IOException;
-
-  /**
-   * Get the latest CRL id from SCM.
-   * @return latest CRL id.
-   * @throws IOException
-   */
-  long getLatestCrlId() throws IOException;
-
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {
     try {
       Objects.requireNonNull(getPublicKey());
@@ -296,27 +281,6 @@ public interface CertificateClient extends Closeable {
           OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST);
     }
   }
-
-  /**
-   * Get Local CRL id received.
-   * @return
-   */
-  long getLocalCrlId();
-
-  /**
-   * Set Local CRL id.
-   * @param crlId
-   */
-  void setLocalCrlId(long crlId);
-
-  /**
-   * Process crl and remove the certificates in the revoked cert list from
-   * client.
-   * @param crl
-   * @return true if the client's own cert needs to be reinit
-   * false otherwise;
-   */
-  boolean processCrl(CRLInfo crl);
 
   /**
    * Return the store factory for key manager and trust manager for server.
