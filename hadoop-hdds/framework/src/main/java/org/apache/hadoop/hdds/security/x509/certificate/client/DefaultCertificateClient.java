@@ -113,10 +113,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private static final Random RANDOM = new SecureRandom();
 
   public static final String CERT_FILE_NAME_FORMAT = "%s.crt";
-  public static final String CA_CERT_PREFIX = "CA-";
-  private static final int CA_CERT_PREFIX_LEN = 3;
-  public static final String ROOT_CA_CERT_PREFIX = "ROOTCA-";
-  private static final int ROOT_CA_PREFIX_LEN = 7;
   private final Logger logger;
   private final SecurityConfig securityConfig;
   private final KeyCodec keyCodec;
@@ -207,7 +203,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   String certFileName = FilenameUtils.getBaseName(
                       file.getName());
                   long tmpCaCertSerailId = NumberUtils.toLong(
-                      certFileName.substring(CA_CERT_PREFIX_LEN));
+                      certFileName.substring(
+                          CAType.SUBORDINATE.getFileNamePrefix().length()));
                   if (tmpCaCertSerailId > latestCaCertSerailId) {
                     latestCaCertSerailId = tmpCaCertSerailId;
                   }
@@ -218,7 +215,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   String certFileName = FilenameUtils.getBaseName(
                       file.getName());
                   long tmpRootCaCertSerailId = NumberUtils.toLong(
-                      certFileName.substring(ROOT_CA_PREFIX_LEN));
+                      certFileName.substring(
+                          CAType.ROOT.getFileNamePrefix().length()));
                   if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
                     latestRootCaCertSerialId = tmpRootCaCertSerailId;
                   }

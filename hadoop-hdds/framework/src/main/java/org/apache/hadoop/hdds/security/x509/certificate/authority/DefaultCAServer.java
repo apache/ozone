@@ -59,7 +59,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -227,13 +226,7 @@ public class DefaultCAServer implements CertificateServer {
   public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role) {
-    LocalDateTime beginDate;
-    if (!testSecureFlag) {
-      beginDate = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
-    } else {
-      beginDate = LocalDateTime.now();
-    }
-
+    LocalDateTime beginDate = LocalDateTime.now();
     LocalDateTime endDate;
     // When issuing certificates for sub-ca use the max certificate duration
     // similar to self signed root certificate.

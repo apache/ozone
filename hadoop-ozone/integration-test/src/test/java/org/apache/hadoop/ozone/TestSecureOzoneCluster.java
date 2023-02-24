@@ -66,6 +66,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -1294,12 +1295,12 @@ public final class TestSecureOzoneCluster {
       certCodec.writeCertificate(certHolder);
       certCodec.writeCertificate(CertificateCodec.getCertificateHolder(scmCert),
           String.format(DefaultCertificateClient.CERT_FILE_NAME_FORMAT,
-          DefaultCertificateClient.CA_CERT_PREFIX +
+          CAType.SUBORDINATE.getFileNamePrefix() +
               scmCert.getSerialNumber().toString()));
       certCodec.writeCertificate(CertificateCodec.getCertificateHolder(
           scmCertClient.getCACertificate()),
           String.format(DefaultCertificateClient.CERT_FILE_NAME_FORMAT,
-              DefaultCertificateClient.ROOT_CA_CERT_PREFIX +
+              CAType.ROOT.getFileNamePrefix() +
                   rootCert.getSerialNumber().toString()));
       omStore.setOmCertSerialId(certId);
       omStore.initialize();
