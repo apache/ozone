@@ -41,8 +41,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
