@@ -713,10 +713,6 @@ public final class RocksDatabase {
     }
   }
 
-  public List<LiveFileMetaData> getLiveFilesMetaData() {
-    return db.get().getLiveFilesMetaData();
-  }
-
   public ManagedTransactionLogIterator getUpdatesSince(long sequenceNumber)
       throws IOException {
     assertClose();
