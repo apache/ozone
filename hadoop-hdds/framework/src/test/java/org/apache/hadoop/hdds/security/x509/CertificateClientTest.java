@@ -197,11 +197,6 @@ public class CertificateClientTest implements CertificateClient {
   }
 
   @Override
-  public String getSecurityProvider() {
-    return secConfig.getProvider();
-  }
-
-  @Override
   public String getComponentName() {
     return "test";
   }

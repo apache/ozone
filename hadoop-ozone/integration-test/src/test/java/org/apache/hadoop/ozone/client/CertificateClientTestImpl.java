@@ -243,7 +243,7 @@ public class CertificateClientTestImpl implements CertificateClient {
       X509Certificate cert) throws CertificateException {
     try {
       Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+          securityConfig.getProvider());
       sign.initVerify(cert);
       sign.update(data);
       return sign.verify(signature);
@@ -318,11 +318,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public String getSignatureAlgorithm() {
     return securityConfig.getSignatureAlgo();
-  }
-
-  @Override
-  public String getSecurityProvider() {
-    return securityConfig.getProvider();
   }
 
   @Override

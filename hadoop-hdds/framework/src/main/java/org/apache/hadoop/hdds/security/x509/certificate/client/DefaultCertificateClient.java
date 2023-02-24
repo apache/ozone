@@ -431,7 +431,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws CertificateException {
     try {
       Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+          securityConfig.getProvider());
       sign.initSign(getPrivateKey());
       byte[] buffer = new byte[1024 * 4];
 
@@ -448,11 +448,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  @Override
-  public String getSecurityProvider() {
-    return securityConfig.getProvider();
-  }
-
   /**
    * Creates digital signature over the data stream using the s private key.
    *
@@ -463,7 +458,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public byte[] signData(byte[] data) throws CertificateException {
     try {
       Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+          securityConfig.getProvider());
 
       sign.initSign(getPrivateKey());
       sign.update(data);
@@ -496,7 +491,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       X509Certificate cert) throws CertificateException {
     try {
       Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+          securityConfig.getProvider());
       sign.initVerify(cert);
       byte[] buffer = new byte[1024 * 4];
 
@@ -527,7 +522,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       X509Certificate cert) throws CertificateException {
     try {
       Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+          securityConfig.getProvider());
       sign.initVerify(cert);
       sign.update(data);
       return sign.verify(signature);
@@ -552,7 +547,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       PublicKey pubKey) throws CertificateException {
     try {
       Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+          securityConfig.getProvider());
       sign.initVerify(pubKey);
       sign.update(data);
       return sign.verify(signature);

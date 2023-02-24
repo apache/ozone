@@ -261,12 +261,6 @@ public interface CertificateClient extends Closeable {
   String getSignatureAlgorithm();
 
   /**
-   * Get security provider.
-   * @return security provider
-   */
-  String getSecurityProvider();
-
-  /**
    * Return component name of this certificate client.
    * @return component name
    */
