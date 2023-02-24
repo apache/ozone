@@ -192,11 +192,6 @@ public class CertificateClientTest implements CertificateClient {
   }
 
   @Override
-  public String getSignatureAlgorithm() {
-    return secConfig.getSignatureAlgo();
-  }
-
-  @Override
   public String getComponentName() {
     return "test";
   }

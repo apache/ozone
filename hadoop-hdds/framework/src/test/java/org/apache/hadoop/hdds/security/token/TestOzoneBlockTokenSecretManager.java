@@ -112,8 +112,6 @@ public class TestOzoneBlockTokenSecretManager {
         thenReturn(x509Certificate);
     when(client.getPublicKey()).thenReturn(keyPair.getPublic());
     when(client.getPrivateKey()).thenReturn(keyPair.getPrivate());
-    when(client.getSignatureAlgorithm()).thenReturn(
-        securityConfig.getSignatureAlgo());
     when(client.verifySignature((byte[]) Mockito.any(),
         Mockito.any(), Mockito.any())).thenCallRealMethod();
 

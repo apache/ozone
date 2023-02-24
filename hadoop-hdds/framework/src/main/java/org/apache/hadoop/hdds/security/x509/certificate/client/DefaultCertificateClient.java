@@ -430,7 +430,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public byte[] signDataStream(InputStream stream)
       throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
           securityConfig.getProvider());
       sign.initSign(getPrivateKey());
       byte[] buffer = new byte[1024 * 4];
@@ -457,7 +457,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public byte[] signData(byte[] data) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
           securityConfig.getProvider());
 
       sign.initSign(getPrivateKey());
@@ -470,11 +470,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throw new CertificateException("Error while signing the stream", e,
           CRYPTO_SIGN_ERROR);
     }
-  }
-
-  @Override
-  public String getSignatureAlgorithm() {
-    return securityConfig.getSignatureAlgo();
   }
 
   /**
@@ -490,7 +485,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public boolean verifySignature(InputStream stream, byte[] signature,
       X509Certificate cert) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
           securityConfig.getProvider());
       sign.initVerify(cert);
       byte[] buffer = new byte[1024 * 4];
@@ -521,7 +516,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public boolean verifySignature(byte[] data, byte[] signature,
       X509Certificate cert) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
           securityConfig.getProvider());
       sign.initVerify(cert);
       sign.update(data);
@@ -546,7 +541,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private boolean verifySignature(byte[] data, byte[] signature,
       PublicKey pubKey) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
           securityConfig.getProvider());
       sign.initVerify(pubKey);
       sign.update(data);
