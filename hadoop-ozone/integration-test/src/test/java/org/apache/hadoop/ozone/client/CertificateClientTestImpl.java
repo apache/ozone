@@ -309,11 +309,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert) {
-
-  }
-
-  @Override
   public List<String> getCAList() {
     return null;
   }

@@ -249,15 +249,6 @@ public interface CertificateClient extends Closeable {
   X509Certificate getRootCACertificate();
 
   /**
-   * Store RootCA certificate.
-   *
-   * @param pemEncodedCert
-   * @throws CertificateException
-   */
-  void storeRootCACertificate(String pemEncodedCert)
-      throws CertificateException;
-
-  /**
    * Return the pem encoded CA certificate list.
    *
    * If initialized return list of pem encoded CA certificates, else return

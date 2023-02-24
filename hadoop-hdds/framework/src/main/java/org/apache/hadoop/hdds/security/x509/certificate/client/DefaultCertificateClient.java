@@ -969,14 +969,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert)
-      throws CertificateException {
-    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
-        component);
-    storeCertificate(pemEncodedCert, CAType.ROOT, certificateCodec, true);
-  }
-
-  @Override
   public synchronized List<String> getCAList() {
     return pemEncodedCACerts;
   }
