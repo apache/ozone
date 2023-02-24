@@ -178,11 +178,14 @@ public abstract class BaseHttpServer {
       }
 
       String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
-      if (!StringUtils.isEmpty(baseDir)) {
-        createDir(baseDir);
-        httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
-        LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
+
+      if (StringUtils.isEmpty(baseDir)) {
+        baseDir = conf.get(OzoneConfigKeys.OZONE_METADATA_DIRS) + "/webserver";
       }
+      createDir(baseDir);
+      httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
+      LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
+    }
     }
   }
 
