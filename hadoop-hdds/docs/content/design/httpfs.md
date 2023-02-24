@@ -22,9 +22,9 @@ author: Zita Dombi, Istvan Fajth
 
 # Abstract
 
-With the HttpFS interface implementation, called Ozone HttpFS, we can provide a REST API - and with that, 
-easy integration for Ozone - for those tools that do not have an easy integration/migration to use the S3 
-interface or the FileSystem API.
+Ozone HttpFS provides an HttpFS-compatible REST API interface to enable applications
+that are designed to use [HttpFS](https://hadoop.apache.org/docs/stable/hadoop-hdfs-httpfs/index.html)
+to interact and integrate with Ozone.
 
 # Link
 
