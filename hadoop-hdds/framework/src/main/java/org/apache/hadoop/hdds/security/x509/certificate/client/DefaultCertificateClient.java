@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -416,34 +415,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           "certSerialId:{} from scm.", certId, e);
       throw new CertificateException("Error while getting certificate for " +
           "certSerialId:" + certId, e, CERTIFICATE_ERROR);
-    }
-  }
-
-  /**
-   * Creates digital signature over the data stream using the s private key.
-   *
-   * @param stream - Data stream to sign.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public byte[] signDataStream(InputStream stream)
-      throws CertificateException {
-    try {
-      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
-          securityConfig.getProvider());
-      sign.initSign(getPrivateKey());
-      byte[] buffer = new byte[1024 * 4];
-
-      int len;
-      while (-1 != (len = stream.read(buffer))) {
-        sign.update(buffer, 0, len);
-      }
-      return sign.sign();
-    } catch (NoSuchAlgorithmException | NoSuchProviderException
-        | InvalidKeyException | SignatureException | IOException e) {
-      getLogger().error("Error while signing the stream", e);
-      throw new CertificateException("Error while signing the stream", e,
-          CRYPTO_SIGN_ERROR);
     }
   }
 
@@ -912,8 +883,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     byte[] challenge =
         RandomStringUtils.random(1000, 0, 0, false, false, null, RANDOM)
             .getBytes(StandardCharsets.UTF_8);
-    byte[]  sign = signDataStream(new ByteArrayInputStream(challenge));
-    return verifySignature(challenge, sign, pubKey);
+    return verifySignature(challenge, signData(challenge), pubKey);
   }
 
   /**

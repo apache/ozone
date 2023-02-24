@@ -114,13 +114,10 @@ public interface CertificateClient extends Closeable {
    * Creates digital signature over the data stream using the components private
    * key.
    *
-   * @param stream - Data stream to sign.
-   * @return byte array - containing the signature.
-   * @throws CertificateException - on Error.
+   * @param data data to be signed
+   * @return byte array - containing the signature
+   * @throws CertificateException - on Error
    */
-  byte[] signDataStream(InputStream stream)
-      throws CertificateException;
-
   byte[] signData(byte[] data) throws CertificateException;
 
   /**

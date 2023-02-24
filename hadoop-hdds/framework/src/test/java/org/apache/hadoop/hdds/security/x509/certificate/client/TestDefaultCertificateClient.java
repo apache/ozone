@@ -208,11 +208,10 @@ public class TestDefaultCertificateClient {
     // Expect error when there is no private key to sign.
     LambdaTestUtils.intercept(IOException.class, "Error while " +
             "signing the stream",
-        () -> dnCertClient.signDataStream(IOUtils.toInputStream(data, UTF_8)));
+        () -> dnCertClient.signData(data.getBytes(UTF_8)));
 
     generateKeyPairFiles();
-    byte[] sign = dnCertClient.signDataStream(IOUtils.toInputStream(data,
-        UTF_8));
+    byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
     validateHash(sign, data.getBytes(UTF_8));
   }
 
@@ -235,8 +234,7 @@ public class TestDefaultCertificateClient {
   @Test
   public void verifySignatureStream() throws Exception {
     String data = RandomStringUtils.random(500);
-    byte[] sign = dnCertClient.signDataStream(IOUtils.toInputStream(data,
-        UTF_8));
+    byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,

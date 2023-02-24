@@ -219,12 +219,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public byte[] signDataStream(InputStream stream)
-      throws CertificateException {
-    return new byte[0];
-  }
-
-  @Override
   public byte[] signData(byte[] data) throws CertificateException {
     return new byte[0];
   }
