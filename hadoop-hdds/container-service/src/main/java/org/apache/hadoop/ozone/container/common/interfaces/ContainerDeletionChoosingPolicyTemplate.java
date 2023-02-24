@@ -61,10 +61,6 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
         if (blockCount == 0) {
           break;
         }
-      } else {
-        LOG.debug("Stop looking for next container, there is no"
-            + " pending deletion block contained in remaining containers.");
-        break;
       }
     }
     LOG.info("Chosen {}/{} blocks from {} candidate containers.",
