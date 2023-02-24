@@ -122,18 +122,6 @@ public interface CertificateClient extends Closeable {
   /**
    * Verifies a digital Signature, given the signature and the certificate of
    * the signer.
-   *
-   * @param stream - Data Stream.
-   * @param signature - Byte Array containing the signature.
-   * @param cert - Certificate of the Signer.
-   * @return true if verified, false if not.
-   */
-  boolean verifySignature(InputStream stream, byte[] signature,
-      X509Certificate cert) throws CertificateException;
-
-  /**
-   * Verifies a digital Signature, given the signature and the certificate of
-   * the signer.
    * @param data - Data in byte array.
    * @param signature - Byte Array containing the signature.
    * @param cert - Certificate of the Signer.

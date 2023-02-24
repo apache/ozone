@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
@@ -219,12 +218,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public byte[] signData(byte[] data) throws CertificateException {
     return new byte[0];
-  }
-
-  @Override
-  public boolean verifySignature(InputStream stream, byte[] signature,
-      X509Certificate cert) throws CertificateException {
-    return true;
   }
 
   @Override

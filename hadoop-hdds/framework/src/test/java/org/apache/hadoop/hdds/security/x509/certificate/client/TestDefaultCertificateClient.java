@@ -239,15 +239,10 @@ public class TestDefaultCertificateClient {
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
-    assertTrue(dnCertClient.verifySignature(
-        IOUtils.toInputStream(data, UTF_8),
-        sign, x509Certificate));
 
     // Negative tests.
     assertFalse(dnCertClient.verifySignature(data.getBytes(UTF_8),
         "abc".getBytes(UTF_8), x509Certificate));
-    assertFalse(dnCertClient.verifySignature(IOUtils.toInputStream(data,
-        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
 
   }
 
@@ -262,16 +257,10 @@ public class TestDefaultCertificateClient {
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
-    assertTrue(dnCertClient.verifySignature(
-        IOUtils.toInputStream(data, UTF_8),
-        sign, x509Certificate));
 
     // Negative tests.
     assertFalse(dnCertClient.verifySignature(data.getBytes(UTF_8),
         "abc".getBytes(UTF_8), x509Certificate));
-    assertFalse(dnCertClient.verifySignature(IOUtils.toInputStream(data,
-        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
-
   }
 
   @Test

@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -414,37 +413,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       getLogger().error("Error while signing the stream", e);
       throw new CertificateException("Error while signing the stream", e,
           CRYPTO_SIGN_ERROR);
-    }
-  }
-
-  /**
-   * Verifies a digital Signature, given the signature and the certificate of
-   * the signer.
-   *
-   * @param stream - Data Stream.
-   * @param signature - Byte Array containing the signature.
-   * @param cert - Certificate of the Signer.
-   * @return true if verified, false if not.
-   */
-  @Override
-  public boolean verifySignature(InputStream stream, byte[] signature,
-      X509Certificate cert) throws CertificateException {
-    try {
-      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
-          securityConfig.getProvider());
-      sign.initVerify(cert);
-      byte[] buffer = new byte[1024 * 4];
-
-      int len;
-      while (-1 != (len = stream.read(buffer))) {
-        sign.update(buffer, 0, len);
-      }
-      return sign.verify(signature);
-    } catch (NoSuchAlgorithmException | NoSuchProviderException
-        | InvalidKeyException | SignatureException | IOException e) {
-      getLogger().error("Error while signing the stream", e);
-      throw new CertificateException("Error while signing the stream", e,
-          CRYPTO_SIGNATURE_VERIFICATION_ERROR);
     }
   }
 
