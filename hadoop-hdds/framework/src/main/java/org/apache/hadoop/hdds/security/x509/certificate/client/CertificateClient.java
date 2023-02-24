@@ -35,7 +35,6 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.CertPath;
-import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
