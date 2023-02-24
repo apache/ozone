@@ -1762,6 +1762,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     </allowedImports>
                     <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                   </RestrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use directly from Guava</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
