@@ -218,11 +218,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public boolean verifyCertificate(X509Certificate certificate) {
-    return true;
-  }
-
-  @Override
   public void setCertificateId(String certSerialId) {
   }
 

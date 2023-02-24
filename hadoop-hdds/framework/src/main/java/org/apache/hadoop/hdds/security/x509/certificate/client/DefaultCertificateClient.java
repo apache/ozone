@@ -421,17 +421,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
-   * Verifies if this certificate is part of a trusted chain.
-   *
-   * @param certificate - certificate.
-   * @return true if it trusted, false otherwise.
-   */
-  @Override
-  public boolean verifyCertificate(X509Certificate certificate) {
-    throw new UnsupportedOperationException("Operation not supported.");
-  }
-
-  /**
    * Creates digital signature over the data stream using the s private key.
    *
    * @param stream - Data stream to sign.

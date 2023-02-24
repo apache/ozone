@@ -106,13 +106,6 @@ public interface CertificateClient extends Closeable {
   X509Certificate getCACertificate();
 
   /**
-   * Verifies if this certificate is part of a trusted chain.
-   * @param certificate - certificate.
-   * @return true if it trusted, false otherwise.
-   */
-  boolean verifyCertificate(X509Certificate certificate);
-
-  /**
    * Set the serial ID of default certificate for the specified component.
    * @param certSerialId - certificate ID.
    * */
