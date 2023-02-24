@@ -186,7 +186,6 @@ public abstract class BaseHttpServer {
       httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
       LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }
-    }
   }
 
   /**
