@@ -56,6 +56,7 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
 
     @CommandLine.Option(names = {"-l", "--list"},
         split = ",",
+        paramLabel = "txId",
         description = "Reset the only given deletedBlock transaction ID" +
             " list, e.g 100,101,102.(Separated by ',')")
     private List<Long> txList;
