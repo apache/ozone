@@ -1050,25 +1050,13 @@ public class HttpFSServer {
       response = handleSetECPolicy(path, params, user);
       break;
     case SATISFYSTORAGEPOLICY:
-      response = handleSatisfyStoragePolicy(path, user);
-      break;
+      throw new UnsupportedOperationException(getClass().getSimpleName()
+          + " doesn't support SATISFYSTORAGEPOLICY");
     default:
       throw new IOException(
         MessageFormat.format("Invalid HTTP PUT operation [{0}]",
                              op.value()));
     }
-    return response;
-  }
-
-  private Response handleSatisfyStoragePolicy(String path,
-                                              UserGroupInformation user)
-      throws IOException, FileSystemAccessException {
-    Response response;
-    FSOperations.FSSatisyStoragePolicy command =
-        new FSOperations.FSSatisyStoragePolicy(path);
-    fsExecute(user, command);
-    AUDIT_LOG.info("satisfy storage policy for [{}]", path);
-    response = Response.ok().build();
     return response;
   }
 
