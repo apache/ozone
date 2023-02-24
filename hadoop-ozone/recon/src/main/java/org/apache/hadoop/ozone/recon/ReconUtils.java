@@ -325,26 +325,4 @@ public class ReconUtils {
     }
     return index;
   }
-
-  /**
-   * Creates CertificateSignRequest.
-   * @param config
-   * */
-  public static PKCS10CertificationRequest getCSR(OzoneConfiguration config,
-      CertificateClient certClient) throws IOException {
-    CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(certClient.getPublicKey(),
-        certClient.getPrivateKey());
-
-    String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
-
-    builder.setCA(false)
-        .setKey(keyPair)
-        .setConfiguration(config)
-        .setSubject(subject);
-
-    return builder.build();
-  }
 }

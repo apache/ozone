@@ -1052,7 +1052,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Get certificate signed
     String newCertSerialId;
     try {
-      CertificateSignRequest.Builder csrBuilder = getCSRBuilder(newKeyPair);
+      CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+      csrBuilder.setKey(newKeyPair);
       newCertSerialId = signAndStoreCertificate(csrBuilder.build(),
           Paths.get(newCertPath));
     } catch (Exception e) {
@@ -1225,10 +1226,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return signAndStoreCertificate(request,
         getSecurityConfig().getCertificateLocation(getComponentName()));
   }
-
-  @Override
-  public abstract CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException;
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
       throws IOException {

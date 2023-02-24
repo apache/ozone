@@ -131,15 +131,6 @@ public interface CertificateClient extends Closeable {
       X509Certificate cert) throws CertificateException;
 
   /**
-   * Returns a CSR builder that can be used to creates a Certificate sigining
-   * request.
-   *
-   * @return CertificateSignRequest.Builder
-   */
-   CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-       throws IOException;
-
-  /**
    * Returns a CSR builder that can be used to create a Certificate sigining
    * request.
    *

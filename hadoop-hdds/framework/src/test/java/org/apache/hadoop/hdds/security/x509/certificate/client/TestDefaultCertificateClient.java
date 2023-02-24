@@ -442,12 +442,6 @@ public class TestDefaultCertificateClient {
               throws CertificateException {
             return null;
           }
-
-          @Override
-          public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-              throws CertificateException {
-            return null;
-          }
         };
 
     InitResponse resp = client.init();

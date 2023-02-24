@@ -238,12 +238,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair key)
-      throws CertificateException {
-    return null;
-  }
-
-  @Override
   public CertificateSignRequest.Builder getCSRBuilder() {
     return new CertificateSignRequest.Builder();
   }

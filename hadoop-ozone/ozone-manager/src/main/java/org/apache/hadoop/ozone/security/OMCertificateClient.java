@@ -98,26 +98,13 @@ public class OMCertificateClient extends CommonCertificateClient {
   }
 
   /**
-   * Returns a CSR builder that can be used to create a Certificate signing
-   * request.
-   * The default flag is added to allow basic SSL handshake.
-   *
-   * @return CertificateSignRequest.Builder
-   */
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
-    return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
-  }
-
-  /**
    * Returns a CSR builder that can be used to create a Certificate sigining
    * request.
    *
    * @return CertificateSignRequest.Builder
    */
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+  public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
     CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
@@ -139,7 +126,7 @@ public class OMCertificateClient extends CommonCertificateClient {
     }
 
     builder.setCA(false)
-        .setKey(keyPair)
+        .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
         .setConfiguration(getConfig())
         .setScmID(scmID)
         .setClusterID(clusterID)

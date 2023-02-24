@@ -70,19 +70,6 @@ public class DNCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
-  }
-
-  /**
-   * Returns a CSR builder that can be used to creates a Certificate signing
-   * request.
-   * The default flag is added to allow basic SSL handshake.
-   *
-   * @return CertificateSignRequest.Builder
-   */
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException {
     CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);
@@ -92,7 +79,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
       String subject = UserGroupInformation.getCurrentUser()
           .getShortUserName() + "@" + hostname;
       builder.setCA(false)
-          .setKey(keyPair)
+          .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
           .setConfiguration(getConfig())
           .setSubject(subject);
 

@@ -262,15 +262,13 @@ public final class HASecurityUtils {
       OzoneConfiguration config, InetSocketAddress scmAddress)
       throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(client.getPublicKey(),
-        client.getPrivateKey());
 
     // Get host name.
     String hostname = scmAddress.getHostName();
 
     String subject = SCM_SUB_CA_PREFIX + hostname;
 
-    builder.setKey(keyPair)
+    builder
         .setConfiguration(config)
         .setScmID(scmStorageConfig.getScmId())
         .setClusterID(scmStorageConfig.getClusterID())

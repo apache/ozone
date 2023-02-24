@@ -69,12 +69,6 @@ public class ReconCertificateClient  extends CommonCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
-  }
-
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException {
     LOG.info("Creating CSR for Recon.");
     try {
       CertificateSignRequest.Builder builder = super.getCSRBuilder();
@@ -83,7 +77,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
           .getShortUserName() + "@" + hostname;
 
       builder.setCA(false)
-          .setKey(keyPair)
+          .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
           .setConfiguration(getConfig())
           .setSubject(subject);
 
