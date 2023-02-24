@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token.TrivialRenewer;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -34,6 +35,7 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Block token identifier for Ozone/HDDS. Ozone block access token is similar
@@ -51,6 +53,20 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   private EnumSet<AccessModeProto> modes;
   private long maxLength;
 
+  public OzoneBlockTokenIdentifier(
+      String ownerId, String blockId, Set<AccessModeProto> modes,
+      long expiryDate, UUID secretKeyid, long maxLength) {
+    this(ownerId, blockId, modes, expiryDate, maxLength);
+    this.setSecretKeyId(secretKeyid);
+  }
+
+  public OzoneBlockTokenIdentifier(
+      String ownerId, BlockID blockId, Set<AccessModeProto> modes,
+      long expiryDate, UUID secretKeyid, long maxLength) {
+    this(ownerId, blockId, modes, expiryDate, maxLength);
+    this.setSecretKeyId(secretKeyid);
+  }
+
   public static String getTokenService(BlockID blockID) {
     return String.valueOf(blockID.getContainerBlockID());
   }
@@ -59,16 +75,15 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, BlockID blockId,
-      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
-      long maxLength) {
-    this(ownerId, getTokenService(blockId), modes, expiryDate, omCertSerialId,
+      Set<AccessModeProto> modes, long expiryDate, long maxLength) {
+    this(ownerId, getTokenService(blockId), modes, expiryDate,
         maxLength);
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, String blockId,
-      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
-      long maxLength) {
-    super(ownerId, Instant.ofEpochMilli(expiryDate), omCertSerialId);
+                                   Set<AccessModeProto> modes, long expiryDate,
+                                   long maxLength) {
+    super(ownerId, Instant.ofEpochMilli(expiryDate));
     this.blockId = blockId;
     this.modes = modes == null
         ? EnumSet.noneOf(AccessModeProto.class) : EnumSet.copyOf(modes);
@@ -136,7 +151,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
     setOwnerId(token.getOwnerId());
     setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
-    setCertSerialId(token.getOmCertSerialId());
+    setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
     this.blockId = token.getBlockId();
     this.modes = EnumSet.copyOf(token.getModesList());
     this.maxLength = token.getMaxLength();
@@ -149,7 +164,8 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
     return new OzoneBlockTokenIdentifier(token.getOwnerId(),
         token.getBlockId(), EnumSet.copyOf(token.getModesList()),
-        token.getExpiryDate(), token.getOmCertSerialId(),
+        token.getExpiryDate(),
+        ProtobufUtils.fromProtobuf(token.getSecretKeyId()),
         token.getMaxLength());
   }
 
@@ -158,7 +174,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
         .setBlockId(blockId)
         .setOwnerId(getOwnerId())
-        .setOmCertSerialId(getCertSerialId())
+        .setSecretKeyId(ProtobufUtils.toProtobuf(getSecretKeyId()))
         .setExpiryDate(getExpiryDate())
         .setMaxLength(maxLength);
     // Add access mode allowed

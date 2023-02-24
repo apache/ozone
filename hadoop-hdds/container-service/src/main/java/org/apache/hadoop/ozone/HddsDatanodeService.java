@@ -40,6 +40,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
@@ -96,6 +98,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeStateMachine datanodeStateMachine;
   private List<ServicePlugin> plugins;
   private CertificateClient dnCertClient;
+  private SecretKeyClient secretKeyClient;
   private String component;
   private HddsDatanodeHttpServer httpServer;
   private boolean printBanner;
@@ -290,9 +293,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         dnCertClient = initializeCertificateClient(dnCertClient);
+
+        if (OzoneSecurityUtil.isTokenEnable(conf)) {
+          secretKeyClient = DefaultSecretKeyClient.create(conf);
+          secretKeyClient.start(conf);
+        }
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, this::terminateDatanode, dnCRLStore);
+          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
@@ -548,6 +556,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("Datanode CRL store stop failed", ex);
       }
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
+
+      if (secretKeyClient != null) {
+        secretKeyClient.stop();
+      }
     }
   }
 
@@ -584,6 +596,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @VisibleForTesting
   public void setCertificateClient(CertificateClient client) {
     dnCertClient = client;
+  }
+
+  @VisibleForTesting
+  public void setSecretKeyClient(SecretKeyClient client) {
+    this.secretKeyClient = client;
   }
 
   @Override

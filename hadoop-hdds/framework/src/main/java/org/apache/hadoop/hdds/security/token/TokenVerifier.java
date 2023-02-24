@@ -23,8 +23,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
@@ -73,15 +73,14 @@ public interface TokenVerifier {
 
   /** Create appropriate token verifier based on the configuration. */
   static TokenVerifier create(SecurityConfig conf,
-      CertificateClient certClient) {
-
+      SecretKeyVerifierClient secretKeyClient) throws IOException {
     if (!conf.isBlockTokenEnabled() && !conf.isContainerTokenEnabled()) {
       return new NoopTokenVerifier();
     }
 
     List<TokenVerifier> list = new LinkedList<>();
-    list.add(new BlockTokenVerifier(conf, certClient));
-    list.add(new ContainerTokenVerifier(conf, certClient));
+    list.add(new BlockTokenVerifier(conf, secretKeyClient));
+    list.add(new ContainerTokenVerifier(conf, secretKeyClient));
     return new CompositeTokenVerifier(list);
   }
 }

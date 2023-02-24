@@ -23,8 +23,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 
 import java.io.IOException;
@@ -46,8 +46,8 @@ public class TestBlockTokenVerifier
 
   @Override
   protected TokenVerifier newTestSubject(SecurityConfig secConf,
-      CertificateClient caClient) {
-    return new BlockTokenVerifier(secConf, caClient);
+      SecretKeyVerifierClient secretKeyClient) {
+    return new BlockTokenVerifier(secConf, secretKeyClient);
   }
 
   @Override
@@ -71,6 +71,6 @@ public class TestBlockTokenVerifier
         new BlockID(1, 0),
         EnumSet.allOf(AccessModeProto.class),
         Instant.now().plusSeconds(3600).toEpochMilli(),
-        CERT_ID, 100);
+        SECRET_KEY_ID, 100);
   }
 }

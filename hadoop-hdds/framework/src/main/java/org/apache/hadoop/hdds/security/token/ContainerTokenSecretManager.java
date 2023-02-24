@@ -20,11 +20,9 @@ package org.apache.hadoop.hdds.security.token;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -38,17 +36,15 @@ public class ContainerTokenSecretManager
     extends ShortLivedTokenSecretManager<ContainerTokenIdentifier>
     implements ContainerTokenGenerator {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerTokenSecretManager.class);
-
-  public ContainerTokenSecretManager(SecurityConfig conf, long tokenLifetime) {
-    super(conf, tokenLifetime, LOG);
+  public ContainerTokenSecretManager(long tokenLifetime,
+                                     SecretKeySignerClient secretKeyClient) {
+    super(tokenLifetime, secretKeyClient);
   }
 
   public ContainerTokenIdentifier createIdentifier(String user,
       ContainerID containerID) {
     return new ContainerTokenIdentifier(user, containerID,
-        getCertSerialId(), getTokenExpiryTime());
+        getTokenExpiryTime());
   }
 
   @Override

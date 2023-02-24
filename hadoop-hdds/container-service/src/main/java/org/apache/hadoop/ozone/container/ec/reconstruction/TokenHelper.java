@@ -22,12 +22,12 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
@@ -52,7 +52,7 @@ class TokenHelper {
   private static final Set<AccessModeProto> MODES =
       EnumSet.of(READ, WRITE, DELETE);
 
-  TokenHelper(ConfigurationSource conf, CertificateClient certClient)
+  TokenHelper(ConfigurationSource conf, SecretKeySignerClient secretKeyClient)
       throws IOException {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
@@ -61,7 +61,7 @@ class TokenHelper {
 
     // checking certClient != null instead of securityConfig.isSecurityEnabled()
     // to allow integration test without full kerberos etc. setup
-    boolean securityEnabled = certClient != null;
+    boolean securityEnabled = secretKeyClient != null;
 
     if (securityEnabled && (blockTokenEnabled || containerTokenEnabled)) {
       user = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -82,17 +82,15 @@ class TokenHelper {
       }
 
       if (blockTokenEnabled) {
-        blockTokenMgr = new OzoneBlockTokenSecretManager(
-            securityConfig, expiryTime);
-        blockTokenMgr.start(certClient);
+        blockTokenMgr = new OzoneBlockTokenSecretManager(expiryTime,
+            secretKeyClient);
       } else {
         blockTokenMgr = null;
       }
 
       if (containerTokenEnabled) {
-        containerTokenMgr = new ContainerTokenSecretManager(
-            securityConfig, expiryTime);
-        containerTokenMgr.start(certClient);
+        containerTokenMgr = new ContainerTokenSecretManager(expiryTime,
+            secretKeyClient);
       } else {
         containerTokenMgr = null;
       }
@@ -100,23 +98,6 @@ class TokenHelper {
       user = null;
       blockTokenMgr = null;
       containerTokenMgr = null;
-    }
-  }
-
-  void stop() {
-    if (blockTokenMgr != null) {
-      try {
-        blockTokenMgr.stop();
-      } catch (IOException ignored) {
-        // no threads involved, cannot really happen
-      }
-    }
-    if (containerTokenMgr != null) {
-      try {
-        containerTokenMgr.stop();
-      } catch (IOException ignored) {
-        // no threads involved, cannot really happen
-      }
     }
   }
 
