@@ -51,6 +51,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -180,10 +181,17 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certificateCodec =
         new CertificateCodec(config, componentName);
     try {
-      return certificateCodec.readCertificate();
+      return certificateCodec.getTargetCertHolder();
     } catch (CertificateException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public CertPath getCaCertPath()
+      throws CertificateException, IOException {
+    CertificateCodec codec = new CertificateCodec(config, componentName);
+    return codec.getCertPath();
   }
 
   /**
@@ -213,7 +221,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(
+  public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role) {
     LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
@@ -231,16 +239,20 @@ public class DefaultCAServer implements CertificateServer {
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
+    CompletableFuture<CertPath> xCertHolders
+        = new CompletableFuture<>();
+
     if (xcertHolder.isCompletedExceptionally()) {
       // This means that approver told us there are things which it disagrees
       // with in this Certificate Request. Since the first set of sanity
       // checks failed, we just return the future object right here.
-      return xcertHolder;
+      xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
+          "verify the CSR."));
     }
     try {
       switch (approverType) {
       case MANUAL:
-        xcertHolder.completeExceptionally(new SCMSecurityException("Manual " +
+        xCertHolders.completeExceptionally(new SCMSecurityException("Manual " +
             "approval is not yet implemented."));
         break;
       case KERBEROS_TRUSTED:
@@ -254,7 +266,10 @@ public class DefaultCAServer implements CertificateServer {
           LOG.error("Certificate storage failed, retrying one more time.", e);
           xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
-        xcertHolder.complete(xcert);
+        CertificateCodec codec = new CertificateCodec(config, componentName);
+        CertPath certPath = codec.getCertPath();
+        CertPath updatedCertPath = codec.prependCertToCertPath(xcert, certPath);
+        xCertHolders.complete(updatedCertPath);
         break;
       default:
         return null; // cannot happen, keeping checkstyle happy.
@@ -262,10 +277,10 @@ public class DefaultCAServer implements CertificateServer {
     } catch (CertificateException | IOException | OperatorCreationException |
              TimeoutException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xcertHolder.completeExceptionally(
+      xCertHolders.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
-    return xcertHolder;
+    return xCertHolders;
   }
 
   private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
@@ -292,7 +307,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(String csr,
+  public Future<CertPath> requestCertificate(String csr,
       CertificateApprover.ApprovalType type, NodeType nodeType)
       throws IOException {
     PKCS10CertificationRequest request =
@@ -474,9 +489,9 @@ public class DefaultCAServer implements CertificateServer {
       };
       break;
     case INITIALIZE:
-      if (type == CAType.SELF_SIGNED_CA) {
+      if (type == CAType.ROOT) {
         consumer = this::initRootCa;
-      } else if (type == CAType.INTERMEDIARY_CA) {
+      } else if (type == CAType.SUBORDINATE) {
         // For sub CA certificates are generated during bootstrap/init. If
         // both keys/certs are missing, init/bootstrap is missed to be
         // performed.
@@ -602,7 +617,7 @@ public class DefaultCAServer implements CertificateServer {
         throw new IOException("External cert path is not correct: " +
             extCertPath);
       }
-      X509CertificateHolder certHolder = certificateCodec.readCertificate(
+      X509CertificateHolder certHolder = certificateCodec.getTargetCertHolder(
           extCertParent, extCertName.toString());
       Path extPrivateKeyParent = extPrivateKeyPath.getParent();
       Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();

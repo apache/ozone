@@ -158,7 +158,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     int minReplicasForMaintenance = request.getMaintenanceRedundancy();
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
-            minReplicasForMaintenance);
+            minReplicasForMaintenance, false);
 
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);

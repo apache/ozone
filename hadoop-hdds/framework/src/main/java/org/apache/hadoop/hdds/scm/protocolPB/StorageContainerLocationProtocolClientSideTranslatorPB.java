@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
@@ -703,6 +704,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  @Override
+  public void transferLeadership(String nodeId)
+      throws IOException {
+    TransferLeadershipRequestProto.Builder reqBuilder =
+        TransferLeadershipRequestProto.newBuilder();
+    reqBuilder.setNewLeaderId(nodeId);
+    submitRequest(Type.TransferLeadership,
+        builder -> builder.setTransferScmLeadershipRequest(reqBuilder.build()));
   }
 
   @Override

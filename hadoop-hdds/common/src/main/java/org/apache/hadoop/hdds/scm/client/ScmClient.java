@@ -362,6 +362,14 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param newLeaderId  the newLeaderId of the target expected leader
+   * @throws IOException
+   */
+  void transferLeadership(String newLeaderId) throws IOException;
+
+  /**
    * Return the failed transactions of the Deleted blocks. A transaction is
    * considered to be failed if it has been sent more than MAX_RETRY limit
    * and its count is reset to -1.

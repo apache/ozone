@@ -132,4 +132,38 @@ public class TestContainerOperations {
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
     }
   }
+
+  @Test
+  public void testDatanodeUsageInfoContainerCount() throws IOException {
+    List<DatanodeDetails> dnList = cluster.getStorageContainerManager()
+            .getScmNodeManager()
+            .getAllNodes();
+
+    for (DatanodeDetails dn : dnList) {
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+              storageClient.getDatanodeUsageInfo(
+                      dn.getIpAddress(), dn.getUuidString());
+
+      assertEquals(1, usageInfoList.size());
+      assertEquals(0, usageInfoList.get(0).getContainerCount());
+    }
+
+    storageClient.createContainer(HddsProtos
+            .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
+            .ONE, OzoneConsts.OZONE);
+
+    int[] totalContainerCount = new int[2];
+    for (DatanodeDetails dn : dnList) {
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+              storageClient.getDatanodeUsageInfo(
+                      dn.getIpAddress(), dn.getUuidString());
+
+      assertEquals(1, usageInfoList.size());
+      assertTrue(usageInfoList.get(0).getContainerCount() >= 0 &&
+              usageInfoList.get(0).getContainerCount() <= 1);
+      totalContainerCount[(int)usageInfoList.get(0).getContainerCount()]++;
+    }
+    assertEquals(2, totalContainerCount[0]);
+    assertEquals(1, totalContainerCount[1]);
+  }
 }

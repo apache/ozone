@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.security;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -39,11 +40,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 @CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE})
 public class S3GetSecretResponse extends OMClientResponse {
 
-  private S3SecretValue s3SecretValue;
+  private final S3SecretValue s3SecretValue;
+  private final S3SecretManager s3SecretManager;
 
   public S3GetSecretResponse(@Nullable S3SecretValue s3SecretValue,
+      @Nonnull S3SecretManager secretManager,
       @Nonnull OMResponse omResponse) {
     super(omResponse);
+    this.s3SecretManager = secretManager;
     this.s3SecretValue = s3SecretValue;
   }
 
@@ -51,10 +55,16 @@ public class S3GetSecretResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (s3SecretValue != null &&
-        getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
-          s3SecretValue.getKerberosID(), s3SecretValue);
+    boolean isOk
+        = getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK;
+    if (s3SecretValue != null && isOk) {
+      if (s3SecretManager.isBatchSupported()) {
+        s3SecretManager.batcher().addWithBatch(batchOperation,
+            s3SecretValue.getKerberosID(), s3SecretValue);
+      } else {
+        s3SecretManager.storeSecret(s3SecretValue.getKerberosID(),
+            s3SecretValue);
+      }
     }
   }
 

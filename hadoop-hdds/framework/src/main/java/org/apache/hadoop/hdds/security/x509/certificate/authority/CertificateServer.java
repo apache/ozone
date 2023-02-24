@@ -31,6 +31,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
@@ -66,6 +67,19 @@ public interface CertificateServer {
       throws CertificateException, IOException;
 
   /**
+   * Gets the certificate bundle for the CA certificate of this server.
+   * The first element of the list is the CA certificate. The issuer of an
+   * element of this list is always the next element of the list. The root CA
+   * certificate is the final element.
+   *
+   * @return the certificate bundle starting with the CA certificate.
+   * @throws CertificateException
+   * @throws IOException
+   */
+  CertPath getCaCertPath() throws CertificateException,
+      IOException;
+
+  /**
    * Returns the Certificate corresponding to given certificate serial id if
    * exist. Return null if it doesn't exist.
    *
@@ -87,7 +101,7 @@ public interface CertificateServer {
    * approved.
    * @throws SCMSecurityException - on Error.
    */
-  Future<X509CertificateHolder> requestCertificate(
+  Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType type, NodeType role)
       throws SCMSecurityException;
@@ -96,14 +110,15 @@ public interface CertificateServer {
   /**
    * Request a Certificate based on Certificate Signing Request.
    *
-   * @param csr - Certificate Signing Request as a PEM encoded String.
-   * @param type - An Enum which says what kind of approval process to follow.
+   * @param csr       - Certificate Signing Request as a PEM encoded String.
+   * @param type      - An Enum which says what kind of approval process to
+   *                  follow.
    * @param nodeType: OM/SCM/DN
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
    */
-  Future<X509CertificateHolder> requestCertificate(String csr,
+  Future<CertPath> requestCertificate(String csr,
       ApprovalType type, NodeType nodeType) throws IOException;
 
   /**
@@ -150,12 +165,4 @@ public interface CertificateServer {
    * @return latest CRL id.
    */
   long getLatestCrlId();
-
-  /**
-   * Make it explicit what type of CertificateServer we are creating here.
-   */
-  enum CAType {
-    SELF_SIGNED_CA,
-    INTERMEDIARY_CA
-  }
 }

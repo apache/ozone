@@ -61,6 +61,11 @@ public class ScmOption {
     return new ContainerOperationClient(conf);
   }
 
+  public ScmClient createScmClient(OzoneConfiguration conf) {
+    checkAndSetSCMAddressArg(conf);
+    return new ContainerOperationClient(conf);
+  }
+
   private void checkAndSetSCMAddressArg(MutableConfigurationSource conf) {
     if (StringUtils.isNotEmpty(scm)) {
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scm);
