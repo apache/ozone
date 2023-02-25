@@ -118,7 +118,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
-  private long localCrlId;
   private String component;
   private List<String> pemEncodedCACerts = null;
   private KeyStoresFactory serverKeyStoresFactory;
@@ -1169,8 +1168,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws IOException {
     if (scmSecurityProtocolClient == null) {
       scmSecurityProtocolClient =
-          getScmSecurityClientWithMaxRetry(
-              (OzoneConfiguration) securityConfig.getConfiguration(), ugi);
+          getScmSecurityClientWithMaxRetry(getConfig(), ugi);
     }
     return scmSecurityProtocolClient;
   }

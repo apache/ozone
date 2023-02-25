@@ -15,15 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.security.x509.certificate.client;
+package org.apache.hadoop.ozone.recon.security;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -50,20 +52,15 @@ public class ReconCertificateClient  extends CommonCertificateClient {
   private final String clusterID;
   private final String reconID;
 
-  public ReconCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String clusterId, String reconId,
-      Consumer<String> saveCertIdCallback, Runnable shutdownCallback) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME,
-        saveCertIdCallback, shutdownCallback);
-    this.clusterID = clusterId;
-    this.reconID = reconId;
-  }
-
-  public ReconCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String clusterId, String reconId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
-    this.clusterID = clusterId;
-    this.reconID = reconId;
+  public ReconCertificateClient(
+      SecurityConfig config,
+      ReconStorageConfig storage,
+      Consumer<String> saveCertIdCallback,
+      Runnable shutdownCallback) {
+    super(config, LOG, storage.getReconCertSerialId(),
+        COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
+    this.clusterID = storage.getClusterID();
+    this.reconID = storage.getReconId();
   }
 
   @Override

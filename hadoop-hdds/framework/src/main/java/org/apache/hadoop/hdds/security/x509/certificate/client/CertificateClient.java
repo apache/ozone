@@ -44,6 +44,18 @@ import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes
 public interface CertificateClient extends Closeable {
 
   /**
+   * Set the serial ID of default certificate for the specified component.
+   * @param certSerialId - certificate ID.
+   * */
+  void setCertificateId(String certSerialId);
+
+  /**
+   * Return component name of this certificate client.
+   * @return component name
+   */
+  String getComponentName();
+
+  /**
    * Returns the private key of the specified component if it exists on the
    * local system.
    *
@@ -58,6 +70,14 @@ public interface CertificateClient extends Closeable {
    * @return public key or Null if there is no data.
    */
   PublicKey getPublicKey();
+
+  /**
+   * Returns the certificate used by the specified component if it exists
+   * on the local system.
+   *
+   * @return the target certificate or null if there is no data.
+   */
+  X509Certificate getCertificate();
 
   /**
    * Returns the certificate  of the specified component if it exists on the
@@ -78,12 +98,11 @@ public interface CertificateClient extends Closeable {
   CertPath getCertPath();
 
   /**
-   * Returns the certificate used by the specified component if it exists
-   * on the local system.
+   * Return the latest CA certificate known to the client.
    *
-   * @return the target certificate or null if there is no data.
+   * @return latest ca certificate known to the client.
    */
-  X509Certificate getCertificate();
+  X509Certificate getCACertificate();
 
   /**
    * Returns the full certificate path for the CA certificate known to the
@@ -94,17 +113,37 @@ public interface CertificateClient extends Closeable {
   CertPath getCACertPath();
 
   /**
-   * Return the latest CA certificate known to the client.
-   *
-   * @return latest ca certificate known to the client.
+   * Return the latest Root CA certificate known to the client.
+   * @return latest Root CA certificate known to the client.
    */
-  X509Certificate getCACertificate();
+  X509Certificate getRootCACertificate();
 
   /**
-   * Set the serial ID of default certificate for the specified component.
-   * @param certSerialId - certificate ID.
-   * */
-  void setCertificateId(String certSerialId);
+   * Return the pem encoded CA certificate list.
+   *
+   * If initialized return list of pem encoded CA certificates, else return
+   * null.
+   * @return list of pem encoded CA certificates.
+   */
+  List<String> getCAList();
+
+  /**
+   * Return the pem encoded  CA certificate list.
+   *
+   * If list is null, fetch the list from SCM and returns the list.
+   * If list is not null, return the pem encoded  CA certificate list.
+   *
+   * @return list of pem encoded  CA certificates.
+   * @throws IOException
+   */
+  List<String> listCA() throws IOException;
+
+  /**
+   * Update and returns the pem encoded CA certificate list.
+   * @return list of pem encoded  CA certificates.
+   * @throws IOException
+   */
+  List<String> updateCAList() throws IOException;
 
   /**
    * Creates digital signature over the data stream using the components private
@@ -156,68 +195,6 @@ public interface CertificateClient extends Closeable {
   void storeCertificate(String pemEncodedCert, CAType caType)
       throws CertificateException;
 
-  /**
-   * Initialize certificate client.
-   *
-   * */
-  InitResponse init() throws CertificateException;
-
-  /**
-   * Represents initialization response of client.
-   * 1. SUCCESS: Means client is initialized successfully and all required
-   *              files are in expected state.
-   * 2. FAILURE: Initialization failed due to some unrecoverable error.
-   * 3. GETCERT: Bootstrap of keypair is successful but certificate is not
-   *             found. Client should request SCM signed certificate.
-   *
-   */
-  enum InitResponse {
-    SUCCESS,
-    FAILURE,
-    GETCERT,
-    RECOVER,
-    REINIT
-  }
-
-  /**
-   * Return component name of this certificate client.
-   * @return component name
-   */
-  String getComponentName();
-
-  /**
-   * Return the latest Root CA certificate known to the client.
-   * @return latest Root CA certificate known to the client.
-   */
-  X509Certificate getRootCACertificate();
-
-  /**
-   * Return the pem encoded CA certificate list.
-   *
-   * If initialized return list of pem encoded CA certificates, else return
-   * null.
-   * @return list of pem encoded CA certificates.
-   */
-  List<String> getCAList();
-
-  /**
-   * Return the pem encoded  CA certificate list.
-   *
-   * If list is null, fetch the list from SCM and returns the list.
-   * If list is not null, return the pem encoded  CA certificate list.
-   *
-   * @return list of pem encoded  CA certificates.
-   * @throws IOException
-   */
-  List<String> listCA() throws IOException;
-
-  /**
-   * Update and returns the pem encoded CA certificate list.
-   * @return list of pem encoded  CA certificates.
-   * @throws IOException
-   */
-  List<String> updateCAList() throws IOException;
-
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {
     try {
       Objects.requireNonNull(getPublicKey());
@@ -245,4 +222,28 @@ public interface CertificateClient extends Closeable {
    * @param receiver
    */
   void registerNotificationReceiver(CertificateNotification receiver);
+
+
+  /**
+   * Initialize certificate client.
+   *
+   * */
+  InitResponse init() throws CertificateException;
+
+  /**
+   * Represents initialization response of client.
+   * 1. SUCCESS: Means client is initialized successfully and all required
+   *              files are in expected state.
+   * 2. FAILURE: Initialization failed due to some unrecoverable error.
+   * 3. GETCERT: Bootstrap of keypair is successful but certificate is not
+   *             found. Client should request SCM signed certificate.
+   *
+   */
+  enum InitResponse {
+    SUCCESS,
+    FAILURE,
+    GETCERT,
+    RECOVER,
+    REINIT
+  }
 }

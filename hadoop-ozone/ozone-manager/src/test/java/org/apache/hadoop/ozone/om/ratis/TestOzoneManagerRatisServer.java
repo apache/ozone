@@ -121,7 +121,7 @@ public class TestOzoneManagerRatisServer {
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     secConfig = new SecurityConfig(conf);
-    certClient = new OMCertificateClient(secConfig);
+    certClient = new OMCertificateClient(secConfig, null, null, null, null);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
       omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();

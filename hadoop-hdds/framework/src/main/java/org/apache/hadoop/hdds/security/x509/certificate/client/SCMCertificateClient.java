@@ -54,10 +54,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME, null, null);
-  }
-
   public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId, String component) {
     super(securityConfig, LOG, certSerialId, component, null, null);

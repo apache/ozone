@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -1320,14 +1321,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Initializing secure OzoneManager.");
 
     CertificateClient certClient =
-        new OMCertificateClient(new SecurityConfig(conf), omStore, scmId);
+        new OMCertificateClient(
+            new SecurityConfig(conf), omStore, scmId, null, null);
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       LOG.info("Re-initialize certificate client.");
       omStore.unsetOmCertSerialId();
       omStore.persistCurrentState();
       certClient = new OMCertificateClient(
-          new SecurityConfig(conf), omStore, scmId);
+          new SecurityConfig(conf), omStore, scmId, null, null);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -4408,7 +4410,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public static HddsProtos.OzoneManagerDetailsProto getOmDetailsProto(
-      OzoneConfiguration config, String omID) {
+      ConfigurationSource config, String omID) {
     boolean flexibleFqdnResolutionEnabled = config.getBoolean(
         OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
         OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);

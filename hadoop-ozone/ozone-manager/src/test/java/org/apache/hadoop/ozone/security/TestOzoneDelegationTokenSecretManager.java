@@ -140,7 +140,7 @@ public class TestOzoneDelegationTokenSecretManager {
     CertPath certPath = fact.engineGenerateCertPath(
         ImmutableList.of(singleCert));
 
-    return new OMCertificateClient(securityConfig) {
+    return new OMCertificateClient(securityConfig, null, null, null, null) {
       @Override
       public CertPath getCertPath() {
         return certPath;

@@ -43,6 +43,7 @@ import java.security.KeyPair;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.ozone.om.OzoneManager.getOmDetailsProto;
 
 /**
  * Certificate client for OzoneManager.
@@ -57,44 +58,19 @@ public class OMCertificateClient extends CommonCertificateClient {
   private final String clusterID;
   private final HddsProtos.OzoneManagerDetailsProto omInfo;
 
-  @SuppressWarnings("parameternumber")
-  public OMCertificateClient(SecurityConfig secConfig, String scmId,
-      String clusterId, HddsProtos.OzoneManagerDetailsProto omDetails,
-      String certSerialId,
-      Consumer<String> persistCertIdCallback, Runnable shutdownCallback) {
-    super(secConfig, LOG, certSerialId, COMPONENT_NAME, persistCertIdCallback,
-        shutdownCallback);
-    this.scmID = scmId;
-    this.clusterID = clusterId;
-    this.omInfo = omDetails;
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig,
-      OMStorage omStorage, String scmID, Consumer<String> saveCertIdCallback,
-      Runnable shutdownCallback) {
-    this(secConfig, scmID, omStorage.getClusterID(),
-        OzoneManager.getOmDetailsProto(
-            (OzoneConfiguration) secConfig.getConfiguration(),
-            omStorage.getOmId()),
-        omStorage.getOmCertSerialId(),
+  public OMCertificateClient(
+      SecurityConfig secConfig,
+      OMStorage omStorage,
+      String scmID,
+      Consumer<String> saveCertIdCallback,
+      Runnable shutdownCallback
+  ) {
+    super(secConfig, LOG, omStorage.getOmCertSerialId(), COMPONENT_NAME,
         saveCertIdCallback, shutdownCallback);
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig, OMStorage omStorage,
-      String scmID) {
-    this(secConfig, scmID, omStorage.getClusterID(),
-        OzoneManager.getOmDetailsProto(
-            (OzoneConfiguration) secConfig.getConfiguration(),
-            omStorage.getOmId()),
-        omStorage.getOmCertSerialId(), null, null);
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig) {
-    this(secConfig, null, null, null, null, null, null);
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig, String certSerialId) {
-    this(secConfig, null, null, null, certSerialId, null, null);
+    this.scmID = scmID;
+    this.clusterID = omStorage.getClusterID();
+    this.omInfo =
+        getOmDetailsProto(secConfig.getConfiguration(), omStorage.getOmId());
   }
 
   /**

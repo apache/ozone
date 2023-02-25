@@ -906,7 +906,7 @@ public final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     client.init();
 
     // save first cert
@@ -982,7 +982,7 @@ public final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     client.init();
 
     // save first cert
@@ -1070,7 +1070,7 @@ public final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     client.init();
 
     // save first cert
