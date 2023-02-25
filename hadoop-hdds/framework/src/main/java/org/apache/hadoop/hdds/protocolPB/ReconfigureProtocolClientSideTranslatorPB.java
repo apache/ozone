@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusRequestProto;
@@ -64,6 +66,10 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
       .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 
   private static final RpcController NULL_CONTROLLER = null;
+
+  private static final GetServerNameRequestProto VOID_GET_SERVER_NAME =
+      GetServerNameRequestProto.newBuilder().build();
+
   private static final StartReconfigureRequestProto VOID_START_RECONFIG =
       StartReconfigureRequestProto.newBuilder().build();
 
@@ -107,6 +113,17 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
   @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
+  }
+
+  @Override
+  public String getServerName() throws IOException {
+    try {
+      GetServerNameResponseProto response =
+          rpcProxy.getServerName(NULL_CONTROLLER, VOID_GET_SERVER_NAME);
+      return response.getName();
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
   }
 
   @Override
