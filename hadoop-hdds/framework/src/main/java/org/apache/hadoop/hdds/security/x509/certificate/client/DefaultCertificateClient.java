@@ -47,7 +47,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -105,9 +104,8 @@ import org.slf4j.Logger;
  */
 public abstract class DefaultCertificateClient implements CertificateClient {
 
-  private static final Random RANDOM = new SecureRandom();
-
   public static final String CERT_FILE_NAME_FORMAT = "%s.crt";
+
   private final Logger logger;
   private final SecurityConfig securityConfig;
   private final KeyCodec keyCodec;
@@ -153,14 +151,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
 
-    loadAllCertificates();
-  }
-
-  public synchronized void setCertificateId(String certId) {
-    Preconditions.checkArgument(certSerialId == null,
-        "certSerialId should only be set once if not renew");
-    this.certSerialId = certId;
-    // reload all new certs
     loadAllCertificates();
   }
 
@@ -797,8 +787,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   protected boolean validateKeyPair(PublicKey pubKey)
       throws CertificateException {
     byte[] challenge =
-        RandomStringUtils.random(1000, 0, 0, false, false, null, RANDOM)
-            .getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.random(1000, 0, 0, false, false, null,
+                new SecureRandom()).getBytes(StandardCharsets.UTF_8);
     return verifySignature(challenge, signData(challenge), pubKey);
   }
 
@@ -1142,6 +1132,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     rootCaCertId = null;
 
     certSerialId = newCertId;
+    loadAllCertificates();
     getLogger().info("Reset and reload key and all certificates.");
   }
 
@@ -1161,6 +1152,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws CertificateException {
     certSerialId = signAndStoreCertificate(request,
         getSecurityConfig().getCertificateLocation(getComponentName()));
+    loadAllCertificates();
     return certSerialId;
   }
 

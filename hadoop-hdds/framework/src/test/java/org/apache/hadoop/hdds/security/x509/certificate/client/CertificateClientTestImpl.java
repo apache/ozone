@@ -212,10 +212,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void setCertificateId(String certSerialId) {
-  }
-
-  @Override
   public byte[] signData(byte[] data) throws CertificateException {
     return new byte[0];
   }
