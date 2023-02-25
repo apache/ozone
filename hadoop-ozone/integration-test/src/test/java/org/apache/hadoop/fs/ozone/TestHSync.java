@@ -280,12 +280,13 @@ public class TestHSync {
         new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
     OzoneOutputStream oos = new OzoneOutputStream(cos);
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
-    CapableOzoneFSOutputStream cofsos = new CapableOzoneFSOutputStream(ofso);
 
-    if (isEC) {
-      assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
-    } else {
-      assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
+    try (CapableOzoneFSOutputStream cofsos = new CapableOzoneFSOutputStream(ofso)) {
+      if (isEC) {
+        assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
+      } else {
+        assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
+      }
     }
   }
 }
