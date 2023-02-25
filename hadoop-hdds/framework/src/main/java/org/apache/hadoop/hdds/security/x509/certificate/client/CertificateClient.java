@@ -44,12 +44,6 @@ import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes
 public interface CertificateClient extends Closeable {
 
   /**
-   * Set the serial ID of default certificate for the specified component.
-   * @param certSerialId - certificate ID.
-   * */
-  void setCertificateId(String certSerialId);
-
-  /**
    * Return component name of this certificate client.
    * @return component name
    */

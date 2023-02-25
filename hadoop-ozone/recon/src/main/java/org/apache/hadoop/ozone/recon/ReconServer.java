@@ -190,8 +190,6 @@ public class ReconServer extends GenericCli {
           certClient.getCSRBuilder().build());
       reconStorage.setReconCertSerialId(certId);
       reconStorage.persistCurrentState();
-      // set new certificate ID
-      certClient.setCertificateId(certId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;

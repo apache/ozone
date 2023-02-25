@@ -904,21 +904,23 @@ public final class TestSecureOzoneCluster {
     OzoneManager.setTestSecureOmFlag(true);
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
-    CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
-    OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
-    client.init();
+
 
     // save first cert
     final int certificateLifetime = 20; // seconds
+    KeyCodec keyCodec =
+        new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
     X509CertificateHolder certHolder = generateX509CertHolder(conf,
-        new KeyPair(client.getPublicKey(), client.getPrivateKey()),
+        new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
-    certCodec.writeCertificate(certHolder);
-    client.setCertificateId(certId);
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
+    CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
+    certCodec.writeCertificate(certHolder);
+    OMCertificateClient client =
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+    client.init();
 
     // first renewed cert
     X509CertificateHolder newCertHolder = generateX509CertHolder(conf,
@@ -981,20 +983,22 @@ public final class TestSecureOzoneCluster {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
-    OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
-    client.init();
 
     // save first cert
     final int certificateLifetime = 20; // seconds
+    KeyCodec keyCodec =
+        new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
     X509CertificateHolder certHolder = generateX509CertHolder(conf,
-        new KeyPair(client.getPublicKey(), client.getPrivateKey()),
+        new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
     certCodec.writeCertificate(certHolder);
-    client.setCertificateId(certId);
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
+
+    OMCertificateClient client =
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+    client.init();
 
     // prepare a mocked scmClient to certificate signing
     SCMSecurityProtocolClientSideTranslatorPB scmClient =

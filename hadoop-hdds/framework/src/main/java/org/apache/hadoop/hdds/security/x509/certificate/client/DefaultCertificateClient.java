@@ -1138,11 +1138,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     privateKey = null;
     publicKey = null;
     certPath = null;
-    certSerialId = null;
     caCertId = null;
     rootCaCertId = null;
 
-    setCertificateId(newCertId);
+    certSerialId = newCertId;
     getLogger().info("Reset and reload key and all certificates.");
   }
 
@@ -1160,8 +1159,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   public String signAndStoreCertificate(PKCS10CertificationRequest request)
       throws CertificateException {
-    return signAndStoreCertificate(request,
+    certSerialId = signAndStoreCertificate(request,
         getSecurityConfig().getCertificateLocation(getComponentName()));
+    return certSerialId;
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
