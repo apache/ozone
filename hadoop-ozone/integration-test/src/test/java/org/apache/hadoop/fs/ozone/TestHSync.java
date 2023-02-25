@@ -276,7 +276,8 @@ public class TestHSync {
     when(codec.getConf()).thenReturn(CONF);
     Encryptor encryptor = mock(Encryptor.class);
     when(codec.createEncryptor()).thenReturn(encryptor);
-    CryptoOutputStream cos = new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
+    CryptoOutputStream cos =
+        new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
     OzoneOutputStream oos = new OzoneOutputStream(cos);
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
     CapableOzoneFSOutputStream cofsos = new CapableOzoneFSOutputStream(ofso);
