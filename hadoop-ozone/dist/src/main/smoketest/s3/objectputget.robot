@@ -152,13 +152,13 @@ Incorrect values for end and start offset
 
 Zero byte file
     ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
-                                Should contain             ${result}        NoSuchKey
+                                Should contain             ${result}        InvalidRange
 
     ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
-                                Should contain             ${result}        NoSuchKey
+                                Should contain             ${result}        InvalidRange
 
     ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
-                                Should contain             ${result}        NoSuchKey
+                                Should contain             ${result}        InvalidRange
 
 Create file with user defined metadata
                                 Execute                   echo "Randomtext" > /tmp/testfile2
