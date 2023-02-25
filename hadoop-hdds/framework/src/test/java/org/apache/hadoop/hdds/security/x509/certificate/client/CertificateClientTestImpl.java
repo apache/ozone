@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -74,8 +75,8 @@ public class CertificateClientTestImpl implements CertificateClient {
   private final SecurityConfig securityConfig;
   private KeyPair keyPair;
   private X509Certificate x509Certificate;
-  private final KeyPair rootKeyPair;
-  private final X509Certificate rootCert;
+  private KeyPair rootKeyPair;
+  private X509Certificate rootCert;
   private HDDSKeyGenerator keyGen;
   private DefaultApprover approver;
   private KeyStoresFactory serverKeyStoresFactory;
@@ -278,6 +279,27 @@ public class CertificateClientTestImpl implements CertificateClient {
     return null;
   }
 
+  public void renewRootCA() throws Exception {
+    LocalDateTime start = LocalDateTime.now();
+    String rootCACertDuration = config.get(HDDS_X509_MAX_DURATION,
+        HDDS_X509_MAX_DURATION_DEFAULT);
+    LocalDateTime end = start.plus(Duration.parse(rootCACertDuration));
+    rootKeyPair = keyGen.generateKey();
+    SelfSignedCertificate.Builder builder =
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(start)
+            .setEndDate(end)
+            .setClusterID("cluster1")
+            .setKey(rootKeyPair)
+            .setSubject("rootCA-new@localhost")
+            .setConfiguration(config)
+            .setScmID("scm1")
+            .makeCA(BigInteger.ONE.add(BigInteger.ONE));
+    rootCert = new JcaX509CertificateConverter().getCertificate(
+        builder.build());
+    certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
+  }
+
   public void renewKey() throws Exception {
     KeyPair newKeyPair = keyGen.generateKey();
     CertificateSignRequest.Builder csrBuilder =
@@ -323,6 +345,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     @Override
     public void run() {
       try {
+        renewRootCA();
         renewKey();
       } catch (Exception e) {
         throw new RuntimeException(e);

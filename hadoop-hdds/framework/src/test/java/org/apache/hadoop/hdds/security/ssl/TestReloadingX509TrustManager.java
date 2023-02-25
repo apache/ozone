@@ -59,6 +59,7 @@ public class TestReloadingX509TrustManager {
       X509Certificate cert1 = caClient.getCACertificate();
       assertEquals(cert1, tm.getAcceptedIssuers()[0]);
 
+      caClient.renewRootCA();
       caClient.renewKey();
       X509Certificate cert2 = caClient.getCACertificate();
       assertNotEquals(cert1, cert2);
