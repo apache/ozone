@@ -879,41 +879,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  private synchronized boolean removeCertificates(List<String> certIds) {
-    boolean reInitCert = false;
-
-    // For now, remove self cert and ca cert is not implemented
-    // both requires a restart of the service.
-    if ((certSerialId != null && certIds.contains(certSerialId)) ||
-        (caCertId != null && certIds.contains(caCertId)) ||
-        (rootCaCertId != null && certIds.contains(rootCaCertId))) {
-      reInitCert = true;
-    }
-
-    Path basePath = securityConfig.getCertificateLocation(component);
-    for (String certId : certIds) {
-      if (certificateMap.containsKey(certId)) {
-        // remove on disk
-        String certName = String.format(CERT_FILE_NAME_FORMAT, certId);
-
-        if (certId.equals(caCertId)) {
-          certName = CAType.SUBORDINATE.getFileNamePrefix() + certName;
-        }
-
-        if (certId.equals(rootCaCertId)) {
-          certName = CAType.ROOT.getFileNamePrefix() + certName;
-        }
-
-        FileUtils.deleteQuietly(basePath.resolve(certName).toFile());
-        // remove in memory
-        certificateMap.remove(certId);
-
-        // TODO: reset certSerialId, caCertId or rootCaCertId
-      }
-    }
-    return reInitCert;
-  }
-
   @Override
   public synchronized KeyStoresFactory getServerKeyStoresFactory()
       throws CertificateException {
