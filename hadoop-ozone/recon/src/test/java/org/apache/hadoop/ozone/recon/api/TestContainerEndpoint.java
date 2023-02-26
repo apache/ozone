@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.junit.Assert.assertNotNull;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -112,6 +113,15 @@ public class TestContainerEndpoint {
   private Pipeline pipeline;
   private PipelineID pipelineID;
   private long keyCount = 5L;
+  private static final String FSO_KEY_NAME = "dir1/file7";
+  private static final String BUCKET_NAME = "bucket1";
+  private static final String VOLUME_NAME = "vol";
+  private static final String FILE_NAME = "file7";
+  private static final long KEY_LENGTH = 13L;
+  private static final long BLOCK_LENGTH = 4L;
+  private static final long KEY_SEQ_NO = 1L;
+  private static final long MODIFICATION_TIME = 0L;
+  private static final int BLOCK_SIZE = 4097;
 
   private UUID uuid1;
   private UUID uuid2;
@@ -229,11 +239,61 @@ public class TestContainerEndpoint {
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
     when(tableMock.getName()).thenReturn("KeyTable");
-    when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
+    when(omMetadataManagerMock.getKeyTable(BucketLayout.DEFAULT))
         .thenReturn(tableMock);
-    ContainerKeyMapperTask containerKeyMapperTask  =
+    when(omMetadataManagerMock.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
+        .thenReturn(tableMock);
+    reprocessContainerKeyMapper();
+  }
+
+  private void reprocessContainerKeyMapper() {
+    ContainerKeyMapperTask containerKeyMapperTask =
         new ContainerKeyMapperTask(reconContainerMetadataManager);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
+  }
+
+  private void setUpMultiBlockKey() throws IOException {
+    OmKeyLocationInfoGroup locationInfoGroup =
+        getLocationInfoGroup1();
+
+    // add the multi-block key to Recon's OM
+    writeKeyToOm(reconOMMetadataManager,
+        FSO_KEY_NAME,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        FILE_NAME,
+        KEY_LENGTH,
+        BLOCK_LENGTH,
+        KEY_SEQ_NO,
+        MODIFICATION_TIME,
+        Collections.singletonList(locationInfoGroup),
+        getBucketLayout(),
+        BLOCK_SIZE);
+  }
+
+  private OmKeyLocationInfoGroup getLocationInfoGroup1() {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    BlockID block1 = new BlockID(20L, 0L);
+    BlockID block2 = new BlockID(21L, 0L);
+    BlockID block3 = new BlockID(22L, 0L);
+
+    OmKeyLocationInfo location1 = new OmKeyLocationInfo.Builder()
+        .setBlockID(block1)
+        .setLength(1000L)
+        .build();
+    OmKeyLocationInfo location2 = new OmKeyLocationInfo.Builder()
+        .setBlockID(block2)
+        .setLength(2000L)
+        .build();
+    OmKeyLocationInfo location3 = new OmKeyLocationInfo.Builder()
+        .setBlockID(block3)
+        .setLength(3000L)
+        .build();
+    locationInfoList.add(location1);
+    locationInfoList.add(location2);
+    locationInfoList.add(location3);
+
+    return new OmKeyLocationInfoGroup(0L, locationInfoList);
   }
 
   @Test
@@ -278,6 +338,34 @@ public class TestContainerEndpoint {
     keyMetadataList = data.getKeys();
     assertEquals(1, keyMetadataList.size());
     assertEquals(3, data.getTotalCount());
+  }
+
+  @Test
+  public void testGetFileTableKeysForContainer() throws IOException {
+    // test to check if the ContainerEndpoint also reads the File table
+
+    // Set up test data for FSO keys
+    setUpMultiBlockKey();
+    // Reprocess the container key mapper to ensure the latest mapping is used
+    reprocessContainerKeyMapper();
+    Response response = containerEndpoint.getKeysForContainer(20L, -1, "");
+
+    // Ensure that the expected number of keys is returned
+    KeysResponse data = (KeysResponse) response.getEntity();
+    Collection<KeyMetadata> keyMetadataList = data.getKeys();
+
+    assertEquals(1, data.getTotalCount());
+    assertEquals(1, keyMetadataList.size());
+
+    // Retrieve the first key from the list and verify its metadata
+    Iterator<KeyMetadata> iterator = keyMetadataList.iterator();
+    KeyMetadata keyMetadata = iterator.next();
+    assertEquals("dir1/file7", keyMetadata.getKey());
+    assertEquals(1, keyMetadata.getVersions().size());
+    assertEquals(1, keyMetadata.getBlockIds().size());
+    Map<Long, List<KeyMetadata.ContainerBlockMetadata>> blockIds =
+        keyMetadata.getBlockIds();
+    assertEquals(0, blockIds.get(0L).iterator().next().getLocalID());
   }
 
   @Test

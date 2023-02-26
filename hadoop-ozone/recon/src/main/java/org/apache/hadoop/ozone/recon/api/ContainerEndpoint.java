@@ -170,16 +170,17 @@ public class ContainerEndpoint {
       for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
           .keySet()) {
 
-      // Directly calling getSkipCache() on the Key/FileTable table accordingly
-      // instead of iterating since only full keys are supported now. We will
-      // try to get the OmKeyInfo object by searching the KEY_TABLE table with
-      // the key prefix. If it's not found, we will then search the FILE_TABLE
+        // Directly calling getSkipCache() on the Key/FileTable table
+        // instead of iterating since only full keys are supported now. We will
+        // try to get the OmKeyInfo object by searching the KEY_TABLE table with
+        // the key prefix. If it's not found, we will then search the FILE_TABLE
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
-            .getSkipCache(containerKeyPrefix.getKeyPrefix()) == null ?
-            omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-                .getSkipCache(containerKeyPrefix.getKeyPrefix()) :
-            omMetadataManager.getKeyTable(BucketLayout.LEGACY)
-                .getSkipCache(containerKeyPrefix.getKeyPrefix());
+            .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        if (omKeyInfo == null) {
+          omKeyInfo =
+              omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+                  .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        }
 
         if (null != omKeyInfo) {
           // Filter keys by version.
