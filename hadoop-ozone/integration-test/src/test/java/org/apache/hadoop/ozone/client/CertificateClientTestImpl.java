@@ -27,6 +27,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -47,6 +48,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -196,8 +198,18 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public CertPath getCertPath() {
+    return null;
+  }
+
+  @Override
   public X509Certificate getCertificate() {
     return x509Certificate;
+  }
+
+  @Override
+  public CertPath getCACertPath() {
+    return null;
   }
 
   @Override
@@ -277,12 +289,12 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force)
+  public void storeCertificate(String cert)
       throws CertificateException {
   }
 
   @Override
-  public void storeCertificate(String cert, boolean force, boolean caCert)
+  public void storeCertificate(String cert, CAType caType)
       throws CertificateException {
   }
 
@@ -329,7 +341,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert, boolean force) {
+  public void storeRootCACertificate(String pemEncodedCert) {
 
   }
 

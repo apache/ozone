@@ -62,4 +62,5 @@ public class TestOzoneManagerHAWithFailover extends TestOzoneManagerHA {
     Assert.assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
         omFailoverProxyProvider.getWaitTime());
   }
+
 }

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -51,6 +52,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
   private long volumeId;
+  private long bucketId;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
@@ -60,11 +62,13 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> unUsedParts,
       @Nonnull BucketLayout bucketLayout,
-      @Nonnull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete, @Nonnull long volumeId) {
+      @CheckForNull OmBucketInfo omBucketInfo,
+      RepeatedOmKeyInfo keysToDelete,
+      @Nonnull long volumeId, @Nonnull long bucketId) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
         bucketLayout, omBucketInfo, keysToDelete);
     this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -87,7 +91,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
 
     OMFileRequest
         .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo(),
-            volumeId, getOmBucketInfo().getObjectID());
+            volumeId, bucketId);
 
     return ozoneKey;
 

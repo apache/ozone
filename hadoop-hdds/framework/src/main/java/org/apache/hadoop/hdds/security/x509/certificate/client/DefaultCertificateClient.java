@@ -37,6 +37,7 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertPath;
 import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -66,6 +67,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -97,7 +99,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 
@@ -111,17 +112,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private static final Random RANDOM = new SecureRandom();
 
   private static final String CERT_FILE_NAME_FORMAT = "%s.crt";
-  private static final String CA_CERT_PREFIX = "CA-";
   private static final int CA_CERT_PREFIX_LEN = 3;
-  private static final String ROOT_CA_CERT_PREFIX = "ROOTCA-";
   private static final int ROOT_CA_PREFIX_LEN = 7;
   private final Logger logger;
   private final SecurityConfig securityConfig;
   private final KeyCodec keyCodec;
   private PrivateKey privateKey;
   private PublicKey publicKey;
-  private X509Certificate x509Certificate;
-  private Map<String, X509Certificate> certificateMap;
+  private CertPath certPath;
+  private Map<String, CertPath> certificateMap;
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
@@ -176,11 +175,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * */
   private synchronized void loadAllCertificates() {
     // See if certs directory exists in file system.
-    Path certPath = securityConfig.getCertificateLocation(component);
-    if (Files.exists(certPath) && Files.isDirectory(certPath)) {
+    Path certificatePath = securityConfig.getCertificateLocation(component);
+    if (Files.exists(certificatePath) && Files.isDirectory(certificatePath)) {
       getLogger().info("Loading certificate from location:{}.",
-          certPath);
-      File[] certFiles = certPath.toFile().listFiles();
+          certificatePath);
+      File[] certFiles = certificatePath.toFile().listFiles();
 
       if (certFiles != null) {
         CertificateCodec certificateCodec =
@@ -190,17 +189,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         for (File file : certFiles) {
           if (file.isFile()) {
             try {
-              X509CertificateHolder x509CertificateHolder = certificateCodec
-                  .readCertificate(certPath, file.getName());
-              X509Certificate cert =
-                  CertificateCodec.getX509Certificate(x509CertificateHolder);
+              CertPath allCertificates =
+                  certificateCodec.getCertPath(file.getName());
+              X509Certificate cert = firstCertificateFrom(allCertificates);
               if (cert != null && cert.getSerialNumber() != null) {
                 if (cert.getSerialNumber().toString().equals(certSerialId)) {
-                  x509Certificate = cert;
+                  this.certPath = allCertificates;
                 }
                 certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
-                    cert);
-                if (file.getName().startsWith(CA_CERT_PREFIX)) {
+                    allCertificates);
+                if (file.getName().startsWith(
+                    CAType.SUBORDINATE.getFileNamePrefix())) {
                   String certFileName = FilenameUtils.getBaseName(
                       file.getName());
                   long tmpCaCertSerailId = NumberUtils.toLong(
@@ -210,7 +209,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   }
                 }
 
-                if (file.getName().startsWith(ROOT_CA_CERT_PREFIX)) {
+                if (file.getName().startsWith(
+                    CAType.ROOT.getFileNamePrefix())) {
                   String certFileName = FilenameUtils.getBaseName(
                       file.getName());
                   long tmpRootCaCertSerailId = NumberUtils.toLong(
@@ -238,7 +238,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           rootCaCertId = Long.toString(latestRootCaCertSerialId);
         }
 
-        if (x509Certificate != null) {
+        if (certPath != null) {
           if (executorService == null) {
             startCertificateMonitor();
           }
@@ -299,15 +299,24 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return publicKey;
   }
 
+  @Override
+  public X509Certificate getCertificate() {
+    CertPath currentCertPath = getCertPath();
+    if (currentCertPath == null || currentCertPath.getCertificates() == null) {
+      return null;
+    }
+    return firstCertificateFrom(currentCertPath);
+  }
+
   /**
    * Returns the default certificate of given client if it exists.
    *
    * @return certificate or Null if there is no data.
    */
   @Override
-  public synchronized X509Certificate getCertificate() {
-    if (x509Certificate != null) {
-      return x509Certificate;
+  public synchronized CertPath getCertPath() {
+    if (certPath != null) {
+      return certPath;
     }
 
     if (certSerialId == null) {
@@ -318,17 +327,27 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Refresh the cache from file system.
     loadAllCertificates();
     if (certificateMap.containsKey(certSerialId)) {
-      x509Certificate = certificateMap.get(certSerialId);
+      certPath = certificateMap.get(certSerialId);
     }
-    return x509Certificate;
+    return certPath;
   }
 
   /**
    * Return the latest CA certificate known to the client.
+   *
    * @return latest ca certificate known to the client.
    */
   @Override
   public synchronized X509Certificate getCACertificate() {
+    CertPath caCertPath = getCACertPath();
+    if (caCertPath == null || caCertPath.getCertificates() == null) {
+      return null;
+    }
+    return firstCertificateFrom(caCertPath);
+  }
+
+  @Override
+  public synchronized CertPath getCACertPath() {
     if (caCertId != null) {
       return certificateMap.get(caCertId);
     }
@@ -338,16 +357,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    * Returns the certificate  with the specified certificate serial id if it
    * exists else try to get it from SCM.
-   * @param  certId
    *
+   * @param certId
    * @return certificate or Null if there is no data.
    */
   @Override
   public synchronized X509Certificate getCertificate(String certId)
       throws CertificateException {
     // Check if it is in cache.
-    if (certificateMap.containsKey(certId)) {
-      return certificateMap.get(certId);
+    if (certificateMap.containsKey(certId) &&
+        certificateMap.get(certId).getCertificates() != null) {
+      return firstCertificateFrom(certificateMap.get(certId));
     }
     // Try to get it from SCM.
     return this.getCertificateFromScm(certId);
@@ -388,7 +408,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         certId);
     try {
       String pemEncodedCert = getScmSecureClient().getCertificate(certId);
-      this.storeCertificate(pemEncodedCert, true);
+      this.storeCertificate(pemEncodedCert);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception e) {
       getLogger().error("Error while getting Certificate with " +
@@ -601,58 +621,55 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Stores the Certificate  for this client. Don't use this api to add trusted
    * certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
+   * @param pemEncodedCert - pem encoded X509 Certificate
    * @throws CertificateException - on Error.
-   *
    */
   @Override
-  public void storeCertificate(String pemEncodedCert, boolean force)
+  public void storeCertificate(String pemEncodedCert)
       throws CertificateException {
-    this.storeCertificate(pemEncodedCert, force, false);
+    this.storeCertificate(pemEncodedCert, CAType.NONE);
   }
 
   /**
    * Stores the Certificate  for this client. Don't use this api to add trusted
    * certificates of others.
    *
-   * @param pemEncodedCert        - pem encoded X509 Certificate
-   * @param force                 - override any existing file
-   * @param caCert                - Is CA certificate.
+   * @param pemEncodedCert - pem encoded X509 Certificate
+   * @param caType         - Is CA certificate.
    * @throws CertificateException - on Error.
-   *
    */
   @Override
-  public void storeCertificate(String pemEncodedCert, boolean force,
-      boolean caCert) throws CertificateException {
+  public void storeCertificate(String pemEncodedCert,
+      CAType caType) throws CertificateException {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         component);
-    storeCertificate(pemEncodedCert, force, caCert, false,
+    storeCertificate(pemEncodedCert, caType,
         certificateCodec, true);
   }
 
   public synchronized void storeCertificate(String pemEncodedCert,
-      boolean force, boolean isCaCert, boolean isRootCaCert,
-      CertificateCodec codec, boolean addToCertMap)
+      CAType caType, CertificateCodec codec, boolean addToCertMap)
       throws CertificateException {
     try {
-      X509Certificate cert =
-          CertificateCodec.getX509Certificate(pemEncodedCert);
-      String certName = String.format(CERT_FILE_NAME_FORMAT,
-          cert.getSerialNumber().toString());
+      CertPath certificatePath =
+          CertificateCodec.getCertPathFromPemEncodedString(pemEncodedCert);
+      X509Certificate cert = firstCertificateFrom(certificatePath);
 
-      if (isCaCert) {
-        certName = CA_CERT_PREFIX + certName;
+      String certName = String.format(CERT_FILE_NAME_FORMAT,
+          caType.getFileNamePrefix() + cert.getSerialNumber().toString());
+
+      if (caType == CAType.SUBORDINATE) {
         caCertId = cert.getSerialNumber().toString();
-      } else if (isRootCaCert) {
-        certName = ROOT_CA_CERT_PREFIX + certName;
+      }
+      if (caType == CAType.ROOT) {
         rootCaCertId = cert.getSerialNumber().toString();
       }
 
-      codec.writeCertificate(codec.getLocation(), certName,
-          pemEncodedCert, force);
+      codec.writeCertificate(certName,
+          pemEncodedCert);
       if (addToCertMap) {
-        certificateMap.putIfAbsent(cert.getSerialNumber().toString(), cert);
+        certificateMap.putIfAbsent(
+            cert.getSerialNumber().toString(), certificatePath);
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,
@@ -800,9 +817,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return handleCase(init);
   }
 
+  private X509Certificate firstCertificateFrom(CertPath certificatePath) {
+    return CertificateCodec.firstCertificateFrom(certificatePath);
+  }
+
   /**
    * Default handling of each {@link InitCase}.
-   * */
+   */
   protected InitResponse handleCase(InitCase init)
       throws CertificateException {
     switch (init) {
@@ -986,18 +1007,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public synchronized X509Certificate getRootCACertificate() {
     if (rootCaCertId != null) {
-      return certificateMap.get(rootCaCertId);
+      return firstCertificateFrom(certificateMap.get(rootCaCertId));
     }
     return null;
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert, boolean force)
+  public void storeRootCACertificate(String pemEncodedCert)
       throws CertificateException {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         component);
-    storeCertificate(pemEncodedCert, force, false, true,
-        certificateCodec, true);
+    storeCertificate(pemEncodedCert, CAType.ROOT, certificateCodec, true);
   }
 
   @Override
@@ -1053,11 +1073,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         String certName = String.format(CERT_FILE_NAME_FORMAT, certId);
 
         if (certId.equals(caCertId)) {
-          certName = CA_CERT_PREFIX + certName;
+          certName = CAType.SUBORDINATE.getFileNamePrefix() + certName;
         }
 
         if (certId.equals(rootCaCertId)) {
-          certName = ROOT_CA_CERT_PREFIX + certName;
+          certName = CAType.ROOT.getFileNamePrefix() + certName;
         }
 
         FileUtils.deleteQuietly(basePath.resolve(certName).toFile());
@@ -1159,7 +1179,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (!force) {
       synchronized (this) {
         Preconditions.checkArgument(
-            timeBeforeExpiryGracePeriod(x509Certificate).isZero());
+            timeBeforeExpiryGracePeriod(firstCertificateFrom(certPath))
+                .isZero());
       }
     }
 
@@ -1339,7 +1360,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // reset current value
     privateKey = null;
     publicKey = null;
-    x509Certificate = null;
+    certPath = null;
     certSerialId = null;
     caCertId = null;
     rootCaCertId = null;
@@ -1358,7 +1379,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   @Override
   public abstract String signAndStoreCertificate(
-      PKCS10CertificationRequest request, Path certPath)
+      PKCS10CertificationRequest request, Path certificatePath)
       throws CertificateException;
 
   public String signAndStoreCertificate(PKCS10CertificationRequest request)
@@ -1393,7 +1414,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Schedule task to refresh certificate before it expires
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     long timeBeforeGracePeriod =
-        timeBeforeExpiryGracePeriod(x509Certificate).toMillis();
+        timeBeforeExpiryGracePeriod(firstCertificateFrom(certPath)).toMillis();
     // At least three chances to renew the certificate before it expires
     long interval =
         Math.min(gracePeriod.toMillis() / 3, TimeUnit.DAYS.toMillis(1));

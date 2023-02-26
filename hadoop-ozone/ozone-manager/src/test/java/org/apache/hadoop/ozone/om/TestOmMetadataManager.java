@@ -45,6 +45,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -624,17 +625,17 @@ public class TestOmMetadataManager {
     }
 
     // Test retrieving fewer expired keys than actually exist.
-    List<OpenKeyBucket> someExpiredKeys =
+    final Collection<OpenKeyBucket.Builder> someExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys - 1, bucketLayout);
+            numExpiredOpenKeys - 1, bucketLayout).getOpenKeyBuckets();
     List<String> names = getOpenKeyNames(someExpiredKeys);
     assertEquals(numExpiredOpenKeys - 1, names.size());
     assertTrue(expiredKeys.containsAll(names));
 
     // Test attempting to retrieving more expired keys than actually exist.
-    List<OpenKeyBucket> allExpiredKeys =
+    Collection<OpenKeyBucket.Builder> allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys + 1, bucketLayout);
+            numExpiredOpenKeys + 1, bucketLayout).getOpenKeyBuckets();
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
     assertTrue(expiredKeys.containsAll(names));
@@ -642,15 +643,16 @@ public class TestOmMetadataManager {
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys, bucketLayout);
+            numExpiredOpenKeys, bucketLayout).getOpenKeyBuckets();
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
     assertTrue(expiredKeys.containsAll(names));
   }
 
-  private List<String> getOpenKeyNames(List<OpenKeyBucket> openKeyBuckets) {
+  private List<String> getOpenKeyNames(
+      Collection<OpenKeyBucket.Builder> openKeyBuckets) {
     return openKeyBuckets.stream()
-        .map(OpenKeyBucket::getKeysList)
+        .map(OpenKeyBucket.Builder::getKeysList)
         .flatMap(List::stream)
         .map(OpenKey::getName)
         .collect(Collectors.toList());
