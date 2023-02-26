@@ -54,7 +54,22 @@ if(${SST_DUMP_INCLUDE})
             zlib
             PROPERTIES
             IMPORTED_LOCATION ${ZLIB_LIB}/libz.a)
-    set(linked_libraries ${linked_libraries} bz2 zlib rocks_tools rocksdb)
+    ADD_LIBRARY(lz4 STATIC IMPORTED)
+    set_target_properties(
+            lz4
+            PROPERTIES
+            IMPORTED_LOCATION ${LZ4_LIB}/liblz4.a)
+    ADD_LIBRARY(snappy STATIC IMPORTED)
+    set_target_properties(
+            snappy
+            PROPERTIES
+            IMPORTED_LOCATION ${SNAPPY_LIB}/libsnappy.a)
+    ADD_LIBRARY(zstd STATIC IMPORTED)
+        set_target_properties(
+                zstd
+                PROPERTIES
+                IMPORTED_LOCATION ${ZSTD_LIB}/libzstd.a)
+    set(linked_libraries ${linked_libraries} bz2 zlib rocks_tools rocksdb lz4 snappy zstd)
 endif()
 add_library(ozone_rocksdb_tools SHARED ${SOURCE_FILES})
 target_link_libraries(ozone_rocksdb_tools ${linked_libraries})

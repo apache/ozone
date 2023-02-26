@@ -46,7 +46,7 @@
                 <executions>
                     <execution>
                         <id>rocksdb source download</id>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>wget</goal>
                         </goals>
@@ -58,7 +58,7 @@
                     </execution>
                     <execution>
                         <id>zlib source download</id>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>wget</goal>
                         </goals>
@@ -70,7 +70,7 @@
                     </execution>
                     <execution>
                         <id>bzip2 source download</id>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>wget</goal>
                         </goals>
@@ -80,28 +80,73 @@
                             <outputDirectory>${project.build.directory}/bzip2</outputDirectory>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>lz4 source download</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/lz4/lz4/archive/refs/tags/v${lz4.version}.tar.gz</url>
+                            <outputFileName>lz4-v${lz4.version}.tar.gz</outputFileName>
+                            <outputDirectory>${project.build.directory}/lz4</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>snappy source download</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/google/snappy/archive/refs/tags/${snappy.version}.tar.gz</url>
+                            <outputFileName>snappy-v${snappy.version}.tar.gz</outputFileName>
+                            <outputDirectory>${project.build.directory}/snappy</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>zstd source download</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/facebook/zstd/archive/refs/tags/v${zstd.version}.tar.gz</url>
+                            <outputFileName>zstd-v${zstd.version}.tar.gz</outputFileName>
+                            <outputDirectory>${project.build.directory}/zstd</outputDirectory>
+                        </configuration>
+                    </execution>
+
                 </executions>
             </plugin>
             <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
+            <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <execution>
                         <id>unzip-artifact</id>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
                                 <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
                                 <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
                                 <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
+                                <untar src="${project.build.directory}/lz4/lz4-v${lz4.version}.tar.gz" compression="gzip" dest="${project.build.directory}/lz4/" />
+                                <untar src="${project.build.directory}/snappy/snappy-v${snappy.version}.tar.gz" compression="gzip" dest="${project.build.directory}/snappy/" />
+                                <untar src="${project.build.directory}/zstd/zstd-v${zstd.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zstd/" />
                             </tasks>
                         </configuration>
                         <goals>
                             <goal>run</goal>
                         </goals>
                     </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
                     <execution>
                         <id>build-zlib</id>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
                                 <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
@@ -117,10 +162,34 @@
                     </execution>
                     <execution>
                         <id>build-bzip2</id>
-                        <phase>generate-resources</phase>
+                        <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
                                 <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true"/>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>build-lz4</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <tasks>
+                                <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true"/>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>build-zstd</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <tasks>
+                                <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true"/>
                             </tasks>
                         </configuration>
                         <goals>
@@ -138,6 +207,8 @@
                                     <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                                 </exec>
                                 <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                                    <arg line="EXTRA_CXXFLAGS='-I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
+                                    <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                     <arg line="-j16"/>
                                     <arg line="tools"/>
                                 </exec>>
@@ -173,11 +244,22 @@
                 <artifactId>hadoop-maven-plugins</artifactId>
                 <executions>
                     <execution>
-                        <id>cmake-compile</id>
+                        <id>cmake-compile-snappy</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>cmake-compile</goal></goals>
+                        <configuration>
+                            <source>${project.build.directory}/snappy/snappy-${snappy.version}</source>
+                            <output>${project.build.directory}/snappy/lib</output>
+                            <vars/>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>cmake-compile-rockstools</id>
                         <phase>compile</phase>
                         <goals><goal>cmake-compile</goal></goals>
                         <configuration>
                             <source>${basedir}/src</source>
+                            <output>${project.build.directory}/native/rocksdb</output>
                             <vars>
                                 <GENERATED_JAVAH>${project.build.directory}/native/javah</GENERATED_JAVAH>
                                 <NATIVE_DIR>${basedir}/src/main/native</NATIVE_DIR>
@@ -187,6 +269,9 @@
                                 <ROCKSDB_LIB>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}</ROCKSDB_LIB>
                                 <ZLIB_LIB>${project.build.directory}/zlib/zlib-${zlib.version}</ZLIB_LIB>
                                 <BZIP2_LIB>${project.build.directory}/bzip2/bzip2-${bzip2.version}</BZIP2_LIB>
+                                <LZ4_LIB>${project.build.directory}/lz4/lz4-${lz4.version}/lib</LZ4_LIB>
+                                <SNAPPY_LIB>${project.build.directory}/snappy/lib</SNAPPY_LIB>
+                                <ZSTD_LIB>${project.build.directory}/zstd/zstd-${zstd.version}/lib</ZSTD_LIB>
                             </vars>
                         </configuration>
                     </execution>
@@ -201,7 +286,7 @@
                         <configuration>
                             <tasks>
                                 <copy toDir="${project.build.outputDirectory}">
-                                    <fileset dir="${project.build.directory}/native" includes="**/lib*.*" />
+                                    <fileset dir="${project.build.directory}/native/rocksdb" includes="**/lib*.*" />
                                 </copy>
                             </tasks>
                         </configuration>

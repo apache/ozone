@@ -295,7 +295,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <awaitility.version>4.2.0</awaitility.version>
     <bzip2.version>1.0.8</bzip2.version>
     <zlib.version>1.2.13</zlib.version>
-
+    <lz4.version>1.9.3</lz4.version>
+    <snappy.version>1.1.8</snappy.version>
+    <zstd.version>1.4.9</zstd.version>
 
   </properties>
 

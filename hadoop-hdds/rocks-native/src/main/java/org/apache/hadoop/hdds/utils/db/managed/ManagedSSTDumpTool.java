@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
@@ -55,4 +56,11 @@ public class ManagedSSTDumpTool {
   }
 
   private native void runInternal(String[] args, long optionsNativeHandle);
+
+  public static void main(String[] args) throws NativeLibraryNotLoadedException {
+    Map<String, String> commandOpts = new HashMap<>();
+    commandOpts.put("file","/Users/sbalachandran/Documents/code/dummyrocks/rocks");
+    commandOpts.put("command","scan");
+    new ManagedSSTDumpTool().run(commandOpts, new ManagedOptions());
+  }
 }
