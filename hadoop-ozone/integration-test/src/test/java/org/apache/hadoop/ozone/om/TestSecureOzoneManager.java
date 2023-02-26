@@ -139,7 +139,8 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getCertificate());
 
     // Case 3: When public key as well as certificate is missing.
-    client = new OMCertificateClient(securityConfig, null, null, null, null);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, null, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
@@ -148,7 +149,8 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getCertificate());
 
     // Case 4: When private key and certificate is missing.
-    client = new OMCertificateClient(securityConfig, null, null, null, null);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, null, null, null);
     KeyCodec keyCodec = new KeyCodec(securityConfig, COMPONENT);
     keyCodec.writePublicKey(publicKey);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
