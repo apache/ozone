@@ -118,8 +118,7 @@ public class TestOzoneBlockTokenSecretManager {
             securityConfig, log, null, "test", null, null) {
           @Override
           protected String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath) throws
-              org.apache.hadoop.hdds.security.x509.exception.CertificateException {
+              PKCS10CertificationRequest request, Path certificatePath) {
             return null;
           }
         };
