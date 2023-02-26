@@ -98,6 +98,8 @@ public class TestOmCertificateClientInit {
     certSerialId = x509Certificate.getSerialNumber().toString();
     OMStorage storage = mock(OMStorage.class);
     when(storage.getOmCertSerialId()).thenReturn(certSerialId);
+    when(storage.getClusterID()).thenReturn("test");
+    when(storage.getOmId()).thenReturn(UUID.randomUUID().toString());
     omCertificateClient =
         new OMCertificateClient(securityConfig, storage, null, null, null);
     omKeyCodec = new KeyCodec(securityConfig, OM_COMPONENT);
