@@ -137,7 +137,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Set<CertificateNotification> notificationReceivers;
   private static UserGroupInformation ugi;
 
-  DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
+  protected DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
       String certSerialId, String component,
       Consumer<String> saveCertId, Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
