@@ -1148,8 +1148,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       PKCS10CertificationRequest request, Path certificatePath)
       throws CertificateException;
 
-  public String signAndStoreCertificate(PKCS10CertificationRequest request)
-      throws CertificateException {
+  public synchronized String signAndStoreCertificate(
+      PKCS10CertificationRequest request) throws CertificateException {
     certSerialId = signAndStoreCertificate(request,
         getSecurityConfig().getCertificateLocation(getComponentName()));
     loadAllCertificates();
