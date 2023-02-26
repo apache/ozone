@@ -70,7 +70,7 @@ public abstract class BaseHttpServer {
   static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
   private static final String JETTY_BASETMPDIR =
       "org.eclipse.jetty.webapp.basetempdir";
-  private final String WEB_SERVER_DIR = "/webserver";
+  private final String serverDir = "/webserver";
 
   private HttpServer2 httpServer;
   private final MutableConfigurationSource conf;
@@ -182,7 +182,7 @@ public abstract class BaseHttpServer {
 
       if (StringUtils.isEmpty(baseDir)) {
         baseDir =
-            conf.get(OzoneConfigKeys.OZONE_METADATA_DIRS) + WEB_SERVER_DIR;
+            conf.get(OzoneConfigKeys.OZONE_METADATA_DIRS) + serverDir;
       }
       createDir(baseDir);
       httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
