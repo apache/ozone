@@ -183,7 +183,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    */
   public synchronized void addFailedDatanodes(Collection<DatanodeDetails> dns) {
     if (initialized) {
-      throw new RuntimeException("Cannot add failed datanodes after the " +
+      throw new IllegalStateException("Cannot add failed datanodes after the " +
           "reader has been initialized");
     }
     DatanodeDetails[] locations = getDataLocations();
