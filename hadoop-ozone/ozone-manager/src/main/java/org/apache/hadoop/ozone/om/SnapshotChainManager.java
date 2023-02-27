@@ -49,7 +49,7 @@ public class SnapshotChainManager {
       snapshotChainPath;
   private Map<String, String> latestPathSnapshotID;
   private String latestGlobalSnapshotID;
-  private Map<String, String> snapshotPathToKey;
+  private Map<String, String> snapshotPathToTableKey;
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotChainManager.class);
 
@@ -58,11 +58,14 @@ public class SnapshotChainManager {
     snapshotChainGlobal = new LinkedHashMap<>();
     snapshotChainPath = new HashMap<>();
     latestPathSnapshotID = new HashMap<>();
-    snapshotPathToKey = new HashMap<>();
+    snapshotPathToTableKey = new HashMap<>();
     latestGlobalSnapshotID = null;
     loadFromSnapshotInfoTable(metadataManager);
   }
 
+  /**
+   * Add snapshot to global snapshot chain.
+   */
   private void addSnapshotGlobal(String snapshotID,
                                  String prevGlobalID) throws IOException {
     // set previous snapshotID to null if it is "" for
@@ -92,9 +95,13 @@ public class SnapshotChainManager {
     latestGlobalSnapshotID = snapshotID;
   };
 
+  /**
+   * Add snapshot to bucket snapshot chain(path based).
+   */
   private void addSnapshotPath(String snapshotPath,
-      String snapshotID, String prevPathID, String snapTableKey)
-      throws IOException {
+                               String snapshotID,
+                               String prevPathID,
+                               String snapTableKey) throws IOException {
     // set previous snapshotID to null if it is "" for
     // internal in-mem structure
     if (prevPathID != null && prevPathID.isEmpty()) {
@@ -132,8 +139,9 @@ public class SnapshotChainManager {
         .put(snapshotID,
             new SnapshotChainInfo(snapshotID, prevPathID, null));
 
+    // store snapshot ID to snapshot DB table key in the map
+    snapshotPathToTableKey.put(snapshotID, snapTableKey);
     // set state variable latestPath snapshot entry to this snapshotID
-    snapshotPathToKey.put(snapshotID, snapTableKey);
     latestPathSnapshotID.put(snapshotPath, snapshotID);
   };
 
@@ -508,7 +516,7 @@ public class SnapshotChainManager {
   }
 
   public String getTableKey(String snapshotPath) {
-    return snapshotPathToKey.get(snapshotPath);
+    return snapshotPathToTableKey.get(snapshotPath);
   }
 
   @VisibleForTesting

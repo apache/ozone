@@ -41,14 +41,12 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,8 +68,6 @@ public class TestSnapshotDeletingService {
   public TemporaryFolder folder = new TemporaryFolder();
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotDeletingService.class);
 
   private KeyManager keyManager;
   private OMMetadataManager omMetadataManager;
@@ -81,12 +77,12 @@ public class TestSnapshotDeletingService {
   private static final String BUCKET_NAME = "bucket1";
 
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     ExitUtils.disableSystemExit();
   }
 
-  @Before
+  @BeforeEach
   public void createConfAndInitValues() throws Exception {
     conf = new OzoneConfiguration();
     File testDir = PathUtils.getTestDir(TestSnapshotDeletingService.class);
@@ -104,9 +100,11 @@ public class TestSnapshotDeletingService {
     om = omTestManagers.getOzoneManager();
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
-    om.stop();
+    if (om != null) {
+      om.stop();
+    }
   }
 
   @Test
@@ -125,9 +123,9 @@ public class TestSnapshotDeletingService {
 
     OmKeyArgs key2 = createKey(VOLUME_NAME, BUCKET_NAME, "key2");
 
-    // Key 1 cannot be deleted as it is still referenced by Snapshot 1.
+    // Key 1 cannot be reclaimed as it is still referenced by Snapshot 1.
     writeClient.deleteKey(key1);
-    //Key 2 is deleted here, which means we can reclaim
+    // Key 2 is deleted here, which means we can reclaim
     // it when snapshot 2 is deleted.
     writeClient.deleteKey(key2);
 
@@ -137,7 +135,6 @@ public class TestSnapshotDeletingService {
     writeClient.deleteKey(key5);
 
     createSnapshot(VOLUME_NAME, BUCKET_NAME, "snap3", ++snapshotCount);
-
 
     String snapshotKey2 = "/vol1/bucket1/snap2";
     SnapshotInfo snapshotInfo = om.getMetadataManager()
@@ -161,13 +158,13 @@ public class TestSnapshotDeletingService {
     OmSnapshot nextSnapshot = (OmSnapshot) om.getOmSnapshotManager()
         .checkForSnapshot(VOLUME_NAME, BUCKET_NAME, getSnapshotPrefix("snap3"));
 
-    //Check key1 added to next non deleted snapshot db.
+    // Check key1 added to next non deleted snapshot db.
     RepeatedOmKeyInfo omKeyInfo =
         nextSnapshot.getMetadataManager()
             .getDeletedTable().get("/vol1/bucket1/key1");
     assertNotNull(omKeyInfo);
 
-    //Check key2 added active db as it can be reclaimed.
+    // Check key2 added active db as it can be reclaimed.
     RepeatedOmKeyInfo omKeyInfo1 = omMetadataManager
         .getDeletedTable().get("/vol1/bucket1/key2");
 
@@ -209,7 +206,7 @@ public class TestSnapshotDeletingService {
             .setLocationInfoList(new ArrayList<>())
             .build();
 
-    // Open and write the key without commit it.
+    // Open and write the key.
     OpenKeySession session = writeClient.openKey(keyArg);
     writeClient.commitKey(keyArg, session.getId());
 

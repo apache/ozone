@@ -1695,14 +1695,14 @@ message DeleteSnapshotRequest {
 }
 
 message SnapshotMoveDeletedKeysRequest {
-  required SnapshotInfo fromSnapshot = 1;
+  optional SnapshotInfo fromSnapshot = 1;
   optional SnapshotInfo nextSnapshot = 2;
-  repeated KeyValuePair activeDBKeys = 3;
-  repeated KeyValuePair nextDBKeys = 4;
+  repeated SnapshotMoveKeyInfos activeDBKeys = 3;
+  repeated SnapshotMoveKeyInfos nextDBKeys = 4;
 }
 
-message KeyValuePair {
-  required string key = 1;
+message SnapshotMoveKeyInfos {
+  optional string key = 1;
   repeated KeyInfo keyInfos = 2;
 }
 

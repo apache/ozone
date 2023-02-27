@@ -28,17 +28,19 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyValuePair;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -58,6 +60,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 
 /**
  * Background Service to clean-up deleted snapshot and reclaim space.
@@ -83,8 +86,9 @@ public class SnapshotDeletingService extends BackgroundService {
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager) throws IOException {
-    super("SnapshotDeletingService", interval, TimeUnit.MILLISECONDS,
-        SNAPSHOT_DELETING_CORE_POOL_SIZE, serviceTimeout);
+    super(SnapshotDeletingService.class.getSimpleName(), interval,
+        TimeUnit.MILLISECONDS, SNAPSHOT_DELETING_CORE_POOL_SIZE,
+        serviceTimeout);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     this.chainManager = ozoneManager.getSnapshotChainManager();
@@ -111,7 +115,6 @@ public class SnapshotDeletingService extends BackgroundService {
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
       try (TableIterator<String, ? extends Table.KeyValue
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
-        iterator.seekToFirst();
 
         long snapshotLimit = snapshotDeletionPerTask;
 
@@ -134,7 +137,7 @@ public class SnapshotDeletingService extends BackgroundService {
           Table<String, RepeatedOmKeyInfo> snapshotDeletedTable =
               omSnapshot.getMetadataManager().getDeletedTable();
 
-          if (snapshotDeletedTable.getEstimatedKeyCount() == 0) {
+          if (snapshotDeletedTable.isEmpty()) {
             continue;
           }
 
@@ -144,11 +147,12 @@ public class SnapshotDeletingService extends BackgroundService {
           OmBucketInfo bucketInfo = ozoneManager.getMetadataManager()
               .getBucketTable().get(dbBucketKey);
 
+          if (bucketInfo == null) {
+            throw new OMException("Bucket " + snapInfo.getBucketName() +
+                " is not found", BUCKET_NOT_FOUND);
+          }
 
-          chainManager.loadFromSnapshotInfoTable(
-              ozoneManager.getMetadataManager());
-          SnapshotInfo nextSnapshot = getNextNonDeletedSnapshot(snapInfo);
-
+          //TODO: Add lock to deletedTable and Active DB.
           SnapshotInfo previousSnapshot = getPreviousSnapshot(snapInfo);
           Table<String, OmKeyInfo> previousKeyTable = null;
           OmSnapshot omPreviousSnapshot = null;
@@ -168,24 +172,34 @@ public class SnapshotDeletingService extends BackgroundService {
           // Move key to either next non deleted snapshot's snapshotDeletedTable
           // or move to active object store deleted table
 
-          List<KeyValuePair> toActiveDBList = new ArrayList<>();
-          List<KeyValuePair> toNextDBList = new ArrayList<>();
+          List<SnapshotMoveKeyInfos> toActiveDBList = new ArrayList<>();
+          List<SnapshotMoveKeyInfos> toNextDBList = new ArrayList<>();
 
           try (TableIterator<String, ? extends Table.KeyValue<String,
               RepeatedOmKeyInfo>> deletedIterator = snapshotDeletedTable
               .iterator()) {
 
-            iterator.seekToFirst();
+            String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
+            iterator.seek(snapshotBucketKey);
 
             while (deletedIterator.hasNext()) {
               Table.KeyValue<String, RepeatedOmKeyInfo>
                   deletedKeyValue = deletedIterator.next();
+              String deletedKey = deletedKeyValue.getKey();
+
+              // Exit if it is out of the bucket scope.
+              if (!deletedKey.contains(snapshotBucketKey)) {
+                break;
+              }
+
               RepeatedOmKeyInfo repeatedOmKeyInfo = deletedKeyValue.getValue();
 
-              KeyValuePair.Builder toActiveDb = KeyValuePair.newBuilder()
-                  .setKey(deletedKeyValue.getKey());
-              KeyValuePair.Builder toNextDb = KeyValuePair.newBuilder()
-                  .setKey(deletedKeyValue.getKey());
+              SnapshotMoveKeyInfos.Builder toActiveDb = SnapshotMoveKeyInfos
+                  .newBuilder()
+                  .setKey(deletedKey);
+              SnapshotMoveKeyInfos.Builder toNextDb = SnapshotMoveKeyInfos
+                  .newBuilder()
+                  .setKey(deletedKey);
 
               for (OmKeyInfo keyInfo: repeatedOmKeyInfo.getOmKeyInfoList()) {
                 splitRepeatedOmKeyInfo(toActiveDb, toNextDb,
@@ -197,15 +211,14 @@ public class SnapshotDeletingService extends BackgroundService {
 
             }
             // Submit Move request to OM.
-            submitSnapshotMoveDeletedKeys(snapInfo, nextSnapshot,
-                toActiveDBList, toNextDBList);
+            submitSnapshotMoveDeletedKeys(snapInfo, toActiveDBList,
+                toNextDBList);
             snapshotLimit--;
+            successRunCount.incrementAndGet();
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service", ex);
           }
         }
-
-        successRunCount.incrementAndGet();
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
       }
@@ -213,8 +226,8 @@ public class SnapshotDeletingService extends BackgroundService {
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-    private void splitRepeatedOmKeyInfo(KeyValuePair.Builder toActiveDb,
-        KeyValuePair.Builder toNextDb, OmKeyInfo keyInfo,
+    private void splitRepeatedOmKeyInfo(SnapshotMoveKeyInfos.Builder toActiveDb,
+        SnapshotMoveKeyInfos.Builder toNextDb, OmKeyInfo keyInfo,
         Table<String, OmKeyInfo> previousKeyTable) throws IOException {
       if (checkKeyExistInPreviousTable(previousKeyTable, keyInfo)) {
         // Move to next non deleted snapshot's deleted table
@@ -228,16 +241,12 @@ public class SnapshotDeletingService extends BackgroundService {
     }
 
     private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-        SnapshotInfo nextSnapshot, List<KeyValuePair> toActiveDBList,
-        List<KeyValuePair> toNextDBList) {
+        List<SnapshotMoveKeyInfos> toActiveDBList,
+        List<SnapshotMoveKeyInfos> toNextDBList) {
 
       SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
           SnapshotMoveDeletedKeysRequest.newBuilder()
               .setFromSnapshot(snapInfo.getProtobuf());
-
-      if (nextSnapshot != null) {
-        moveDeletedKeysBuilder.setNextSnapshot(nextSnapshot.getProtobuf());
-      }
 
       SnapshotMoveDeletedKeysRequest moveDeletedKeys =
           moveDeletedKeysBuilder.addAllActiveDBKeys(toActiveDBList)
@@ -286,30 +295,6 @@ public class SnapshotDeletingService extends BackgroundService {
       return null;
     }
 
-    /**
-     * Get the next non deleted snapshot in the snapshot chain.
-     */
-    private SnapshotInfo getNextNonDeletedSnapshot(SnapshotInfo snapInfo)
-        throws IOException {
-      while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(), 
-          snapInfo.getSnapshotID())) {
-
-        String nextPathSnapshot =
-            chainManager.nextPathSnapshot(
-                snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
-
-        String tableKey = chainManager.getTableKey(nextPathSnapshot);
-        SnapshotInfo nextSnapshotInfo =
-            omSnapshotManager.getSnapshotInfo(tableKey);
-
-        if (nextSnapshotInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-          return nextSnapshotInfo;
-        }
-      }
-      return null;
-    }
-
     private void submitRequest(OMRequest omRequest) {
       try {
         if (isRatisEnabled()) {
@@ -353,18 +338,18 @@ public class SnapshotDeletingService extends BackgroundService {
   }
 
   /**
-   * Suspend the service (for testing).
+   * Suspend the service.
    */
   @VisibleForTesting
-  public void suspend() {
+  void suspend() {
     suspended.set(true);
   }
 
   /**
-   * Resume the service if suspended (for testing).
+   * Resume the service if suspended.
    */
   @VisibleForTesting
-  public void resume() {
+  void resume() {
     suspended.set(false);
   }
 

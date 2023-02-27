@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -155,14 +156,14 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       String latestGlobalSnapshot =
           snapshotChainManager.getLatestGlobalSnapshot();
 
-      if (latestPathSnapshot == null || latestPathSnapshot.isEmpty()) {
-        snapshotInfo.setPathPreviousSnapshotID("");
+      if (StringUtils.isEmpty(latestPathSnapshot)) {
+        snapshotInfo.setPathPreviousSnapshotID(null);
       } else {
         snapshotInfo.setPathPreviousSnapshotID(latestPathSnapshot);
       }
 
-      if (latestGlobalSnapshot == null || latestGlobalSnapshot.isEmpty()) {
-        snapshotInfo.setGlobalPreviousSnapshotID("");
+      if (StringUtils.isEmpty(latestGlobalSnapshot)) {
+        snapshotInfo.setGlobalPreviousSnapshotID(null);
       } else {
         snapshotInfo.setGlobalPreviousSnapshotID(latestGlobalSnapshot);
       }

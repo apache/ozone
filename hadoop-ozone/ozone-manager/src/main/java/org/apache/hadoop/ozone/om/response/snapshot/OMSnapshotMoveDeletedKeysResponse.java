@@ -26,9 +26,10 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyValuePair;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
 
@@ -41,23 +42,32 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
   private OmSnapshot nextSnapshot;
-  private List<KeyValuePair> activeDBKeysList;
-  private List<KeyValuePair> nextDBKeysList;
+  private List<SnapshotMoveKeyInfos> activeDBKeysList;
+  private List<SnapshotMoveKeyInfos> nextDBKeysList;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
-       OmSnapshot omNextSnapshot, List<KeyValuePair> activeDBKeysList,
-       List<KeyValuePair> nextDBKeysList) {
+       OmSnapshot omNextSnapshot, List<SnapshotMoveKeyInfos> activeDBKeysList,
+       List<SnapshotMoveKeyInfos> nextDBKeysList) {
     super(omResponse);
     this.nextSnapshot = omNextSnapshot;
     this.activeDBKeysList = activeDBKeysList;
     this.nextDBKeysList = nextDBKeysList;
   }
 
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMSnapshotMoveDeletedKeysResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+  }
+
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    for (KeyValuePair activeDBKey : activeDBKeysList) {
+    for (SnapshotMoveKeyInfos activeDBKey : activeDBKeysList) {
       RepeatedOmKeyInfo activeDBOmKeyInfo =
           createRepeatedOmKeyInfo(activeDBKey.getKeyInfosList());
 
@@ -69,7 +79,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
           batchOperation, activeDBKey.getKey(), activeDBOmKeyInfo);
     }
 
-    for (KeyValuePair nextDBKey : nextDBKeysList) {
+    for (SnapshotMoveKeyInfos nextDBKey : nextDBKeysList) {
       RepeatedOmKeyInfo nextDBOmKeyInfo =
           createRepeatedOmKeyInfo(nextDBKey.getKeyInfosList());
 
@@ -88,11 +98,11 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
   }
 
-  private RepeatedOmKeyInfo createRepeatedOmKeyInfo(List<KeyInfo> keyInfosList)
+  private RepeatedOmKeyInfo createRepeatedOmKeyInfo(List<KeyInfo> keyInfoList)
       throws IOException {
     RepeatedOmKeyInfo result = null;
 
-    for (KeyInfo keyInfo: keyInfosList) {
+    for (KeyInfo keyInfo: keyInfoList) {
       if (result == null) {
         result = new RepeatedOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo));
       } else {
