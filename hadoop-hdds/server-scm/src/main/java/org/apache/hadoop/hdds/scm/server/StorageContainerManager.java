@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidation
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
@@ -694,11 +695,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    long containerReplicaOpExpiryMs = conf.getTimeDuration(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
     long backgroundServiceSafemodeWaitMs = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
@@ -712,7 +708,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setIntervalInMillis(containerReplicaOpScrubberIntervalMs)
             .setWaitTimeInMillis(backgroundServiceSafemodeWaitMs)
             .setPeriodicalTask(() -> containerReplicaPendingOps
-                .removeExpiredEntries(containerReplicaOpExpiryMs)).build();
+                .removeExpiredEntries()).build();
 
     serviceManager.register(expiredContainerReplicaOpScrubber);
 
@@ -817,7 +813,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmCertificateClient.getComponentName());
       // INTERMEDIARY_CA which issues certs to DN and OM.
       scmCertificateServer.init(new SecurityConfig(configuration),
-          CertificateServer.CAType.INTERMEDIARY_CA);
+          CAType.SUBORDINATE);
     }
 
     // If primary SCM node Id is set it means this is a cluster which has
@@ -1576,7 +1572,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     try {
       LOG.info("Stopping Storage Container Manager HTTP server.");
-      httpServer.stop();
+      if (httpServer != null) {
+        httpServer.stop();
+      }
     } catch (Exception ex) {
       LOG.error("Storage Container Manager HTTP server stop failed.", ex);
     }

@@ -67,7 +67,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
-  private static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;

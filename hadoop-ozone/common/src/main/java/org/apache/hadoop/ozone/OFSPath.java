@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 
 /**
  * Utility class for Rooted Ozone Filesystem (OFS) path processing.
@@ -275,6 +276,23 @@ public class OFSPath {
     return this.getKeyName().isEmpty() &&
         !this.getBucketName().isEmpty() &&
         !this.getVolumeName().isEmpty();
+  }
+
+  /**
+   * If volume and bucket names are not empty and the key name
+   * only contains the snapshot indicator, then return true.
+   * e.g. /vol/bucket/.snapshot is a snapshot path.
+   */
+  public boolean isSnapshotPath() {
+    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      String[] keyNames = keyName.split(OZONE_URI_DELIMITER);
+
+      if (keyNames.length == 1) {
+        return  !bucketName.isEmpty() &&
+                !volumeName.isEmpty();
+      }
+    }
+    return false;
   }
 
   /**

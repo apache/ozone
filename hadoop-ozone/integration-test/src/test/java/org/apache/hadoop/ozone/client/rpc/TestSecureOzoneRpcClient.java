@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -296,9 +297,12 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     String accessKey = UserGroupInformation.getCurrentUser().getUserName();
 
+    S3SecretManager s3SecretManager = cluster.getOzoneManager()
+        .getS3SecretManager();
+
     // Add secret to S3Secret table.
-    cluster.getOzoneManager().getMetadataManager().getS3SecretTable().put(
-        accessKey, new S3SecretValue(accessKey, secret));
+    s3SecretManager.storeSecret(accessKey,
+        new S3SecretValue(accessKey, secret));
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -345,16 +349,16 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     Assert.assertEquals(accessKey, volumeInfo.getAdminName());
     Assert.assertEquals(accessKey, volumeInfo.getOwnerName());
 
-    // Override secret to S3Secret table with some dummy value
-    cluster.getOzoneManager().getMetadataManager().getS3SecretTable().put(
-        accessKey, new S3SecretValue(accessKey, "dummy"));
+    // Override secret to S3Secret store with some dummy value
+    s3SecretManager
+        .storeSecret(accessKey, new S3SecretValue(accessKey, "dummy"));
 
     // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, writeRequest);
     Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
 
-  // Read request with invalid credentials.
+    // Read request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, readRequest);
     Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);

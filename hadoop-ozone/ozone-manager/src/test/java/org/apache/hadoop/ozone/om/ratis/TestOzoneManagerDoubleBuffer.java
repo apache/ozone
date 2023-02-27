@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.jupiter.api.AfterEach;
@@ -68,9 +69,9 @@ class TestOzoneManagerDoubleBuffer {
   private static OMClientResponse omBucketCreateResponse =
       mock(OMBucketCreateResponse.class);
   private static OMClientResponse omSnapshotCreateResponse1 =
-      mock(OMBucketCreateResponse.class);
+      mock(OMSnapshotCreateResponse.class);
   private static OMClientResponse omSnapshotCreateResponse2 =
-      mock(OMBucketCreateResponse.class);
+      mock(OMSnapshotCreateResponse.class);
   @TempDir
   private File tempDir;
 
@@ -109,9 +110,10 @@ class TestOzoneManagerDoubleBuffer {
     when(omBucketResponse.getTraceID()).thenReturn("bucketTraceId");
     when(omSnapshotResponse1.getTraceID()).thenReturn("snapshotTraceId-1");
     when(omSnapshotResponse2.getTraceID()).thenReturn("snapshotTraceId-2");
-
-    when(omKeyResponse.getCreateSnapshotResponse()).thenReturn(null);
-    when(omBucketResponse.getCreateSnapshotResponse()).thenReturn(null);
+    when(omSnapshotResponse1.hasCreateSnapshotResponse())
+        .thenReturn(true);
+    when(omSnapshotResponse2.hasCreateSnapshotResponse())
+        .thenReturn(true);
     when(omSnapshotResponse1.getCreateSnapshotResponse())
         .thenReturn(snapshotResponse1);
     when(omSnapshotResponse2.getCreateSnapshotResponse())

@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -755,6 +756,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     updateKey(args, clientId, false);
   }
 
+  public static void setReplicationConfig(ReplicationConfig replication,
+      KeyArgs.Builder b) {
+    if (replication == null) {
+      return;
+    }
+    if (replication instanceof ECReplicationConfig) {
+      b.setEcReplicationConfig(((ECReplicationConfig) replication).toProto());
+    } else {
+      b.setFactor(ReplicationConfig.getLegacyFactor(replication));
+    }
+    b.setType(replication.getReplicationType());
+  }
+
   private void updateKey(OmKeyArgs args, long clientId, boolean hsync)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
@@ -770,16 +784,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
             .collect(Collectors.toList()));
 
-    if (args.getReplicationConfig() != null) {
-      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
-        keyArgsBuilder.setEcReplicationConfig(
-            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
-      } else {
-        keyArgsBuilder.setFactor(
-            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
-      }
-      keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
-    }
+    setReplicationConfig(args.getReplicationConfig(), keyArgsBuilder);
 
     req.setKeyArgs(keyArgsBuilder.build());
     req.setClientID(clientId);
@@ -1350,16 +1355,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
 
-    if (omKeyArgs.getReplicationConfig() != null) {
-      if (omKeyArgs.getReplicationConfig() instanceof ECReplicationConfig) {
-        keyArgs.setEcReplicationConfig(
-            ((ECReplicationConfig) omKeyArgs.getReplicationConfig()).toProto());
-      } else {
-        keyArgs.setFactor(ReplicationConfig
-            .getLegacyFactor(omKeyArgs.getReplicationConfig()));
-      }
-      keyArgs.setType(omKeyArgs.getReplicationConfig().getReplicationType());
-    }
+    setReplicationConfig(omKeyArgs.getReplicationConfig(), keyArgs);
 
     multipartInfoInitiateRequest.setKeyArgs(keyArgs.build());
 
@@ -1573,6 +1569,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()),
         resp.getCaCertificate(), resp.getCaCertsList());
   }
+
+  @Override
+  public void transferLeadership(String newLeaderId)
+      throws IOException {
+    TransferLeadershipRequestProto.Builder builder =
+        TransferLeadershipRequestProto.newBuilder();
+    builder.setNewLeaderId(newLeaderId);
+    OMRequest omRequest = createOMRequest(Type.TransferLeadership)
+        .setTransferOmLeadershipRequest(builder.build())
+        .build();
+    handleError(submitRequest(omRequest));
+  }
+
 
   @Override
   public boolean triggerRangerBGSync(boolean noWait) throws IOException {

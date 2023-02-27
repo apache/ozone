@@ -170,11 +170,23 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>logback-classic</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>com.google.cloud.bigdataoss</groupId>
+          <artifactId>gcs-connector</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.nimbusds</groupId>
+          <artifactId>nimbus-jose-jwt</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-bundle</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.lucene</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
@@ -204,6 +216,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>org.apache.solr</groupId>
           <artifactId>solr-solrj</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.opensearch.client</groupId>
+          <artifactId>opensearch-rest-client</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

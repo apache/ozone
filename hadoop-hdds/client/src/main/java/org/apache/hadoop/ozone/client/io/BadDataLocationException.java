@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Exception used to indicate a problem with a specific block location, allowing
@@ -27,30 +29,46 @@ import java.io.IOException;
  */
 public class BadDataLocationException extends IOException {
 
-  private DatanodeDetails failedLocation;
+  private List<DatanodeDetails> failedLocations = new ArrayList<>();
+  private int failedLocationIndex;
 
   public BadDataLocationException(DatanodeDetails dn) {
     super();
-    failedLocation = dn;
+    failedLocations.add(dn);
   }
 
   public BadDataLocationException(DatanodeDetails dn, String message) {
     super(message);
-    failedLocation = dn;
+    failedLocations.add(dn);
   }
 
   public BadDataLocationException(DatanodeDetails dn, String message,
       Throwable ex) {
     super(message, ex);
-    failedLocation = dn;
+    failedLocations.add(dn);
   }
 
   public BadDataLocationException(DatanodeDetails dn, Throwable ex) {
     super(ex);
-    failedLocation = dn;
+    failedLocations.add(dn);
   }
 
-  public DatanodeDetails getFailedLocation() {
-    return failedLocation;
+  public BadDataLocationException(DatanodeDetails dn, int failedIndex,
+      Throwable ex) {
+    super(ex);
+    failedLocations.add(dn);
+    failedLocationIndex = failedIndex;
+  }
+
+  public List<DatanodeDetails> getFailedLocations() {
+    return failedLocations;
+  }
+
+  public void addFailedLocations(List<DatanodeDetails> dns) {
+    failedLocations.addAll(dns);
+  }
+
+  public int getFailedLocationIndex() {
+    return failedLocationIndex;
   }
 }

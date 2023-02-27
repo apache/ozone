@@ -131,6 +131,8 @@ enum Type {
   SnapshotDiff = 114;
   DeleteSnapshot = 115;
   SnapshotMoveDeletedKeys = 116;
+
+  TransferLeadership = 117;
 }
 
 message OMRequest {
@@ -245,6 +247,8 @@ message OMRequest {
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
   optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
 
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+
 }
 
 message OMResponse {
@@ -351,6 +355,8 @@ message OMResponse {
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
   optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
   optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
+
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
 }
 
 enum Status {
@@ -461,10 +467,10 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
-
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
+    SSL_CONNECTION_FAILURE = 89;
 }
 
 /**

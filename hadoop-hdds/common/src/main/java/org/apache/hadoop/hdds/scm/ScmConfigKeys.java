@@ -370,10 +370,6 @@ public final class ScmConfigKeys {
   public static final String
       OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT =
       "5m";
-  public static final String OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT =
-      "ozone.scm.expired.container.replica.op.time.out";
-  public static final String
-      OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT = "30m";
 
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
@@ -581,7 +577,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE =
       "ozone.scm.ha.ratis.server.leaderelection.pre-vote";
   public static final boolean
-      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";

@@ -89,9 +89,6 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         return false;
       }
 
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          container.containerID());
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending" +
               " is [{}]. isUnrecoverable is [{}]. hasHealthyReplicas is [{}].",
           container,
@@ -103,6 +100,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             container.containerID());
         return true;
       }
+      report.incrementAndSample(
+          ReplicationManagerReport.HealthState.UNDER_REPLICATED,
+          container.containerID());
+
       if (!underHealth.isReplicatedOkAfterPending() &&
           underHealth.hasHealthyReplicas()) {
         request.getReplicationQueue().enqueue(underHealth);
@@ -158,7 +159,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     int minReplicasForMaintenance = request.getMaintenanceRedundancy();
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
-            minReplicasForMaintenance);
+            minReplicasForMaintenance, false);
 
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
