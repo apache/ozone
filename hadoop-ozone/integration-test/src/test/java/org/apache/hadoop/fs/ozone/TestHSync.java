@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -104,6 +105,7 @@ public class TestHSync {
   }
 
   @Test
+  @Flaky("HDDS-8024")
   public void testO3fsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
