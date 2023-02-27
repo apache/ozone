@@ -122,16 +122,18 @@ public class FileSizeCountTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
       if (!taskTables.contains(omdbUpdateEvent.getTable())) {
         continue;
       }
       String updatedKey = omdbUpdateEvent.getKey();
       Object value = omdbUpdateEvent.getValue();
+      Object oldValue = omdbUpdateEvent.getOldValue();
 
-      if (value instanceof OmKeyInfo) {
+      if (value instanceof OmKeyInfo || oldValue instanceof OmKeyInfo) {
         OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
 
         try {
           switch (omdbUpdateEvent.getAction()) {
@@ -144,8 +146,7 @@ public class FileSizeCountTask implements ReconOmTask {
             break;
 
           case UPDATE:
-            handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue(),
-                fileSizeCountMap);
+            handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
             handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
             break;
 
@@ -159,7 +160,7 @@ public class FileSizeCountTask implements ReconOmTask {
           return new ImmutablePair<>(getTaskName(), false);
         }
       } else {
-        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+        LOG.debug("Unexpected value type {} for key {}. Skipping processing.",
             value.getClass().getName(), updatedKey);
       }
     }

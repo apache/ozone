@@ -87,10 +87,15 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       String updatedKey = omdbUpdateEvent.getKey();
 
       try {
-        OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-            (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
-        OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
-        OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
+        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        Object value = keyTableUpdateEvent.getValue();
+        Object oldValue = keyTableUpdateEvent.getOldValue();
+        if (!(value instanceof OmKeyInfo) || !(value instanceof OmKeyInfo)) {
+          LOG.debug("Unexpected value type for key. Skipping processing.");
+          continue;
+        }
+        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
 
         // KeyTable entries belong to both Legacy and OBS buckets.
         // Check bucket layout and if it's OBS
