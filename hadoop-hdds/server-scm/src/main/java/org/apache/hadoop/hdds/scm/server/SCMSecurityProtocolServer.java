@@ -421,9 +421,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   }
 
   public void join() throws InterruptedException {
-    LOGGER.trace("Join RPC server for SCMSecurityProtocolServer.");
+    LOGGER.info("Join RPC server for SCMSecurityProtocolServer.");
     getRpcServer().join();
-    LOGGER.trace("Join gRPC server for SCMSecurityProtocolServer.");
+    LOGGER.info("Join gRPC server for SCMSecurityProtocolServer.");
     getGrpcUpdateServer().join();
 
   }
