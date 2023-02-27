@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
@@ -42,6 +43,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
+  private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
       throws IOException {
@@ -56,13 +58,23 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
-    table.putWithBatch(getCurrentBatchOperation(), key, value);
+    rwLock.readLock().lock();
+    try {
+      table.putWithBatch(getCurrentBatchOperation(), key, value);
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
-    table.deleteWithBatch(getCurrentBatchOperation(), key);
+    rwLock.readLock().lock();
+    try {
+      table.deleteWithBatch(getCurrentBatchOperation(), key);
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
@@ -92,23 +104,28 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void flush() throws IOException {
-    // write latest trx info into trx table in the same batch
-    Table<String, TransactionInfo> transactionInfoTable
-        = metadataStore.getTransactionInfoTable();
-    transactionInfoTable.putWithBatch(currentBatchOperation,
-        TRANSACTION_INFO_KEY, latestTrxInfo);
+    rwLock.writeLock().lock();
+    try {
+      // write latest trx info into trx table in the same batch
+      Table<String, TransactionInfo> transactionInfoTable
+          = metadataStore.getTransactionInfoTable();
+      transactionInfoTable.putWithBatch(currentBatchOperation,
+          TRANSACTION_INFO_KEY, latestTrxInfo);
 
-    metadataStore.getStore().commitBatchOperation(currentBatchOperation);
-    currentBatchOperation.close();
-    this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
-    // reset batch operation
-    currentBatchOperation = metadataStore.getStore().initBatchOperation();
+      metadataStore.getStore().commitBatchOperation(currentBatchOperation);
+      currentBatchOperation.close();
+      this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
+      // reset batch operation
+      currentBatchOperation = metadataStore.getStore().initBatchOperation();
 
-    DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
-        .getDeletedBlockLog();
-    Preconditions.checkArgument(
-        deletedBlockLog instanceof DeletedBlockLogImpl);
-    ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
+      DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
+          .getDeletedBlockLog();
+      Preconditions.checkArgument(
+          deletedBlockLog instanceof DeletedBlockLogImpl);
+      ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
+    } finally {
+      rwLock.writeLock().unlock();
+    }
   }
 
   @Override
