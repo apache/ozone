@@ -131,7 +131,7 @@ public class FileSizeCountTask implements ReconOmTask {
       Object value = omdbUpdateEvent.getValue();
       Object oldValue = omdbUpdateEvent.getOldValue();
 
-      if (value instanceof OmKeyInfo || oldValue instanceof OmKeyInfo) {
+      if (value instanceof OmKeyInfo) {
         OmKeyInfo omKeyInfo = (OmKeyInfo) value;
         OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
 
@@ -146,8 +146,13 @@ public class FileSizeCountTask implements ReconOmTask {
             break;
 
           case UPDATE:
-            handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
-            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            if (omKeyInfoOld != null) {
+              handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
+              handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.",
+                  updatedKey);
+            }
             break;
 
           default:
