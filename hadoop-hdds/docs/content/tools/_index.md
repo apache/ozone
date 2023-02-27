@@ -55,7 +55,6 @@ Admin commands:
    * **dtutil**    - Operations related to delegation tokens
    * **envvars** - Display computed Hadoop environment variables.
    * **getconf** -  Reads ozone config values from configuration.
-   * **jmxget**  - Get JMX exported values from NameNode or DataNode.
    * **genconf** -  Generate minimally required ozone configs and output to
    ozone-site.xml.
 
