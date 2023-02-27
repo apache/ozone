@@ -88,6 +88,13 @@ public class TestOzoneFsHAURLs {
   private final String o3fsImplValue =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
 
+  private final String ofsImplKey =
+      "fs." + OzoneConsts.OZONE_OFS_URI_SCHEME + ".impl";
+
+  private final String ofsImplValue =
+      "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
+
+
   @BeforeClass
   public static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -349,5 +356,52 @@ public class TestOzoneFsHAURLs {
     String unqualifiedFs2 = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     testWithDefaultFS(unqualifiedFs2);
+  }
+
+  @Test
+  public void testIncorrectAuthorityInURI() throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(conf);
+    clientConf.setQuietMode(false);
+    clientConf.set(o3fsImplKey, o3fsImplValue);
+    clientConf.set(ofsImplKey, ofsImplValue);
+    FsShell shell = new FsShell(clientConf);
+    String incorrectSvcId = "dummy";
+    String o3fsPathWithCorrectSvcId =
+        String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+            bucketName, volumeName, omServiceId);
+    String o3fsPathWithInCorrectSvcId =
+        String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+            bucketName, volumeName, incorrectSvcId);
+    String ofsPathWithCorrectSvcId = "ofs://" + omServiceId + "/";
+    String ofsPathWithIncorrectSvcId = "ofs://" + incorrectSvcId + "/";
+    try {
+      int res = ToolRunner.run(shell,
+          new String[] {"-ls", ofsPathWithCorrectSvcId });
+      Assert.assertEquals(0, res);
+      res = ToolRunner.run(shell,
+          new String[] {"-ls", o3fsPathWithCorrectSvcId });
+      Assert.assertEquals(0, res);
+
+      try (GenericTestUtils.SystemErrCapturer capture = new
+          GenericTestUtils.SystemErrCapturer()) {
+        res = ToolRunner.run(shell,
+            new String[] {"-ls", ofsPathWithIncorrectSvcId });
+        Assert.assertEquals(-1, res);
+        Assert.assertTrue(
+            capture.getOutput().contains("Cannot resolve OM host"));
+      }
+
+      try (GenericTestUtils.SystemErrCapturer capture = new
+          GenericTestUtils.SystemErrCapturer()) {
+        res = ToolRunner.run(shell,
+            new String[] {"-ls", o3fsPathWithInCorrectSvcId });
+        Assert.assertEquals(-1, res);
+        Assert.assertTrue(
+            capture.getOutput().contains("Cannot resolve OM host"));
+      }
+    } finally {
+      shell.close();
+    }
+
   }
 }

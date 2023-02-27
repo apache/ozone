@@ -184,6 +184,9 @@ public class BasicRootedOzoneClientAdapterImpl
         this.ozoneClient =
             OzoneClientFactory.getRpcClient(omHost, conf);
       } else if (StringUtils.isNotEmpty(omHost) && omPort != -1) {
+        // If the authority in the URI is not one of the service ID's,
+        // it is treated as a hostname. Check if this hostname can be resolved.
+        OzoneClientUtils.resolveOmHost(omHost, omPort);
         this.ozoneClient =
             OzoneClientFactory.getRpcClient(omHost, omPort, conf);
       } else {

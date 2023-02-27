@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -39,6 +40,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.Objects;
 import java.util.Set;
 
@@ -249,6 +252,15 @@ public final class OzoneClientUtils {
       limitVal = 2;
     }
     return limitVal;
+  }
+
+  public static void resolveOmHost(String omHost, int omPort) {
+    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    if (omHostAddress.isUnresolved()) {
+      throw new IllegalArgumentException(
+          "Cannot resolve OM host " + omHost + " in the URI",
+          new UnknownHostException());
+    }
   }
 
 }

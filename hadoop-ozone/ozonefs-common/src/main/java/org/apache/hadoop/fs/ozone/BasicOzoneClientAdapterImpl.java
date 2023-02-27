@@ -166,6 +166,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.ozoneClient =
           OzoneClientFactory.getRpcClient(omHost, conf);
     } else if (StringUtils.isNotEmpty(omHost) && omPort != -1) {
+      OzoneClientUtils.resolveOmHost(omHost, omPort);
       this.ozoneClient =
           OzoneClientFactory.getRpcClient(omHost, omPort, conf);
     } else {

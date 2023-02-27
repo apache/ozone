@@ -442,7 +442,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
-      500;
+      45;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
