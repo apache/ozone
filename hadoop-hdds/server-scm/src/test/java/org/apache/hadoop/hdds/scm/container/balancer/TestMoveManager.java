@@ -236,19 +236,19 @@ public class TestMoveManager {
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
     // Return healthy before move but mis replicated after move
-    Mockito.when(replicationManager.getContainerReplicationHealth(any(),
-            any())).thenAnswer(invocationOnMock -> {
-      Set<ContainerReplica> replicasBeingChecked =
-          invocationOnMock.getArgument(1);
-      if (replicasBeingChecked.contains(sourceReplica)) {
-        // before move
-        return new ContainerHealthResult.HealthyResult(containerInfo);
-      } else {
-        // after move
-        return new ContainerHealthResult.MisReplicatedHealthResult(
-            containerInfo, false);
-      }
-    });
+    Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
+        .thenAnswer(invocationOnMock -> {
+          Set<ContainerReplica> replicasBeingChecked =
+              invocationOnMock.getArgument(1);
+          if (replicasBeingChecked.contains(sourceReplica)) {
+            // before move
+            return new ContainerHealthResult.HealthyResult(containerInfo);
+          } else {
+            // after move
+            return new ContainerHealthResult.MisReplicatedHealthResult(
+                containerInfo, false);
+          }
+        });
 
     assertMoveFailsWith(
         MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE,
