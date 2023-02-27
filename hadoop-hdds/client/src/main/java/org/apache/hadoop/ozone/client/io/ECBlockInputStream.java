@@ -311,6 +311,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         return super.read(byteBuffer);
       } catch (BadDataLocationException e) {
         int failedIndex = e.getFailedLocationIndex();
+        closeStream(failedIndex);
         if (shouldRetryFailedRead(failedIndex)) {
           byteBuffer.position(currentBufferPosition);
           seek(currentPosition);
@@ -325,6 +326,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private boolean shouldRetryFailedRead(int failedIndex) {
     Deque<DatanodeDetails> spareLocations = spareDataLocations.get(failedIndex);
     if (spareLocations != null && spareLocations.size() > 0) {
+      failedLocations.add(dataLocations[failedIndex]);
       DatanodeDetails spare = spareLocations.removeFirst();
       dataLocations[failedIndex] = spare;
       LOG.debug("{}: switching [{}] to spare {}", this, failedIndex, spare);
@@ -361,12 +363,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         totalRead += read;
         position += read;
       } catch (IOException ioe) {
-        DatanodeDetails failedLocation = dataLocations[currentIndex];
-        failedLocations.add(failedLocation);
-        LOG.debug("{}: failed to read [{}] from {}", this,
-            currentIndex, failedLocation);
-        closeStream(currentIndex);
-        throw new BadDataLocationException(failedLocation, currentIndex, ioe);
+        throw new BadDataLocationException(
+            dataLocations[currentIndex], currentIndex, ioe);
       }
     }
     return totalRead;
