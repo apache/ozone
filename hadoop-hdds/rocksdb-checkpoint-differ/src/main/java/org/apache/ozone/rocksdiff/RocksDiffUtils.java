@@ -87,11 +87,12 @@ public final class RocksDiffUtils {
       String tableName = new String(properties.getColumnFamilyName(), UTF_8);
       if (tableToPrefixMap.containsKey(tableName)) {
         String prefix = tableToPrefixMap.get(tableName) + OM_KEY_PREFIX;
-        SstFileReaderIterator iterator =
-            sstFileReader.newIterator(new ReadOptions());
-        iterator.seek(prefix.getBytes(UTF_8));
-        String seekResultKey = new String(iterator.key(), UTF_8);
-        return seekResultKey.startsWith(prefix);
+        try (SstFileReaderIterator iterator = sstFileReader.newIterator(
+            new ReadOptions())) {
+          iterator.seek(prefix.getBytes(UTF_8));
+          String seekResultKey = new String(iterator.key(), UTF_8);
+          return seekResultKey.startsWith(prefix);
+        }
       }
       return false;
     } catch (RocksDBException e) {
