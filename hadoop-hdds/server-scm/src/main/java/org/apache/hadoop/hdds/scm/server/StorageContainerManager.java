@@ -1572,7 +1572,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     try {
       LOG.info("Stopping Storage Container Manager HTTP server.");
-      httpServer.stop();
+      if (httpServer != null) {
+        httpServer.stop();
+      }
     } catch (Exception ex) {
       LOG.error("Storage Container Manager HTTP server stop failed.", ex);
     }

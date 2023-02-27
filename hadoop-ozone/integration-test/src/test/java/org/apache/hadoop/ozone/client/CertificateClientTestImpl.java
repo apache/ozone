@@ -332,7 +332,7 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public String getComponentName() {
-    return null;
+    return this.getClass().getSimpleName();
   }
 
   @Override
