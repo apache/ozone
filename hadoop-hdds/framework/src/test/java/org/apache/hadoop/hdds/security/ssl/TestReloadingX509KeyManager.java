@@ -59,6 +59,7 @@ public class TestReloadingX509KeyManager {
       assertEquals(privateKey1,
           km.getPrivateKey(caClient.getComponentName() + "_key"));
 
+      caClient.renewRootCA();
       caClient.renewKey();
       PrivateKey privateKey2 = caClient.getPrivateKey();
       assertNotEquals(privateKey1, privateKey2);
