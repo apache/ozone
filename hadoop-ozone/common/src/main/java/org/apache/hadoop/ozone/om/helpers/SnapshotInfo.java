@@ -513,8 +513,9 @@ public final class SnapshotInfo implements Auditable {
         name.equals(that.name) && volumeName.equals(that.volumeName) &&
         bucketName.equals(that.bucketName) &&
         snapshotStatus == that.snapshotStatus &&
-        pathPreviousSnapshotID.equals(that.pathPreviousSnapshotID) &&
-        globalPreviousSnapshotID.equals(that.globalPreviousSnapshotID) &&
+        Objects.equals(pathPreviousSnapshotID, that.pathPreviousSnapshotID) &&
+        Objects.equals(
+            globalPreviousSnapshotID, that.globalPreviousSnapshotID) &&
         snapshotPath.equals(that.snapshotPath) &&
         checkpointDir.equals(that.checkpointDir);
   }
