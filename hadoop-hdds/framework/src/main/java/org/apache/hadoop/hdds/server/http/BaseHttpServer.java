@@ -43,6 +43,7 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.createDir;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
@@ -182,7 +183,7 @@ public abstract class BaseHttpServer {
 
       if (StringUtils.isEmpty(baseDir)) {
         baseDir =
-            conf.get(OzoneConfigKeys.OZONE_METADATA_DIRS) + serverDir;
+            conf.get(String.valueOf(getOzoneMetaDirPath(conf))) + serverDir;
       }
       createDir(baseDir);
       httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
