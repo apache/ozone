@@ -327,7 +327,6 @@ public class ECReconstructionCoordinator implements Closeable {
       String message = "Chunk write failed at the new target node: " +
           targetBlockStream.getDatanodeDetails() +
           ". Aborting the reconstruction process.";
-      LOG.error(message, targetBlockStream.getIoException());
       throw new IOException(message, targetBlockStream.getIoException());
     }
   }
