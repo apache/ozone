@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 
-import java.util.HashMap;
+import java.io.FileNotFoundException;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
@@ -45,22 +45,20 @@ public class ManagedSSTDumpTool {
 
   }
 
-  public void run(String[] args, ManagedOptions options) {
-    this.runInternal(args, options.getNativeHandle());
+  public void run(String[] args) {
+    this.runInternal(args);
   }
 
-  public void run(Map<String, String> args, ManagedOptions options) {
+  public void run(Map<String, String> args) {
     this.run(args.entrySet().stream().map(e -> "--"
             + (e.getValue() == null || e.getValue().isEmpty() ? e.getKey() :
-            e.getKey() + "=" + e.getValue())).toArray(String[]::new), options);
+            e.getKey() + "=" + e.getValue())).toArray(String[]::new));
   }
 
-  private native void runInternal(String[] args, long optionsNativeHandle);
+  private native void runInternal(String[] args);
 
-  public static void main(String[] args) throws NativeLibraryNotLoadedException {
-    Map<String, String> commandOpts = new HashMap<>();
-    commandOpts.put("file","/Users/sbalachandran/Documents/code/dummyrocks/rocks");
-    commandOpts.put("command","scan");
-    new ManagedSSTDumpTool().run(commandOpts, new ManagedOptions());
+  public static void main(String[] args)
+          throws NativeLibraryNotLoadedException, FileNotFoundException {
+    new ManagedSSTDumpTool().run(args);
   }
 }

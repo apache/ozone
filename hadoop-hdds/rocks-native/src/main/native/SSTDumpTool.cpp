@@ -21,9 +21,7 @@
 #include "rocksdb/sst_dump_tool.h"
 #include "string"
 
-void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal(JNIEnv *env, jobject obj, jobjectArray argsArray,
-                                  jlong options_native_handle) {
-    auto* options = reinterpret_cast<const ROCKSDB_NAMESPACE::Options*>(options_native_handle);
+void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal(JNIEnv *env, jobject obj, jobjectArray argsArray) {
     ROCKSDB_NAMESPACE::SSTDumpTool dumpTool;
     int length = env->GetArrayLength(argsArray);
     const char* args[length + 1];
@@ -33,5 +31,5 @@ void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal
         args[i+1] = (char*)env->GetStringUTFChars((jstring)env->
                 GetObjectArrayElement(argsArray, (jsize)i), JNI_FALSE);
     }
-    dumpTool.Run(length + 1, args, *options);
+    dumpTool.Run(length + 1, args);
 }
