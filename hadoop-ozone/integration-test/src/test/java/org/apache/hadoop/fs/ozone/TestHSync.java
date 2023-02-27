@@ -120,6 +120,7 @@ public class TestHSync {
   }
 
   @Test
+  @Flaky("HDDS-8024")
   public void testOfsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
