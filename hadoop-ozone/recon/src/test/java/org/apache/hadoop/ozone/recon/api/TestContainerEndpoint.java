@@ -239,7 +239,7 @@ public class TestContainerEndpoint {
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
     Table tableMock = mock(Table.class);
     when(tableMock.getName()).thenReturn("KeyTable");
-    when(omMetadataManagerMock.getKeyTable(BucketLayout.DEFAULT))
+    when(omMetadataManagerMock.getKeyTable(BucketLayout.LEGACY))
         .thenReturn(tableMock);
     when(omMetadataManagerMock.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
         .thenReturn(tableMock);

@@ -92,7 +92,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
               .reinitWithNewContainerDataFromOm(new HashMap<>());
 
       // loop over both key table and file table
-      for (BucketLayout layout : Arrays.asList(BucketLayout.DEFAULT,
+      for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
           BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         Table<String, OmKeyInfo> omKeyInfoTable =
             omMetadataManager.getKeyTable(layout);
