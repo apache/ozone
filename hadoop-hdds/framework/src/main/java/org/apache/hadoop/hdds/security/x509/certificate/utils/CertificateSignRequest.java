@@ -108,7 +108,6 @@ public final class CertificateSignRequest {
         scmID, clusterID));
   }
 
-  // TODO: move the PKCS10CSRValidator class
   public static Extensions getPkcs9Extensions(PKCS10CertificationRequest csr)
       throws CertificateException {
     ASN1Set pkcs9ExtReq = getPkcs9ExtRequest(csr);
