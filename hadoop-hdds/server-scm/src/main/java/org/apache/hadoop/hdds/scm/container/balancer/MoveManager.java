@@ -91,8 +91,13 @@ public final class MoveManager implements
     // rack location) will not be satisfied, so we should not delete
     // the container
     DELETE_FAIL_POLICY,
+    /*
+    Container is not healthy if it has issues such as under, over, or mis
+    replication. We don't try to move replicas of such containers.
+     */
+    REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
     //  replicas + target - src does not satisfy placement policy
-    REPLICATION_NOT_HEALTHY,
+    REPLICATION_NOT_HEALTHY_AFTER_MOVE,
     // A move is already scheduled for this container
     FAIL_CONTAINER_ALREADY_BEING_MOVED,
     // Unexpected error
@@ -258,6 +263,20 @@ public final class MoveManager implements
       }
 
       /*
+      If the container is under, over, or mis replicated, we should let
+      replication manager solve these issues first. Fail move for such a
+      container.
+       */
+      ContainerHealthResult healthBeforeMove =
+          replicationManager.getContainerReplicationHealth(containerInfo,
+              currentReplicas);
+      if (healthBeforeMove.getHealthState() !=
+          ContainerHealthResult.HealthState.HEALTHY) {
+        ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE);
+        return ret;
+      }
+
+      /*
        * Ensure the container has no inflight actions.
        * The reason why the given container should not be taking any inflight
        * action is that: if the given container is being replicated or deleted,
@@ -293,7 +312,7 @@ public final class MoveManager implements
           .getContainerReplicationHealth(containerInfo, replicasAfterMove);
       if (healthResult.getHealthState()
           != ContainerHealthResult.HealthState.HEALTHY) {
-        ret.complete(MoveResult.REPLICATION_NOT_HEALTHY);
+        ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE);
         return ret;
       }
       startMove(containerInfo, src, tgt, ret);
