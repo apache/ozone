@@ -90,7 +90,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
-        if (!(value instanceof OmKeyInfo) || !(value instanceof OmKeyInfo)) {
+        if (!(value instanceof OmKeyInfo) || !(oldValue instanceof OmKeyInfo)) {
           LOG.debug("Unexpected value type for key. Skipping processing.");
           continue;
         }
