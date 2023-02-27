@@ -311,6 +311,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         return super.read(byteBuffer);
       } catch (BadDataLocationException e) {
         int failedIndex = e.getFailedLocationIndex();
+        if (LOG.isDebugEnabled()) {
+          String cause = e.getCause() != null
+              ? " due to " + e.getCause().getMessage()
+              : "";
+          LOG.debug("{}: read [{}] failed from {}{}", this,
+              failedIndex, dataLocations[failedIndex], cause);
+        }
         closeStream(failedIndex);
         if (shouldRetryFailedRead(failedIndex)) {
           byteBuffer.position(currentBufferPosition);
