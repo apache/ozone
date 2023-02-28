@@ -18,10 +18,11 @@
 package org.apache.ozone.rocksdiff;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.rocksdb.SstFileReader;
 import org.rocksdb.TableProperties;
 import org.rocksdb.Options;
-import org.rocksdb.SstFileReaderIterator;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -81,16 +82,18 @@ public final class RocksDiffUtils {
 
   public static boolean doesSstFileContainKeyRange(String filepath,
       Map<String, String> tableToPrefixMap) throws RocksDBException {
-    try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
-      sstFileReader.open(filepath);
-      TableProperties properties = sstFileReader.getTableProperties();
+    try (ManagedSstFileReader sstFileReader = ManagedSstFileReader.managed(
+        new SstFileReader(new Options()))) {
+      sstFileReader.get().open(filepath);
+      TableProperties properties = sstFileReader.get().getTableProperties();
       String tableName = new String(properties.getColumnFamilyName(), UTF_8);
       if (tableToPrefixMap.containsKey(tableName)) {
         String prefix = tableToPrefixMap.get(tableName) + OM_KEY_PREFIX;
-        try (SstFileReaderIterator iterator = sstFileReader.newIterator(
-            new ReadOptions())) {
-          iterator.seek(prefix.getBytes(UTF_8));
-          String seekResultKey = new String(iterator.key(), UTF_8);
+        try (ManagedSstFileReaderIterator iterator =
+            ManagedSstFileReaderIterator.managed(sstFileReader.get()
+                .newIterator(new ReadOptions()))) {
+          iterator.get().seek(prefix.getBytes(UTF_8));
+          String seekResultKey = new String(iterator.get().key(), UTF_8);
           return seekResultKey.startsWith(prefix);
         }
       }
