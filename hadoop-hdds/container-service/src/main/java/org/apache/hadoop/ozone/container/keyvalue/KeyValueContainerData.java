@@ -322,7 +322,7 @@ public class KeyValueContainerData extends ContainerData {
     numPendingDeletionBlocks.set(0);
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
-    metadataTable.put(pendingDeleteBlockCountKey(), 0L);
+    metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
   }
 
   public int getReplicaIndex() {

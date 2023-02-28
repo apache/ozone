@@ -457,14 +457,14 @@ public class TestBlockDeletingService {
       Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
       Assert.assertEquals(0, db.getStore().getMetadataTable()
-          .get(incorrectData.pendingDeleteBlockCountKey()).longValue());
+          .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
       Assert.assertEquals(0,
           incorrectData.getNumPendingDeletionBlocks());
 
       // Alter the pending delete value in memory and the DB.
       incorrectData.incrPendingDeletionBlocks(blockDeleteLimit);
       db.getStore().getMetadataTable().put(
-          incorrectData.pendingDeleteBlockCountKey(), (long)blockDeleteLimit);
+          incorrectData.getPendingDeleteBlockCountKey(), (long)blockDeleteLimit);
     }
 
     // Create one container with fewer pending delete blocks than the first.
@@ -479,7 +479,7 @@ public class TestBlockDeletingService {
           getUnderDeletionBlocksCount(db, correctData));
       Assert.assertEquals(correctNumBlocksToDelete,
           db.getStore().getMetadataTable()
-              .get(correctData.pendingDeleteBlockCountKey()).longValue());
+              .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
 
     // Create the deleting service instance with very large interval between
@@ -506,7 +506,7 @@ public class TestBlockDeletingService {
       Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
       Assert.assertEquals(0, db.getStore().getMetadataTable()
-          .get(incorrectData.pendingDeleteBlockCountKey()).longValue());
+          .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
     }
     // Correct container should not have been processed.
     Assert.assertEquals(correctNumBlocksToDelete,
@@ -516,7 +516,7 @@ public class TestBlockDeletingService {
           getUnderDeletionBlocksCount(db, correctData));
       Assert.assertEquals(correctNumBlocksToDelete,
           db.getStore().getMetadataTable()
-              .get(correctData.pendingDeleteBlockCountKey()).longValue());
+              .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
 
     // On the second run, the correct container should be picked up, because
@@ -530,7 +530,7 @@ public class TestBlockDeletingService {
       Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
           incorrectData));
       Assert.assertEquals(0, db.getStore().getMetadataTable()
-          .get(incorrectData.pendingDeleteBlockCountKey()).longValue());
+          .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
     }
     // The correct container should have been processed this run and had its
     // blocks deleted.
@@ -539,7 +539,7 @@ public class TestBlockDeletingService {
       Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
           correctData));
       Assert.assertEquals(0, db.getStore().getMetadataTable()
-          .get(correctData.pendingDeleteBlockCountKey()).longValue());
+          .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
   }
 
