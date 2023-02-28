@@ -146,7 +146,7 @@ public class DeletedBlockLogImpl
         } else {
           while (iter.hasNext() && failedTXs.size() < count) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
-            if (delTX.getCount() == -1) {
+            if (delTX.getCount() == LIST_ALL_FAILED_TRANSACTIONS) {
               failedTXs.add(delTX);
             }
           }
