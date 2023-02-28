@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -788,6 +789,30 @@ public final class OmUtils {
       return "STANDALONE";
     } else {
       return sb.toString();
+    }
+  }
+
+  /**
+   * @param omHost
+   * @param omPort
+   * If the authority in the URI is not one of the service ID's,
+   * it is treated as a hostname. Check if this hostname can be resolved
+   * and if it's reachable.
+   */
+  public static void resolveOmHost(String omHost, int omPort) {
+    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    if (omHostAddress.isUnresolved()) {
+      throw new IllegalArgumentException(
+          "Cannot resolve OM host " + omHost + " in the URI",
+          new UnknownHostException());
+    }
+    try {
+      if (!omHostAddress.getAddress().isReachable(5000)) {
+        throw new IllegalArgumentException(
+            "OM host " + omHost + " unreachable in the URI");
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 }
