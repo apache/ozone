@@ -228,18 +228,18 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         "\nExample: ",
         "# create 25000 keys, run time 180s",
         "$ bin/ozone freon ommg --operation CREATE_KEY -n 25000"
-            + " --runtime 180s --timebase\n",
+            + " --duration  180s\n",
         "# read 25000 keys, run time 180s",
         "$ bin/ozone freon ommg --operation READ_KEY -n 25000"
-            + " --runtime 180s --timebase\n",
+            + " --duration 180s\n",
         "# 20 threads, list 1000 keys each request, and run time 180s",
         "$ bin/ozone freon ommg --operation LIST_KEYS -t 20 --batch-size 1000"
-            + " --runtime 180s --timebase\n",
+            + " --duration 180s\n",
         "# 10 threads, 1 threads list keys, 5 threads create file,"
             + " 4 threads lookup file and run time 180s",
         "$ bin/ozone freon ommg"
             + " --operation MIXED --ops CREATE_FILE,LOOKUP_FILE,LIST_STATUS"
-            + " --opsnum 5,4,1 -t 10 -n 1000  --runtime 180s --timebase\n",
+            + " --opsnum 5,4,1 -t 10 -n 1000 --duration 180s\n",
         "Note that: You must create a sufficient number of "
             + "objects before executing read-related tests\n"
     ));

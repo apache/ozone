@@ -99,10 +99,10 @@ public class BaseFreonGenerator {
       defaultValue = "10")
   private int threadNo;
 
-  @Option(names = {"--runtime"},
-      description = "Duration to run the test."
+  @Option(names = {"--duration"},
+      description = "Duration to run the test. "
           + " Can be '30s', '5m', '1h', '7d' etc..")
-  private String runtime;
+  private String duration;
 
   @Option(names = {"-f", "--fail-at-end"},
       description = "If turned on, all the tasks will be executed even if "
@@ -286,9 +286,9 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    if (runtime != null) {
+    if (duration != null) {
       durationInSecond = TimeDurationUtil.getTimeDurationHelper(
-          "--runtime", runtime, TimeUnit.SECONDS);
+          "--runtime", duration, TimeUnit.SECONDS);
       if (durationInSecond <= 0) {
         throw new IllegalArgumentException(
             "Incomplete command, "
@@ -323,7 +323,7 @@ public class BaseFreonGenerator {
     executor = Executors.newFixedThreadPool(threadNo);
     long maxValue;
     LongSupplier supplier;
-    if (runtime != null) {
+    if (duration != null) {
       maxValue = durationInSecond;
       supplier = () -> Duration.between(
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
