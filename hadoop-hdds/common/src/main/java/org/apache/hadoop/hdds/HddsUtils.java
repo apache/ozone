@@ -791,9 +791,9 @@ public final class HddsUtils {
     Map<String, String> ozoneProps = conf.getOzoneProperties();
     ConfigRedactor redactor = new ConfigRedactor(conf);
     Map<String, String> sortedOzoneProps = new TreeMap<>();
-    for (String name : ozoneProps.keySet()) {
-      String value = redactor.redact(name, ozoneProps.get(name));
-      sortedOzoneProps.put(name, value);
+    for (Map.Entry<String, String> entry : ozoneProps.entrySet()) {
+      String value = redactor.redact(entry.getKey(), entry.getValue());
+      sortedOzoneProps.put(entry.getKey(), value);
     }
     return sortedOzoneProps;
   }
