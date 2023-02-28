@@ -132,20 +132,26 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public void init() throws IOException {
     metadataStore = scm.getScmMetadataStore();
 
-    // initialize a batch operation during construction time
-    currentBatchOperation = this.metadataStore.getStore().initBatchOperation();
-    latestTrxInfo = this.metadataStore.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (latestTrxInfo == null) {
-      // transaction table is empty
-      latestTrxInfo =
-          TransactionInfo
-              .builder()
-              .setTransactionIndex(-1)
-              .setCurrentTerm(0)
-              .build();
+    rwLock.writeLock().lock();
+    try {
+      // initialize a batch operation during construction time
+      currentBatchOperation = this.metadataStore.getStore().
+          initBatchOperation();
+      latestTrxInfo = this.metadataStore.getTransactionInfoTable()
+          .get(TRANSACTION_INFO_KEY);
+      if (latestTrxInfo == null) {
+        // transaction table is empty
+        latestTrxInfo =
+            TransactionInfo
+                .builder()
+                .setTransactionIndex(-1)
+                .setCurrentTerm(0)
+                .build();
+      }
+      latestSnapshot = latestTrxInfo.toSnapshotInfo();
+    } finally {
+      rwLock.writeLock().unlock();
     }
-    latestSnapshot = latestTrxInfo.toSnapshotInfo();
   }
 
   @Override
