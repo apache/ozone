@@ -263,16 +263,16 @@ public class TestHddsUtils {
             "password$",
             "key$"));
     /* Sensitive properties */
-    conf.set("test.password", ORIGINAL_VALUE);
-    conf.set("fs.s3a.secret.key", ORIGINAL_VALUE);
+    conf.set("ozone.test.password", ORIGINAL_VALUE);
+    conf.set("hdds.test.secret.key", ORIGINAL_VALUE);
     /* Non-Sensitive properties */
-    conf.set("normal.config", ORIGINAL_VALUE);
+    conf.set("ozone.normal.config", ORIGINAL_VALUE);
     Map<String, String> processedConf = processForLogging(conf);
 
     /* Verify that sensitive properties are redacted */
-    assertEquals(processedConf.get("test.password"), REDACTED_TEXT);
-    assertEquals(processedConf.get("fs.s3a.secret.key"), REDACTED_TEXT);
+    assertEquals(processedConf.get("ozone.test.password"), REDACTED_TEXT);
+    assertEquals(processedConf.get("hdds.test.secret.key"), REDACTED_TEXT);
     /* Verify that non-sensitive properties retain their value */
-    assertEquals(processedConf.get("normal.config"), ORIGINAL_VALUE);
+    assertEquals(processedConf.get("ozone.normal.config"), ORIGINAL_VALUE);
   }
 }

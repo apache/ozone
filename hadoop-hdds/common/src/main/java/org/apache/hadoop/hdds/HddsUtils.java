@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Properties;
 import java.util.TreeMap;
 
 import org.apache.hadoop.conf.ConfigRedactor;
@@ -789,13 +788,13 @@ public final class HddsUtils {
    * @return Sorted Map of properties
    */
   public static Map<String, String> processForLogging(OzoneConfiguration conf) {
-    Properties props = conf.getAllProperties();
+    Map<String, String> ozoneProps = conf.getOzoneProperties();
     ConfigRedactor redactor = new ConfigRedactor(conf);
-    Map<String, String> configMap = new TreeMap<>();
-    for (String name : props.stringPropertyNames()) {
-      String value = redactor.redact(name, props.getProperty(name));
-      configMap.put(name, value);
+    Map<String, String> sortedOzoneProps = new TreeMap<>();
+    for (String name : ozoneProps.keySet()) {
+      String value = redactor.redact(name, ozoneProps.get(name));
+      sortedOzoneProps.put(name, value);
     }
-    return configMap;
+    return sortedOzoneProps;
   }
 }
