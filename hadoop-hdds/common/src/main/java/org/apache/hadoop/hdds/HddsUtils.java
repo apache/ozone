@@ -793,6 +793,9 @@ public final class HddsUtils {
     Map<String, String> sortedOzoneProps = new TreeMap<>();
     for (Map.Entry<String, String> entry : ozoneProps.entrySet()) {
       String value = redactor.redact(entry.getKey(), entry.getValue());
+      if (value != null) {
+        value = value.trim();
+      }
       sortedOzoneProps.put(entry.getKey(), value);
     }
     return sortedOzoneProps;
