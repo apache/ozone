@@ -99,13 +99,6 @@ public class BaseFreonGenerator {
       defaultValue = "10")
   private int threadNo;
 
-  @Option(names = {"--timebase"},
-      description = "If set, freon will run for the duration of the --runtime"
-          + " specified even if the --number-of-tests operation"
-          + " has been completed.",
-      defaultValue = "false")
-  private boolean timebase;
-
   @Option(names = {"--runtime"},
       description = "Duration to run the test."
           + " Can be '30s', '5m', '1h', '7d' etc..")
@@ -139,6 +132,7 @@ public class BaseFreonGenerator {
 
   private long startTime;
   private long durationInSecond;
+  private boolean timebase;
 
   private PathSchema pathSchema;
   private String spanName;
@@ -292,13 +286,17 @@ public class BaseFreonGenerator {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
     }
-    durationInSecond = TimeDurationUtil.getTimeDurationHelper(
-            "--runtime", runtime, TimeUnit.SECONDS);
-    if (timebase && durationInSecond <= 0) {
-      throw new IllegalArgumentException(
-              "Incomplete command, "
-                      + "the runtime must be given, and must not be negative");
+    if (runtime != null) {
+      durationInSecond = TimeDurationUtil.getTimeDurationHelper(
+          "--runtime", runtime, TimeUnit.SECONDS);
+      if (durationInSecond <= 0) {
+        throw new IllegalArgumentException(
+            "Incomplete command, "
+                + "the runtime must be given, and must not be negative");
+      }
+      timebase = true;
     }
+
     if (testNo <= 0) {
       throw new IllegalArgumentException(
               "Invalid command, "
@@ -325,7 +323,7 @@ public class BaseFreonGenerator {
     executor = Executors.newFixedThreadPool(threadNo);
     long maxValue;
     LongSupplier supplier;
-    if (timebase) {
+    if (runtime != null) {
       maxValue = durationInSecond;
       supplier = () -> Duration.between(
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
