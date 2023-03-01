@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -373,6 +374,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmDBTenantState> getTenantStateTable();
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
+
+  Table<Long, RepeatedOmString> getRenamedKeyTable();
 
   /**
    * Gets the OM Meta table.
