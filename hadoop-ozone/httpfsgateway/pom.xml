@@ -115,13 +115,17 @@
       <groupId>org.apache.curator</groupId>
       <artifactId>curator-framework</artifactId>
       <scope>runtime</scope>
-      <version>2.4.0</version>
+      <version>4.2.0</version>
       <!-- These were excluded as non of them is used in the HttpFS module, but all of them would be a new unnecessary
        dependency to the Ozone project, we would also need to update the jar-report.txt with that. -->
       <exclusions>
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-math</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.yetus</groupId>
+          <artifactId>audience-annotations</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -140,8 +144,8 @@
           <artifactId>log4j</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.jboss.netty</groupId>
-          <artifactId>netty</artifactId>
+          <groupId>io.netty</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
