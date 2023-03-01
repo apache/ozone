@@ -91,10 +91,10 @@ public class ReconServer extends GenericCli {
   public Void call() throws Exception {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
-    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        ReconServer.class, originalArgs, LOG);
 
     configuration = createOzoneConfiguration();
+    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+            ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
     injector = Guice.createInjector(new ReconControllerModule(),
