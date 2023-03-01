@@ -145,13 +145,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     keyCodec = new KeyCodec(securityConfig, component);
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
-    this.certSerialId = certSerialId;
     this.component = component;
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
 
-    loadAllCertificates();
+    updateCertSerialId(certSerialId);
   }
 
   /**
@@ -1131,8 +1130,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     caCertId = null;
     rootCaCertId = null;
 
-    certSerialId = newCertId;
-    loadAllCertificates();
+    updateCertSerialId(newCertId);
     getLogger().info("Reset and reload key and all certificates.");
   }
 
@@ -1144,15 +1142,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return (OzoneConfiguration)securityConfig.getConfiguration();
   }
 
+  private synchronized void updateCertSerialId(String newCertSerialId) {
+    certSerialId = newCertSerialId;
+    loadAllCertificates();
+  }
+
   protected abstract String signAndStoreCertificate(
       PKCS10CertificationRequest request, Path certificatePath)
       throws CertificateException;
 
-  public synchronized String signAndStoreCertificate(
+  public String signAndStoreCertificate(
       PKCS10CertificationRequest request) throws CertificateException {
-    certSerialId = signAndStoreCertificate(request,
-        getSecurityConfig().getCertificateLocation(getComponentName()));
-    loadAllCertificates();
+    updateCertSerialId(signAndStoreCertificate(request,
+        getSecurityConfig().getCertificateLocation(getComponentName())));
     return certSerialId;
   }
 
