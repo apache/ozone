@@ -182,8 +182,7 @@ public abstract class BaseHttpServer {
       String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
 
       if (StringUtils.isEmpty(baseDir)) {
-        baseDir =
-            conf.get(String.valueOf(getOzoneMetaDirPath(conf))) + serverDir;
+        baseDir = getOzoneMetaDirPath(conf) + serverDir;
       }
       createDir(baseDir);
       httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
