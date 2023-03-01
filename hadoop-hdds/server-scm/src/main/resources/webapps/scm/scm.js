@@ -26,8 +26,8 @@
         },
         controller: function ($http,$scope) {
             var ctrl = this;
-            $scope.reverse = true;
-            $scope.columnName = "";
+            $scope.reverse = false;
+            $scope.columnName = "hostname";
             let nodeStatusCopy = [];
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;

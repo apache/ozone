@@ -46,9 +46,12 @@
 <table class="table table-bordered table-striped col-md-6">
     <thead>
         <tr>
-            <th ng-click = "columnSort('hostname')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">HostName</th>
-            <th ng-click = "columnSort('opstate')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">Operational State</th>
-            <th ng-click = "columnSort('comstate')" ng-class="{'sortorder' : reverse, 'sortorder reverse' : !reverse}">Commisioned State</th>
+            <th ng-click = "columnSort('hostname')" class="nodeStausInfo"><span ng-class = "{'sorting' : (columnName != 'hostname'), 'sortasc' : (columnName == 'hostname' && !reverse),
+                                        'sortdesc':(columnName == 'hostname' && reverse)}">HostName</span></th>
+            <th ng-click = "columnSort('opstate')" class="nodeStausInfo" ><span ng-class="{'sorting' : (columnName != 'opstate'), 'sortasc' : (columnName == 'opstate' && !reverse),
+                                        'sortdesc':(columnName == 'opstate' && reverse)}">Operational State</span></th>
+            <th ng-click = "columnSort('comstate')" class="nodeStausInfo">  <span ng-class="{'sorting' : (columnName != 'comstate'), 'sortasc' : (columnName == 'comstate' && !reverse),
+                                        'sortdesc':(columnName == 'comstate' && reverse)}">Commisioned State</span> </th>
         </tr>
     </thead>
     <tbody>
