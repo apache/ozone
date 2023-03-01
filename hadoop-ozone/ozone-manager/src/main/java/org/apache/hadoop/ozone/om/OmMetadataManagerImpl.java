@@ -1088,7 +1088,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     if (StringUtil.isNotBlank(keyPrefix)) {
       seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
     } else {
-      seekPrefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
+      seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
     }
     int currentCount = 0;
 
