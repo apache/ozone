@@ -231,13 +231,42 @@
                                     <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                     <arg line="-j4"/>
                                     <arg line="tools"/>
-                                </exec>>
+                                </exec>
                             </tasks>
                         </configuration>
                         <goals>
                             <goal>run</goal>
                         </goals>
                     </execution>
+                    <execution>
+                        <id>build-rocks-tools</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <tasks>
+                                <mkdir dir="${project.build.directory}/native/rocksdb"/>
+                                <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
+                                    <arg line="${basedir}/src"/>
+                                    <env key="CFLAGS" value="-fPIC"/>
+                                    <env key="GENERATED_JAVAH" value="${project.build.directory}/native/javah"/>
+                                    <env key="NATIVE_DIR" value="${basedir}/src/main/native"/>
+                                    <env key="SST_DUMP_INCLUDE" value="${sstDump.include}"/>
+                                    <env key="CMAKE_STANDARDS" value="${cmake.standards}"/>
+                                    <env key="ROCKSDB_HEADERS" value="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
+                                    <env key="ROCKSDB_LIB" value="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                                    <env key="ZLIB_LIB" value="${project.build.directory}/zlib/zlib-${zlib.version}"/>
+                                    <env key="BZIP2_LIB" value="${project.build.directory}/bzip2/bzip2-${bzip2.version}"/>
+                                    <env key="LZ4_LIB" value="${project.build.directory}/lz4/lz4-${lz4.version}/lib"/>
+                                    <env key="SNAPPY_LIB" value="${project.build.directory}/snappy/lib"/>
+                                    <env key="ZSTD_LIB" value="${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
+                                </exec>
+                                <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+
                 </executions>
             </plugin>
             <plugin>
@@ -245,7 +274,7 @@
                 <artifactId>native-maven-plugin</artifactId>
                 <executions>
                     <execution>
-                        <phase>compile</phase>
+                        <phase>generate-resources</phase>
                         <goals>
                             <goal>javah</goal>
                         </goals>
@@ -255,34 +284,6 @@
                                 <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
                             </javahClassNames>
                             <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-maven-plugins</artifactId>
-                <executions>
-                    <execution>
-                        <id>cmake-compile-rockstools</id>
-                        <phase>compile</phase>
-                        <goals><goal>cmake-compile</goal></goals>
-                        <configuration>
-                            <source>${basedir}/src</source>
-                            <output>${project.build.directory}/native/rocksdb</output>
-                            <vars>
-                                <GENERATED_JAVAH>${project.build.directory}/native/javah</GENERATED_JAVAH>
-                                <NATIVE_DIR>${basedir}/src/main/native</NATIVE_DIR>
-                                <SST_DUMP_INCLUDE>${sstDump.include}</SST_DUMP_INCLUDE>
-                                <CMAKE_STANDARDS>${cmake.standards}</CMAKE_STANDARDS>
-                                <ROCKSDB_HEADERS>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include</ROCKSDB_HEADERS>
-                                <ROCKSDB_LIB>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}</ROCKSDB_LIB>
-                                <ZLIB_LIB>${project.build.directory}/zlib/zlib-${zlib.version}</ZLIB_LIB>
-                                <BZIP2_LIB>${project.build.directory}/bzip2/bzip2-${bzip2.version}</BZIP2_LIB>
-                                <LZ4_LIB>${project.build.directory}/lz4/lz4-${lz4.version}/lib</LZ4_LIB>
-                                <SNAPPY_LIB>${project.build.directory}/snappy/lib</SNAPPY_LIB>
-                                <ZSTD_LIB>${project.build.directory}/zstd/zstd-${zstd.version}/lib</ZSTD_LIB>
-                            </vars>
                         </configuration>
                     </execution>
                 </executions>
