@@ -40,7 +40,7 @@ public class NativeLibraryLoader {
     this.librariesLoaded = librariesLoaded;
   }
 
-  private synchronized static void initNewInstance() {
+  private static synchronized void initNewInstance() {
     if (instance == null) {
       instance = new NativeLibraryLoader(new ConcurrentHashMap<>());
     }
