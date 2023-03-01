@@ -40,9 +40,10 @@ public class ReconfigureStartSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
         .getSingleNodeReconfigureProxy(parent.getAddress());
+    String serverName = reconfigProxy.getServerName();
     reconfigProxy.startReconfigure();
-    System.out.printf("Started reconfiguration task on node [%s].%n",
-        parent.getAddress());
+    System.out.printf("%s: Started reconfiguration task on node [%s].%n",
+        serverName, parent.getAddress());
     return null;
   }
 
