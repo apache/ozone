@@ -264,19 +264,19 @@
                             <tasks>
                                 <mkdir dir="${project.build.directory}/native/rocksdb"/>
                                 <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
-                                    <arg line="${basedir}/src"/>
                                     <env key="CFLAGS" value="-fPIC"/>
-                                    <env key="GENERATED_JAVAH" value="${project.build.directory}/native/javah"/>
-                                    <env key="NATIVE_DIR" value="${basedir}/src/main/native"/>
-                                    <env key="SST_DUMP_INCLUDE" value="${sstDump.include}"/>
-                                    <env key="CMAKE_STANDARDS" value="${cmake.standards}"/>
-                                    <env key="ROCKSDB_HEADERS" value="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
-                                    <env key="ROCKSDB_LIB" value="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
-                                    <env key="ZLIB_LIB" value="${project.build.directory}/zlib/zlib-${zlib.version}"/>
-                                    <env key="BZIP2_LIB" value="${project.build.directory}/bzip2/bzip2-${bzip2.version}"/>
-                                    <env key="LZ4_LIB" value="${project.build.directory}/lz4/lz4-${lz4.version}/lib"/>
-                                    <env key="SNAPPY_LIB" value="${project.build.directory}/snappy/lib"/>
-                                    <env key="ZSTD_LIB" value="${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
+                                    <arg line="${basedir}/src"/>
+                                    <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah"/>
+                                    <arg line="-DNATIVE_DIR=${basedir}/src/main/native"/>
+                                    <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}"/>
+                                    <arg line="-DCMAKE_STANDARDS=${cmake.standards}"/>
+                                    <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
+                                    <arg line="-DROCKSDB_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                                    <arg line="-DZLIB_LIB=${project.build.directory}/zlib/zlib-${zlib.version}"/>
+                                    <arg line="-DBZIP2_LIB=${project.build.directory}/bzip2/bzip2-${bzip2.version}"/>
+                                    <arg line="-DLZ4_LIB=${project.build.directory}/lz4/lz4-${lz4.version}/lib"/>
+                                    <arg line="-DSNAPPY_LIB=${project.build.directory}/snappy/lib"/>
+                                    <arg line="-DZSTD_LIB=${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
                                 </exec>
                                 <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
                             </tasks>
