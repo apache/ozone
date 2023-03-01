@@ -464,7 +464,8 @@ public class TestBlockDeletingService {
       // Alter the pending delete value in memory and the DB.
       incorrectData.incrPendingDeletionBlocks(blockDeleteLimit);
       db.getStore().getMetadataTable().put(
-          incorrectData.getPendingDeleteBlockCountKey(), (long)blockDeleteLimit);
+          incorrectData.getPendingDeleteBlockCountKey(),
+          (long)blockDeleteLimit);
     }
 
     // Create one container with fewer pending delete blocks than the first.
