@@ -259,7 +259,7 @@
                                     <env key="SNAPPY_LIB" value="${project.build.directory}/snappy/lib"/>
                                     <env key="ZSTD_LIB" value="${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
                                 </exec>
-                                <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
+                                <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
                             </tasks>
                         </configuration>
                         <goals>
