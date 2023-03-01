@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.junit.After;
 import org.junit.Before;
@@ -74,6 +75,9 @@ public class TestBucketRequest {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
+        BucketLayout.fromString(
+            OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT));
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);

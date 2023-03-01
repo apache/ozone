@@ -91,10 +91,13 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to add a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param deadlineEpochMillis The time by which the replica should have been
+   *                            added and reported by the datanode, or it will
+   *                            be discarded.
    */
   public void scheduleAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex) {
-    addReplica(ADD, containerID, target, replicaIndex);
+      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
+    addReplica(ADD, containerID, target, replicaIndex, deadlineEpochMillis);
   }
 
   /**
@@ -102,10 +105,13 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to delete a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param deadlineEpochMillis The time by which the replica should have been
+   *                            deleted and reported by the datanode, or it will
+   *                            be discarded.
    */
   public void scheduleDeleteReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex) {
-    addReplica(DELETE, containerID, target, replicaIndex);
+      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
+    addReplica(DELETE, containerID, target, replicaIndex, deadlineEpochMillis);
   }
 
   /**
@@ -121,7 +127,7 @@ public class ContainerReplicaPendingOps {
     boolean completed = completeOp(ADD, containerID, target, replicaIndex);
     if (isMetricsNotNull() && completed) {
       if (replicaIndex > 0) {
-        replicationMetrics.incrEcReplicationCmdsCompletedTotal();
+        replicationMetrics.incrEcReplicasCreatedTotal();
       } else if (replicaIndex == 0) {
         replicationMetrics.incrNumReplicationCmdsCompleted();
       }
@@ -143,7 +149,7 @@ public class ContainerReplicaPendingOps {
     boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
     if (isMetricsNotNull() && completed) {
       if (replicaIndex > 0) {
-        replicationMetrics.incrEcDeletionCmdsCompletedTotal();
+        replicationMetrics.incrEcReplicasDeletedTotal();
       } else if (replicaIndex == 0) {
         replicationMetrics.incrNumDeletionCmdsCompleted();
       }
@@ -166,9 +172,8 @@ public class ContainerReplicaPendingOps {
   /**
    * Iterate over all pending entries and remove any which have expired, meaning
    * they have not completed the operation inside the given time.
-   * @param expiryMilliSeconds
    */
-  public void removeExpiredEntries(long expiryMilliSeconds) {
+  public void removeExpiredEntries() {
     for (ContainerID containerID : pendingOps.keySet()) {
       // List of expired ops that subscribers will be notified about
       List<ContainerReplicaOp> expiredOps = new ArrayList<>();
@@ -189,8 +194,7 @@ public class ContainerReplicaPendingOps {
         Iterator<ContainerReplicaOp> iterator = ops.listIterator();
         while (iterator.hasNext()) {
           ContainerReplicaOp op = iterator.next();
-          if (op.getScheduledEpochMillis() + expiryMilliSeconds
-              < clock.millis()) {
+          if (clock.millis() > op.getDeadlineEpochMillis()) {
             iterator.remove();
             expiredOps.add(op);
             pendingOpCount.get(op.getOpType()).decrementAndGet();
@@ -214,13 +218,13 @@ public class ContainerReplicaPendingOps {
   private void updateTimeoutMetrics(ContainerReplicaOp op) {
     if (op.getOpType() == ADD && isMetricsNotNull()) {
       if (op.getReplicaIndex() > 0) {
-        replicationMetrics.incrEcReplicationCmdsTimeoutTotal();
+        replicationMetrics.incrEcReplicaCreateTimeoutTotal();
       } else if (op.getReplicaIndex() == 0) {
         replicationMetrics.incrNumReplicationCmdsTimeout();
       }
     } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
       if (op.getReplicaIndex() > 0) {
-        replicationMetrics.incrEcDeletionCmdsTimeoutTotal();
+        replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
       } else if (op.getReplicaIndex() == 0) {
         replicationMetrics.incrNumDeletionCmdsTimeout();
       }
@@ -228,14 +232,15 @@ public class ContainerReplicaPendingOps {
   }
 
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
-      ContainerID containerID, DatanodeDetails target, int replicaIndex) {
+      ContainerID containerID, DatanodeDetails target, int replicaIndex,
+      long deadlineEpochMillis) {
     Lock lock = writeLock(containerID);
     lock.lock();
     try {
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
-          target, replicaIndex, clock.millis()));
+          target, replicaIndex, deadlineEpochMillis));
       pendingOpCount.get(opType).incrementAndGet();
     } finally {
       lock.unlock();

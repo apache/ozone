@@ -180,6 +180,8 @@ public class TestBlockDeletion {
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(DeleteBlocksCommandHandler.LOG);
 
     String value = RandomStringUtils.random(1024 * 1024);
     store.createVolume(volumeName);
@@ -284,6 +286,12 @@ public class TestBlockDeletion {
         metrics.getNumBlockDeletionTransactionFailure() +
             metrics.getNumBlockDeletionTransactionSuccess());
     LOG.info(metrics.toString());
+
+    // Datanode should receive retried requests with continuous retry counts.
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(0)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(1)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(2)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(3)"));
   }
 
   @Test
@@ -441,7 +449,7 @@ public class TestBlockDeletion {
             .getContainer(blockID.getContainerID()).getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, conf)) {
           Assertions.assertNotNull(db.getStore().getBlockDataTable()
-              .get(cData.blockKey(blockID.getLocalID())));
+              .get(cData.getBlockKey(blockID.getLocalID())));
         }
       }, omKeyLocationInfoGroups);
     }
@@ -459,12 +467,13 @@ public class TestBlockDeletion {
           Table<String, BlockData> blockDataTable =
               db.getStore().getBlockDataTable();
 
-          String blockKey = cData.blockKey(blockID.getLocalID());
+          String blockKey = cData.getBlockKey(blockID.getLocalID());
 
           BlockData blockData = blockDataTable.get(blockKey);
           Assertions.assertNull(blockData);
 
-          String deletingKey = cData.deletingBlockKey(blockID.getLocalID());
+          String deletingKey = cData.getDeletingBlockKey(
+              blockID.getLocalID());
           Assertions.assertNull(blockDataTable.get(deletingKey));
         }
         containerIdsWithDeletedBlocks.add(blockID.getContainerID());

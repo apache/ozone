@@ -19,13 +19,16 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPair;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
@@ -48,16 +51,16 @@ public class SCMCertificateClient extends DefaultCertificateClient {
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
+    super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME);
+    super(securityConfig, LOG, null, COMPONENT_NAME, null, null);
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId, String component) {
-    super(securityConfig, LOG, certSerialId, component);
+    super(securityConfig, LOG, certSerialId, component, null, null);
   }
 
   @Override
@@ -139,5 +142,19 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public Logger getLogger() {
     return LOG;
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath) throws CertificateException {
+    throw new UnsupportedOperationException("signAndStoreCertificate of " +
+        " SCMCertificateClient is not supported currently");
+  }
+
+  @Override
+  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+      throws CertificateException {
+    throw new UnsupportedOperationException("getCSRBuilder of " +
+        "SCMCertificateClient is not supported currently");
   }
 }

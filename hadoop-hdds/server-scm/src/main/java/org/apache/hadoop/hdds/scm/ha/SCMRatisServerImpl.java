@@ -349,7 +349,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }
 
-  private RaftPeer getLeader() {
+  public RaftPeer getLeader() {
     if (division.getInfo().isLeader()) {
       return division.getPeer();
     } else {

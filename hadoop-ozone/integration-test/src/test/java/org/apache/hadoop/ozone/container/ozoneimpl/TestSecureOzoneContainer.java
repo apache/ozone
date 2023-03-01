@@ -123,9 +123,7 @@ public class TestSecureOzoneContainer {
     secConfig = new SecurityConfig(conf);
     caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(
-        new SecurityConfig(conf),
-        TimeUnit.DAYS.toMillis(1),
-        caClient.getCertificate().getSerialNumber().toString());
+        new SecurityConfig(conf), TimeUnit.DAYS.toMillis(1));
   }
 
   @Test

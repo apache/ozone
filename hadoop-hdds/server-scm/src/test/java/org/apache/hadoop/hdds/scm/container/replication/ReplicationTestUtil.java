@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
@@ -120,6 +121,16 @@ public final class ReplicationTestUtil {
         datanodeDetails, datanodeDetails.getUuid());
   }
 
+  public static ContainerReplica createContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long seqId) {
+    DatanodeDetails datanodeDetails
+        = MockDatanodeDetails.randomDatanodeDetails();
+    return createContainerReplica(containerID, replicaIndex, opState,
+        replicaState, 123L, 1234L,
+        datanodeDetails, datanodeDetails.getUuid(), seqId);
+  }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
@@ -139,6 +150,24 @@ public final class ReplicationTestUtil {
     return builder.build();
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public static ContainerReplica createContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long keyCount, long bytesUsed,
+      DatanodeDetails datanodeDetails, UUID originNodeId, long seqId) {
+    ContainerReplica.ContainerReplicaBuilder builder
+        = ContainerReplica.newBuilder();
+    datanodeDetails.setPersistedOpState(opState);
+    builder.setContainerID(containerID);
+    builder.setReplicaIndex(replicaIndex);
+    builder.setKeyCount(keyCount);
+    builder.setBytesUsed(bytesUsed);
+    builder.setContainerState(replicaState);
+    builder.setDatanodeDetails(datanodeDetails);
+    builder.setSequenceId(seqId);
+    builder.setOriginNodeId(originNodeId);
+    return builder.build();
+  }
 
   public static ContainerInfo createContainerInfo(ReplicationConfig repConfig) {
     return createContainerInfo(repConfig, 1, HddsProtos.LifeCycleState.CLOSED);
@@ -198,6 +227,9 @@ public final class ReplicationTestUtil {
 
   public static PlacementPolicy getSimpleTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf) {
+
+    final Node rackNode = MockDatanodeDetails.randomDatanodeDetails();
+
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
@@ -215,6 +247,12 @@ public final class ReplicationTestUtil {
       @Override
       public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
         return null;
+      }
+
+      @Override
+      protected Node getPlacementGroup(DatanodeDetails dn) {
+        // Make it look like a single rack cluster
+        return rackNode;
       }
     };
   }

@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -37,8 +36,8 @@ import java.util.Set;
 public class ECMisReplicationHandler extends MisReplicationHandler {
   public ECMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, NodeManager nodeManager) {
-    super(containerPlacement, conf, nodeManager);
+          ConfigurationSource conf, NodeManager nodeManager, boolean push) {
+    super(containerPlacement, conf, nodeManager, push);
   }
 
   @Override
@@ -56,15 +55,12 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
   }
 
   @Override
-  protected ReplicateContainerCommand getReplicateCommand(
-          ContainerInfo containerInfo, ContainerReplica replica) {
-    final ReplicateContainerCommand replicateCommand =
-            new ReplicateContainerCommand(containerInfo.getContainerID(),
-            Collections.singletonList(replica.getDatanodeDetails()));
+  protected ReplicateContainerCommand updateReplicateCommand(
+          ReplicateContainerCommand command, ContainerReplica replica) {
     // For EC containers, we need to track the replica index which is
     // to be replicated, so add it to the command.
-    replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-    return replicateCommand;
+    command.setReplicaIndex(replica.getReplicaIndex());
+    return command;
   }
 
 

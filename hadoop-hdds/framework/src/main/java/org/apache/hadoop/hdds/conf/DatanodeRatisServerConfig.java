@@ -176,12 +176,12 @@ public class DatanodeRatisServerConfig {
   }
 
   @Config(key = "leaderelection.pre-vote",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = {OZONE, DATANODE, RATIS},
       description = "Flag to enable/disable ratis election pre-vote."
   )
-  private boolean preVoteEnabled;
+  private boolean preVoteEnabled = true;
 
   public boolean isPreVoteEnabled() {
     return preVoteEnabled;

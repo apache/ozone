@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -38,36 +39,45 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -101,6 +111,8 @@ public class TestReplicationManager {
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
     containerManager = Mockito.mock(ContainerManager.class);
     ratisPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
+        anyInt())).thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
     ecPlacementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
@@ -133,7 +145,12 @@ public class TestReplicationManager {
         nodeManager,
         clock,
         legacyReplicationManager,
-        containerReplicaPendingOps);
+        containerReplicaPendingOps) {
+      @Override
+      protected void startSubServices() {
+        // do not start any threads for processing
+      }
+    };
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
@@ -181,6 +198,177 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void misMatchedReplicasOfRatisContainerShouldBeClosed()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    // Container is closed but replicas are open
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSING, 0, 0, 0);
+    ContainerReplica closedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.CLOSED);
+    replicas.add(closedReplica);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+
+    Mockito.verify(eventPublisher, Mockito.times(3))
+        .fireEvent(any(), any());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    /*
+    Though over replicated, this container should not be added to over
+    replicated queue until all replicas are closed.
+     */
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testUnderReplicatedQuasiClosedContainerWithUnhealthyReplica()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    // Container is closed but replicas are open
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSING, 0);
+    ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(quasiClosedReplica);
+    replicas.add(unhealthyReplica);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+
+    Mockito.verify(eventPublisher, Mockito.times(1))
+        .fireEvent(any(), any());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testUnderReplicatedClosedContainerWithOnlyUnhealthyReplicas()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    // Container is closed but replicas are UNHEALTHY
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.UNHEALTHY, 0, 0);
+    ContainerReplica unhealthyOnDecommissioning = createContainerReplica(
+        container.containerID(), 0, DECOMMISSIONING,
+        ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyOnDecommissioning);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  /**
+   * Situation: QUASI_CLOSED container with 3 QUASI_CLOSED and 1 UNHEALTHY
+   * replica. They all have the same origin node id. It's expected that the
+   * UNHEALTHY replica (and not a QUASI_CLOSED one) is deleted.
+   */
+  @Test
+  public void testQuasiClosedContainerWithExcessUnhealthyReplica()
+      throws IOException, NodeNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
+    UUID origin = replicas.iterator().next().getOriginDatanodeId();
+    ContainerReplica unhealthy =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY, 1, 123,
+            MockDatanodeDetails.randomDatanodeDetails(), origin);
+    replicas.add(unhealthy);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
+
+    RatisOverReplicationHandler handler =
+        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+
+    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenReturn(NodeStatus.inServiceHealthy());
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        handler.processAndCreateCommands(replicas, Collections.emptyList(),
+            repQueue.dequeueOverReplicatedContainer(), 2);
+    Assert.assertTrue(commands.iterator().hasNext());
+    Assert.assertEquals(unhealthy.getDatanodeDetails(),
+        commands.iterator().next().getKey());
+    Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
+        commands.iterator().next().getValue().getType());
+  }
+
+  @Test
+  public void testQuasiClosedContainerWithUnhealthyReplicaOnUniqueOrigin()
+      throws IOException, NodeNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
+    ContainerReplica unhealthy =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthy);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
+
+    RatisOverReplicationHandler handler =
+        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+
+    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenReturn(NodeStatus.inServiceHealthy());
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        handler.processAndCreateCommands(replicas, Collections.emptyList(),
+            repQueue.dequeueOverReplicatedContainer(), 2);
+    Assert.assertTrue(commands.iterator().hasNext());
+    Assert.assertNotEquals(unhealthy.getDatanodeDetails(),
+        commands.iterator().next().getKey());
+    Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
+        commands.iterator().next().getValue().getType());
+  }
+
+  @Test
   public void testHealthyContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
@@ -213,7 +401,8 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5);
+        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        clock.millis() + 10000);
 
     replicationManager.processContainer(
         container, repQueue, repReport);
@@ -241,7 +430,7 @@ public class TestReplicationManager {
     // replication list. It will be checked again on the next RM run.
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, repReport.getStat(
+    Assert.assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.MISSING));
@@ -303,7 +492,7 @@ public class TestReplicationManager {
 
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, repReport.getStat(
+    Assert.assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.MISSING));
@@ -377,7 +566,8 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5);
+        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        clock.millis() + 10000);
     replicationManager.processContainer(
         container, repQueue, repReport);
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
@@ -576,7 +766,7 @@ public class TestReplicationManager {
     sources.add(MockDatanodeDetails.randomDatanodeDetails());
 
 
-    ReplicateContainerCommand command = new ReplicateContainerCommand(
+    ReplicateContainerCommand command = ReplicateContainerCommand.fromSources(
         containerInfo.getContainerID(), sources);
     command.setReplicaIndex(1);
 
@@ -611,7 +801,7 @@ public class TestReplicationManager {
     containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
         HddsProtos.LifeCycleState.CLOSED, 10, 20);
 
-    command = new ReplicateContainerCommand(
+    command = ReplicateContainerCommand.fromSources(
         containerInfo.getContainerID(), sources);
     replicationManager.sendDatanodeCommand(command, containerInfo, target);
 
@@ -626,6 +816,35 @@ public class TestReplicationManager {
         .getEcReplicationCmdsSentTotal());
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getNumReplicationCmdsSent());
+  }
+
+  @Test
+  public void testSendLowPriorityReplicateContainerCommand()
+      throws NotLeaderException {
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails src = MockDatanodeDetails.randomDatanodeDetails();
+    long scmDeadline = clock.millis() + 1000;
+    long datanodeDeadline = clock.millis() + 500;
+
+    replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+        0, src, target, scmDeadline, datanodeDeadline);
+
+    ArgumentCaptor<CommandForDatanode> command =
+        ArgumentCaptor.forClass(CommandForDatanode.class);
+    Mockito.verify(eventPublisher).fireEvent(any(), command.capture());
+
+    CommandForDatanode sentCommand = command.getValue();
+    Assertions.assertEquals(datanodeDeadline,
+        sentCommand.getCommand().getDeadline());
+    ReplicateContainerCommand replicateContainerCommand =
+        (ReplicateContainerCommand) sentCommand.getCommand();
+    Assertions.assertEquals(LOW, replicateContainerCommand.getPriority());
+    Assertions.assertEquals(src.getUuid(), sentCommand.getDatanodeId());
+    Assertions.assertEquals(target,
+        replicateContainerCommand.getTargetDatanode());
   }
 
   @SafeVarargs

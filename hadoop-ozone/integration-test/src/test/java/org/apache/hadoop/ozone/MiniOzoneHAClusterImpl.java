@@ -528,7 +528,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                   om.getOmRpcServerAddr());
             } else {
               inactiveOMs.add(om);
-              LOG.info("Intialized OzoneManager at {}. This OM is currently "
+              LOG.info("Initialized OzoneManager at {}. This OM is currently "
                   + "inactive (not running).", om.getOmRpcServerAddr());
             }
           }
@@ -611,8 +611,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                   + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
-
-
           break;
         } catch (BindException e) {
           for (StorageContainerManager scm : scmList) {

@@ -83,7 +83,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
-  private boolean closed;
+  private volatile boolean closed;
+  private volatile boolean closing;
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
@@ -217,6 +218,10 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void logStreamError(List<ECBlockOutputStream> failedStreams,
                               String operation) {
+    if (!LOG.isWarnEnabled()) {
+      return;
+    }
+
     Set<Integer> failedStreamIndexSet =
             failedStreams.stream().map(ECBlockOutputStream::getReplicationIndex)
                     .collect(Collectors.toSet());
@@ -242,9 +247,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     List<ECBlockOutputStream> failedStreams =
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        logStreamError(failedStreams, "EC stripe write");
-      }
+      logStreamError(failedStreams, "EC stripe write");
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
@@ -259,9 +262,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        logStreamError(failedStreams, "Put block");
-      }
+      logStreamError(failedStreams, "Put block");
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
@@ -408,6 +409,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private void writeToOutputStream(ECBlockOutputStreamEntry current,
       byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
+    if (closing) {
+      throw new IOException("Stream is closing, avoid re-opening streams");
+    }
     try {
       if (!isParity) {
         // In case if exception while writing, this length will be updated back
@@ -438,8 +442,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private void markStreamClosed() {
-    blockOutputStreamEntryPool.cleanup();
-    closed = true;
+    closing = true;
   }
 
   private void markStreamAsFailed(Exception e) {
@@ -487,23 +490,23 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      // If stripe buffer is not empty, encode and flush the stripe.
-      if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
-        generateParityCells();
-        addStripeToQueue(ecChunkBufferCache);
+      if (!closing) {
+        // If stripe buffer is not empty, encode and flush the stripe.
+        if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
+          generateParityCells();
+          addStripeToQueue(ecChunkBufferCache);
+        }
+        // Send EOF mark to flush thread.
+        addStripeToQueue(new EOFDummyStripe());
+
+        // Wait for all the stripes to be written.
+        flushFuture.get();
+
+        Preconditions.checkArgument(writeOffset == offset,
+            "Expected writeOffset= " + writeOffset
+                + " Expected offset=" + offset);
+        blockOutputStreamEntryPool.commitKey(offset);
       }
-      // Send EOF mark to flush thread.
-      addStripeToQueue(new EOFDummyStripe());
-
-      // Wait for all the stripes to be written.
-      flushFuture.get();
-      flushExecutor.shutdownNow();
-
-      closeCurrentStreamEntry();
-      Preconditions.checkArgument(writeOffset == offset,
-          "Expected writeOffset= " + writeOffset
-              + " Expected offset=" + offset);
-      blockOutputStreamEntryPool.commitKey(offset);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -516,6 +519,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     } catch (InterruptedException e) {
       throw new IOException("Flushing thread was interrupted", e);
     } finally {
+      flushExecutor.shutdownNow();
+      closeCurrentStreamEntry();
       blockOutputStreamEntryPool.cleanup();
     }
   }
@@ -548,7 +553,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private boolean flushStripeFromQueue() throws IOException {
     try {
       ECChunkBuffers stripe = ecStripeQueue.take();
-      while (!(stripe instanceof EOFDummyStripe)) {
+      while (!closing && !(stripe instanceof EOFDummyStripe)) {
         if (stripe instanceof CheckpointDummyStripe) {
           flushCheckpoint.set(((CheckpointDummyStripe) stripe).version);
         } else {
@@ -639,7 +644,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
    * @throws IOException if the connection is closed.
    */
   private void checkNotClosed() throws IOException {
-    if (closed) {
+    if (closing || closed) {
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockOutputStreamEntryPool.getKeyName());

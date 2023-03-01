@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.collections.iterators.LoopingIterator;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,11 +36,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -53,14 +55,17 @@ public class RatisUnderReplicationHandler
   private final PlacementPolicy placementPolicy;
   private final NodeManager nodeManager;
   private final long currentContainerSize;
+  private final ReplicationManager replicationManager;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
-      final ConfigurationSource conf, final NodeManager nodeManager) {
+      final ConfigurationSource conf, final NodeManager nodeManager,
+      final ReplicationManager replicationManager) {
     this.placementPolicy = placementPolicy;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
   }
 
   /**
@@ -73,7 +78,6 @@ public class RatisUnderReplicationHandler
    * @param result Health check result indicating under replication.
    * @param minHealthyForMaintenance Number of healthy replicas that must be
    *                                 available for a DN to enter maintenance
-   *
    * @return Returns the key value pair of destination dn where the command gets
    * executed and the command itself. If an empty map is returned, it indicates
    * the container is no longer unhealthy and can be removed from the unhealthy
@@ -81,49 +85,43 @@ public class RatisUnderReplicationHandler
    * should be retried later.
    */
   @Override
-  public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
+  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int minHealthyForMaintenance)
       throws IOException {
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated Ratis container {}", containerInfo);
 
-    // count pending adds and deletes
-    int pendingAdd = 0, pendingDelete = 0;
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd++;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete++;
-      }
-    }
-    RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(containerInfo, replicas, pendingAdd,
-            pendingDelete, containerInfo.getReplicationFactor().getNumber(),
-            minHealthyForMaintenance);
+    RatisContainerReplicaCount withUnhealthy =
+        new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+            minHealthyForMaintenance, true);
+
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+            minHealthyForMaintenance, false);
 
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
-    if (!verifyUnderReplication(replicaCount)) {
-      return Collections.emptyMap();
+    if (!verifyUnderReplication(withUnhealthy, withoutUnhealthy)) {
+      return Collections.emptySet();
     }
 
     // find sources that can provide replicas
     List<DatanodeDetails> sourceDatanodes =
-        getSources(replicaCount, pendingOps);
+        getSources(withUnhealthy, pendingOps);
     if (sourceDatanodes.isEmpty()) {
-      LOG.warn("Cannot replicate container {} because no healthy replicas " +
-          "were found.", containerInfo);
-      return Collections.emptyMap();
+      LOG.warn("Cannot replicate container {} because no CLOSED, QUASI_CLOSED" +
+          " or UNHEALTHY replicas were found.", containerInfo);
+      return Collections.emptySet();
     }
 
     // find targets to send replicas to
     List<DatanodeDetails> targetDatanodes =
-        getTargets(replicaCount, pendingOps);
+        getTargets(withUnhealthy, pendingOps);
     if (targetDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no eligible targets " +
           "were found.", containerInfo);
-      return Collections.emptyMap();
+      return Collections.emptySet();
     }
 
     return createReplicationCommands(containerInfo.getContainerID(),
@@ -135,27 +133,38 @@ public class RatisUnderReplicationHandler
    * pending adds. Note that the container might be under replicated but
    * unrecoverable (no replicas), in which case this returns false.
    *
-   * @param replicaCount RatisContainerReplicaCount object to check
+   * @param withUnhealthy RatisContainerReplicaCount object to check with
+   * considerHealthy flag true
+   * @param withoutUnhealthy RatisContainerReplicaCount object to check with
+   * considerHealthy flag false
    * @return true if the container is under replicated, false if the
    * container is sufficiently replicated or unrecoverable.
    */
   private boolean verifyUnderReplication(
-      RatisContainerReplicaCount replicaCount) {
-    if (replicaCount.isSufficientlyReplicated()) {
+      RatisContainerReplicaCount withUnhealthy,
+      RatisContainerReplicaCount withoutUnhealthy) {
+    if (withoutUnhealthy.isSufficientlyReplicated()) {
       LOG.info("The container {} state changed and it's not under " +
-          "replicated any more.", replicaCount.getContainer().containerID());
+          "replicated any more.", withUnhealthy.getContainer().containerID());
       return false;
     }
-    if (replicaCount.isSufficientlyReplicated(true)) {
+    if (withoutUnhealthy.isSufficientlyReplicated(true)) {
       LOG.info("Container {} with replicas {} will be sufficiently " +
               "replicated after pending replicas are created.",
-          replicaCount.getContainer().getContainerID(),
-          replicaCount.getReplicas());
+          withoutUnhealthy.getContainer().getContainerID(),
+          withoutUnhealthy.getReplicas());
       return false;
     }
-    if (replicaCount.getReplicas().isEmpty()) {
+    if (withUnhealthy.getReplicas().isEmpty()) {
       LOG.warn("Container {} does not have any replicas and is unrecoverable" +
-          ".", replicaCount.getContainer());
+          ".", withUnhealthy.getContainer());
+      return false;
+    }
+    if (withUnhealthy.isSufficientlyReplicated(true) &&
+        withUnhealthy.getHealthyReplicaCount() == 0) {
+      LOG.info("Container {} with only UNHEALTHY replicas [{}] will be " +
+              "sufficiently replicated after pending adds are created.",
+          withUnhealthy.getContainer(), withUnhealthy.getReplicas());
       return false;
     }
     return true;
@@ -168,7 +177,8 @@ public class RatisUnderReplicationHandler
    * @param replicaCount RatisContainerReplicaCount object for this container
    * @param pendingOps List of pending ContainerReplicaOp
    * @return List of healthy datanodes that have closed/quasi-closed replicas
-   * and are not pending replica deletion. Sorted in descending order of
+   * (or UNHEALTHY replicas if they're the only ones available) and are not
+   * pending replica deletion. Sorted in descending order of
    * sequence id.
    */
   private List<DatanodeDetails> getSources(
@@ -182,14 +192,21 @@ public class RatisUnderReplicationHandler
       }
     }
 
+    Predicate<ContainerReplica> predicate;
+    if (replicaCount.getHealthyReplicaCount() == 0) {
+      predicate = replica -> replica.getState() == State.UNHEALTHY;
+    } else {
+      predicate = replica -> replica.getState() == State.CLOSED ||
+          replica.getState() == State.QUASI_CLOSED;
+    }
+
     /*
-     * Return healthy datanodes that have closed/quasi-closed replicas and
-     * are not pending replica deletion. Sorted in descending order of
-     * sequence id.
+     * Return healthy datanodes which have a replica that satisfies the
+     * predicate and is not pending replica deletion. Sorted in descending
+     * order of sequence id.
      */
     return replicaCount.getReplicas().stream()
-        .filter(r -> r.getState() == State.QUASI_CLOSED ||
-            r.getState() == State.CLOSED)
+        .filter(predicate)
         .filter(r -> ReplicationManager.getNodeStatus(r.getDatanodeDetails(),
             nodeManager).isHealthy())
         .filter(r -> !pendingDeletion.contains(r.getDatanodeDetails()))
@@ -227,14 +244,29 @@ public class RatisUnderReplicationHandler
         replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
   }
 
-  private Map<DatanodeDetails, SCMCommand<?>> createReplicationCommands(
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createReplicationCommands(
       long containerID, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) {
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-    for (DatanodeDetails target : targets) {
-      ReplicateContainerCommand command =
-          new ReplicateContainerCommand(containerID, sources);
-      commands.put(target, command);
+    final boolean push = replicationManager.getConfig().isPush();
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+
+    if (push) {
+      Collections.shuffle(sources);
+      for (Iterator<DatanodeDetails> srcIter = new LoopingIterator(sources),
+              targetIter = targets.iterator();
+          srcIter.hasNext() && targetIter.hasNext();) {
+        DatanodeDetails source = srcIter.next();
+        DatanodeDetails target = targetIter.next();
+        ReplicateContainerCommand command =
+            ReplicateContainerCommand.toTarget(containerID, target);
+        commands.add(Pair.of(source, command));
+      }
+    } else {
+      for (DatanodeDetails target : targets) {
+        ReplicateContainerCommand command =
+            ReplicateContainerCommand.fromSources(containerID, sources);
+        commands.add(Pair.of(target, command));
+      }
     }
 
     return commands;

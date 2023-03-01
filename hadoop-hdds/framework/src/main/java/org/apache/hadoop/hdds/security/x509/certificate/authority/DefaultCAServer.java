@@ -27,9 +27,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -51,12 +51,14 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -67,9 +69,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
-import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * The default CertificateServer used by SCM. This has no dependencies on any
@@ -135,6 +137,7 @@ public class DefaultCAServer implements CertificateServer {
   private CRLApprover crlApprover;
   private CertificateStore store;
   private Lock lock;
+  private static boolean testSecureFlag;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -180,10 +183,17 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certificateCodec =
         new CertificateCodec(config, componentName);
     try {
-      return certificateCodec.readCertificate();
+      return certificateCodec.getTargetCertHolder();
     } catch (CertificateException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public CertPath getCaCertPath()
+      throws CertificateException, IOException {
+    CertificateCodec codec = new CertificateCodec(config, componentName);
+    return codec.getCertPath();
   }
 
   /**
@@ -213,34 +223,36 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(
+  public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role) {
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-
-    LocalDate endDate;
+    LocalDateTime beginDate = LocalDateTime.now();
+    LocalDateTime endDate;
     // When issuing certificates for sub-ca use the max certificate duration
     // similar to self signed root certificate.
     if (role == NodeType.SCM) {
-      endDate = temp.plus(config.getMaxCertificateDuration()).toLocalDate();
+      endDate = beginDate.plus(config.getMaxCertificateDuration());
     } else {
-      endDate = temp.plus(config.getDefaultCertDuration()).toLocalDate();
+      endDate = beginDate.plus(config.getDefaultCertDuration());
     }
 
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
+    CompletableFuture<CertPath> xCertHolders
+        = new CompletableFuture<>();
+
     if (xcertHolder.isCompletedExceptionally()) {
       // This means that approver told us there are things which it disagrees
       // with in this Certificate Request. Since the first set of sanity
       // checks failed, we just return the future object right here.
-      return xcertHolder;
+      xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
+          "verify the CSR."));
     }
     try {
       switch (approverType) {
       case MANUAL:
-        xcertHolder.completeExceptionally(new SCMSecurityException("Manual " +
+        xCertHolders.completeExceptionally(new SCMSecurityException("Manual " +
             "approval is not yet implemented."));
         break;
       case KERBEROS_TRUSTED:
@@ -254,7 +266,10 @@ public class DefaultCAServer implements CertificateServer {
           LOG.error("Certificate storage failed, retrying one more time.", e);
           xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
-        xcertHolder.complete(xcert);
+        CertificateCodec codec = new CertificateCodec(config, componentName);
+        CertPath certPath = codec.getCertPath();
+        CertPath updatedCertPath = codec.prependCertToCertPath(xcert, certPath);
+        xCertHolders.complete(updatedCertPath);
         break;
       default:
         return null; // cannot happen, keeping checkstyle happy.
@@ -262,14 +277,14 @@ public class DefaultCAServer implements CertificateServer {
     } catch (CertificateException | IOException | OperatorCreationException |
              TimeoutException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xcertHolder.completeExceptionally(
+      xCertHolders.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
-    return xcertHolder;
+    return xCertHolders;
   }
 
-  private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
-      LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
+  private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
+      LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
       OperatorCreationException, CertificateException, TimeoutException {
 
@@ -278,8 +293,10 @@ public class DefaultCAServer implements CertificateServer {
     try {
       xcert = approver.sign(config,
           getCAKeys().getPrivate(),
-          getCACertificate(), java.sql.Date.valueOf(beginDate),
-          java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
+          getCACertificate(),
+          Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
+          Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant()),
+          csr, scmID, clusterID);
       if (store != null) {
         store.checkValidCertID(xcert.getSerialNumber());
         store.storeValidCertificate(xcert.getSerialNumber(),
@@ -292,7 +309,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(String csr,
+  public Future<CertPath> requestCertificate(String csr,
       CertificateApprover.ApprovalType type, NodeType nodeType)
       throws IOException {
     PKCS10CertificationRequest request =
@@ -474,9 +491,9 @@ public class DefaultCAServer implements CertificateServer {
       };
       break;
     case INITIALIZE:
-      if (type == CAType.SELF_SIGNED_CA) {
+      if (type == CAType.ROOT) {
         consumer = this::initRootCa;
-      } else if (type == CAType.INTERMEDIARY_CA) {
+      } else if (type == CAType.SUBORDINATE) {
         // For sub CA certificates are generated during bootstrap/init. If
         // both keys/certs are missing, init/bootstrap is missed to be
         // performed.
@@ -575,7 +592,7 @@ public class DefaultCAServer implements CertificateServer {
           });
     } catch (IOException e) {
       throw new org.apache.hadoop.hdds.security.x509
-          .exceptions.CertificateException(
+          .exception.CertificateException(
           "Error while adding ip to CA self signed certificate", e,
           CSR_ERROR);
     }
@@ -602,7 +619,7 @@ public class DefaultCAServer implements CertificateServer {
         throw new IOException("External cert path is not correct: " +
             extCertPath);
       }
-      X509CertificateHolder certHolder = certificateCodec.readCertificate(
+      X509CertificateHolder certHolder = certificateCodec.getTargetCertHolder(
           extCertParent, extCertName.toString());
       Path extPrivateKeyParent = extPrivateKeyPath.getParent();
       Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
@@ -655,5 +672,10 @@ public class DefaultCAServer implements CertificateServer {
     MISSING_KEYS, /* Private key is missing, certificate Exists.*/
     MISSING_CERTIFICATE, /* Keys exist, but root certificate missing.*/
     INITIALIZE /* All artifacts are missing, we should init the system. */
+  }
+
+  @VisibleForTesting
+  public static void setTestSecureFlag(boolean flag) {
+    testSecureFlag = flag;
   }
 }

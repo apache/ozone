@@ -22,8 +22,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -32,13 +34,16 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public class ReconstructECContainersCommandHandler implements CommandHandler {
 
-  private ECReconstructionSupervisor supervisor;
-  private ConfigurationSource conf;
+  private final ReplicationSupervisor supervisor;
+  private final ECReconstructionCoordinator coordinator;
+  private final ConfigurationSource conf;
 
   public ReconstructECContainersCommandHandler(ConfigurationSource conf,
-      ECReconstructionSupervisor supervisor) {
+      ReplicationSupervisor supervisor,
+      ECReconstructionCoordinator coordinator) {
     this.conf = conf;
     this.supervisor = supervisor;
+    this.coordinator = coordinator;
   }
 
   @Override
@@ -48,7 +53,8 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
         (ReconstructECContainersCommand) command;
     ECReconstructionCommandInfo reconstructionCommandInfo =
         new ECReconstructionCommandInfo(ecContainersCommand);
-    this.supervisor.addTask(reconstructionCommandInfo);
+    this.supervisor.addTask(new ECReconstructionCoordinatorTask(
+        coordinator, reconstructionCommandInfo));
   }
 
   @Override
@@ -68,7 +74,8 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return supervisor.getInFlightReplications();
+    return supervisor
+        .getInFlightReplications(ECReconstructionCoordinatorTask.class);
   }
 
   public ConfigurationSource getConf() {

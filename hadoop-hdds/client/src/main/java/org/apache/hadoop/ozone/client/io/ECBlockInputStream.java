@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -36,8 +37,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Function;
 
 /**
@@ -58,7 +66,11 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final BlockLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
   private final BlockExtendedInputStream[] blockStreams;
+  private final Map<Integer, LinkedList<DatanodeDetails>> spareDataLocations
+      = new TreeMap<>();
+  private final List<DatanodeDetails> failedLocations = new ArrayList<>();
   private final int maxLocations;
+  private final String string;
 
   private long position = 0;
   private boolean closed = false;
@@ -124,6 +136,10 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     this.stripeSize = (long)ecChunkSize * repConfig.getData();
     setBlockLocations(this.blockInfo.getPipeline());
+    string = getClass().getSimpleName() + "{" + blockIdForDebug() + "}@"
+        + Integer.toHexString(hashCode());
+    LOG.debug("{}: config: {}, locations: {} / {}", this,
+        repConfig, dataLocations, spareDataLocations);
   }
 
   public synchronized boolean hasSufficientLocations() {
@@ -187,6 +203,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           blockInfo.getToken(), verifyChecksum, xceiverClientFactory,
           ecPipelineRefreshFunction(locationIndex + 1, refreshFunction));
       blockStreams[locationIndex] = stream;
+      LOG.debug("{}: created stream [{}]: {}", this, locationIndex, stream);
     }
     return stream;
   }
@@ -263,7 +280,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       throw new IndexOutOfBoundsException("The index " + index + " is greater "
           + "than the EC Replication Config (" + repConfig + ")");
     }
-    dataLocations[index - 1] = location;
+    int arrayIndex = index - 1;
+    if (dataLocations[arrayIndex] == null) {
+      dataLocations[arrayIndex] = location;
+    } else {
+      spareDataLocations.computeIfAbsent(arrayIndex,
+          k -> new LinkedList<>()).add(location);
+    }
   }
 
   protected long blockLength() {
@@ -272,6 +295,51 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   protected long remaining() {
     return blockLength() - position;
+  }
+
+  @Override
+  public synchronized int read(byte[] b, int off, int len) throws IOException {
+    return read(ByteBuffer.wrap(b, off, len));
+  }
+
+  @Override
+  public synchronized int read(ByteBuffer byteBuffer) throws IOException {
+    while (true) {
+      int currentBufferPosition = byteBuffer.position();
+      long currentPosition = getPos();
+      try {
+        return super.read(byteBuffer);
+      } catch (BadDataLocationException e) {
+        int failedIndex = e.getFailedLocationIndex();
+        if (LOG.isDebugEnabled()) {
+          String cause = e.getCause() != null
+              ? " due to " + e.getCause().getMessage()
+              : "";
+          LOG.debug("{}: read [{}] failed from {}{}", this,
+              failedIndex, dataLocations[failedIndex], cause);
+        }
+        closeStream(failedIndex);
+        if (shouldRetryFailedRead(failedIndex)) {
+          byteBuffer.position(currentBufferPosition);
+          seek(currentPosition);
+        } else {
+          e.addFailedLocations(failedLocations);
+          throw e;
+        }
+      }
+    }
+  }
+
+  private boolean shouldRetryFailedRead(int failedIndex) {
+    Deque<DatanodeDetails> spareLocations = spareDataLocations.get(failedIndex);
+    if (spareLocations != null && spareLocations.size() > 0) {
+      failedLocations.add(dataLocations[failedIndex]);
+      DatanodeDetails spare = spareLocations.removeFirst();
+      dataLocations[failedIndex] = spare;
+      LOG.debug("{}: switching [{}] to spare {}", this, failedIndex, spare);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -294,15 +362,16 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
     int totalRead = 0;
     while (strategy.getTargetLength() > 0 && remaining() > 0) {
+      int currentIndex = currentStreamIndex();
       try {
-        int currentIndex = currentStreamIndex();
         BlockExtendedInputStream stream = getOrOpenStream(currentIndex);
         int read = readFromStream(stream, strategy);
+        LOG.trace("{}: read {} bytes for [{}]", this, read, currentIndex);
         totalRead += read;
         position += read;
       } catch (IOException ioe) {
         throw new BadDataLocationException(
-            dataLocations[currentStreamIndex()], ioe);
+            dataLocations[currentIndex], currentIndex, ioe);
       }
     }
     return totalRead;
@@ -382,20 +451,14 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized void close() {
+    LOG.debug("{}: close", this);
     closeStreams();
     closed = true;
   }
 
   protected synchronized void closeStreams() {
     for (int i = 0; i < blockStreams.length; i++) {
-      if (blockStreams[i] != null) {
-        try {
-          blockStreams[i].close();
-          blockStreams[i] = null;
-        } catch (IOException e) {
-          LOG.error("Failed to close stream {}", blockStreams[i], e);
-        }
-      }
+      closeStream(i);
     }
     // If the streams have been closed outside of a close() call, then it may
     // be due to freeing resources. If they are reopened, then we will need to
@@ -403,8 +466,22 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     seeked = true;
   }
 
+  private void closeStream(int i) {
+    if (blockStreams[i] != null) {
+      try {
+        blockStreams[i].close();
+        blockStreams[i] = null;
+        LOG.debug("{}: closed stream [{}]", this, i);
+      } catch (IOException e) {
+        LOG.error("{}: failed to close stream [{}]: {}", this,
+            i, blockStreams[i], e);
+      }
+    }
+  }
+
   @Override
   public synchronized void unbuffer() {
+    LOG.trace("{}: unbuffer", this);
     for (BlockExtendedInputStream stream : blockStreams) {
       if (stream != null) {
         stream.unbuffer();
@@ -414,6 +491,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+    LOG.trace("{}: seek({})", this, pos);
     checkOpen();
     if (pos < 0 || pos > getLength()) {
       if (pos == 0) {
@@ -435,11 +513,21 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   protected synchronized void setPos(long pos) {
+    LOG.trace("{}: setPos({})", this, pos);
     position = pos;
   }
 
   @Override
   public synchronized boolean seekToNewSource(long l) throws IOException {
     return false;
+  }
+
+  protected ContainerBlockID blockIdForDebug() {
+    return getBlockID().getContainerBlockID();
+  }
+
+  @Override
+  public String toString() {
+    return string;
   }
 }
