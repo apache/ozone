@@ -486,11 +486,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
     out.println("Number of Volumes created: " + numberOfVolumesCreated);
     out.println("Number of Buckets created: " + numberOfBucketsCreated);
     out.println("Number of Keys added: " + numberOfKeysAdded);
-    out.println("Replication: " + (replicationConfig != null ?
-        replicationConfig.getReplication() : OZONE_REPLICATION_DEFAULT));
-    out.println("Replication type: " + (replicationConfig != null ?
-        replicationConfig.getReplicationType() :
-        OZONE_REPLICATION_TYPE_DEFAULT));
+    if (replicationConfig != null) {
+      out.println("Replication: " + replicationConfig);
+    }
     out.println(
         "Average Time spent in volume creation: " + prettyAverageVolumeTime);
     out.println(
