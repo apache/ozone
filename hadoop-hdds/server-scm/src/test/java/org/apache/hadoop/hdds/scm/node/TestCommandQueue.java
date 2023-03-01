@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,14 @@ public class TestCommandQueue {
         new CreatePipelineCommand(PipelineID.randomId(),
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Collections.emptyList());
+    SCMCommand<?> replicationCommand = ReplicateContainerCommand.toTarget(
+        containerID, MockDatanodeDetails.randomDatanodeDetails());
+
+    ReplicateContainerCommand lowReplicationCommand = ReplicateContainerCommand
+        .toTarget(containerID, MockDatanodeDetails.randomDatanodeDetails());
+    lowReplicationCommand.setPriority(StorageContainerDatanodeProtocolProtos
+        .ReplicationCommandPriority.LOW);
+
 
     UUID datanode1UUID = UUID.randomUUID();
     UUID datanode2UUID = UUID.randomUUID();
@@ -53,6 +64,9 @@ public class TestCommandQueue {
     commandQueue.addCommand(datanode1UUID, closeContainerCommand);
     commandQueue.addCommand(datanode1UUID, closeContainerCommand);
     commandQueue.addCommand(datanode1UUID, createPipelineCommand);
+    commandQueue.addCommand(datanode1UUID, replicationCommand);
+    commandQueue.addCommand(datanode1UUID, lowReplicationCommand);
+
 
     commandQueue.addCommand(datanode2UUID, closeContainerCommand);
     commandQueue.addCommand(datanode2UUID, createPipelineCommand);
@@ -68,6 +82,9 @@ public class TestCommandQueue {
         datanode1UUID, SCMCommandProto.Type.createPipelineCommand));
     Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closePipelineCommand));
+    Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
+        datanode1UUID, SCMCommandProto.Type.replicateContainerCommand));
+
 
     Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.closeContainerCommand));
@@ -76,7 +93,7 @@ public class TestCommandQueue {
 
     // Ensure the counts are cleared when the commands are retrieved
     List<SCMCommand> cmds = commandQueue.getCommand(datanode1UUID);
-    Assert.assertEquals(3, cmds.size());
+    Assert.assertEquals(5, cmds.size());
 
     Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closeContainerCommand));
@@ -84,6 +101,8 @@ public class TestCommandQueue {
         datanode1UUID, SCMCommandProto.Type.createPipelineCommand));
     Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closePipelineCommand));
+    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+        datanode1UUID, SCMCommandProto.Type.replicateContainerCommand));
 
     Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.closeContainerCommand));

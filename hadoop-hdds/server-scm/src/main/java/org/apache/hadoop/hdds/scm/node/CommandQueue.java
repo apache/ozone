@@ -105,7 +105,10 @@ public class CommandQueue {
 
   /**
    * Returns the count of commands of the give type currently queued for the
-   * given datanode.
+   * given datanode. Note that any commands which return false for their
+   * Command.contributesToQueueSize() method will not be included in the count.
+   * At the current time, only low priority ReplicateContainerCommands meet this
+   * condition.
    * @param datanodeUuid Datanode UUID.
    * @param commandType The type of command for which to get the count.
    * @return The currently queued command count, or zero if none are queued.
@@ -174,8 +177,10 @@ public class CommandQueue {
      */
     public void add(SCMCommand command) {
       this.commands.add(command);
-      summary.put(command.getType(),
-          summary.getOrDefault(command.getType(), 0) + 1);
+      if (command.contributesToQueueSize()) {
+        summary.put(command.getType(),
+            summary.getOrDefault(command.getType(), 0) + 1);
+      }
       updateTime = Time.monotonicNow();
     }
 
