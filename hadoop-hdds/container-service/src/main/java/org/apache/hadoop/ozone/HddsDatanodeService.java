@@ -162,11 +162,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
+    OzoneConfiguration configuration = createOzoneConfiguration();
     if (printBanner) {
       StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
-          HddsDatanodeService.class, args, LOG);
+          HddsDatanodeService.class, args, LOG, configuration);
     }
-    start(createOzoneConfiguration());
+    start(configuration);
     ShutdownHookManager.get().addShutdownHook(() -> {
       try {
         stop();
