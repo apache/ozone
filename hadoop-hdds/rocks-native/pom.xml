@@ -200,6 +200,23 @@
                         </goals>
                     </execution>
                     <execution>
+                        <id>build-snappy</id>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <tasks>
+                                <mkdir dir="${project.build.directory}/snappy/lib"/>
+                                <exec executable="cmake" failonerror="true" dir="${project.build.directory}/snappy/lib">
+                                    <arg line="${project.build.directory}/snappy/snappy-${snappy.version}"/>
+                                    <env key="CFLAGS" value="-fPIC"/>
+                                </exec>
+                                <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
                         <id>build-rocksjava</id>
                         <phase>generate-resources</phase>
                         <configuration>
@@ -246,16 +263,6 @@
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-maven-plugins</artifactId>
                 <executions>
-                    <execution>
-                        <id>cmake-compile-snappy</id>
-                        <phase>generate-sources</phase>
-                        <goals><goal>cmake-compile</goal></goals>
-                        <configuration>
-                            <source>${project.build.directory}/snappy/snappy-${snappy.version}</source>
-                            <output>${project.build.directory}/snappy/lib</output>
-                            <vars/>
-                        </configuration>
-                    </execution>
                     <execution>
                         <id>cmake-compile-rockstools</id>
                         <phase>compile</phase>
