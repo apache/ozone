@@ -1682,6 +1682,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName);
+    String ownerName = getRealUserInfo().getShortUserName();
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
       if (replicationConfig.getReplicationType()
@@ -1697,6 +1698,7 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
+        .setOwnerName(ownerName)
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
         .initiateMultipartUpload(keyArgs);
