@@ -146,7 +146,8 @@
                         <configuration>
                             <tasks>
                                 <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
-                                <exec executable="./configure --static" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
+                                <exec executable="./configure" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
+                                    <arg line="--static"/>
                                     <env key="CFLAGS" value="-fPIC"/>
                                 </exec>
                                 <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
@@ -161,7 +162,9 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
-                                <exec executable="make CFLAGS='-fPIC'" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true"/>
+                                <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true">
+                                    <arg line="CFLAGS='-fPIC'"/>
+                                </exec>
                             </tasks>
                         </configuration>
                         <goals>
@@ -173,7 +176,9 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
-                                <exec executable="make CFLAGS='-fPIC'" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true"/>
+                                <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true">
+                                    <arg line="CFLAGS='-fPIC'"/>
+                                </exec>
                             </tasks>
                         </configuration>
                         <goals>
@@ -185,7 +190,9 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
-                                <exec executable="make CFLAGS='-fPIC'" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true"/>
+                                <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true">
+                                    <arg line="CFLAGS='-fPIC'"/>
+                                </exec>
                             </tasks>
                         </configuration>
                         <goals>
