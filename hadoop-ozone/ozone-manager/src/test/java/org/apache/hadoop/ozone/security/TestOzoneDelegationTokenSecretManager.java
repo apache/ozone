@@ -57,6 +57,7 @@ import org.apache.hadoop.util.Time;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
+import org.apache.ratis.protocol.RaftPeerId;
 import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.After;
 import org.junit.Assert;
@@ -171,7 +172,7 @@ public class TestOzoneDelegationTokenSecretManager {
   public void testLeadershipCheckinRetrievePassword() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
-    Mockito.doThrow(new OMNotLeaderException("Not leader"))
+    Mockito.doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om")))
         .when(om).checkLeaderStatus();
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
     try {

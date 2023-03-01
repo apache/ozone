@@ -30,20 +30,20 @@ public class CommonPrefix {
 
   @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Prefix")
-  private String prefix;
+  private EncodingTypeObject prefix;
 
-  public CommonPrefix(String prefix) {
+  public CommonPrefix(EncodingTypeObject prefix) {
     this.prefix = prefix;
   }
 
   public CommonPrefix() {
   }
 
-  public String getPrefix() {
+  public EncodingTypeObject getPrefix() {
     return prefix;
   }
 
-  public void setPrefix(String prefix) {
+  public void setPrefix(EncodingTypeObject prefix) {
     this.prefix = prefix;
   }
 }

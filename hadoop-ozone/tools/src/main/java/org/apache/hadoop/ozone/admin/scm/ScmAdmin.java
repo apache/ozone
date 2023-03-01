@@ -38,10 +38,11 @@ import picocli.CommandLine.Spec;
         GetScmRatisRolesSubcommand.class,
         FinalizeScmUpgradeSubcommand.class,
         FinalizationScmStatusSubcommand.class,
-        ResetDeletedBlockRetryCountSubcommand.class
+        ResetDeletedBlockRetryCountSubcommand.class,
+        TransferScmLeaderSubCommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
-public class ScmAdmin extends GenericCli  implements SubcommandWithParent {
+public class ScmAdmin extends GenericCli implements SubcommandWithParent {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;

@@ -430,7 +430,7 @@ Apache License 2.0
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
    org.jetbrains.kotlin:kotlin-stdlib-common
-   org.jboss.weld.servlet:weld-servlet
+   org.jboss.weld.servlet:weld-servlet-shaded
    org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen

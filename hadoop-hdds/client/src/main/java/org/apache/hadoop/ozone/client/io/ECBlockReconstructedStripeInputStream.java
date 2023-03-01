@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Queue;
@@ -138,7 +137,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   // but needed for reconstructing missing data)
   private final SortedSet<Integer> internalBuffers = new TreeSet<>();
   // Data Indexes we have tried to read from, and failed for some reason
-  private final Set<Integer> failedDataIndexes = new HashSet<>();
+  private final Set<Integer> failedDataIndexes = new TreeSet<>();
   private final ByteBufferPool byteBufferPool;
 
   private RawErasureDecoder decoder;
@@ -183,7 +182,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    */
   public synchronized void addFailedDatanodes(Collection<DatanodeDetails> dns) {
     if (initialized) {
-      throw new RuntimeException("Cannot add failed datanodes after the " +
+      throw new IllegalStateException("Cannot add failed datanodes after the " +
           "reader has been initialized");
     }
     DatanodeDetails[] locations = getDataLocations();
@@ -195,6 +194,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         }
       }
     }
+    LOG.debug("{}: set failed indexes {}", this, failedDataIndexes);
   }
 
   /**
@@ -209,6 +209,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     Preconditions.assertNotNull(indexes, "recovery indexes");
     recoveryIndexes.clear();
     recoveryIndexes.addAll(indexes);
+    LOG.debug("{}: set recovery indexes {}", this, recoveryIndexes);
   }
 
   private void init() throws InsufficientLocationsException {
@@ -218,7 +219,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
     if (!hasSufficientLocations()) {
       String msg = "There are insufficient datanodes to read the EC block";
-      LOG.debug(msg);
+      LOG.debug("{}: {}", this, msg);
       throw new InsufficientLocationsException(msg);
     }
     allocateInternalBuffers();
@@ -265,7 +266,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     DatanodeDetails[] locations = getDataLocations();
     for (int i = 0; i < locations.length; i++) {
       if (locations[i] == null && failedDataIndexes.add(i)) {
-        LOG.debug("Marked index={} as failed", i);
+        LOG.debug("{}: marked [{}] as failed", this, i);
       }
     }
   }
@@ -508,8 +509,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   private SortedSet<Integer> selectInternalInputs(
       SortedSet<Integer> available, long count) {
 
-    LOG.debug("Selecting {} internal inputs from {}", count, available);
-
     if (count <= 0) {
       return emptySortedSet();
     }
@@ -581,23 +580,22 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // an IOException.
         pair.getValue().get();
       } catch (ExecutionException ee) {
-        String message = "Failed to read from block {} EC index {}. Excluding" +
-                " the block";
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(message, getBlockID(), index + 1, ee.getCause());
+        boolean added = failedDataIndexes.add(index);
+        Throwable t = ee.getCause() != null ? ee.getCause() : ee;
+        String msg = "{}: error reading [{}]";
+        if (added) {
+          msg += ", marked as failed";
         } else {
-          Throwable t = ee.getCause() != null ? ee.getCause() : ee;
-          LOG.warn(message + " Exception: {} Exception Message: {}",
-                  getBlockID(), index + 1, t.getClass().getName(),
-                  t.getMessage());
+          msg += ", already had failed"; // should not really happen
         }
+        LOG.info(msg, this, index, t);
 
-        failedDataIndexes.add(index);
         exceptionOccurred = true;
       } catch (InterruptedException ie) {
         // Catch each InterruptedException to ensure all the futures have been
         // handled, and then throw the exception later
-        LOG.debug("Interrupted while waiting for reads to complete", ie);
+        LOG.debug("{}: interrupted while waiting for reads to complete",
+            this, ie);
         Thread.currentThread().interrupt();
       }
     }
@@ -606,7 +604,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
           "Interrupted while waiting for reads to complete");
     }
     if (exceptionOccurred) {
-      throw new IOException("One or more errors occurred reading blocks");
+      throw new IOException("One or more errors occurred reading block "
+          + getBlockID());
     }
   }
 
@@ -622,12 +621,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // stored in OM. Therefore if there is any remaining space in the
         // buffer, we should throw an exception.
         if (buf.hasRemaining()) {
+          LOG.trace("{}: unexpected EOF with {} bytes remaining [{}]",
+              this, buf.remaining(), ind);
           throw new IOException("Expected to read " + buf.remaining() +
               " bytes from block " + getBlockID() + " EC index " + (ind + 1) +
               " but reached EOF");
         }
+        LOG.debug("{}: EOF for [{}]", this, ind);
         break;
       }
+      LOG.trace("{}: read {} bytes for [{}]", this, read, ind);
     }
   }
 
@@ -704,7 +707,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void freeAllResourcesWithoutClosing() throws IOException {
-    LOG.debug("Freeing all resources while leaving the block open");
+    LOG.debug("{}: Freeing all resources while leaving the block open", this);
     freeBuffers();
     closeStreams();
   }
@@ -769,6 +772,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
 
     SortedSet<Integer> internal = selectInternalInputs(candidates, required);
+    LOG.debug("{}: selected {}, {} as inputs", this, selectedIndexes, internal);
     selectedIndexes.addAll(internal);
   }
 

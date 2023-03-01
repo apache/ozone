@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -40,12 +42,14 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -82,12 +86,13 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -305,30 +310,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // metadata constructor for snapshots
-  private OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName)
-      throws IOException {
+  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
+      boolean isSnapshotInCache) throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     String snapshotDir = OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    setStore(loadDB(conf, new File(snapshotDir),
-        OM_DB_NAME + snapshotDirName, true));
+    File metaDir = new File(snapshotDir);
+    String dbName = OM_DB_NAME + snapshotDirName;
+    // The check is only to prevent every snapshot read to perform a disk IO
+    // and check if a checkpoint dir exists. If entry is present in cache,
+    // it is most likely DB entries will get flushed in this wait time.
+    if (isSnapshotInCache) {
+      File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
+      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+    }
+    setStore(loadDB(conf, metaDir, dbName, true));
     initializeOmTables(false);
-  }
-
-  /**
-   * Factory method for creating snapshot metadata manager.
-   *
-   * @param conf - ozone configuration
-   * @param snapshotDirName - the UUID that identifies the snapshot
-   * @return the metadata manager representing the snapshot
-   * @throws IOException
-   */
-  public static OmMetadataManagerImpl createSnapshotMetadataManager(
-      OzoneConfiguration conf, String snapshotDirName) throws IOException {
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
-        snapshotDirName);
-    return smm;
   }
 
   @Override
@@ -913,7 +911,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     return false;
   }
-
   /**
    * Checks if a key starts with the given prefix is present in the table.
    *
@@ -1398,10 +1395,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
+  public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
-    Map<String, OpenKeyBucket.Builder> expiredKeys = new HashMap<>();
+    final ExpiredOpenKeys expiredKeys = new ExpiredOpenKeys();
 
+    final Table<String, OmKeyInfo> kt = getKeyTable(bucketLayout);
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
@@ -1411,33 +1409,55 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       final long expiredCreationTimestamp =
           expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
-      OpenKey.Builder builder = OpenKey.newBuilder();
 
       int num = 0;
       while (num < count && keyValueTableIterator.hasNext()) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String dbOpenKeyName = openKeyValue.getKey();
+
+        final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
+        final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
-          final String volume = openKeyInfo.getVolumeName();
-          final String bucket = openKeyInfo.getBucketName();
-          final String mapKey = volume + OM_KEY_PREFIX + bucket;
-          if (!expiredKeys.containsKey(mapKey)) {
-            expiredKeys.put(mapKey,
-                OpenKeyBucket.newBuilder()
-                    .setVolumeName(volume)
-                    .setBucketName(bucket));
+          final String clientIdString
+              = dbOpenKeyName.substring(lastPrefix + 1);
+
+          final OmKeyInfo info = kt.get(dbKeyName);
+          final boolean isHsync = java.util.Optional.ofNullable(info)
+              .map(WithMetadata::getMetadata)
+              .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+              .filter(id -> id.equals(clientIdString))
+              .isPresent();
+
+          if (!isHsync) {
+            // add non-hsync'ed keys
+            expiredKeys.addOpenKey(openKeyInfo, dbOpenKeyName);
+          } else {
+            // add hsync'ed keys
+            final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+                .setVolumeName(info.getVolumeName())
+                .setBucketName(info.getBucketName())
+                .setKeyName(info.getKeyName())
+                .setDataSize(info.getDataSize());
+            java.util.Optional.ofNullable(info.getLatestVersionLocations())
+                .map(OmKeyLocationInfoGroup::getLocationList)
+                .map(Collection::stream)
+                .orElseGet(Stream::empty)
+                .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .forEach(keyArgs::addKeyLocations);
+
+            OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig(
+                info.getReplicationConfig(), keyArgs);
+
+            expiredKeys.addHsyncKey(keyArgs, Long.parseLong(clientIdString));
           }
-          expiredKeys.get(mapKey)
-              .addKeys(builder.setName(dbOpenKeyName).build());
           num++;
         }
       }
     }
 
-    return expiredKeys.values().stream().map(OpenKeyBucket.Builder::build)
-        .collect(Collectors.toList());
+    return expiredKeys;
   }
 
   @Override

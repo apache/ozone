@@ -82,6 +82,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -347,6 +348,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneAdmins s3OzoneAdmins;
 
   private final OMMetrics metrics;
+  private OMHAMetrics omhaMetrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       omClientProtocolMetrics;
   private OzoneManagerHttpServer httpServer;
@@ -417,6 +419,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Test flags
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
+  private static UserGroupInformation testUgi;
 
   private final OzoneLockProvider ozoneLockProvider;
   private OMPerformanceMetrics perfMetrics;
@@ -573,7 +576,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             ResultCodes.SCM_VERSION_MISMATCH_ERROR);
       }
     } else {
-      scmInfo = new ScmInfo.Builder().setScmId("testSecureOm").build();
+      scmInfo = new ScmInfo.Builder().setScmId("test").build();
     }
 
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
@@ -1246,7 +1249,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static void loginOMUserIfSecurityEnabled(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
-    if (securityEnabled) {
+    if (securityEnabled && testUgi == null) {
       loginOMUser(conf);
     }
   }
@@ -1894,6 +1897,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
+    RaftPeer leader = omRatisServer.getLeader();
+    if (Objects.nonNull(leader)) {
+      // If we have any leader information, its id cannot be null.
+      String leaderId = leader.getId().toString();
+      omHAMetricsInit(leaderId);
+    } else {
+      LOG.error("OzoneManagerRatisServer leader is null, " +
+          "unregistering OMHAMetrics.");
+      // Unregister, to get rid of stale metrics
+      OMHAMetrics.unRegister();
+    }
   }
 
   /**
@@ -2160,6 +2174,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisServer != null) {
         omRatisServer.stop();
         omRatisServer = null;
+        OMHAMetrics.unRegister();
       }
       isOmRpcServerRunning = false;
       if (isOmGrpcServerEnabled) {
@@ -2909,6 +2924,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       return "Ratis-Disabled";
     }
+  }
+
+  /**
+   * Create OMHAMetrics instance.
+   */
+  private void omHAMetricsInit(String leaderId) {
+    // unregister, in case metrics already exist
+    // so that the metric tags will get updated.
+    OMHAMetrics.unRegister();
+    omhaMetrics = OMHAMetrics
+        .create(getOMNodeId(), leaderId);
+  }
+
+  @VisibleForTesting
+  public OMHAMetrics getOmhaMetrics() {
+    return omhaMetrics;
   }
 
   public String getRatisLogDirectory() {
@@ -3829,6 +3860,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OzoneManager.testSecureOmFlag = testSecureOmFlag;
   }
 
+  @VisibleForTesting
+  public static void setUgi(UserGroupInformation user) {
+    OzoneManager.testUgi = user;
+  }
+
   public OMNodeDetails getNodeDetails() {
     return omNodeDetails;
   }
@@ -3891,6 +3927,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
         omRatisServer.checkLeaderStatus();
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+    RaftPeerId raftLeaderId = omRatisServer.getRaftLeaderId();
+    String raftLeaderAddress = omRatisServer.getRaftLeaderAddress();
 
     switch (raftServerStatus) {
     case LEADER_AND_READY: return;
@@ -3899,9 +3937,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         raftPeerId.toString() + " is Leader " +
             "but not ready to process request yet.");
     case NOT_LEADER:
-      // TODO: Set suggest leaderID. Right now, client is not using suggest
-      // leaderID. Need to fix this.
-      throw new OMNotLeaderException(raftPeerId);
+      throw raftLeaderId == null ? new OMNotLeaderException(raftPeerId) :
+          new OMNotLeaderException(raftPeerId, raftLeaderId,
+              raftLeaderAddress);
     default: throw new IllegalStateException(
         "Unknown Ratis Server state: " + raftServerStatus);
     }
