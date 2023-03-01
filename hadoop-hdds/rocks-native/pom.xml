@@ -227,6 +227,7 @@
                                 <exec executable="cmake" failonerror="true" dir="${project.build.directory}/snappy/lib">
                                     <arg line="${project.build.directory}/snappy/snappy-${snappy.version}"/>
                                     <env key="CFLAGS" value="-fPIC"/>
+                                    <env key="CXXFLAGS" value="-fPIC"/>
                                 </exec>
                                 <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
                             </tasks>
@@ -265,6 +266,7 @@
                                 <mkdir dir="${project.build.directory}/native/rocksdb"/>
                                 <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
                                     <env key="CFLAGS" value="-fPIC"/>
+                                    <env key="CXXFLAGS" value="-fPIC"/>
                                     <arg line="${basedir}/src"/>
                                     <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah"/>
                                     <arg line="-DNATIVE_DIR=${basedir}/src/main/native"/>
