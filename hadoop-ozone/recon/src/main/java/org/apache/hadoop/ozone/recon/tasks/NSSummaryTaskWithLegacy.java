@@ -91,7 +91,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
         if (!(value instanceof OmKeyInfo)) {
-          LOG.debug("Unexpected value type {} for key {}. Skipping processing.",
+          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
               value.getClass().getName(), updatedKey);
           continue;
         }
