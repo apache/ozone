@@ -374,8 +374,8 @@ public abstract class TestOzoneRpcClientAbstract {
           bucket.getKey(key2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
-      ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
-      store = ozClient.getObjectStore();
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
     }
 
   }
@@ -384,8 +384,8 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName, String keyContent, UserGroupInformation user)
       throws IOException {
     UserGroupInformation.setLoginUser(user);
-    ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
-    store = ozClient.getObjectStore();
+    setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+    setStore(ozClient.getObjectStore());
     OzoneBucket bucket = store.getVolume(volumeName).getBucket(bucketName);
     createTestKey(bucket, keyName, keyContent);
   }
@@ -2921,8 +2921,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
       // user1 MultipartUpload a key
       UserGroupInformation.setLoginUser(user1);
-      ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
-      store = ozClient.getObjectStore();
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
       bucket = store.getVolume(volumeName).getBucket(bucketName);
       doMultipartUpload(bucket, keyName1, (byte) 96, replication);
 
@@ -2948,8 +2948,8 @@ public abstract class TestOzoneRpcClientAbstract {
           .getS3SecretManager();
       s3SecretManager.storeSecret(awsUser1.getShortUserName(),
           new S3SecretValue(awsUser1.getShortUserName(), secret));
-      ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
-      store = ozClient.getObjectStore();
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
 
       // set AWS user for RPCClient and OzoneManager
       store.getClientProxy().setThreadLocalS3Auth(s3Auth);
@@ -2964,8 +2964,8 @@ public abstract class TestOzoneRpcClientAbstract {
     } finally {
       OzoneManager.setS3Auth(null);
       UserGroupInformation.setLoginUser(oldUser);
-      ozClient = OzoneClientFactory.getRpcClient(cluster.getConf());
-      store = ozClient.getObjectStore();
+      setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
+      setStore(ozClient.getObjectStore());
     }
   }
 
