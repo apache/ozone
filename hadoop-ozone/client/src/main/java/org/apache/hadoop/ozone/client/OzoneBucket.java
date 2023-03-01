@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -48,7 +47,6 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -151,193 +149,45 @@ public class OzoneBucket extends WithMetadata {
    */
   private String owner;
 
-  private OzoneBucket(ConfigurationSource conf, String volumeName,
-      String bucketName, ClientProtocol proxy) {
-    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
-    this.volumeName = volumeName;
-    this.name = bucketName;
-
+  protected OzoneBucket(Builder builder) {
+    this.metadata = builder.metadata;
+    this.proxy = builder.proxy;
+    this.volumeName = builder.volumeName;
+    this.name = builder.name;  // bucket name
     // Bucket level replication is not configured by default.
-    this.defaultReplication = null;
-
-    this.proxy = proxy;
-    this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE).build();
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, Map<String, String> metadata,
-      String encryptionKeyName,
-      String sourceVolume, String sourceBucket) {
-    this(conf, volumeName, bucketName, proxy);
-    this.storageType = storageType;
-    this.versioning = versioning;
-    this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.metadata = metadata;
-    this.encryptionKeyName = encryptionKeyName;
-    this.sourceVolume = sourceVolume;
-    this.sourceBucket = sourceBucket;
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
-          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    this.defaultReplication = builder.defaultReplicationConfig != null ?
+        builder.defaultReplicationConfig.getReplicationConfig() : null;
+    this.storageType = builder.storageType;
+    this.versioning = builder.versioning;
+    if (builder.conf != null) {
+      this.listCacheSize = HddsClientUtils.getListCacheSize(builder.conf);
     }
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket, long usedBytes,
-      long usedNamespace, long quotaInBytes, long quotaInNamespace) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
-    this.usedBytes = usedBytes;
-    this.usedNamespace = usedNamespace;
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket, long usedBytes,
-      long usedNamespace, long quotaInBytes, long quotaInNamespace,
-      BucketLayout bucketLayout) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, modificationTime, metadata, encryptionKeyName,
-        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace);
-    this.bucketLayout = bucketLayout;
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket, long usedBytes,
-      long usedNamespace, long quotaInBytes, long quotaInNamespace,
-      BucketLayout bucketLayout, String owner,
-      DefaultReplicationConfig defaultReplicationConfig) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, modificationTime, metadata, encryptionKeyName,
-        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace, bucketLayout, owner);
-    this.bucketLayout = bucketLayout;
-    if (defaultReplicationConfig != null) {
-      this.defaultReplication =
-          defaultReplicationConfig.getType() == ReplicationType.EC ?
-              defaultReplicationConfig.getEcReplicationConfig() :
-              ReplicationConfig
-                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
-                      defaultReplicationConfig.getFactor());
+    this.usedBytes = builder.usedBytes;
+    this.usedNamespace = builder.usedNamespace;
+    this.creationTime = Instant.ofEpochMilli(builder.creationTime);
+    if (builder.modificationTime != 0) {
+      this.modificationTime = Instant.ofEpochMilli(builder.modificationTime);
     } else {
-      // Bucket level replication is not configured by default.
-      this.defaultReplication = null;
+      modificationTime = Instant.now();
+      if (modificationTime.isBefore(this.creationTime)) {
+        modificationTime = Instant.ofEpochSecond(
+            this.creationTime.getEpochSecond(), this.creationTime.getNano());
+      }
     }
-  }
-
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-       String volumeName, String bucketName, StorageType storageType,
-       Boolean versioning, long creationTime, long modificationTime,
-       Map<String, String> metadata, String encryptionKeyName,
-       String sourceVolume, String sourceBucket, long usedBytes,
-       long usedNamespace, long quotaInBytes, long quotaInNamespace,
-       BucketLayout bucketLayout, String owner) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, modificationTime, metadata, encryptionKeyName,
-        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace, bucketLayout);
-    this.owner = owner;
-  }
-
-  /**
-   * Constructs OzoneBucket instance.
-   * @param conf Configuration object.
-   * @param proxy ClientProtocol proxy.
-   * @param volumeName Name of the volume the bucket belongs to.
-   * @param bucketName Name of the bucket.
-   * @param storageType StorageType of the bucket.
-   * @param versioning versioning status of the bucket.
-   * @param creationTime creation time of the bucket.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, Map<String, String> metadata) {
-    this(conf, volumeName, bucketName, proxy);
-    this.storageType = storageType;
-    this.versioning = versioning;
-    this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.metadata = metadata;
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
-          this.creationTime.getEpochSecond(), this.creationTime.getNano());
-    }
-  }
-
-  /**
-   * @param modificationTime modification time of the bucket.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-  }
-
-  @VisibleForTesting
-  @SuppressWarnings("parameternumber")
-  OzoneBucket(String volumeName, String name,
-      ReplicationConfig defaultReplication,
-      StorageType storageType,
-      Boolean versioning, long creationTime) {
-    this.proxy = null;
-    this.volumeName = volumeName;
-    this.name = name;
-    this.defaultReplication = defaultReplication;
-    this.storageType = storageType;
-    this.versioning = versioning;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
+    this.encryptionKeyName = builder.encryptionKeyName;
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(name)
         .setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    this.sourceVolume = builder.sourceVolume;
+    this.sourceBucket = builder.sourceBucket;
+    this.quotaInBytes = builder.quotaInBytes;
+    this.quotaInNamespace = builder.quotaInNamespace;
+    if (builder.bucketLayout != null) {
+      this.bucketLayout = builder.bucketLayout;
     }
+    this.owner = builder.owner;
   }
 
   /**
@@ -1039,6 +889,135 @@ public class OzoneBucket extends WithMetadata {
     return result;
   }
 
+  public static Builder newBuilder(ConfigurationSource conf,
+      ClientProtocol proxy) {
+    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
+    return new Builder(conf, proxy);
+  }
+
+  /**
+   * Inner builder for OzoneBucket.
+   */
+  public static class Builder {
+    private Map<String, String> metadata;
+    private ConfigurationSource conf;
+    private ClientProtocol proxy;
+    private String volumeName;
+    private String name;
+    private DefaultReplicationConfig defaultReplicationConfig;
+    private StorageType storageType;
+    private Boolean versioning;
+    private long usedBytes;
+    private long usedNamespace;
+    private long creationTime;
+    private long modificationTime;
+    private String encryptionKeyName;
+    private String sourceVolume;
+    private String sourceBucket;
+    private long quotaInBytes;
+    private long quotaInNamespace;
+    private BucketLayout bucketLayout;
+    private String owner;
+
+    protected Builder() {
+    }
+
+    private Builder(ConfigurationSource conf, ClientProtocol proxy) {
+      this.conf = conf;
+      this.proxy = proxy;
+    }
+
+    public Builder setMetadata(Map<String, String> metadata) {
+      this.metadata = metadata;
+      return this;
+    }
+
+    public Builder setVolumeName(String volumeName) {
+      this.volumeName = volumeName;
+      return this;
+    }
+
+    public Builder setName(String name) {
+      this.name = name;
+      return this;
+    }
+
+    public Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultReplicationConfig) {
+      this.defaultReplicationConfig = defaultReplicationConfig;
+      return this;
+    }
+
+    public Builder setStorageType(StorageType storageType) {
+      this.storageType = storageType;
+      return this;
+    }
+
+    public Builder setVersioning(Boolean versioning) {
+      this.versioning = versioning;
+      return this;
+    }
+
+    public Builder setUsedBytes(long usedBytes) {
+      this.usedBytes = usedBytes;
+      return this;
+    }
+
+    public Builder setUsedNamespace(long usedNamespace) {
+      this.usedNamespace = usedNamespace;
+      return this;
+    }
+
+    public Builder setCreationTime(long creationTime) {
+      this.creationTime = creationTime;
+      return this;
+    }
+
+    public Builder setModificationTime(long modificationTime) {
+      this.modificationTime = modificationTime;
+      return this;
+    }
+
+    public Builder setEncryptionKeyName(String encryptionKeyName) {
+      this.encryptionKeyName = encryptionKeyName;
+      return this;
+    }
+
+    public Builder setSourceVolume(String sourceVolume) {
+      this.sourceVolume = sourceVolume;
+      return this;
+    }
+
+    public Builder setSourceBucket(String sourceBucket) {
+      this.sourceBucket = sourceBucket;
+      return this;
+    }
+
+    public Builder setQuotaInBytes(long quotaInBytes) {
+      this.quotaInBytes = quotaInBytes;
+      return this;
+    }
+
+    public Builder setQuotaInNamespace(long quotaInNamespace) {
+      this.quotaInNamespace = quotaInNamespace;
+      return this;
+    }
+
+    public Builder setBucketLayout(BucketLayout bucketLayout) {
+      this.bucketLayout = bucketLayout;
+      return this;
+    }
+
+    public Builder setOwner(String owner) {
+      this.owner = owner;
+      return this;
+    }
+
+    public OzoneBucket build() {
+      return new OzoneBucket(this);
+    }
+  }
+
   /**
    * An Iterator to iterate over {@link OzoneKey} list.
    */
@@ -1426,9 +1405,12 @@ public class OzoneBucket extends WithMetadata {
       addedKeyPrefix = true;
 
       // not required to addKeyPrefix
-      // case-1) if keyPrefix is null or empty
+      // case-1) if keyPrefix is null/empty/just contains snapshot indicator
+      // (The snapshot indicator is the null prefix equivalent for snapshot
+      //  reads.)
       // case-2) if startKey is not null or empty
-      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey)) {
+      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey) ||
+          OmUtils.isBucketSnapshotIndicator(keyPrefix)) {
         return;
       }
 

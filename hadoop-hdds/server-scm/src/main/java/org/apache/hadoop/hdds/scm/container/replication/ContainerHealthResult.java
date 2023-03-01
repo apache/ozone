@@ -80,7 +80,7 @@ public class ContainerHealthResult {
    */
   public static class UnHealthyResult extends ContainerHealthResult {
 
-    UnHealthyResult(ContainerInfo containerInfo) {
+    public UnHealthyResult(ContainerInfo containerInfo) {
       super(containerInfo, HealthState.UNHEALTHY);
     }
   }
@@ -108,6 +108,8 @@ public class ContainerHealthResult {
     private final boolean dueToDecommission;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
+    private boolean hasHealthyReplicas;
+    private boolean hasUnReplicatedOfflineIndexes = false;
     private int requeueCount = 0;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
@@ -206,6 +208,35 @@ public class ContainerHealthResult {
     public boolean isUnrecoverable() {
       return unrecoverable;
     }
+
+    /**
+     * Pass true if a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @param val pass true if the container has indexes on nodes going offline
+     *            or false otherwise.
+     */
+    public void setHasUnReplicatedOfflineIndexes(boolean val) {
+      hasUnReplicatedOfflineIndexes = val;
+    }
+    /**
+     * Indicates whether a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @return True if the container has some decommission or maintenance only
+     *         indexes.
+     */
+    public boolean hasUnreplicatedOfflineIndexes() {
+      return hasUnReplicatedOfflineIndexes;
+    }
+
+    public boolean hasHealthyReplicas() {
+      return hasHealthyReplicas;
+    }
+
+    public void setHasHealthyReplicas(boolean hasHealthyReplicas) {
+      this.hasHealthyReplicas = hasHealthyReplicas;
+    }
   }
 
   /**
@@ -246,7 +277,8 @@ public class ContainerHealthResult {
 
     private final int excessRedundancy;
     private final boolean sufficientlyReplicatedAfterPending;
-
+    private boolean hasMismatchedReplicas;
+    private boolean isSafelyOverReplicated;
 
     public OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
@@ -277,6 +309,22 @@ public class ContainerHealthResult {
      */
     public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
+    }
+
+    public boolean hasMismatchedReplicas() {
+      return hasMismatchedReplicas;
+    }
+
+    public void setHasMismatchedReplicas(boolean hasMismatchedReplicas) {
+      this.hasMismatchedReplicas = hasMismatchedReplicas;
+    }
+
+    public boolean isSafelyOverReplicated() {
+      return isSafelyOverReplicated;
+    }
+
+    public void setIsSafelyOverReplicated(boolean isSafelyOverReplicated) {
+      this.isSafelyOverReplicated = isSafelyOverReplicated;
     }
   }
 }

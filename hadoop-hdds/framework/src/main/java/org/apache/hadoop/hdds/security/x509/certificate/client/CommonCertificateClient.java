@@ -18,9 +18,11 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.slf4j.Logger;
+
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
@@ -31,13 +33,15 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 /**
  * Common Certificate client.
  */
-public class CommonCertificateClient extends DefaultCertificateClient {
+public abstract class CommonCertificateClient extends DefaultCertificateClient {
 
   private final Logger log;
 
   public CommonCertificateClient(SecurityConfig securityConfig, Logger log,
-      String certSerialId, String component) {
-    super(securityConfig, log, certSerialId, component);
+      String certSerialId, String component,
+      Consumer<String> saveCertIdCallback, Runnable shutdownCallback) {
+    super(securityConfig, log, certSerialId, component, saveCertIdCallback,
+        shutdownCallback);
     this.log = log;
   }
 

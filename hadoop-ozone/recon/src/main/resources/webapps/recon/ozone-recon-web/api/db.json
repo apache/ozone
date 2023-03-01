@@ -684,9 +684,57 @@
         "status": "OPEN",
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost2.storage.enterprise.com",
-          "localhost3.storage.enterprise.com"
+          {
+          "level": 0,
+          "parent": null,
+          "cost": 0,
+          "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "ipAddress": "172.22.0.5",
+          "hostName": "ozone_datanode_1.ozone_default",
+          "ports": [
+            {
+              "name": "REPLICATION",
+              "value": 9886
+            },
+            {
+              "name": "RATIS",
+              "value": 9858
+            },
+            {
+              "name": "RATIS_ADMIN",
+              "value": 9857
+            },
+            {
+              "name": "RATIS_SERVER",
+              "value": 9856
+            },
+            {
+              "name": "RATIS_DATASTREAM",
+              "value": 9855
+            },
+            {
+              "name": "STANDALONE",
+              "value": 9859
+            }
+          
+          ],
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "IN_SERVICE",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "signature": -460136136,
+          "decomissioned": false,
+          "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "numOfLeaves": 1
+          }
         ],
         "lastLeaderElection": 1578491471528,
         "duration": 389445,
@@ -700,9 +748,106 @@
         "status": "OPEN",
         "leaderNode": "localhost5.storage.enterprise.com",
         "datanodes": [
-          "localhost4.storage.enterprise.com",
-          "localhost5.storage.enterprise.com",
-          "localhost6.storage.enterprise.com"
+          {
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8728",
+            "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8728",
+            "ipAddress": "172.22.0.5",
+            "hostName": "ozone_datanode_2.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": -460136136,
+            "decomissioned": false,
+            "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "numOfLeaves": 1
+          },
+          {
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "uuidString": "0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "ipAddress": "172.22.0.3",
+            "hostName": "ozone_datanode_3.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": 776905284,
+            "decomissioned": false,
+            "networkName": "0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "numOfLeaves": 1
+          }
         ],
         "lastLeaderElection": 1578441471528,
         "duration": 50073382,
@@ -716,9 +861,56 @@
         "status": "CLOSED",
         "leaderNode": "localhost9.storage.enterprise.com",
         "datanodes": [
-          "localhost7.storage.enterprise.com",
-          "localhost8.storage.enterprise.com",
-          "localhost9.storage.enterprise.com"
+          {
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "e9011d34-2aeb-49fc-ab17-a35175342058",
+            "uuidString": "e9011d34-2aeb-49fc-ab17-a35175342058",
+            "ipAddress": "172.22.0.2",
+            "hostName": "ozone_datanode_4.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": 1287180809,
+            "decomissioned": false,
+            "networkName": "e9011d34-2aeb-49fc-ab17-a35175342058",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/e9011d34-2aeb-49fc-ab17-a35175342058",
+            "numOfLeaves": 1
+          }
         ],
         "lastLeaderElection": 1578441871828,
         "duration": 49712212,
@@ -1073,12 +1265,141 @@
     "sizeDirectKey": 0
   },
   "metadata": {
-    "type": "DUMMY_TYPE",
+  "path": "",
+  "type": "DUMMY_TYPE",
+  "countStats": {
     "numVolume": 100,
     "numBucket": 200,
     "numDir": 400,
-    "numKey": 800,
-    "status": "OK"
+    "numKey": 80
+  },
+  "objectInfo": {
+    "versioningEnabled": false,
+    "metadata": {
+      
+    },
+    "name": "fso-bucket",
+    "fileName": "file1",
+    "file": false,
+    "quotaInBytes": 1000000000,
+    "quotaInNamespace": 2000000000,
+    "usedNamespace": 10,
+    "creationTime": 1673415921920,
+    "modificationTime": 1673415921920,
+    "acls": [
+      {
+        "type": "USER",
+        "name": "hadoop",
+        "aclScope": "ACCESS",
+        "aclList": [
+          "ALL"
+        ]
+      },
+      {
+        "type": "GROUP",
+        "name": "hadoop",
+        "aclScope": "ACCESS",
+        "aclList": [
+          "ALL"
+        ]
+      }
+    ],
+    "keyLocationVersions": [
+      {
+        "version": 0,
+        "locationList": [
+          {
+            "blockID": {
+              "containerBlockID": {
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "blockCommitSequenceId": 18,
+              "containerID": 1,
+              "localID": 111677748019200007
+            },
+            "length": 3879,
+            "offset": 0,
+            "token": null,
+            "createVersion": 0,
+            "pipeline": null,
+            "partNumber": 0,
+            "containerID": 1,
+            "localID": 111677748019200007,
+            "blockCommitSequenceId": 18
+          }
+        ],
+        "multipartKey": false,
+        "blocksLatestVersionOnly": [
+          {
+            "blockID": {
+              "containerBlockID": {
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "blockCommitSequenceId": 18,
+              "containerID": 1,
+              "localID": 111677748019200007
+            },
+            "length": 3879,
+            "offset": 0,
+            "token": null,
+            "createVersion": 0,
+            "pipeline": null,
+            "partNumber": 0,
+            "containerID": 1,
+            "localID": 111677748019200007,
+            "blockCommitSequenceId": 18
+          }
+        ],
+        "locationLists": [
+          [
+            {
+              "blockID": {
+                "containerBlockID": {
+                  "containerID": 1,
+                  "localID": 111677748019200007
+                },
+                "blockCommitSequenceId": 18,
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "length": 3879,
+              "offset": 0,
+              "token": null,
+              "createVersion": 0,
+              "pipeline": null,
+              "partNumber": 0,
+              "containerID": 1,
+              "localID": 111677748019200007,
+              "blockCommitSequenceId": 18
+            }
+          ]
+        ],
+        "locationListCount": 1
+      }
+    ],
+    "volumeName": "volume1",
+    "bucketName": "fso-bucket",
+    "keyName": "file1",
+    "dataSize": 18513,
+    "storageType": "DISK",
+    "versioning": false,
+    "usedBytes": null,
+    "encryptionInfo": null,
+    "replicationConfig": {
+      "replicationFactor": "THREE",
+      "requiredNodes": 3,
+      "replicationType": "RATIS"
+    },
+    "encInfo": null,
+    "sourceVolume": null,
+    "sourceBucket": null,
+    "bucketLayout": "FILE_SYSTEM_OPTIMIZED",
+    "owner": "hadoop",
+    "volume": "vol1"
+  },
+  "status": "OK"
   },
   "quota": {
     "allowed": 1000000000,

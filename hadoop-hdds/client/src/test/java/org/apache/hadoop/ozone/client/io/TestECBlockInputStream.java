@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -392,8 +393,58 @@ public class TestECBlockInputStream {
       buf.clear();
       BadDataLocationException e =
           assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      Assertions.assertEquals(1, e.getFailedLocations().size());
       Assertions.assertEquals(2,
-          keyInfo.getPipeline().getReplicaIndex(e.getFailedLocation()));
+          keyInfo.getPipeline().getReplicaIndex(e.getFailedLocations().get(0)));
+    }
+  }
+
+  @Test
+  public void testNoErrorIfSpareLocationToRead() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
+        ONEMB);
+    Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+    // Add a second index = 1
+    datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), 1);
+
+    BlockLocationInfo keyInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, 8 * ONEMB, datanodes);
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, true, null, null, streamFactory)) {
+      // Read a full stripe to ensure all streams are created in the stream
+      // factory
+      ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
+      int read = ecb.read(buf);
+      Assertions.assertEquals(3 * ONEMB, read);
+      // Now make replication index 1 error on the next read but as there is a
+      // spare it should read from it with no errors
+      streamFactory.getBlockStreams().get(0).setThrowException(true);
+      buf.clear();
+      read = ecb.read(buf);
+      Assertions.assertEquals(3 * ONEMB, read);
+
+      // Now make the spare one error on the next read, and we should get an
+      // error with two failed locations. As each stream is created, a new
+      // stream will be created in the stream factory. Our read will read from
+      // DNs with EC indexes 1 - 3 first, creating streams 0 to 2. Then when
+      // stream(0) is failed for index=1 a new steam is created for the
+      // alternative index=1 at stream(3). Hence, to make it error we set
+      // stream(3) to throw as below.
+      streamFactory.getBlockStreams().get(3).setThrowException(true);
+      buf.clear();
+      BadDataLocationException e =
+          assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      List<DatanodeDetails> failed = e.getFailedLocations();
+      // Expect 2 different DNs reported as failure
+      Assertions.assertEquals(2, failed.size());
+      Assertions.assertNotEquals(failed.get(0), failed.get(1));
+      // Both failures should map to index = 1.
+      for (DatanodeDetails dn : failed) {
+        Assertions.assertEquals(1, datanodes.get(dn));
+      }
     }
   }
 

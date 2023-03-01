@@ -166,6 +166,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>rocksdb-checkpoint-differ</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-hadoop-dependency-test</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
@@ -279,10 +284,14 @@
             <configuration>
               <rules>
                 <DependencyConvergence>
-                  <uniqueVersions>false</uniqueVersions>
+                  <uniqueVersions>true</uniqueVersions>
                 </DependencyConvergence>
               </rules>
             </configuration>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <phase>validate</phase>
           </execution>
         </executions>
       </plugin>

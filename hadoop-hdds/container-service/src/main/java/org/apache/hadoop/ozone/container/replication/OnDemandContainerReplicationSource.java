@@ -19,13 +19,11 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
@@ -39,16 +37,9 @@ public class OnDemandContainerReplicationSource
 
   private final ContainerController controller;
 
-  private Map<String, TarContainerPacker> packer = new HashMap<>();
-
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
     this.controller = controller;
-    for (Map.Entry<CopyContainerCompression, String> entry :
-        CopyContainerCompression.getCompressionMapping().entrySet()) {
-      packer.put(
-          entry.getKey().toString(), new TarContainerPacker(entry.getValue()));
-    }
   }
 
   @Override
@@ -58,7 +49,7 @@ public class OnDemandContainerReplicationSource
 
   @Override
   public void copyData(long containerId, OutputStream destination,
-                       String compression)
+                       CopyContainerCompression compression)
       throws IOException {
 
     Container container = controller.getContainer(containerId);
@@ -68,13 +59,8 @@ public class OnDemandContainerReplicationSource
           " is not found.", CONTAINER_NOT_FOUND);
     }
 
-    if (!packer.containsKey(compression)) {
-      throw new IOException("Can't compress the container. Compression " +
-          compression + " is not found.");
-    }
     controller.exportContainer(
         container.getContainerType(), containerId, destination,
-        packer.get(compression));
-
+        new TarContainerPacker(compression));
   }
 }

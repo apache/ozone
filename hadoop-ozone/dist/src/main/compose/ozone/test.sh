@@ -61,7 +61,14 @@ execute_debug_tests
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
 
-execute_robot_test scm ec/basic.robot
+prefix=${RANDOM}
+execute_robot_test scm -v PREFIX:${prefix} ec/basic.robot
+docker-compose up -d --no-recreate --scale datanode=4
+execute_robot_test scm -v PREFIX:${prefix} ec/read.robot
+docker-compose up -d --no-recreate --scale datanode=3
+execute_robot_test scm -v PREFIX:${prefix} ec/read.robot
+
+execute_robot_test scm snapshot
 
 stop_docker_env
 

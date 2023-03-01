@@ -29,21 +29,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.rocksdb.RocksDBException;
+
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 
 /**
  * RocksDB Store that supports creating Tables in DB.
@@ -57,20 +63,37 @@ public class RDBStore implements DBStore {
   private ObjectName statMBeanName;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
+  private final String snapshotsParentDir;
   private final RDBMetrics rdbMetrics;
+  private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  private final String dbCompactionSSTBackupDirName = "compaction-sst-backup";
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  private final String dbCompactionLogDirName = "compaction-log";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, null);
+        new CodecRegistry(), false, 1000, null, false,
+        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1));
   }
 
+  @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry, boolean readOnly,
-                  String dbJmxBeanNameName) throws IOException {
+                  CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
+                  String dbJmxBeanNameName, boolean enableCompactionLog,
+                  long maxTimeAllowedForSnapshotInDag,
+                  long compactionDagDaemonInterval)
+      throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
@@ -80,6 +103,16 @@ public class RDBStore implements DBStore {
         dbJmxBeanNameName;
 
     try {
+      if (enableCompactionLog) {
+        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+            dbLocation.getParent(), dbCompactionSSTBackupDirName,
+            dbCompactionLogDirName, dbLocation, maxTimeAllowedForSnapshotInDag,
+            compactionDagDaemonInterval);
+        rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+      } else {
+        rocksDBCheckpointDiffer = null;
+      }
+
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
@@ -88,7 +121,8 @@ public class RDBStore implements DBStore {
         jmxProperties.put("dbName", dbJmxBeanName);
         statMBeanName = HddsUtils.registerWithJmxProperties(
             "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(), dbJmxBeanName));
+            RocksDBStoreMBean.create(dbOptions.statistics(), db,
+                dbJmxBeanName));
         if (statMBeanName == null) {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
               dbJmxBeanName);
@@ -100,20 +134,44 @@ public class RDBStore implements DBStore {
 
       //create checkpoints directory if not exists.
       checkpointsParentDir =
-              Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
+          Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
         if (!success) {
-          LOG.warn("Unable to create RocksDB checkpoint directory");
+          throw new IOException(
+              "Unable to create RocksDB checkpoint directory: " +
+              checkpointsParentDir);
         }
+      }
+
+      //create snapshot directory if does not exist.
+      snapshotsParentDir = Paths.get(dbLocation.getParent(),
+          OM_SNAPSHOT_DIR).toString();
+      File snapshotsDir = new File(snapshotsParentDir);
+      if (!snapshotsDir.exists()) {
+        boolean success = snapshotsDir.mkdir();
+        if (!success) {
+          throw new IOException(
+              "Unable to create RocksDB snapshot directory: " +
+              snapshotsParentDir);
+        }
+      }
+
+      if (enableCompactionLog) {
+        // Finish the initialization of compaction DAG tracker by setting the
+        // sequence number as current compaction log filename.
+        rocksDBCheckpointDiffer.setCurrentCompactionLog(
+            db.getLatestSequenceNumber());
+        // Load all previous compaction logs
+        rocksDBCheckpointDiffer.loadAllCompactionLogs();
       }
 
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
-    } catch (IOException e) {
+    } catch (IOException | RocksDBException e) {
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
           + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
@@ -131,9 +189,20 @@ public class RDBStore implements DBStore {
     }
   }
 
+  public String getSnapshotsParentDir() {
+    return snapshotsParentDir;
+  }
+
+  public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
+    return rocksDBCheckpointDiffer;
+  }
+
   @Override
   public void compactDB() throws IOException {
-    db.compactRange();
+    try (ManagedCompactRangeOptions options =
+             new ManagedCompactRangeOptions()) {
+      db.compactDB(options);
+    }
   }
 
   @Override
@@ -250,6 +319,11 @@ public class RDBStore implements DBStore {
       this.flushDB();
     }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
+  }
+
+  public DBCheckpoint getSnapshot(String name) throws IOException {
+    this.flushLog(true);
+    return checkPointManager.createCheckpoint(snapshotsParentDir, name);
   }
 
   @Override

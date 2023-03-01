@@ -18,7 +18,7 @@
 package org.apache.ozone.erasurecode;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.NativeRSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.NativeXORRawErasureCoderFactory;

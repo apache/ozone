@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -64,6 +65,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -136,6 +139,8 @@ public class TestIncrementalContainerReportHandler {
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
+            conf, Clock.system(ZoneId.systemDefault())))
         .build();
 
     this.publisher = Mockito.mock(EventPublisher.class);
@@ -299,7 +304,8 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testDeleteContainer() throws IOException, TimeoutException {
+  public void testDeleteContainer() throws IOException, TimeoutException,
+      NodeNotFoundException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -316,20 +322,35 @@ public class TestIncrementalContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree);
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
+    containerReplicas.forEach(r -> {
+      containerStateManager.updateContainerReplica(container.containerID(), r);
+      try {
+        nodeManager.addContainer(
+            r.getDatanodeDetails(), container.containerID());
+      } catch (NodeNotFoundException e) {
+        Assertions.fail("Node should be found");
+      }
+    });
     Assertions.assertEquals(3, containerStateManager
         .getContainerReplicas(container.containerID()).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeOne).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
+        .size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
             ContainerReplicaProto.State.DELETED,
-            datanodeThree.getUuidString());
+            datanodeOne.getUuidString());
     final IncrementalContainerReportFromDatanode icr =
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
     Assertions.assertEquals(2, containerStateManager
         .getContainerReplicas(container.containerID()).size());
+    Assertions.assertEquals(0, nodeManager.getContainers(datanodeOne).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
+        .size());
   }
 
   @Test

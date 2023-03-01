@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -68,8 +67,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
@@ -277,7 +274,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getReplicationConfig().getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
       numMissingParents = missingParentInfos.size();
       checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
       omBucketInfo.incrUsedNamespace(numMissingParents);
@@ -286,14 +284,13 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOpenKeyName),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+          dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-          bucketName, Optional.absent(), Optional.of(missingParentInfos),
-          trxnLogIndex);
+          bucketName, omBucketInfo.getBucketLayout(),
+          null, missingParentInfos, trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()

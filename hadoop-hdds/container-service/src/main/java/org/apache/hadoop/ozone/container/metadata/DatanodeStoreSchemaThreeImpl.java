@@ -21,12 +21,24 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.bouncycastle.util.Strings;
+import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
@@ -126,5 +138,83 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
 
   public static File getDumpDir(File metaDir) {
     return new File(metaDir, DUMP_DIR);
+  }
+
+  public void compactionIfNeeded() throws Exception {
+    // Calculate number of files per level and size per level
+    RocksDatabase rocksDB = ((RDBStore)getStore()).getDb();
+    List<LiveFileMetaData> liveFileMetaDataList =
+        rocksDB.getLiveFilesMetaData();
+    DatanodeConfiguration df =
+        getDbDef().getConfig().getObject(DatanodeConfiguration.class);
+    int numThreshold = df.getAutoCompactionSmallSstFileNum();
+    long sizeThreshold = df.getAutoCompactionSmallSstFileSize();
+    Map<String, Map<Integer, List<LiveFileMetaData>>> stat = new HashMap<>();
+    Map<Integer, List<LiveFileMetaData>> map;
+
+    for (LiveFileMetaData file: liveFileMetaDataList) {
+      if (file.size() >= sizeThreshold) {
+        continue;
+      }
+      String cf = Strings.fromByteArray(file.columnFamilyName());
+      stat.computeIfAbsent(cf, k -> new HashMap<>());
+      stat.computeIfPresent(cf, (k, v) -> {
+        v.computeIfAbsent(file.level(), l -> new LinkedList<>());
+        v.computeIfPresent(file.level(), (k1, v1) -> {
+          v1.add(file);
+          return v1;
+        });
+        return v;
+      });
+    }
+
+    for (Map.Entry<String, Map<Integer, List<LiveFileMetaData>>> entry :
+        stat.entrySet()) {
+      for (Map.Entry<Integer, List<LiveFileMetaData>> innerEntry:
+          entry.getValue().entrySet()) {
+        if (innerEntry.getValue().size() > numThreshold) {
+          ColumnFamily columnFamily = null;
+          // Find CF Handler
+          for (ColumnFamily cf : rocksDB.getExtraColumnFamilies()) {
+            if (cf.getName().equals(entry.getKey())) {
+              columnFamily = cf;
+              break;
+            }
+          }
+          if (columnFamily != null) {
+            // Find the key range of these sst files
+            long startCId = Long.MAX_VALUE;
+            long endCId = Long.MIN_VALUE;
+            for (LiveFileMetaData file: innerEntry.getValue()) {
+              long firstCId = DatanodeSchemaThreeDBDefinition.getContainerId(
+                  FixedLengthStringUtils.bytes2String(file.smallestKey()));
+              long lastCId = DatanodeSchemaThreeDBDefinition.getContainerId(
+                  FixedLengthStringUtils.bytes2String(file.largestKey()));
+              startCId = Math.min(firstCId, startCId);
+              endCId = Math.max(lastCId, endCId);
+            }
+
+            // Do the range compaction
+            ManagedCompactRangeOptions options =
+                new ManagedCompactRangeOptions();
+            options.setBottommostLevelCompaction(
+                ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+            LOG.info("CF {} level {} small file number {} exceeds threshold {}"
+                    + ". Auto compact small sst files.", entry.getKey(),
+                innerEntry.getKey(), innerEntry.getValue().size(),
+                numThreshold);
+            rocksDB.compactRange(columnFamily,
+                DatanodeSchemaThreeDBDefinition
+                    .getContainerKeyPrefixBytes(startCId),
+                DatanodeSchemaThreeDBDefinition
+                    .getContainerKeyPrefixBytes(endCId + 1),
+                options);
+          } else {
+            LOG.warn("Failed to find cf {} in DB {}", entry.getKey(),
+                getDbDef().getDBLocation(null));
+          }
+        }
+      }
+    }
   }
 }

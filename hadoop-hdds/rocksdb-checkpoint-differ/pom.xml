@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>1.4.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>rocksdb-checkpoint-differ</artifactId>
+  <version>1.4.0-SNAPSHOT</version>
+  <description>RocksDB Checkpoint Differ</description>
+  <name>RocksDB Checkpoint Differ</name>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.rocksdb</groupId>
+      <artifactId>rocksdbjni</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
+      <version>${hdds.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.spotbugs</groupId>
+      <artifactId>spotbugs-annotations</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>${basedir}/src/main/resources</directory>
+        <excludes>
+          <exclude>ozone-version-info.properties</exclude>
+        </excludes>
+        <filtering>false</filtering>
+      </resource>
+      <resource>
+        <directory>${basedir}/src/main/resources</directory>
+        <includes>
+          <include>ozone-version-info.properties</include>
+        </includes>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-maven-plugins</artifactId>
+        <executions>
+          <execution>
+            <id>version-info</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>version-info</goal>
+            </goals>
+            <configuration>
+              <source>
+                <directory>${basedir}/../</directory>
+                <includes>
+                  <include>*/src/main/java/**/*.java</include>
+                  <include>*/src/main/proto/*.proto</include>
+                </includes>
+              </source>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>depcheck</id>
+            <phase></phase>
+          </execution>
+          <execution>
+            <id>banned-rocksdb-imports</id>
+            <phase>process-sources</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <RestrictImports>
+                  <includeTestCode>false</includeTestCode>
+                  <reason>Use managed RocksObjects under org.apache.hadoop.hdds.utils.db.managed instead.</reason>
+                  <!-- By default, ban all the classes in org.rocksdb -->
+                  <bannedImport>org.rocksdb.**</bannedImport>
+                  <allowedImports>
+                    <allowedImport>org.rocksdb.AbstractEventListener</allowedImport>
+                    <allowedImport>org.rocksdb.Checkpoint</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyHandle</allowedImport>
+                    <allowedImport>org.rocksdb.ColumnFamilyOptions</allowedImport>
+                    <allowedImport>org.rocksdb.CompactionJobInfo</allowedImport>
+                    <allowedImport>org.rocksdb.CompressionType</allowedImport>
+                    <allowedImport>org.rocksdb.DBOptions</allowedImport>
+                    <allowedImport>org.rocksdb.FlushOptions</allowedImport>
+                    <allowedImport>org.rocksdb.LiveFileMetaData</allowedImport>
+                    <allowedImport>org.rocksdb.Options</allowedImport>
+                    <allowedImport>org.rocksdb.RocksDB</allowedImport>
+                    <allowedImport>org.rocksdb.RocksDBException</allowedImport>
+                    <allowedImport>org.rocksdb.SstFileReader</allowedImport>
+                    <allowedImport>org.rocksdb.TableProperties</allowedImport>
+                    <allowedImport>org.rocksdb.ReadOptions</allowedImport>
+                    <allowedImport>org.rocksdb.SstFileReaderIterator</allowedImport>
+                  </allowedImports>
+                  <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
+                </RestrictImports>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <profile>
+      <id>k8s-dev</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>io.fabric8</groupId>
+            <artifactId>docker-maven-plugin</artifactId>
+            <configuration>
+              <images>
+                <image>
+                  <name>${user.name}/ozone:${project.version}</name>
+                  <build>
+                    <dockerFileDir>${project.basedir}</dockerFileDir>
+                  </build>
+                </image>
+              </images>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

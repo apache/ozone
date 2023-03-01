@@ -17,7 +17,7 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.util.PerformanceAdvisory;
 import org.slf4j.Logger;

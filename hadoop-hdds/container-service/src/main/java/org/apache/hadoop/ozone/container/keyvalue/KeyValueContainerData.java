@@ -306,14 +306,23 @@ public class KeyValueContainerData extends ContainerData {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
-    metadataTable.putWithBatch(batchOperation, bytesUsedKey(),
+    metadataTable.putWithBatch(batchOperation, getBytesUsedKey(),
             getBytesUsed() - releasedBytes);
-    metadataTable.putWithBatch(batchOperation, blockCountKey(),
+    metadataTable.putWithBatch(batchOperation, getBlockCountKey(),
             getBlockCount() - deletedBlockCount);
-    metadataTable.putWithBatch(batchOperation, pendingDeleteBlockCountKey(),
+    metadataTable.putWithBatch(batchOperation,
+        getPendingDeleteBlockCountKey(),
         getNumPendingDeletionBlocks() - deletedBlockCount);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+  }
+
+  public void resetPendingDeleteBlockCount(DBHandle db) throws IOException {
+    // Reset the in memory metadata.
+    numPendingDeletionBlocks.set(0);
+    // Reset the metadata on disk.
+    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+    metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
   }
 
   public int getReplicaIndex() {
@@ -328,39 +337,39 @@ public class KeyValueContainerData extends ContainerData {
   // to container schemas, we should use them instead of using
   // raw const variables defined.
 
-  public String blockKey(long localID) {
+  public String getBlockKey(long localID) {
     return formatKey(Long.toString(localID));
   }
 
-  public String deletingBlockKey(long localID) {
+  public String getDeletingBlockKey(long localID) {
     return formatKey(DELETING_KEY_PREFIX + localID);
   }
 
-  public String deleteTxnKey(long txnID) {
+  public String getDeleteTxnKey(long txnID) {
     return formatKey(Long.toString(txnID));
   }
 
-  public String latestDeleteTxnKey() {
+  public String getLatestDeleteTxnKey() {
     return formatKey(DELETE_TRANSACTION_KEY);
   }
 
-  public String bcsIdKey() {
+  public String getBcsIdKey() {
     return formatKey(BLOCK_COMMIT_SEQUENCE_ID);
   }
 
-  public String blockCountKey() {
+  public String getBlockCountKey() {
     return formatKey(BLOCK_COUNT);
   }
 
-  public String bytesUsedKey() {
+  public String getBytesUsedKey() {
     return formatKey(CONTAINER_BYTES_USED);
   }
 
-  public String pendingDeleteBlockCountKey() {
+  public String getPendingDeleteBlockCountKey() {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
   }
 
-  public String deletingBlockKeyPrefix() {
+  public String getDeletingBlockKeyPrefix() {
     return formatKey(DELETING_KEY_PREFIX);
   }
 
@@ -370,7 +379,7 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {
-    return new KeyPrefixFilter().addFilter(deletingBlockKeyPrefix());
+    return new KeyPrefixFilter().addFilter(getDeletingBlockKeyPrefix());
   }
 
   /**

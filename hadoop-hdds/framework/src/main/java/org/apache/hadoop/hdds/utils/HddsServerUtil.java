@@ -37,9 +37,6 @@ import com.google.protobuf.BlockingService;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
@@ -450,8 +447,8 @@ public final class HddsServerUtil {
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf)
-      throws IOException {
+      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf,
+      UserGroupInformation ugi) throws IOException {
     // Certificate from SCM is required for DN startup to succeed, so retry
     // for ever. In this way DN start up is resilient to SCM service running
     // status.
@@ -464,7 +461,7 @@ public final class HddsServerUtil {
 
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(configuration,
-            UserGroupInformation.getCurrentUser()));
+            ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB
@@ -526,7 +523,7 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
+   * Write DB Checkpoint to an output stream as a compressed file (tar).
    *
    * @param checkpoint  checkpoint file
    * @param destination destination output stream.
@@ -535,11 +532,8 @@ public final class HddsServerUtil {
   public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
       OutputStream destination)
       throws IOException {
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination);
-        ArchiveOutputStream archiveOutputStream =
-            new TarArchiveOutputStream(gzippedOut);
+    try (ArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(destination);
         Stream<Path> files =
             Files.list(checkpoint.getCheckpointLocation())) {
       for (Path path : files.collect(Collectors.toList())) {
@@ -551,15 +545,11 @@ public final class HddsServerUtil {
           }
         }
       }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
     }
   }
 
   private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
+                                 ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);

@@ -435,7 +435,8 @@ Apache License 2.0
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
    org.jetbrains.kotlin:kotlin-stdlib-common
-   org.jboss.weld.servlet:weld-servlet
+   org.jboss.weld.servlet:weld-servlet-shaded
+   org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen
    org.jooq:jooq-meta
@@ -449,7 +450,7 @@ Apache License 2.0
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
    software.amazon.ion:ion-java
-
+   org.awaitility:awaitility
 
 MIT
 =====================
@@ -464,6 +465,22 @@ MIT
    org.slf4j:slf4j-reload4j
 
 
+EPL 2.0
+=====================
+
+   jakarta.annotation:jakarta.annotation-api
+   jakarta.ws.rs:jakarta.ws.rs-api
+
+
+CDDL + GPLv2 with classpath exception
+=====================
+
+   javax.annotation:javax.annotation-api
+   javax.el:javax.el-api
+   javax.interceptor:javax.interceptor-api
+   javax.servlet:javax.servlet-api
+
+
 Public Domain
 =====================
 
@@ -473,6 +490,7 @@ Public Domain
 BSD 3-Clause
 =====================
 
+   com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
    com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j

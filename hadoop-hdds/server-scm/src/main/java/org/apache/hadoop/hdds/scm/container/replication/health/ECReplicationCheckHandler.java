@@ -71,27 +71,27 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       // handler so return as unhandled so any further handlers will be tried.
       return false;
     }
-    // TODO - should the report have a HEALTHY state, rather than just bad
-    //        states? It would need to be added to legacy RM too.
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       if (underHealth.isUnrecoverable()) {
-        // TODO - do we need a new health state for unrecoverable EC?
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.MISSING, containerID);
+      } else {
+        report.incrementAndSample(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
-          !underHealth.isUnrecoverable()) {
+          (!underHealth.isUnrecoverable()
+              || underHealth.hasUnreplicatedOfflineIndexes())) {
         request.getReplicationQueue().enqueue(underHealth);
       }
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
-          + "is [{}]. isUnrecoverable is [{}]", container,
-          underHealth.isReplicatedOkAfterPending(),
-          underHealth.isUnrecoverable());
+          + "is [{}]. isUnrecoverable is [{}]. hasUnreplicatedOfflineIndexes "
+          + "is [{}]", container, underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable(),
+          underHealth.hasUnreplicatedOfflineIndexes());
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
@@ -149,10 +149,16 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         dueToDecommission = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
-      return new ContainerHealthResult.UnderReplicatedHealthResult(
-          container, remainingRedundancy, dueToDecommission,
-          replicaCount.isSufficientlyReplicated(true),
-          replicaCount.isUnrecoverable());
+      ContainerHealthResult.UnderReplicatedHealthResult result =
+          new ContainerHealthResult.UnderReplicatedHealthResult(
+              container, remainingRedundancy, dueToDecommission,
+              replicaCount.isSufficientlyReplicated(true),
+              replicaCount.isUnrecoverable());
+      if (replicaCount.decommissioningOnlyIndexes(true).size() > 0
+          || replicaCount.maintenanceOnlyIndexes(true).size() > 0) {
+        result.setHasUnReplicatedOfflineIndexes(true);
+      }
+      return result;
     }
 
     if (replicaCount.isOverReplicated(false)) {

@@ -1,0 +1,174 @@
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<configuration>
+  <property>
+    <name>hdds.profiler.endpoint.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>ozone.scm.block.client.address</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.csi.owner</name>
+    <value>hadoop</value>
+  </property>
+  <property>
+    <name>ozone.csi.socket</name>
+    <value>/tmp/csi.sock</value>
+  </property>
+  <property>
+    <name>ozone.scm.client.address</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.metadata.dirs</name>
+    <value>/tmp/metadata</value>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.enable</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>ozone.scm.service.ids</name>
+    <value>scm-group</value>
+  </property>
+  <property>
+    <name>ozone.scm.nodes.scm-group</name>
+    <value>scm1,scm2,scm3</value>
+  </property>
+  <property>
+    <name>ozone.scm.address.scm-group.scm1</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.scm.address.scm-group.scm2</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.scm.address.scm-group.scm3</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.scm.client.port.scm-group.scm1</name>
+    <value>19860</value>
+  </property>
+  <property>
+    <name>ozone.scm.client.port.scm-group.scm2</name>
+    <value>29860</value>
+  </property>
+  <property>
+    <name>ozone.scm.client.port.scm-group.scm3</name>
+    <value>39860</value>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.port.scm-group.scm1</name>
+    <value>19861</value>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.port.scm-group.scm2</name>
+    <value>29861</value>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.port.scm-group.scm3</name>
+    <value>39861</value>
+  </property>
+  <property>
+    <name>ozone.scm.block.client.port.scm-group.scm1</name>
+    <value>19863</value>
+  </property>
+  <property>
+    <name>ozone.scm.block.client.port.scm-group.scm2</name>
+    <value>29863</value>
+  </property>
+  <property>
+    <name>ozone.scm.block.client.port.scm-group.scm3</name>
+    <value>39863</value>
+  </property>
+  <property>
+    <name>ozone.scm.security.service.port.scm-group.scm1</name>
+    <value>19961</value>
+  </property>
+  <property>
+    <name>ozone.scm.security.service.port.scm-group.scm2</name>
+    <value>29961</value>
+  </property>
+  <property>
+    <name>ozone.scm.security.service.port.scm-group.scm3</name>
+    <value>39961</value>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.port.scm-group.scm1</name>
+    <value>19894</value>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.port.scm-group.scm2</name>
+    <value>29894</value>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.port.scm-group.scm3</name>
+    <value>39894</value>
+  </property>
+  <property>
+    <name>ozone.scm.grpc.port.scm-group.scm1</name>
+    <value>19895</value>
+  </property>
+  <property>
+    <name>ozone.scm.grpc.port.scm-group.scm2</name>
+    <value>29895</value>
+  </property>
+  <property>
+    <name>ozone.scm.grpc.port.scm-group.scm3</name>
+    <value>39895</value>
+  </property>
+
+  <property>
+    <name>ozone.om.address</name>
+    <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.scm.container.size</name>
+    <value>1G</value>
+  </property>
+  <property>
+    <name>hdds.datanode.storage.utilization.critical.threshold</name>
+    <value>0.99</value>
+  </property>
+  <property>
+    <name>hdds.prometheus.endpoint.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>ozone.recon.address</name>
+    <value>localhost:9891</value>
+  </property>
+  <property>
+    <name>ozone.recon.db.dir</name>
+    <value>/tmp/recon</value>
+  </property>
+
+  <property>
+    <name>datanode.replication.port</name>
+    <value>0</value>
+  </property>
+
+  <property>
+    <name>ozone.security.enabled</name>
+    <value>false</value>
+  </property>
+</configuration>

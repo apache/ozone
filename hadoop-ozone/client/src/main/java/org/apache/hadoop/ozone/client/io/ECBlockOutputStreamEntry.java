@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
@@ -104,6 +105,14 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   @Override
+  void cleanup(boolean invalidateClient) {
+    if (isInitialized()) {
+      IOUtils.close(LOG, blockOutputStreams);
+      blockOutputStreams = null;
+    }
+  }
+
+  @Override
   public OutputStream getOutputStream() {
     if (!isInitialized()) {
       return null;
@@ -132,7 +141,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   public void markFailed(Exception e) {
-    if (blockOutputStreams[currentStreamIdx] != null) {
+    if (isInitialized() && blockOutputStreams[currentStreamIdx] != null) {
       blockOutputStreams[currentStreamIdx].setIoException(e);
     }
   }
@@ -379,13 +388,17 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   }
 
   private Stream<ECBlockOutputStream> blockStreams() {
-    return Arrays.stream(blockOutputStreams).filter(Objects::nonNull);
+    return isInitialized()
+        ? Arrays.stream(blockOutputStreams).filter(Objects::nonNull)
+        : Stream.empty();
   }
 
   private Stream<ECBlockOutputStream> dataStreams() {
-    return Arrays.stream(blockOutputStreams)
-        .limit(replicationConfig.getData())
-        .filter(Objects::nonNull);
+    return isInitialized()
+        ? Arrays.stream(blockOutputStreams)
+            .limit(replicationConfig.getData())
+            .filter(Objects::nonNull)
+        : Stream.empty();
   }
 
   public ByteString calculateChecksum() throws IOException {
