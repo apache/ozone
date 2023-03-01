@@ -450,7 +450,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
    *
    * @param out PrintStream
    */
-  private void printStats(PrintStream out) {
+  void printStats(PrintStream out) {
     long endTime = System.nanoTime() - startTime;
     String execTime = DurationFormatUtils
         .formatDuration(TimeUnit.NANOSECONDS.toMillis(endTime),
