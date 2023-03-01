@@ -146,7 +146,9 @@
                         <configuration>
                             <tasks>
                                 <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
-                                <exec executable="export CFLAGS='-fPIC'; ./configure --static" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
+                                <exec executable="./configure --static" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
+                                    <env key="CFLAGS" value="-fPIC"/>
+                                </exec>
                                 <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
                             </tasks>
                         </configuration>
