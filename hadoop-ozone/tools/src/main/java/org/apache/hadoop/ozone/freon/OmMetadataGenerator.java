@@ -398,7 +398,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       getMetrics().timer(operation.name()).time(() -> {
         List<OmKeyInfo> keyInfoList = ozoneManagerClient.listKeys(
             volumeName, bucketName, startKeyName, "", batchSize);
-        if (keyInfoList.size() < batchSize - 1) {
+        if (keyInfoList.size() + 1 < batchSize) {
           throw new NoSuchFileException(
               "There are not enough files for testing you should use "
                   + "CREATE_FILE to create at least batch-size * threads = "
@@ -414,7 +414,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       getMetrics().timer(operation.name()).time(() -> {
         List<OzoneFileStatus> fileStatusList = ozoneManagerClient.listStatus(
             keyArgs, false, startKeyName, batchSize);
-        if (fileStatusList.size() < batchSize - 1) {
+        if (fileStatusList.size() + 1 < batchSize) {
           throw new NoSuchFileException(
               "There are not enough files for testing you should use "
                   + "CREATE_FILE to create at least batch-size * threads = "
