@@ -147,7 +147,7 @@ public class HddsVolume extends StorageVolume {
       MutableVolumeSet dbVolumeSet) throws IOException {
     super.createWorkingDir(workingDirName, dbVolumeSet);
 
-    createTmpDir(workingDirName);
+    createTmpDir();
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
@@ -374,16 +374,13 @@ public class HddsVolume extends StorageVolume {
    * cluster, cleanup path should already be on
    * disk. This method syncs the HddsVolume
    * with the path on disk.
-   * 
-   * @param id clusterId or scmId
    */
-  public void checkTmpDirPaths(String id) {
-    Path tmpPath = createTmpPath(id);
+  public void checkTmpDirPaths() {
+    Path tmpPath = createTmpPath();
     deleteServiceDirPath = tmpPath.resolve(TMP_DELETE_SERVICE_DIR);
   }
 
-  private Path createTmpPath(String id) {
-
+  public void checkTmpDirPaths(String id) {
     // HddsVolume root directory path
     String hddsRoot = getHddsRootDir().toString();
 
@@ -393,11 +390,28 @@ public class HddsVolume extends StorageVolume {
     Path volPath = Paths.get(vol);
     Path idPath = Paths.get(id);
 
+    deleteServiceDirPath = volPath
+        .resolve(idPath)
+        .resolve(TMP_DIR)
+        .resolve(TMP_DELETE_SERVICE_DIR);
+  }
+
+  private Path createTmpPath() {
+
+    // HddsVolume root directory path
+    String hddsRoot = getHddsRootDir().toString();
+
+    // HddsVolume path
+    String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
+
+    Path volPath = Paths.get(vol);
+    Path idPath = Paths.get(getClusterID());
+
     return volPath.resolve(idPath).resolve(TMP_DIR);
   }
 
-  private void createTmpDir(String id) {
-    tmpDirPath = createTmpPath(id);
+  private void createTmpDir() {
+    tmpDirPath = createTmpPath();
 
     if (Files.notExists(tmpDirPath)) {
       try {
@@ -408,9 +422,9 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  public void createDeleteServiceDir(String id) {
+  public void createDeleteServiceDir() {
     if (tmpDirPath == null) {
-      createTmpDir(id);
+      createTmpDir();
     }
 
     deleteServiceDirPath =

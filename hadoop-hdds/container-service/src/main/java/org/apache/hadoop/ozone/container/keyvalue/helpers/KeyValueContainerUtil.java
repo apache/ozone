@@ -448,9 +448,8 @@ public final class KeyValueContainerUtil {
         return;
       }
 
-      // Initialize tmp and delete service directories
-      hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
-
+      // getDeleteLeftovers initializes tmp and
+      // delete service directories as well
       ListIterator<File> leftoversListIt = getDeleteLeftovers(hddsVolume);
 
       while (leftoversListIt.hasNext()) {
@@ -522,7 +521,7 @@ public final class KeyValueContainerUtil {
       List<File> leftovers = new ArrayList<>();
 
       // Initialize tmp and delete service directories
-      hddsVolume.checkTmpDirPaths(hddsVolume.getClusterID());
+      hddsVolume.checkTmpDirPaths();
 
       File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
 
@@ -551,7 +550,7 @@ public final class KeyValueContainerUtil {
       String containerDirName = container.getName();
 
       // Initialize delete directory
-      hddsVolume.createDeleteServiceDir(hddsVolume.getClusterID());
+      hddsVolume.createDeleteServiceDir();
 
       String destinationDirPath = hddsVolume.getDeleteServiceDirPath()
           .resolve(Paths.get(containerDirName)).toString();

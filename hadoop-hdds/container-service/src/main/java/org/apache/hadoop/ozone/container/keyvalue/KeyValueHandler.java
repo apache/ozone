@@ -1246,18 +1246,20 @@ public class KeyValueHandler extends Handler {
         boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
             .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
 
-        if (success) {
-          String containerPath = keyValueContainerData
-              .getContainerPath().toString();
-          File containerDir = new File(containerPath);
-
-          LOG.debug("Container {} has been successfuly moved under {}",
-              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
-        } else {
+        if (!success) {
           LOG.error("Failed to move container under " +
               hddsVolume.getDeleteServiceDirPath());
           throw new StorageContainerException("Moving container failed",
               CONTAINER_INTERNAL_ERROR);
+        }
+
+        if (LOG.isDebugEnabled()) {
+          String containerPath = keyValueContainerData
+              .getContainerPath();
+          File containerDir = new File(containerPath);
+
+          LOG.debug("Container {} has been successfuly moved under {}",
+              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
         }
       }
       long containerId = container.getContainerData().getContainerID();
