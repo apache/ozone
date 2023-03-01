@@ -78,6 +78,24 @@ public class CommandQueue {
   }
 
   /**
+   * Explicitly lock the command queue so no other threads can add or remove
+   * commands or query the command counts. Note it must be unlocked via the
+   * unlock method or all commands will be blocked. This allows for a series of
+   * individual calls to the command queue ensuring a consistent state between
+   * the calls.
+   */
+  public void lock() {
+    lock.lock();
+  }
+
+  /**
+   * Unlock the command queue after a previous lock command.
+   */
+  public void unlock() {
+    lock.unlock();
+  }
+
+  /**
    * Returns  a list of Commands for the datanode to execute, if we have no
    * commands returns a empty list otherwise the current set of
    * commands are returned and command map set to empty list again.
@@ -122,6 +140,30 @@ public class CommandQueue {
         return 0;
       }
       return commands.getCommandSummary(commandType);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Return a summary of all commands currently queued for the given Datanode.
+   * Note that any commands which return false for their
+   * Command.contributesToQueueSize() method will not be included in the count.
+   * At the current time, only low priority ReplicateContainerCommands meet this
+   * condition.
+   * @param datanodeUuid Datanode UUID
+   * @return A map containing the command summary. Note the returned map is a
+   *         copy of the internal map and can be modified safely by the caller.
+   */
+  public Map<SCMCommandProto.Type, Integer> getDatanodeCommandSummary(
+      final UUID datanodeUuid) {
+    lock.lock();
+    try {
+      Commands commands = commandMap.get(datanodeUuid);
+      if (commands == null) {
+        return Collections.emptyMap();
+      }
+      return commands.getAllCommandsSummary();
     } finally {
       lock.unlock();
     }
@@ -186,6 +228,10 @@ public class CommandQueue {
 
     public int getCommandSummary(SCMCommandProto.Type commandType) {
       return summary.getOrDefault(commandType, 0);
+    }
+
+    public Map<SCMCommandProto.Type, Integer> getAllCommandsSummary() {
+      return new HashMap<>(summary);
     }
 
     /**

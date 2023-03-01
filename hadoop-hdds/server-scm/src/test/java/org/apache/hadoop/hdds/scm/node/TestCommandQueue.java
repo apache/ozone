@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -85,6 +86,15 @@ public class TestCommandQueue {
     Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.replicateContainerCommand));
 
+    Map<SCMCommandProto.Type, Integer> commandSummary =
+        commandQueue.getDatanodeCommandSummary(datanode1UUID);
+    Assert.assertEquals(3, commandSummary.size());
+    Assert.assertEquals(Integer.valueOf(2),
+        commandSummary.get(SCMCommandProto.Type.closeContainerCommand));
+    Assert.assertEquals(Integer.valueOf(1),
+        commandSummary.get(SCMCommandProto.Type.createPipelineCommand));
+    Assert.assertEquals(Integer.valueOf(1),
+        commandSummary.get(SCMCommandProto.Type.replicateContainerCommand));
 
     Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.closeContainerCommand));
