@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -71,7 +72,7 @@ public abstract class BaseHttpServer {
   static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
   private static final String JETTY_BASETMPDIR =
       "org.eclipse.jetty.webapp.basetempdir";
-  private final String serverDir = "/webserver";
+  public static final String SERVER_DIR = "/webserver";
 
   private HttpServer2 httpServer;
   private final MutableConfigurationSource conf;
@@ -188,6 +189,12 @@ public abstract class BaseHttpServer {
       httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
       LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }
+  }
+
+  @VisibleForTesting
+  public String getJettyPath() {
+    return httpServer.getWebAppContext().getAttribute(JETTY_BASETMPDIR)
+        .toString();
   }
 
   /**
