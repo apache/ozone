@@ -198,7 +198,7 @@ public interface MiniOzoneCluster {
    * @throws IOException
    */
   StorageContainerLocationProtocolClientSideTranslatorPB
-  getStorageContainerLocationClient() throws IOException;
+      getStorageContainerLocationClient() throws IOException;
 
   /**
    * Restarts StorageContainerManager instance.
