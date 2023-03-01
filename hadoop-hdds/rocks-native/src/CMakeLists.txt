@@ -21,11 +21,14 @@
 #
 
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 project(ozone_native)
 set(CMAKE_BUILD_TYPE Release)
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
 set(CMAKE_CXX_STANDARD ${CMAKE_STANDARDS})
+
 set(linked_libraries "")
 if(NOT GENERATED_JAVAH)
     message(FATAL_ERROR "You must set the CMake variable GENERATED_JAVAH")

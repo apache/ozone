@@ -146,9 +146,7 @@
                         <configuration>
                             <tasks>
                                 <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
-                                <exec executable="${shell-executable}" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
-                                    <arg line="./configure"/>
-                                </exec>
+                                <exec executable="CFLAGS='-fPIC' ./configure --static" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
                                 <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
                             </tasks>
                         </configuration>
@@ -161,7 +159,7 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
-                                <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true"/>
+                                <exec executable="make CFLAGS='-fPIC'" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true"/>
                             </tasks>
                         </configuration>
                         <goals>
@@ -173,7 +171,7 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
-                                <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true"/>
+                                <exec executable="make CFLAGS='-fPIC'" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true"/>
                             </tasks>
                         </configuration>
                         <goals>
@@ -185,7 +183,7 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
-                                <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true"/>
+                                <exec executable="make CFLAGS='-fPIC'" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true"/>
                             </tasks>
                         </configuration>
                         <goals>
@@ -203,7 +201,7 @@
                                     <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                                 </exec>
                                 <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
-                                    <arg line="EXTRA_CXXFLAGS='-I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
+                                    <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                     <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                     <arg line="-j16"/>
                                     <arg line="tools"/>

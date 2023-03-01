@@ -25,9 +25,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,6 +60,7 @@ public class ManagedSSTDumpIterator implements
   private KeyValue nextKey;
 
   private long pollIntervalMillis;
+  private Lock lock;
 
 
   public ManagedSSTDumpIterator(String sstDumptoolJarPath,
@@ -68,6 +72,7 @@ public class ManagedSSTDumpIterator implements
               sstFile.getAbsolutePath()));
     }
     this.pollIntervalMillis = pollIntervalMillis;
+    this.lock = new ReentrantLock();
     init(sstFile, sstDumptoolJarPath);
   }
 
@@ -79,7 +84,7 @@ public class ManagedSSTDumpIterator implements
     process = HddsServerUtil.getJavaProcess(Collections.emptyList(),
             sstDumptoolJarPath, SST_DUMP_TOOL_CLASS, args).start();
     processOutput = new BufferedReader(new InputStreamReader(
-            process.getInputStream()));
+            process.getInputStream(), StandardCharsets.UTF_8));
     stdoutString = new StringBuilder();
     currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
     charBuffer = new char[8192];
@@ -100,40 +105,45 @@ public class ManagedSSTDumpIterator implements
   }
 
   @Override
-  public synchronized KeyValue next() throws RuntimeIOException {
+  public KeyValue next() throws RuntimeIOException {
     checkSanityOfProcess();
-    currentKey = nextKey;
-    nextKey = null;
-    while (!currentMatcher.find()) {
-      try {
-        if (prevMatchEndIndex != 0) {
-          stdoutString = new StringBuilder(stdoutString.substring(
-                  prevMatchEndIndex, stdoutString.length()));
-          prevMatchEndIndex = 0;
-          currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
-        }
-        Thread.sleep(pollIntervalMillis);
-        int numberOfCharsRead = processOutput.read(charBuffer);
-        if (numberOfCharsRead < 0) {
-          if (currentKey != null) {
-            currentKey.setValue(stdoutString.toString());
+    try {
+      lock.lock();
+      currentKey = nextKey;
+      nextKey = null;
+      while (!currentMatcher.find()) {
+        try {
+          if (prevMatchEndIndex != 0) {
+            stdoutString = new StringBuilder(stdoutString.substring(
+                    prevMatchEndIndex, stdoutString.length()));
+            prevMatchEndIndex = 0;
+            currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
           }
-          return currentKey;
+          Thread.sleep(pollIntervalMillis);
+          int numberOfCharsRead = processOutput.read(charBuffer);
+          if (numberOfCharsRead < 0) {
+            if (currentKey != null) {
+              currentKey.setValue(stdoutString.toString());
+            }
+            return currentKey;
+          }
+          stdoutString.append(charBuffer, 0, numberOfCharsRead);
+          currentMatcher.reset();
+        } catch (IOException | InterruptedException e) {
+          throw new RuntimeIOException(e);
         }
-        stdoutString.append(charBuffer, 0, numberOfCharsRead);
-        currentMatcher.reset();
-      } catch (IOException | InterruptedException e) {
-        throw new RuntimeIOException(e);
       }
+      if (currentKey != null) {
+        currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
+                currentMatcher.start()));
+      }
+      prevMatchEndIndex = currentMatcher.end();
+      nextKey =  new KeyValue(currentMatcher.group(1), currentMatcher.group(2),
+              currentMatcher.group(3));
+      return currentKey;
+    } finally {
+      lock.unlock();
     }
-    if (currentKey != null) {
-      currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
-              currentMatcher.start()));
-    }
-    prevMatchEndIndex = currentMatcher.end();
-    nextKey =  new KeyValue(currentMatcher.group(1), currentMatcher.group(2),
-            currentMatcher.group(3));
-    return currentKey;
   }
 
   @Override

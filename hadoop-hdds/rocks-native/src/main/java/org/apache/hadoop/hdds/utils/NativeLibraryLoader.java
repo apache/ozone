@@ -34,19 +34,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NativeLibraryLoader {
   private static final String OS = System.getProperty("os.name").toLowerCase();
   private Map<String, Boolean> librariesLoaded;
-  private static NativeLibraryLoader instance;
+  private static volatile NativeLibraryLoader instance;
 
   public NativeLibraryLoader(final Map<String, Boolean> librariesLoaded) {
     this.librariesLoaded = librariesLoaded;
   }
 
+  private synchronized static void initNewInstance() {
+    if (instance == null) {
+      instance = new NativeLibraryLoader(new ConcurrentHashMap<>());
+    }
+  }
+
   public static NativeLibraryLoader getInstance() {
     if (instance == null) {
-      synchronized (NativeLibraryLoader.class) {
-        if (instance == null) {
-          instance = new NativeLibraryLoader(new ConcurrentHashMap<>());
-        }
-      }
+      initNewInstance();
     }
     return instance;
   }
