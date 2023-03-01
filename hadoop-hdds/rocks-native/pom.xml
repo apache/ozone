@@ -240,7 +240,7 @@
                     </execution>
                     <execution>
                         <id>build-rocks-tools</id>
-                        <phase>generate-sources</phase>
+                        <phase>compile</phase>
                         <configuration>
                             <tasks>
                                 <mkdir dir="${project.build.directory}/native/rocksdb"/>
