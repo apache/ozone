@@ -74,6 +74,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     LIST_STATUS,
     CREATE_KEY,
     LOOKUP_KEY,
+    GET_KEYINFO,
     HEAD_KEY,
     READ_KEY,
     LIST_KEYS,
@@ -87,7 +88,6 @@ public class OmMetadataGenerator extends BaseFreonGenerator
           + " created if missing.",
       defaultValue = "vol1")
   private String volumeName;
-
 
   @Option(names = {"-b", "--bucket"},
       description = "Name of the bucket which contains the test data. Will be"
@@ -108,16 +108,16 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   @Option(
       names = "--batch-size",
       description = "The number of key/file requests per LIST_KEY/LIST_STATUS"
-          + " request."
-  )
-  private int batchSize = 1000;
+          + " request.",
+      defaultValue = "1000")
+  private int batchSize;
 
   @Option(
       names = "--random",
       description = "random read/write if given. This means that it"
-          + " is possible to read/write the same file at the same time"
-  )
-  private boolean randomOp = false;
+          + " is possible to read/write the same file at the same time",
+      defaultValue = "false")
+  private boolean randomOp;
 
   @Option(names = {"-o", "--operation"},
       description = "The operation to perform, --ophelp Print detail")
@@ -337,12 +337,20 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         return null;
       });
       break;
+    case GET_KEYINFO:
+      keyName = getPath(counter);
+      keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
+      getMetrics().timer(operation.name()).time(() -> {
+        ozoneManagerClient.getKeyInfo(keyArgs, false);
+        return null;
+      });
+      break;
     case HEAD_KEY:
       keyName = getPath(counter);
       keyArgs = omKeyArgsBuilder.get()
           .setKeyName(keyName).setHeadOp(true).build();
       getMetrics().timer(operation.name()).time(() -> {
-        ozoneManagerClient.lookupKey(keyArgs);
+        ozoneManagerClient.getKeyInfo(keyArgs, false);
         return null;
       });
       break;
@@ -405,7 +413,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       keyArgs = omKeyArgsBuilder.get().setKeyName("").build();
       getMetrics().timer(operation.name()).time(() -> {
         List<OzoneFileStatus> fileStatusList = ozoneManagerClient.listStatus(
-            keyArgs, true, startKeyName, batchSize);
+            keyArgs, false, startKeyName, batchSize);
         if (fileStatusList.size() < batchSize - 1) {
           throw new NoSuchFileException(
               "There are not enough files for testing you should use "
