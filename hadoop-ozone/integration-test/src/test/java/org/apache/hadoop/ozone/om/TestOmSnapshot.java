@@ -415,27 +415,27 @@ public class TestOmSnapshot {
   }
 
   @Test
-    public void testCreateSnapshotMissingMandatoryParams() throws Exception {
-      String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-      String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
-      store.createVolume(volume);
-      OzoneVolume volume1 = store.getVolume(volume);
-      volume1.createBucket(bucket);
-      OzoneBucket bucket1 = volume1.getBucket(bucket);
-      // Create Key1 and take snapshot
-      String key1 = "key-1-";
-      createFileKey(bucket1, key1);
-      String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
-      createSnapshot(volume, bucket, snap1);
+  public void testCreateSnapshotMissingMandatoryParams() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
 
-      String nullstr = "";
-      // Bucket is empty
-      assertThrows(IllegalArgumentException.class,
-              () -> createSnapshot(volume, nullstr));
-      // Volume is empty
-      assertThrows(IllegalArgumentException.class,
-              () -> createSnapshot(nullstr, bucket));
-    }
+    String nullstr = "";
+    // Bucket is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> createSnapshot(volume, nullstr));
+    // Volume is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> createSnapshot(nullstr, bucket));
+  }
 
   @Test
   public void testBucketDeleteIfSnapshotExists() throws Exception {
@@ -663,75 +663,75 @@ public class TestOmSnapshot {
   }
 
   @Test
-    public void testDeleteSnapshotTwice() throws Exception {
-      String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-      String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
-      store.createVolume(volume);
-      OzoneVolume volume1 = store.getVolume(volume);
-      volume1.createBucket(bucket);
-      OzoneBucket bucket1 = volume1.getBucket(bucket);
-      // Create Key1 and take snapshot
-      String key1 = "key-1-";
-      createFileKey(bucket1, key1);
-      String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
-      createSnapshot(volume, bucket, snap1);
-      store.deleteSnapshot(volume, bucket, snap1);
+  public void testDeleteSnapshotTwice() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+    store.deleteSnapshot(volume, bucket, snap1);
 
-      LambdaTestUtils.intercept(OMException.class,
-                  "FILE_NOT_FOUND",
-                  () -> store.deleteSnapshot(volume, bucket, snap1));
+    LambdaTestUtils.intercept(OMException.class,
+            "FILE_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, bucket, snap1));
 
-    }
+  }
 
-    @Test
-    public void testDeleteSnapshotFailure() throws Exception {
-      String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-      String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
-      store.createVolume(volume);
-      OzoneVolume volume1 = store.getVolume(volume);
-      volume1.createBucket(bucket);
-      OzoneBucket bucket1 = volume1.getBucket(bucket);
-      // Create Key1 and take snapshot
-      String key1 = "key-1-";
-      createFileKey(bucket1, key1);
-      String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
-      createSnapshot(volume, bucket, snap1);
+  @Test
+  public void testDeleteSnapshotFailure() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
 
-      // Delete non-existent snapshot
-      LambdaTestUtils.intercept(OMException.class,
-                  "FILE_NOT_FOUND",
-                  () -> store.deleteSnapshot(volume, bucket, "snapnonexistent"));
+    // Delete non-existent snapshot
+    LambdaTestUtils.intercept(OMException.class,
+            "FILE_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, bucket, "snapnonexistent"));
 
-      // Delete snapshot with non-existent url
-      LambdaTestUtils.intercept(OMException.class,
-                   "BUCKET_NOT_FOUND",
-                  () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
-    }
+    // Delete snapshot with non-existent url
+    LambdaTestUtils.intercept(OMException.class,
+            "BUCKET_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
+  }
 
-    @Test
-    public void testDeleteSnapshotMissingMandatoryParams() throws Exception {
-      String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-      String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
-      store.createVolume(volume);
-      OzoneVolume volume1 = store.getVolume(volume);
-      volume1.createBucket(bucket);
-      OzoneBucket bucket1 = volume1.getBucket(bucket);
-      // Create Key1 and take snapshot
-      String key1 = "key-1-";
-      createFileKey(bucket1, key1);
-      String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
-      createSnapshot(volume, bucket, snap1);
-      String nullstr = "";
-      // Snapshot is empty
-      assertThrows(IllegalArgumentException.class,
-              () -> store.deleteSnapshot(volume, bucket, nullstr));
-      // Bucket is empty
-      assertThrows(IllegalArgumentException.class,
-              () -> store.deleteSnapshot(volume, nullstr, snap1));
-      // Volume is empty
-      assertThrows(IllegalArgumentException.class,
-              () -> store.deleteSnapshot(nullstr, bucket, snap1));
-    }
+  @Test
+  public void testDeleteSnapshotMissingMandatoryParams() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+    String nullstr = "";
+    // Snapshot is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(volume, bucket, nullstr));
+    // Bucket is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(volume, nullstr, snap1));
+    // Volume is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(nullstr, bucket, snap1));
+  }
 
   @NotNull
   private static List<LiveFileMetaData> getKeyTableSstFiles() {
