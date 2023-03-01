@@ -22,7 +22,7 @@
 
 <!--Tags supported are OZONE, CBLOCK, MANAGEMENT, SECURITY, PERFORMANCE,   -->
 <!--DEBUG, CLIENT, SERVER, OM, SCM, CRITICAL, RATIS, CONTAINER, REQUIRED, -->
-<!--REST, STORAGE, PIPELINE, STANDALONE                                    -->
+<!--REST, STORAGE, PIPELINE, STANDALONE, DATASTREAM                        -->
 
 <configuration>
 
