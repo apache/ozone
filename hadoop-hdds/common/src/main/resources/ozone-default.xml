@@ -20,9 +20,28 @@
 <!-- wish to modify from this file into ozone-site.xml and change them -->
 <!-- there.  If ozone-site.xml does not already exist, create it.      -->
 
-<!--Tags supported are OZONE, CBLOCK, MANAGEMENT, SECURITY, PERFORMANCE,   -->
-<!--DEBUG, CLIENT, SERVER, OM, SCM, CRITICAL, RATIS, CONTAINER, REQUIRED, -->
-<!--REST, STORAGE, PIPELINE, STANDALONE, DATASTREAM                        -->
+<!-- Known Ozone configuration tags                                      -->
+<!--                                                                     -->
+<!-- Listed in hadoop.tags.custom:                                       -->
+<!--   CLIENT, CONTAINER, CRITICAL, DEBUG, MANAGEMENT, OM, OZONE,        -->
+<!--   PERFORMANCE, PIPELINE, RATIS, RECON, REQUIRED, REST, S3GATEWAY,   -->
+<!--   SCM, SECURITY, SERVER, STANDALONE, STORAGE                        -->
+<!--                                                                     -->
+<!-- Listed in ozone.tags.system:                                        -->
+<!--   CLIENT, CONTAINER, CRITICAL, DEBUG, MANAGEMENT, OM, OZONE,        -->
+<!--   PERFORMANCE, PIPELINE, RATIS, RECON, REQUIRED, REST, S3GATEWAY,   -->
+<!--   SCM, SECURITY, SERVER, STANDALONE, STORAGE, TLS, TOKEN            -->
+<!--                                                                     -->
+<!-- Used in ozone-default.xml (this file):                              -->
+<!--   ACL, CLIENT, CONTAINER, DATANODE, DATASTREAM, DEBUG, DEPRECATED,  -->
+<!--   DN, FREON, HA, HDDS, KERBEROS, MANAGEMENT, OM, OPERATION, OZONE,  -->
+<!--   OZONEFS, PERFORMANCE, PIPELINE, RATIS, RECON, REQUIRED, S3G,      -->
+<!--   S3GATEWAY, SCM, SECURITY, STORAGE, TLS, TOKEN, X509               -->
+<!--                                                                     -->
+<!-- Used in classes annotated with @Config:                             -->
+<!--   BALANCER, CLIENT, DATANODE, DATASTREAM, DELETION, MANAGEMENT, OM, -->
+<!--   OZONE, PERFORMANCE, PIPELINE, RATIS, RECON, S3GATEWAY, SCM,       -->
+<!--   SECURITY, STORAGE, UPGRADE                                        -->
 
 <configuration>
 
