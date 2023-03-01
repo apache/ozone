@@ -21,8 +21,10 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -47,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -64,12 +67,16 @@ import org.apache.hadoop.security.token.Token;
 
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of all container protocol calls performed by Container
  * clients.
  */
 public final class ContainerProtocolCalls  {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerProtocolCalls.class);
 
   /**
    * There is no need to instantiate this class.
@@ -278,7 +285,29 @@ public final class ContainerProtocolCalls  {
             .setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .setChunkData(chunk)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
-    String id = xceiverClient.getPipeline().getClosestNode().getUuidString();
+    Set<DatanodeDetails> excluded = null;
+    for (; ;) {
+      final DatanodeDetails d = xceiverClient.getPipeline()
+          .getClosestNode(excluded);
+      final ReadChunkResponseProto response = readChunk(xceiverClient,
+          chunk, blockID, validators, token, readChunkRequest, d);
+      if (response != null) {
+        return response;
+      }
+      if (excluded == null) {
+        excluded = new HashSet<>();
+      }
+      excluded.add(d);
+    }
+  }
+
+  private static ContainerProtos.ReadChunkResponseProto readChunk(
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
+      List<CheckedBiFunction> validators,
+      Token<? extends TokenIdentifier> token,
+      ReadChunkRequestProto.Builder readChunkRequest,
+      DatanodeDetails d) throws IOException {
+    final String id = d.getUuidString();
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)
             .setContainerID(blockID.getContainerID())
@@ -287,9 +316,37 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
     ContainerCommandRequestProto request = builder.build();
-    ContainerCommandResponseProto reply =
-        xceiverClient.sendCommand(request, validators);
-    return reply.getReadChunk();
+    final ContainerCommandResponseProto reply;
+    try {
+      reply = xceiverClient.sendCommand(request, validators);
+    } catch (IOException e) {
+      LOG.warn(toErrorMessage(chunk, blockID, d), e);
+      return null;
+    }
+    final ReadChunkResponseProto response = reply.getReadChunk();
+    final long readLen = getLen(response);
+    if (readLen != chunk.getLen()) {
+      LOG.warn(toErrorMessage(chunk, blockID, d) + ": readLen=" + readLen);
+      return null;
+    }
+    return response;
+  }
+
+  static String toErrorMessage(ChunkInfo chunk, BlockID blockId,
+      DatanodeDetails d) {
+    return String.format("Failed to read chunk %s (len=%s) %s from %s",
+        chunk.getChunkName(), chunk.getLen(), blockId, d);
+  }
+
+  static long getLen(ReadChunkResponseProto response) {
+    if (response.hasData()) {
+      return response.getData().size();
+    } else if (response.hasDataBuffers()) {
+      return response.getDataBuffers() .getBuffersList().stream()
+          .mapToLong(ByteString::size).sum();
+    } else {
+      return -1;
+    }
   }
 
   /**
