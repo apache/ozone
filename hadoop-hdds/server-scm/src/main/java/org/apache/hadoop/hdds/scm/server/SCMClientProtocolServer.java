@@ -24,17 +24,23 @@ package org.apache.hadoop.hdds.scm.server;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -112,7 +118,7 @@ import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
  * The RPC server that listens to requests from clients.
  */
 public class SCMClientProtocolServer implements
-    StorageContainerLocationProtocol, Auditor {
+    StorageContainerLocationProtocol, ReconfigureProtocol, Auditor {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMClientProtocolServer.class);
   private static final AuditLogger AUDIT =
@@ -152,6 +158,16 @@ public class SCMClientProtocolServer implements
             StorageContainerLocationProtocolPB.class,
             storageProtoPbService,
             handlerCount);
+
+    // Add reconfigureProtocolService.
+    ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
+        = new ReconfigureProtocolServerSideTranslatorPB(this);
+    BlockingService reconfigureService =
+        ReconfigureProtocolService.newReflectiveBlockingService(
+            reconfigureServerProtocol);
+    HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolPB.class,
+        reconfigureService, clientRpcServer);
+
     clientRpcAddress =
         updateRPCListenAddress(conf,
             scm.getScmNodeDetails().getClientProtocolServerAddressKey(),
@@ -1250,6 +1266,29 @@ public class SCMClientProtocolServer implements
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
+  }
+
+  @Override
+  public String getServerName() throws IOException {
+    return "SCM";
+  }
+
+  @Override
+  public void startReconfigure() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    getScm().startReconfigurationTask();
+  }
+
+  @Override
+  public ReconfigurationTaskStatus getReconfigureStatus() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    return getScm().getReconfigurationTaskStatus();
+  }
+
+  @Override
+  public List<String> listReconfigureProperties() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser());
+    return Lists.newArrayList(getScm().getReconfigurableProperties());
   }
 
   @Override

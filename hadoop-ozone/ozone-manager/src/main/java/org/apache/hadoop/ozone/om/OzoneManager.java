@@ -4479,6 +4479,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override // ReconfigureProtocol
+  public String getServerName() throws IOException {
+    return "OM";
+  }
+
+  @Override // ReconfigureProtocol
   public void startReconfigure() throws IOException {
     String operationName = "startOmReconfiguration";
     checkAdminUserPrivilege(operationName);
