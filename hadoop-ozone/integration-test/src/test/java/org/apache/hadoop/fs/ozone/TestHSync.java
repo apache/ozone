@@ -267,9 +267,9 @@ public class TestHSync {
       GeneralSecurityException {
     KeyOutputStream kos;
     if (isEC) {
-      kos = mock(KeyOutputStream.class);
-    } else {
       kos = mock(ECKeyOutputStream.class);
+    } else {
+      kos = mock(KeyOutputStream.class);
     }
     CryptoCodec codec = mock(CryptoCodec.class);
     when(codec.getCipherSuite()).thenReturn(CipherSuite.AES_CTR_NOPADDING);
