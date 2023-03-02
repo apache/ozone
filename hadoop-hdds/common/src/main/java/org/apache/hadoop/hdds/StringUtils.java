@@ -21,9 +21,11 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.SignalLogger;
 import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.net.NetUtils;
@@ -105,12 +107,13 @@ public final class StringUtils {
   }
 
   public static void startupShutdownMessage(VersionInfo versionInfo,
-      Class<?> clazz, String[] args, Logger log) {
+      Class<?> clazz, String[] args, Logger log, OzoneConfiguration conf) {
     final String hostname = NetUtils.getHostname();
     final String className = clazz.getSimpleName();
+
     if (log.isInfoEnabled()) {
       log.info(createStartupShutdownMessage(versionInfo, className, hostname,
-          args));
+          args, HddsUtils.processForLogging(conf)));
     }
 
     if (SystemUtils.IS_OS_UNIX) {
@@ -135,7 +138,8 @@ public final class StringUtils {
    * @return a string to log.
    */
   public static String createStartupShutdownMessage(VersionInfo versionInfo,
-      String className, String hostname, String[] args) {
+      String className, String hostname, String[] args,
+      Map<String, String> conf) {
     return toStartupShutdownString("STARTUP_MSG: ",
         "Starting " + className,
         "  host = " + hostname,
@@ -146,7 +150,8 @@ public final class StringUtils {
             + versionInfo.getRevision()
             + " ; compiled by '" + versionInfo.getUser()
             + "' on " + versionInfo.getDate(),
-        "  java = " + System.getProperty("java.version"));
+        "  java = " + System.getProperty("java.version"),
+        "  conf = " + conf);
   }
 
   public static String appendIfNotPresent(String str, char c) {

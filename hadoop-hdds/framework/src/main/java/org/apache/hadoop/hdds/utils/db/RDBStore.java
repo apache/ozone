@@ -121,7 +121,8 @@ public class RDBStore implements DBStore {
         jmxProperties.put("dbName", dbJmxBeanName);
         statMBeanName = HddsUtils.registerWithJmxProperties(
             "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(), dbJmxBeanName));
+            RocksDBStoreMBean.create(dbOptions.statistics(), db,
+                dbJmxBeanName));
         if (statMBeanName == null) {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
               dbJmxBeanName);

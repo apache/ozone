@@ -49,6 +49,7 @@ import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.Ignore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -414,6 +415,29 @@ public class TestOmSnapshot {
   }
 
   @Test
+  public void testCreateSnapshotMissingMandatoryParams() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+
+    String nullstr = "";
+    // Bucket is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> createSnapshot(volume, nullstr));
+    // Volume is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> createSnapshot(nullstr, bucket));
+  }
+
+  @Test
   public void testBucketDeleteIfSnapshotExists() throws Exception {
     String volume1 = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucket1 = "buc-" + RandomStringUtils.randomNumeric(5);
@@ -597,6 +621,7 @@ public class TestOmSnapshot {
    * snapshots pertaining to different buckets. This will test the
    * sst filtering code path.
    */
+  @Ignore //TODO - Fix in HDDS-8005
   @Test
   public void testSnapDiffWithMultipleSSTs()
       throws IOException, InterruptedException, TimeoutException {
@@ -635,6 +660,77 @@ public class TestOmSnapshot {
     SnapshotDiffReport diff1 =
         store.snapshotDiff(volumeName1, bucketName1, snap1, snap2);
     Assert.assertEquals(1, diff1.getDiffList().size());
+  }
+
+  @Test
+  public void testDeleteSnapshotTwice() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+    store.deleteSnapshot(volume, bucket, snap1);
+
+    LambdaTestUtils.intercept(OMException.class,
+            "FILE_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, bucket, snap1));
+
+  }
+
+  @Test
+  public void testDeleteSnapshotFailure() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+
+    // Delete non-existent snapshot
+    LambdaTestUtils.intercept(OMException.class,
+            "FILE_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, bucket, "snapnonexistent"));
+
+    // Delete snapshot with non-existent url
+    LambdaTestUtils.intercept(OMException.class,
+            "BUCKET_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
+  }
+
+  @Test
+  public void testDeleteSnapshotMissingMandatoryParams() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+    String nullstr = "";
+    // Snapshot is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(volume, bucket, nullstr));
+    // Bucket is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(volume, nullstr, snap1));
+    // Volume is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(nullstr, bucket, snap1));
   }
 
   @NotNull

@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(ReloadingX509TrustManager.class);
+      LoggerFactory.getLogger(ReloadingX509KeyManager.class);
 
   static final String RELOAD_ERROR_MESSAGE =
       "Could not reload keystore (keep using existing one) : ";

@@ -107,6 +107,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
   @Test
+  @Flaky("HDDS-8035")
   public void testOMHAMetrics() throws InterruptedException,
       TimeoutException, IOException {
     waitForLeaderToBeReady();

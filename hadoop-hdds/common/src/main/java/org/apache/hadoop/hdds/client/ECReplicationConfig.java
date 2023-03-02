@@ -198,11 +198,8 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   @Override
   public String toString() {
-    return HddsProtos.ReplicationType.EC + "/ECReplicationConfig{"
-        + "data=" + data
-        + ", parity=" + parity
-        + ", ecChunkSize=" + ecChunkSize
-        + ", codec=" + codec + '}';
+    return HddsProtos.ReplicationType.EC + "{"
+        + codec + "-" + data + "-" + parity + "-" + ecChunkSize + "}";
   }
 
   @Override
