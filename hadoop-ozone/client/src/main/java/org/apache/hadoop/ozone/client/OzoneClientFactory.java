@@ -86,10 +86,10 @@ public final class OzoneClientFactory {
   public static OzoneClient getRpcClient(String omHost, Integer omRpcPort,
       MutableConfigurationSource config)
       throws IOException {
-    OmUtils.resolveOmHost(omHost, omRpcPort);
     Preconditions.checkNotNull(omHost);
     Preconditions.checkNotNull(omRpcPort);
     Preconditions.checkNotNull(config);
+    OmUtils.resolveOmHost(omHost, omRpcPort);
     config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
     return getRpcClient(getClientProtocol(config), config);
   }
