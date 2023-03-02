@@ -591,20 +591,6 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
-   * Process the Command Queue Report sent from datanodes as part of the
-   * heartbeat message.
-   * @param datanodeDetails
-   * @param commandReport
-   * @param commandsToBeSent
-   */
-  @Override
-  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport,
-      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
-    // do nothing.
-  }
-
-  /**
    * Get the number of commands of the given type queued on the datanode at the
    * last heartbeat. If the Datanode has not reported information for the given
    * command type, -1 will be returned.
@@ -759,11 +745,13 @@ public class MockNodeManager implements NodeManager {
    *
    * @param datanodeDetails - Datanode ID.
    * @param layoutInfo - DataNode Layout info
+   * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo) {
+      LayoutVersionProto layoutInfo,
+      CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
 

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -297,19 +296,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void processLayoutVersionReport(DatanodeDetails datanodeDetails,
                          LayoutVersionProto layoutReport);
-
-  /**
-   * Process the Command Queue Report sent from datanodes as part of the
-   * heartbeat message.
-   * @param datanodeDetails DatanodeDetails the report is from
-   * @param commandReport Command summary report from the DN when the heartbeat
-   *                      was created.
-   * @param commandsToBeSent Summary of command counts that will be sent to
-   *                         the Datanode as part of the current heartbeat
-   */
-  void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport,
-      Map<SCMCommandProto.Type, Integer> commandsToBeSent);
 
   /**
    * Get the number of commands of the given type queued on the datanode at the

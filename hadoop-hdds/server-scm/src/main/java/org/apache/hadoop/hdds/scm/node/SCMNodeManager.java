@@ -497,7 +497,8 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo) {
+                                           LayoutVersionProto layoutInfo,
+      CommandQueueReportProto queueReport) {
     Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
@@ -511,7 +512,19 @@ public class SCMNodeManager implements NodeManager {
       LOG.error("SCM trying to process heartbeat from an " +
           "unregistered node {}. Ignoring the heartbeat.", datanodeDetails);
     }
-    return commandQueue.getCommand(datanodeDetails.getUuid());
+    commandQueue.lock();
+    try {
+      Map<SCMCommandProto.Type, Integer> summary =
+          commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
+      List<SCMCommand> commands =
+          commandQueue.getCommand(datanodeDetails.getUuid());
+      if (queueReport != null) {
+        processNodeCommandQueueReport(datanodeDetails, queueReport, summary);
+      }
+      return commands;
+    } finally {
+      commandQueue.unlock();
+    }
   }
 
   boolean opStateDiffers(DatanodeDetails dnDetails, NodeStatus nodeStatus) {
@@ -704,12 +717,16 @@ public class SCMNodeManager implements NodeManager {
    * @param commandQueueReportProto
    * @param commandsToBeSent
    */
-  @Override
-  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
+  private void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
       CommandQueueReportProto commandQueueReportProto,
       Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     LOG.debug("Processing Command Queue Report from [datanode={}]",
         datanodeDetails.getHostName());
+    if (commandQueueReportProto == null) {
+      LOG.debug("The Command Queue Report from [datanode={}] is null",
+          datanodeDetails.getHostName());
+      return;
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Command Queue Report is received from [datanode={}]: " +
           "<json>{}</json>", datanodeDetails.getHostName(),
@@ -717,13 +734,11 @@ public class SCMNodeManager implements NodeManager {
     }
     try {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
-      if (commandQueueReportProto != null) {
-        datanodeInfo.setCommandCounts(commandQueueReportProto,
-            commandsToBeSent);
-        metrics.incNumNodeCommandQueueReportProcessed();
-        scmNodeEventPublisher.fireEvent(
-            SCMEvents.DATANODE_COMMAND_COUNT_UPDATED, datanodeDetails);
-      }
+      datanodeInfo.setCommandCounts(commandQueueReportProto,
+          commandsToBeSent);
+      metrics.incNumNodeCommandQueueReportProcessed();
+      scmNodeEventPublisher.fireEvent(
+          SCMEvents.DATANODE_COMMAND_COUNT_UPDATED, datanodeDetails);
     } catch (NodeNotFoundException e) {
       metrics.incNumNodeCommandQueueReportProcessingFailed();
       LOG.warn("Got Command Queue Report from unregistered datanode {}",

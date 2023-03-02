@@ -291,12 +291,6 @@ public class SimpleMockNodeManager implements NodeManager {
                                          LayoutVersionProto layoutReport) {
   }
 
-  @Override
-  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport,
-      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
-  }
-
   /**
    * Get the number of commands of the given type queued on the datanode at the
    * last heartbeat. If the Datanode has not reported information for the given
@@ -394,7 +388,8 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo) {
+      LayoutVersionProto layoutInfo,
+      CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
 

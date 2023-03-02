@@ -366,11 +366,13 @@ public class ReplicationNodeManagerMock implements NodeManager {
    *
    * @param dd - Datanode Details.
    * @param layoutInfo - Layout Version Proto
+   * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
-                                           LayoutVersionProto layoutInfo) {
+      LayoutVersionProto layoutInfo,
+      CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
 
@@ -430,13 +432,6 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void processLayoutVersionReport(DatanodeDetails dnUuid,
                                 LayoutVersionProto layoutVersionReport) {
     // do nothing.
-  }
-
-  @Override
-  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport,
-      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
-    // Do nothing.
   }
 
   /**
