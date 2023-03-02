@@ -4136,21 +4136,29 @@ public abstract class TestOzoneRpcClientAbstract {
     String snapshotPrefixA = "snapshot-a-";
     String snapshotPrefixB = "snapshot-b-";
     for (int i = 0; i < 10; i++) {
-      store.createSnapshot(volumeA, bucketA, snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
-      store.createSnapshot(volumeA, bucketB, snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
-      store.createSnapshot(volumeB, bucketA, snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
-      store.createSnapshot(volumeB, bucketB, snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeA, bucketA,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeA, bucketB,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketA,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketB,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
     }
     for (int i = 0; i < 10; i++) {
-      store.createSnapshot(volumeA, bucketA, snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
-      store.createSnapshot(volumeA, bucketB, snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
-      store.createSnapshot(volumeB, bucketA, snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
-      store.createSnapshot(volumeB, bucketB, snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeA, bucketA,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeA, bucketB,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketA,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketB,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
 
     Iterator<? extends OzoneSnapshot> snapshotIter = store.listSnapshot(volumeA, bucketA, null, null);
     int volABucketASnapshotCount = 0;
-    while (snapshotIter.hasNext()){
+    while (snapshotIter.hasNext()) {
       OzoneSnapshot snapshot = snapshotIter.next();
       volABucketASnapshotCount++;
     }
@@ -4158,7 +4166,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     snapshotIter = store.listSnapshot(volumeA, bucketB, null, null);
     int volABucketBSnapshotCount = 0;
-    while (snapshotIter.hasNext()){
+    while (snapshotIter.hasNext()) {
       OzoneSnapshot snapshot = snapshotIter.next();
       volABucketBSnapshotCount++;
     }
@@ -4166,7 +4174,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     snapshotIter = store.listSnapshot(volumeB, bucketA, null, null);
     int volBBucketASnapshotCount = 0;
-    while (snapshotIter.hasNext()){
+    while (snapshotIter.hasNext()) {
       OzoneSnapshot snapshot = snapshotIter.next();
       volBBucketASnapshotCount++;
     }
@@ -4174,7 +4182,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     snapshotIter = store.listSnapshot(volumeB, bucketB, null, null);
     int volBBucketBSnapshotCount = 0;
-    while (snapshotIter.hasNext()){
+    while (snapshotIter.hasNext()) {
       OzoneSnapshot snapshot = snapshotIter.next();
       volBBucketBSnapshotCount++;
     }
