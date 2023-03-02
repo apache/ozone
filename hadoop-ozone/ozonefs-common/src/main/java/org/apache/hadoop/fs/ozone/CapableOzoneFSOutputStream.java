@@ -53,7 +53,8 @@ public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
     return hasWrappedCapability(os, capability);
   }
 
-  private static boolean hasWrappedCapability(OutputStream os, String capability) {
+  private static boolean hasWrappedCapability(OutputStream os,
+      String capability) {
     if (os instanceof ECKeyOutputStream) {
       return false;
     } else if (os instanceof KeyOutputStream) {
