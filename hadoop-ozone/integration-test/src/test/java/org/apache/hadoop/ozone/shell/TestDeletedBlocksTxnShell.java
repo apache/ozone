@@ -227,7 +227,7 @@ public class TestDeletedBlocksTxnShell {
     Assertions.assertEquals(20, matchCount);
 
     // print the first 10 failed txns info into file
-    cmd.parseArgs("-o", txnFile.getAbsolutePath(), "-n", "10");
+    cmd.parseArgs("-o", txnFile.getAbsolutePath(), "-c", "10");
     getCommand.execute(scmClient);
     Assertions.assertTrue(txnFile.exists());
 

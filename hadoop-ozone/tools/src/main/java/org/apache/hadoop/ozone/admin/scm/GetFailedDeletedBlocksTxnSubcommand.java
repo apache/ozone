@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  */
 @CommandLine.Command(
     name = "ls",
-    description = "Print the failed DeletedBlocksTxn (retry count = -1)",
+    description = "Print the failed DeletedBlocksTransaction(retry count = -1)",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
@@ -50,24 +50,30 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
         description = "Get all the failed transactions.")
     private boolean getAll;
 
-    @CommandLine.Option(names = {"-n", "--num"},
+    @CommandLine.Option(names = {"-c", "--count"},
         defaultValue = "20",
-        description = "Get certain number of the failed transactions.")
-    private int num;
+        description = "Get at most the count number of the" +
+            " failed transactions.")
+    private int count;
   }
+
+  @CommandLine.Option(names = {"-s", "--startTxId"},
+      defaultValue = "0",
+      description = "The least transaction ID to start with, default 0." +
+          " Only work with -c/--count")
+  private int startTxId;
 
   @CommandLine.Option(names = {"-o", "--out"},
       description = "Print transactions into file in JSON format.")
   private String fileName;
 
+  private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
+
   @Override
   public void execute(ScmClient client) throws IOException {
     List<DeletedBlocksTransactionInfo> response;
-    if (group.getAll) {
-      response = client.getFailedDeletedBlockTxn(-1);
-    } else {
-      response = client.getFailedDeletedBlockTxn(group.num);
-    }
+    int count = group.getAll ? LIST_ALL_FAILED_TRANSACTIONS : group.count;
+    response = client.getFailedDeletedBlockTxn(count, startTxId);
     List<DeletedBlocksTransactionInfoWrapper> txns = response.stream()
         .map(DeletedBlocksTransactionInfoWrapper::fromProtobuf)
         .filter(Objects::nonNull)

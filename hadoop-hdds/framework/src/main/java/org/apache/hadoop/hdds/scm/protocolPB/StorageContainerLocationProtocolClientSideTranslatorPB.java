@@ -717,11 +717,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count)
-      throws IOException {
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      int startTxId) throws IOException {
     GetFailedDeletedBlocksTxnRequestProto request =
         GetFailedDeletedBlocksTxnRequestProto.newBuilder()
             .setCount(count)
+            .setStartTxId(startTxId)
             .build();
     GetFailedDeletedBlocksTxnResponseProto resp = submitRequest(
         Type.GetFailedDeletedBlocksTransaction,

@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  */
 @CommandLine.Command(
     name = "reset",
-    description = "Reset the failed DeletedBlocksTxn retry count",
+    description = "Reset the retry count of failed DeletedBlocksTransaction",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
@@ -58,12 +58,12 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
         split = ",",
         paramLabel = "txId",
         description = "Reset the only given deletedBlock transaction ID" +
-            " list, e.g 100,101,102.(Separated by ',')")
+            " list. Example: 100,101,102.(Separated by ',')")
     private List<Long> txList;
 
     @CommandLine.Option(names = {"-i", "--in"},
         description = "Use file as input, need to be JSON Array format and" +
-            " contains multi \"txID\" key.")
+            " contains multi \"txID\" key.Example: [{\"txID\":1},{\"txID\":2}]")
     private String fileName;
   }
 

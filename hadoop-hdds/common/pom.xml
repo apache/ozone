@@ -227,10 +227,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hdds-interface-admin</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-interface-server</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-all</artifactId>
       <scope>test</scope>

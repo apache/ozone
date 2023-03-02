@@ -92,7 +92,7 @@ public class DeletedBlockLogImpl
   private final SequenceIdGenerator sequenceIdGen;
   private final ScmBlockDeletingServiceMetrics metrics;
 
-  private static final  int LIST_ALL_FAILED_TRANSACTIONS = -1;
+  private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
 
   @SuppressWarnings("parameternumber")
   public DeletedBlockLogImpl(ConfigurationSource conf,
@@ -128,15 +128,15 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public List<DeletedBlocksTransaction> getFailedTransactions(int count)
-      throws IOException {
+  public List<DeletedBlocksTransaction> getFailedTransactions(int count,
+      int startTxId) throws IOException {
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        if (count <= 0) {
+        if (count == LIST_ALL_FAILED_TRANSACTIONS) {
           while (iter.hasNext()) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
             if (delTX.getCount() == -1) {
@@ -146,7 +146,7 @@ public class DeletedBlockLogImpl
         } else {
           while (iter.hasNext() && failedTXs.size() < count) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
-            if (delTX.getCount() == -1) {
+            if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
               failedTXs.add(delTX);
             }
           }
@@ -202,7 +202,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       if (txIDs == null || txIDs.isEmpty()) {
-        txIDs = getFailedTransactions(LIST_ALL_FAILED_TRANSACTIONS).stream()
+        txIDs = getFailedTransactions(LIST_ALL_FAILED_TRANSACTIONS, 0).stream()
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
       }

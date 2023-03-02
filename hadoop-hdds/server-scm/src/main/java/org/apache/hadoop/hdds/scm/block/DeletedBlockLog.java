@@ -56,10 +56,11 @@ public interface DeletedBlockLog extends Closeable {
    * and its count is reset to -1.
    *
    * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param startTxId The least transaction id to start with.
    * @return a list of failed deleted block transactions.
    * @throws IOException
    */
-  List<DeletedBlocksTransaction> getFailedTransactions(int count)
+  List<DeletedBlocksTransaction> getFailedTransactions(int count, int startTxId)
       throws IOException;
 
   /**

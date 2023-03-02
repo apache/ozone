@@ -375,11 +375,12 @@ public interface ScmClient extends Closeable {
    * and its count is reset to -1.
    *
    * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param startTxId The least transaction id to start with.
    * @return a list of failed deleted block transactions.
    * @throws IOException
    */
-  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count)
-      throws IOException;
+  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      int startTxId) throws IOException;
 
   /**
    * Reset the failed deleted block retry count.

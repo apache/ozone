@@ -832,12 +832,12 @@ public class SCMClientProtocolServer implements
     }
   }
 
-  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count)
-      throws IOException {
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      int startTxId) throws IOException {
     List<DeletedBlocksTransactionInfo> result;
     try {
       result = scm.getScmBlockManager().getDeletedBlockLog()
-          .getFailedTransactions(count).stream()
+          .getFailedTransactions(count, startTxId).stream()
           .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
           .collect(Collectors.toList());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
