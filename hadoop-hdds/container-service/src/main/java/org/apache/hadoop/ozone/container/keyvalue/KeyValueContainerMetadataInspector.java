@@ -233,7 +233,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   static long getLong(String key, JsonObject json) {
     final JsonElement e = json.get(key);
-    return e == null || e.isJsonNull()? 0 : e.getAsLong();
+    return e == null || e.isJsonNull() ? 0 : e.getAsLong();
   }
 
   static void checkDeleteCounts(JsonObject dBMetadata, JsonObject aggregates,

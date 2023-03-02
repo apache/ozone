@@ -22,7 +22,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -32,7 +31,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
-import java.util.Iterator;
 import java.util.concurrent.Callable;
 
 /**
@@ -57,13 +55,13 @@ public class InspectSubcommand implements Callable<Void> {
         .serializeNulls()
         .create();
 
-    for(Container<?> container : parent.getController().getContainerSet()) {
+    for (Container<?> container : parent.getController().getContainerSet()) {
       final ContainerData data = container.getContainerData();
       if (!(data instanceof KeyValueContainerData)) {
         continue;
       }
-      final KeyValueContainerData kvData = (KeyValueContainerData)data;
-      try(DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
+      final KeyValueContainerData kvData = (KeyValueContainerData) data;
+      try (DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
           kvData, conf, true)) {
         final JsonObject json = KeyValueContainerMetadataInspector
             .inspectContainer(kvData, store);
