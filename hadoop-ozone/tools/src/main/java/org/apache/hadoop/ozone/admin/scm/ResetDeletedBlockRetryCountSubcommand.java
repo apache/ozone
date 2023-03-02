@@ -56,7 +56,7 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
 
     @CommandLine.Option(names = {"-l", "--list"},
         split = ",",
-        paramLabel = "txId",
+        paramLabel = "txID",
         description = "Reset the only given deletedBlock transaction ID" +
             " list. Example: 100,101,102.(Separated by ',')")
     private List<Long> txList;
@@ -74,21 +74,29 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
       count = client.resetDeletedBlockRetryCount(new ArrayList<>());
     } else if (group.fileName != null) {
       Gson gson = new Gson();
-      List<Long> txIds;
+      List<Long> txIDs;
       try (InputStream in = new FileInputStream(group.fileName);
            Reader fileReader = new InputStreamReader(in,
                StandardCharsets.UTF_8)) {
         DeletedBlocksTransactionInfoWrapper[] txns = gson.fromJson(fileReader,
             DeletedBlocksTransactionInfoWrapper[].class);
-        txIds = Arrays.stream(txns).map(DeletedBlocksTransactionInfoWrapper::
-            getTxID).distinct().collect(Collectors.toList());
-        System.out.println("Load txIDS: " + txIds);
+        txIDs = Arrays.stream(txns)
+            .map(DeletedBlocksTransactionInfoWrapper::getTxID)
+            .sorted()
+            .distinct()
+            .collect(Collectors.toList());
+        System.out.println("Num of loaded txIDs: " + txIDs.size());
+        if (!txIDs.isEmpty()) {
+          System.out.println("The first loaded txID: " + txIDs.get(0));
+          System.out.println("The last loaded txID: " +
+              txIDs.get(txIDs.size() - 1));
+        }
       } catch (Exception ex) {
         System.out.println("Cannot parse the file " + group.fileName);
         ex.printStackTrace();
         return;
       }
-      count = client.resetDeletedBlockRetryCount(txIds);
+      count = client.resetDeletedBlockRetryCount(txIDs);
     } else {
       if (group.txList == null || group.txList.isEmpty()) {
         System.out.println("TransactionId list should not be empty");
