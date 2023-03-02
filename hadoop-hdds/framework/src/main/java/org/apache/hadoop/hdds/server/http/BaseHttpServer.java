@@ -192,7 +192,7 @@ public abstract class BaseHttpServer {
   }
 
   @VisibleForTesting
-  public String getJettyPath() {
+  public String getJettyBaseTmpDir() {
     return httpServer.getWebAppContext().getAttribute(JETTY_BASETMPDIR)
         .toString();
   }

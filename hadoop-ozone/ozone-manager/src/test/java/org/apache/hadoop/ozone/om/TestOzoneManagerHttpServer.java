@@ -150,7 +150,8 @@ public class TestOzoneManagerHttpServer {
       // Verify that the jetty directory is set correctly
       String expectedJettyDirLocation =
           ozoneMetadataDirectory.getAbsolutePath() + BaseHttpServer.SERVER_DIR;
-      Assertions.assertEquals(expectedJettyDirLocation, server.getJettyPath());
+      Assertions.assertEquals(expectedJettyDirLocation,
+          server.getJettyBaseTmpDir());
     } finally {
       if (server != null) {
         server.stop();
