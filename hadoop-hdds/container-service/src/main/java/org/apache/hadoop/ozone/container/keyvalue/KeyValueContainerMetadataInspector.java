@@ -43,7 +43,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 
@@ -99,6 +101,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
       ".metadata.inspector";
+
+  static final String DELETE_COUNT_DELTA_KEY
+      = "dbDeleteCount_minus_aggregatedDeleteCount";
 
   private Mode mode;
 
@@ -185,8 +190,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
   }
 
-  private JsonObject inspectContainer(KeyValueContainerData containerData,
-      DatanodeStore store) {
+  public static JsonObject inspectContainer(
+      KeyValueContainerData containerData, DatanodeStore store) {
 
     JsonObject containerJson = new JsonObject();
 
@@ -216,6 +221,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       JsonObject chunksDirectory =
           getChunksDirectoryJson(new File(containerData.getChunksPath()));
       containerJson.add("chunksDirectory", chunksDirectory);
+
+      checkDeleteCounts(dBMetadata, aggregates, containerJson);
     } catch (IOException ex) {
       LOG.error("Inspecting container {} failed",
           containerData.getContainerID(), ex);
@@ -224,7 +231,29 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return containerJson;
   }
 
-  private JsonObject getDBMetadataJson(Table<String, Long> metadataTable,
+  static long getLong(String key, JsonObject json) {
+    final JsonElement e = json.get(key);
+    return e == null || e.isJsonNull()? 0 : e.getAsLong();
+  }
+
+  static void checkDeleteCounts(JsonObject dBMetadata, JsonObject aggregates,
+      JsonObject container) {
+    try {
+      final long dbDeleteCount = getLong(
+          OzoneConsts.PENDING_DELETE_BLOCK_COUNT, dBMetadata);
+      final long aggregatedDeleteCount = getLong(
+          PendingDeleteType.COUNT.getJsonKey(), aggregates);
+      final long delta = dbDeleteCount - aggregatedDeleteCount;
+      if (delta != 0) {
+        container.addProperty(DELETE_COUNT_DELTA_KEY, delta);
+      }
+    } catch (Throwable t) {
+      LOG.error("Failed to check delete counts for container "
+          + container.get("containerID"), t);
+    }
+  }
+
+  static JsonObject getDBMetadataJson(Table<String, Long> metadataTable,
       KeyValueContainerData containerData) throws IOException {
     JsonObject dBMetadata = new JsonObject();
 
@@ -242,14 +271,13 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return dBMetadata;
   }
 
-  private JsonObject getAggregateValues(DatanodeStore store,
+  static JsonObject getAggregateValues(DatanodeStore store,
       KeyValueContainerData containerData, String schemaVersion)
       throws IOException {
     JsonObject aggregates = new JsonObject();
 
     long usedBytesTotal = 0;
     long blockCountTotal = 0;
-    long pendingDeleteBlockCountTotal = 0;
     // Count normal blocks.
     try (BlockIterator<BlockData> blockIter =
              store.getBlockIterator(containerData.getContainerID(),
@@ -262,7 +290,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // Count pending delete blocks.
+    final EnumMap<PendingDeleteType, Long> pendingDeletes;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+      long pendingDeleteBlockCountTotal = 0;
+      long pendingDeleteBytes = 0;
       try (BlockIterator<BlockData> blockIter =
                store.getBlockIterator(containerData.getContainerID(),
                    containerData.getDeletingBlockKeyFilter())) {
@@ -270,18 +301,22 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         while (blockIter.hasNext()) {
           blockCountTotal++;
           pendingDeleteBlockCountTotal++;
-          usedBytesTotal += getBlockLength(blockIter.nextBlock());
+          final long bytes = getBlockLength(blockIter.nextBlock());
+          usedBytesTotal += bytes;
+          pendingDeleteBytes += bytes;
         }
       }
+      pendingDeletes = PendingDeleteType.newMap(
+          pendingDeleteBlockCountTotal, pendingDeleteBytes);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       DatanodeStoreSchemaTwoImpl schemaTwoStore =
           (DatanodeStoreSchemaTwoImpl) store;
-      pendingDeleteBlockCountTotal =
-          countPendingDeletesSchemaV2(schemaTwoStore);
+      pendingDeletes =
+          countPendingDeletesSchemaV2(schemaTwoStore, containerData);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
       DatanodeStoreSchemaThreeImpl schemaThreeStore =
           (DatanodeStoreSchemaThreeImpl) store;
-      pendingDeleteBlockCountTotal =
+      pendingDeletes =
           countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
@@ -290,13 +325,13 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
     aggregates.addProperty("blockCount", blockCountTotal);
     aggregates.addProperty("usedBytes", usedBytesTotal);
-    aggregates.addProperty("pendingDeleteBlocks",
-        pendingDeleteBlockCountTotal);
+    PendingDeleteType.COUNT.addProperty(pendingDeletes, aggregates);
+    PendingDeleteType.BYTES.addProperty(pendingDeletes, aggregates);
 
     return aggregates;
   }
 
-  private JsonObject getChunksDirectoryJson(File chunksDir) throws IOException {
+  static JsonObject getChunksDirectoryJson(File chunksDir) throws IOException {
     JsonObject chunksDirectory = new JsonObject();
 
     chunksDirectory.addProperty("path", chunksDir.getAbsolutePath());
@@ -437,30 +472,88 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return error;
   }
 
-  private long countPendingDeletesSchemaV2(DatanodeStoreSchemaTwoImpl
-      schemaTwoStore) throws IOException {
+  enum PendingDeleteType {
+    COUNT("pendingDeleteBlocks"),
+    BYTES("pendingDeleteBytes");
+
+    private final String jsonKey;
+
+    PendingDeleteType(String jsonKey) {
+      this.jsonKey = jsonKey;
+    }
+
+    String getJsonKey() {
+      return jsonKey;
+    }
+
+    void addProperty(EnumMap<PendingDeleteType, Long> map,
+        JsonObject json) {
+      Optional.of(map.get(this))
+          .ifPresent(bytes -> json.addProperty(getJsonKey(), bytes));
+    }
+
+    static EnumMap<PendingDeleteType, Long> newMap(long count, long bytes) {
+      final EnumMap<PendingDeleteType, Long> map
+          = new EnumMap<>(PendingDeleteType.class);
+      map.put(PendingDeleteType.COUNT, count);
+      map.put(PendingDeleteType.BYTES, bytes);
+      return map;
+    }
+  }
+
+  static EnumMap<PendingDeleteType, Long> countPendingDeletesSchemaV2(
+      DatanodeStoreSchemaTwoImpl schemaTwoStore,
+      KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
+    long pendingDeleteBytes = 0;
+
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
+    final Table<String, BlockData> blockDataTable
+        = schemaTwoStore.getBlockDataTable();
+
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
         DeletedBlocksTransaction>> iterator = delTxTable.iterator()) {
       while (iterator.hasNext()) {
         DeletedBlocksTransaction txn = iterator.next().getValue();
+        final List<Long> localIDs = txn.getLocalIDList();
         // In schema 2, pending delete blocks are stored in the
         // transaction object. Since the actual blocks still exist in the
         // block data table with no prefix, they have already been
         // counted towards bytes used and total block count above.
-        pendingDeleteBlockCountTotal += txn.getLocalIDList().size();
+        pendingDeleteBlockCountTotal += localIDs.size();
+        pendingDeleteBytes += computePendingDeleteBytes(
+            localIDs, containerData, blockDataTable);
       }
     }
 
-    return pendingDeleteBlockCountTotal;
+    return PendingDeleteType.newMap(pendingDeleteBlockCountTotal,
+        pendingDeleteBytes);
   }
 
-  private long countPendingDeletesSchemaV3(
+  static long computePendingDeleteBytes(List<Long> localIDs,
+      KeyValueContainerData containerData,
+      Table<String, BlockData> blockDataTable) {
+    long pendingDeleteBytes = 0;
+    for (long id : localIDs) {
+      try {
+        final String blockKey = containerData.getBlockKey(id);
+        final BlockData blockData = blockDataTable.get(blockKey);
+        pendingDeleteBytes += blockData == null ? 0 : blockData.getSize();
+      } catch (Throwable t) {
+        LOG.error("Failed to get block data size for local id #" + id, t);
+      }
+    }
+    return pendingDeleteBytes;
+  }
+
+  static EnumMap<PendingDeleteType, Long> countPendingDeletesSchemaV3(
       DatanodeStoreSchemaThreeImpl schemaThreeStore,
       KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
+    long pendingDeleteBytes = 0;
+    final Table<String, BlockData> blockDataTable
+        = schemaThreeStore.getBlockDataTable();
     try (
         TableIterator<String, ? extends Table.KeyValue<String,
             DeletedBlocksTransaction>>
@@ -468,10 +561,14 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
             .iterator(containerData.containerPrefix())) {
       while (iter.hasNext()) {
         DeletedBlocksTransaction delTx = iter.next().getValue();
-        pendingDeleteBlockCountTotal += delTx.getLocalIDList().size();
+        final List<Long> localIDs = delTx.getLocalIDList();
+        pendingDeleteBlockCountTotal += localIDs.size();
+        pendingDeleteBytes += computePendingDeleteBytes(
+            localIDs, containerData, blockDataTable);
       }
-      return pendingDeleteBlockCountTotal;
     }
+    return PendingDeleteType.newMap(pendingDeleteBlockCountTotal,
+        pendingDeleteBytes);
   }
 
   private static long getBlockLength(BlockData block) {

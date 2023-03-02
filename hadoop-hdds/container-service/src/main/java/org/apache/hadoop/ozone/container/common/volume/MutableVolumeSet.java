@@ -165,6 +165,8 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     for (String locationString : rawLocations) {
+      LOG.info("Start initializing raw location {}", locationString);
+
       try {
         StorageLocation location = StorageLocation.parse(locationString);
 
