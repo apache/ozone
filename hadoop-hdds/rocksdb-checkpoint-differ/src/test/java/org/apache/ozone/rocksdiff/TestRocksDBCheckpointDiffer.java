@@ -331,7 +331,7 @@ public class TestRocksDBCheckpointDiffer {
    * Test SST differ.
    */
   void diffAllSnapshots(RocksDBCheckpointDiffer differ)
-      throws RocksDBException {
+      throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
 
     // Hard-coded expected output.

@@ -28,6 +28,7 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -69,7 +70,7 @@ public final class RocksDiffUtils {
   }
 
   public static void filterRelevantSstFiles(Set<String> inputFiles,
-      Map<String, String> tableToPrefixMap) throws RocksDBException {
+      Map<String, String> tableToPrefixMap) throws IOException {
     for (Iterator<String> fileIterator =
          inputFiles.iterator(); fileIterator.hasNext();) {
       String filepath = fileIterator.next();
@@ -81,7 +82,7 @@ public final class RocksDiffUtils {
   }
 
   public static boolean doesSstFileContainKeyRange(String filepath,
-      Map<String, String> tableToPrefixMap) throws RocksDBException {
+      Map<String, String> tableToPrefixMap) throws IOException {
     try (ManagedSstFileReader sstFileReader = ManagedSstFileReader.managed(
         new SstFileReader(new Options()))) {
       sstFileReader.get().open(filepath);
@@ -100,7 +101,7 @@ public final class RocksDiffUtils {
       return false;
     } catch (RocksDBException e) {
       LOG.error("Failed to read SST File ", e);
-      throw e;
+      throw new IOException(e);
     }
   }
 

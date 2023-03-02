@@ -94,7 +94,7 @@ public class TestOmSnapshot {
   private static OzoneManagerProtocol writeClient;
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static boolean enabledFileSystemPaths;
-  private static boolean useFullSnapshotDiff;
+  private static boolean forceFullSnapshotDiff;
   private static ObjectStore store;
   private static File metaDir;
   private static OzoneManager leaderOzoneManager;
@@ -115,7 +115,7 @@ public class TestOmSnapshot {
   }
 
   public TestOmSnapshot(BucketLayout newBucketLayout,
-      boolean newEnableFileSystemPaths, boolean shouldUseFullSnapshotDiff)
+      boolean newEnableFileSystemPaths, boolean forceFullSnapDiff)
       throws Exception {
     // Checking whether 'newBucketLayout' and
     // 'newEnableFileSystemPaths' flags represents next parameter
@@ -124,19 +124,19 @@ public class TestOmSnapshot {
     // Parameterized.Parameters.
     if (TestOmSnapshot.enabledFileSystemPaths != newEnableFileSystemPaths ||
             TestOmSnapshot.bucketLayout != newBucketLayout ||
-            TestOmSnapshot.useFullSnapshotDiff != shouldUseFullSnapshotDiff) {
+            TestOmSnapshot.forceFullSnapshotDiff != forceFullSnapDiff) {
       setConfig(newBucketLayout, newEnableFileSystemPaths,
-          shouldUseFullSnapshotDiff);
+          forceFullSnapDiff);
       tearDown();
       init();
     }
   }
 
   private static void setConfig(BucketLayout newBucketLayout,
-      boolean newEnableFileSystemPaths, boolean shouldUseFullSnapshotDiff) {
+      boolean newEnableFileSystemPaths, boolean forceFullSnapDiff) {
     TestOmSnapshot.enabledFileSystemPaths = newEnableFileSystemPaths;
     TestOmSnapshot.bucketLayout = newBucketLayout;
-    TestOmSnapshot.useFullSnapshotDiff = shouldUseFullSnapshotDiff;
+    TestOmSnapshot.forceFullSnapshotDiff = forceFullSnapDiff;
   }
 
   /**
@@ -150,8 +150,8 @@ public class TestOmSnapshot {
         enabledFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
-    conf.setBoolean(OzoneConfigKeys.OZONE_OM_SNAPSHOT_USE_FULL_DIFF,
-        useFullSnapshotDiff);
+    conf.setBoolean(OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+        forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)

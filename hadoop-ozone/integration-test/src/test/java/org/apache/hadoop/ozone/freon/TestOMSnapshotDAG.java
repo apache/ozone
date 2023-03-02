@@ -42,7 +42,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -166,8 +165,7 @@ public class TestOMSnapshotDAG {
 
   @Test
   public void testDAGReconstruction()
-      throws IOException, InterruptedException, TimeoutException,
-      RocksDBException {
+      throws IOException, InterruptedException, TimeoutException {
 
     // Generate keys
     RandomKeyGenerator randomKeyGenerator =

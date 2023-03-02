@@ -757,7 +757,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public List<String> getSSTDiffListWithFullPath(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws RocksDBException {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
 
     List<String> sstDiffList = getSSTDiffList(src, dest);
 
@@ -778,7 +778,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized List<String> getSSTDiffList(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws RocksDBException {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
@@ -826,7 +826,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * filter the files.
    */
   public void filterRelevantSstFilesFullPath(Set<String> inputFiles,
-      Map<String, String> tableToPrefixMap) throws RocksDBException {
+      Map<String, String> tableToPrefixMap) throws IOException {
     for (Iterator<String> fileIterator =
          inputFiles.iterator(); fileIterator.hasNext();) {
       String filename = fileIterator.next();

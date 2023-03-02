@@ -79,7 +79,7 @@ public class SnapshotDiffManager {
 
 
   public SnapshotDiffManager(ManagedRocksDB db,
-                             RocksDBCheckpointDiffer differ,
+      RocksDBCheckpointDiffer differ,
       OzoneConfiguration conf) {
     this.db = db;
     this.differ = differ;
@@ -212,8 +212,8 @@ public class SnapshotDiffManager {
           toSnapshot.getMetadataManager().getKeyTable(bucketLayout);
 
       boolean useFullDiff = configuration.getBoolean(
-          OzoneConfigKeys.OZONE_OM_SNAPSHOT_USE_FULL_DIFF,
-          OzoneConfigKeys.OZONE_OM_SNAPSHOT_USE_FULL_DIFF_DEFAULT);
+          OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+          OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
 
       Map<String, String> tablePrefixes =
           getTablePrefixes(toSnapshot.getMetadataManager(), volume, bucket);
