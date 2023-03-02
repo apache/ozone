@@ -43,6 +43,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.Rule;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,8 +58,6 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETION_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETION_SERVICE_TIMEOUT;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Test Snapshot Deleting Service.
@@ -74,7 +73,8 @@ public class TestSnapshotDeletingService {
   private OzoneConfiguration conf;
   private OmTestManagers omTestManagers;
   private static final String VOLUME_NAME = "vol1";
-  private static final String BUCKET_NAME = "bucket1";
+  private static final String BUCKET_NAME_ONE = "bucket1";
+  private static final String BUCKET_NAME_TWO = "bucket2";
 
 
   @BeforeAll
@@ -109,34 +109,65 @@ public class TestSnapshotDeletingService {
 
   @Test
   public void testSnapshotKeySpaceReclaim() throws Exception {
-    int snapshotCount = 0;
+    SnapshotDeletingService snapshotDeletingService = (SnapshotDeletingService)
+        keyManager.getSnapshotDeletingService();
+
+    // Suspending SnapshotDeletingService
+    snapshotDeletingService.suspend();
+    createSnapshotDataForBucket1();
+    snapshotDeletingService.resume();
+
+    snapshotDeletingService.setSuccessRunCount(0);
+
+    GenericTestUtils.waitFor(() ->
+            snapshotDeletingService.getSuccessfulRunCount() >= 1,
+        1000, 10000);
+
+    OmSnapshot nextSnapshot = (OmSnapshot) om.getOmSnapshotManager()
+        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
+            getSnapshotPrefix("bucket1snap3"));
+
+    // Check bucket1key1 added to next non deleted snapshot db.
+    RepeatedOmKeyInfo omKeyInfo =
+        nextSnapshot.getMetadataManager()
+            .getDeletedTable().get("/vol1/bucket1/bucket1key1");
+    Assertions.assertNotNull(omKeyInfo);
+
+    // Check bucket1key2 added active db as it can be reclaimed.
+    RepeatedOmKeyInfo omKeyInfo1 = omMetadataManager
+        .getDeletedTable().get("/vol1/bucket1/bucket1key2");
+
+    Assertions.assertNotNull(omKeyInfo1);
+
+  }
+
+  @Test
+  public void testMultipleSnapshotKeyReclaim() throws Exception {
 
     SnapshotDeletingService snapshotDeletingService = (SnapshotDeletingService)
         keyManager.getSnapshotDeletingService();
 
+    // Suspending SnapshotDeletingService
     snapshotDeletingService.suspend();
+    int snapshotCount = createSnapshotDataForBucket1();
 
-    OmKeyArgs key1 = createVolumeBucketKey(VOLUME_NAME, BUCKET_NAME,
-        BucketLayout.DEFAULT, "key1");
+    OmKeyArgs bucket2key1 = createVolumeBucketKey(VOLUME_NAME, BUCKET_NAME_TWO,
+        BucketLayout.DEFAULT, "bucket2key1");
 
-    createSnapshot(VOLUME_NAME, BUCKET_NAME, "snap1", ++snapshotCount);
+    OmKeyArgs bucket2key2 = createKey(VOLUME_NAME, BUCKET_NAME_TWO,
+        "bucket2key2");
 
-    OmKeyArgs key2 = createKey(VOLUME_NAME, BUCKET_NAME, "key2");
+    createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO, "bucket2snap1",
+        ++snapshotCount);
 
-    // Key 1 cannot be reclaimed as it is still referenced by Snapshot 1.
-    writeClient.deleteKey(key1);
-    // Key 2 is deleted here, which means we can reclaim
-    // it when snapshot 2 is deleted.
-    writeClient.deleteKey(key2);
+    // Both key 1 and key 2 can be reclaimed when Snapshot 1 is deleted.
+    writeClient.deleteKey(bucket2key1);
+    writeClient.deleteKey(bucket2key2);
 
-    createSnapshot(VOLUME_NAME, BUCKET_NAME, "snap2", ++snapshotCount);
-    createKey(VOLUME_NAME, BUCKET_NAME, "key4");
-    OmKeyArgs key5 = createKey(VOLUME_NAME, BUCKET_NAME, "key5");
-    writeClient.deleteKey(key5);
+    createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO, "bucket2snap2",
+        ++snapshotCount);
 
-    createSnapshot(VOLUME_NAME, BUCKET_NAME, "snap3", ++snapshotCount);
-
-    String snapshotKey2 = "/vol1/bucket1/snap2";
+    String snapshotKey2 = "/vol1/bucket2/bucket2snap1";
     SnapshotInfo snapshotInfo = om.getMetadataManager()
         .getSnapshotInfoTable().get(snapshotKey2);
 
@@ -146,30 +177,26 @@ public class TestSnapshotDeletingService {
         .getSnapshotInfoTable().put(snapshotKey2, snapshotInfo);
     snapshotInfo = om.getMetadataManager()
         .getSnapshotInfoTable().get(snapshotKey2);
-    assertEquals(snapshotInfo.getSnapshotStatus(),
+    Assertions.assertEquals(snapshotInfo.getSnapshotStatus(),
         SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
 
     snapshotDeletingService.resume();
 
+    snapshotDeletingService.setSuccessRunCount(0L);
     GenericTestUtils.waitFor(() ->
             snapshotDeletingService.getSuccessfulRunCount() >= 1,
         1000, 10000);
 
-    OmSnapshot nextSnapshot = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME, getSnapshotPrefix("snap3"));
-
-    // Check key1 added to next non deleted snapshot db.
-    RepeatedOmKeyInfo omKeyInfo =
-        nextSnapshot.getMetadataManager()
-            .getDeletedTable().get("/vol1/bucket1/key1");
-    assertNotNull(omKeyInfo);
-
-    // Check key2 added active db as it can be reclaimed.
+    // Check bucket2key1 added active db as it can be reclaimed.
     RepeatedOmKeyInfo omKeyInfo1 = omMetadataManager
-        .getDeletedTable().get("/vol1/bucket1/key2");
+        .getDeletedTable().get("/vol1/bucket2/bucket2key1");
 
-    assertNotNull(omKeyInfo1);
+    // Check bucket2key2 added active db as it can be reclaimed.
+    RepeatedOmKeyInfo omKeyInfo2 = omMetadataManager
+        .getDeletedTable().get("/vol1/bucket2/bucket2key2");
 
+    Assertions.assertNotNull(omKeyInfo1);
+    Assertions.assertNotNull(omKeyInfo2);
   }
 
   private OmKeyArgs createVolumeBucketKey(String volumeName, String bucketName,
@@ -191,6 +218,49 @@ public class TestSnapshotDeletingService {
             .build());
 
     return createKey(volumeName, bucketName, keyName);
+  }
+
+
+  private int createSnapshotDataForBucket1() throws Exception {
+    int snapshotCount = 0;
+    OmKeyArgs bucket1key1 = createVolumeBucketKey(VOLUME_NAME, BUCKET_NAME_ONE,
+        BucketLayout.DEFAULT, "bucket1key1");
+
+    createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1",
+        ++snapshotCount);
+
+    OmKeyArgs bucket1key2 = createKey(VOLUME_NAME, BUCKET_NAME_ONE,
+        "bucket1key2");
+
+    // Key 1 cannot be reclaimed as it is still referenced by Snapshot 1.
+    writeClient.deleteKey(bucket1key1);
+    // Key 2 is deleted here, which means we can reclaim
+    // it when snapshot 2 is deleted.
+    writeClient.deleteKey(bucket1key2);
+
+    createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap2",
+        ++snapshotCount);
+    createKey(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1key4");
+    OmKeyArgs bucket1key5 = createKey(VOLUME_NAME, BUCKET_NAME_ONE,
+        "bucket1key5");
+    writeClient.deleteKey(bucket1key5);
+
+    createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3",
+        ++snapshotCount);
+
+    String snapshotKey2 = "/vol1/bucket1/bucket1snap2";
+    SnapshotInfo snapshotInfo = om.getMetadataManager()
+        .getSnapshotInfoTable().get(snapshotKey2);
+
+    snapshotInfo
+        .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+    om.getMetadataManager()
+        .getSnapshotInfoTable().put(snapshotKey2, snapshotInfo);
+    snapshotInfo = om.getMetadataManager()
+        .getSnapshotInfoTable().get(snapshotKey2);
+    Assertions.assertEquals(snapshotInfo.getSnapshotStatus(),
+        SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+    return snapshotCount;
   }
 
   private OmKeyArgs createKey(String volumeName, String bucketName,

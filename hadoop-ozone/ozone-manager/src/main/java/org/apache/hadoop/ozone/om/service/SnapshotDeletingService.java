@@ -152,7 +152,7 @@ public class SnapshotDeletingService extends BackgroundService {
                 " is not found", BUCKET_NOT_FOUND);
           }
 
-          //TODO: Add lock to deletedTable and Active DB.
+          //TODO: [SNAPSHOT] Add lock to deletedTable and Active DB.
           SnapshotInfo previousSnapshot = getPreviousSnapshot(snapInfo);
           Table<String, OmKeyInfo> previousKeyTable = null;
           OmSnapshot omPreviousSnapshot = null;
@@ -270,7 +270,7 @@ public class SnapshotDeletingService extends BackgroundService {
         return false;
       }
 
-      //TODO: Handle Renamed Keys
+      //TODO: [SNAPSHOT] Handle Renamed Keys
       String dbKey = ozoneManager.getMetadataManager()
           .getOzoneKey(deletedKeyInfo.getVolumeName(),
               deletedKeyInfo.getBucketName(), deletedKeyInfo.getKeyName());
@@ -359,5 +359,10 @@ public class SnapshotDeletingService extends BackgroundService {
 
   public long getSuccessfulRunCount() {
     return successRunCount.get();
+  }
+
+  @VisibleForTesting
+  public void setSuccessRunCount(long num) {
+    successRunCount.getAndSet(num);
   }
 }
