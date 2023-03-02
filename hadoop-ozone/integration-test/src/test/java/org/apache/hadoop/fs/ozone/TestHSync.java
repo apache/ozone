@@ -284,9 +284,9 @@ public class TestHSync {
     try (CapableOzoneFSOutputStream cofsos =
         new CapableOzoneFSOutputStream(ofso)) {
       if (isEC) {
-        assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
-      } else {
         assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
+      } else {
+        assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
       }
     }
   }
