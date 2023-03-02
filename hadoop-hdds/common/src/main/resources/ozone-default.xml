@@ -3160,7 +3160,7 @@
     <name>ozone.snapshot.deleting.limit.per.task</name>
     <value>10</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
-    <description>The number of maximum snapshots to be reclaimed by the
+    <description>The maximum number of snapshots that would be reclaimed by
       Snapshot Deleting Service per run.
     </description>
   </property>
