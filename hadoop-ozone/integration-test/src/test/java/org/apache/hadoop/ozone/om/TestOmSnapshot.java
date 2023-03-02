@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -94,6 +95,7 @@ public class TestOmSnapshot {
   private static OzoneManagerProtocol writeClient;
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static boolean enabledFileSystemPaths;
+  private static boolean forceFullSnapshotDiff;
   private static ObjectStore store;
   private static File metaDir;
   private static OzoneManager leaderOzoneManager;
@@ -108,30 +110,34 @@ public class TestOmSnapshot {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-                         new Object[]{OBJECT_STORE, false},
-                         new Object[]{FILE_SYSTEM_OPTIMIZED, false},
-                         new Object[]{BucketLayout.LEGACY, true});
+                         new Object[]{OBJECT_STORE, false, false},
+                         new Object[]{FILE_SYSTEM_OPTIMIZED, false, false},
+                         new Object[]{BucketLayout.LEGACY, true, true});
   }
 
   public TestOmSnapshot(BucketLayout newBucketLayout,
-      boolean newEnableFileSystemPaths) throws Exception {
+      boolean newEnableFileSystemPaths, boolean forceFullSnapDiff)
+      throws Exception {
     // Checking whether 'newBucketLayout' and
     // 'newEnableFileSystemPaths' flags represents next parameter
     // index values. This is to ensure that initialize init() function
     // will be invoked only at the beginning of every new set of
     // Parameterized.Parameters.
     if (TestOmSnapshot.enabledFileSystemPaths != newEnableFileSystemPaths ||
-            TestOmSnapshot.bucketLayout != newBucketLayout) {
-      setConfig(newBucketLayout, newEnableFileSystemPaths);
+            TestOmSnapshot.bucketLayout != newBucketLayout ||
+            TestOmSnapshot.forceFullSnapshotDiff != forceFullSnapDiff) {
+      setConfig(newBucketLayout, newEnableFileSystemPaths,
+          forceFullSnapDiff);
       tearDown();
       init();
     }
   }
 
   private static void setConfig(BucketLayout newBucketLayout,
-      boolean newEnableFileSystemPaths) {
+      boolean newEnableFileSystemPaths, boolean forceFullSnapDiff) {
     TestOmSnapshot.enabledFileSystemPaths = newEnableFileSystemPaths;
     TestOmSnapshot.bucketLayout = newBucketLayout;
+    TestOmSnapshot.forceFullSnapshotDiff = forceFullSnapDiff;
   }
 
   /**
@@ -145,6 +151,8 @@ public class TestOmSnapshot {
         enabledFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
+    conf.setBoolean(OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+        forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
@@ -325,10 +333,10 @@ public class TestOmSnapshot {
       }
     }
     OmKeyArgs keyArgs = genKeyArgs(snapshotKeyPrefix + key1);
-    
+
     OmKeyInfo omKeyInfo = writeClient.lookupKey(keyArgs);
     assertEquals(omKeyInfo.getKeyName(), snapshotKeyPrefix + key1);
-    
+
     OmKeyInfo fileInfo = writeClient.lookupFile(keyArgs);
     assertEquals(fileInfo.getKeyName(), snapshotKeyPrefix + key1);
 
@@ -613,6 +621,33 @@ public class TestOmSnapshot {
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> store.snapshotDiff(nullstr, bucket, snap1, snap2));
+  }
+
+  @Test
+  public void testSnapDiffMultipleBuckets() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucketName1 = "buck-" + RandomStringUtils.randomNumeric(5);
+    String bucketName2 = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucketName1);
+    volume1.createBucket(bucketName2);
+    OzoneBucket bucket1 = volume1.getBucket(bucketName1);
+    OzoneBucket bucket2 = volume1.getBucket(bucketName2);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    key1 = createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucketName1, snap1);
+    // Create key in bucket2 and bucket1 and calculate diff
+    // Diff should not contain bucket2's key
+    createFileKey(bucket1, key1);
+    createFileKey(bucket2, key1);
+    String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucketName1, snap2);
+    SnapshotDiffReport diff1 =
+        store.snapshotDiff(volume, bucketName1, snap1, snap2);
+    Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
 
