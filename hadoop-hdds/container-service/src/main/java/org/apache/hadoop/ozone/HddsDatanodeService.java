@@ -121,14 +121,16 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     if (datanodeStateMachine != null) {
       MutableVolumeSet volumeSet =
           datanodeStateMachine.getContainer().getVolumeSet();
-      for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
-          volumeSet.getVolumesList())) {
-        try {
-          KeyValueContainerUtil.ContainerDeleteDirectory
-              .cleanTmpDir(hddsVolume);
-        } catch (IOException ex) {
-          LOG.error("Error while cleaning tmp delete directory " +
-              "under {}", hddsVolume.getWorkingDir(), ex);
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        if (volume instanceof HddsVolume) {
+          HddsVolume hddsVolume = (HddsVolume) volume;
+          try {
+            KeyValueContainerUtil.ContainerDeleteDirectory
+                .cleanTmpDir(hddsVolume);
+          } catch (IOException ex) {
+            LOG.error("Error while cleaning tmp delete directory " +
+                "under {}", hddsVolume.getWorkingDir(), ex);
+          }
         }
       }
     }

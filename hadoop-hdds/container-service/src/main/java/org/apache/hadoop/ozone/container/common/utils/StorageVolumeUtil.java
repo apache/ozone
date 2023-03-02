@@ -238,7 +238,6 @@ public final class StorageVolumeUtil {
       // skipped. Create cluster ID symlink now.
       // Else, We are still pre-finalized.
       // The existing directory should be left for backwards compatibility.
-      checkCleanupDirs(volume, conf, scmId, clusterId);
       return VersionedDatanodeFeatures.ScmHA.
           upgradeVolumeIfNeeded(volume, clusterId);
     } else {
@@ -248,19 +247,7 @@ public final class StorageVolumeUtil {
             rootFiles.length, clusterDir);
         return false;
       }
-      // Same here as above, create cluster ID symlink.
-      checkCleanupDirs(volume, conf, scmId, clusterId);
       return true;
-    }
-  }
-
-  public static void checkCleanupDirs(StorageVolume volume,
-                                      ConfigurationSource conf,
-                                      String scmId, String clusterId) {
-    if (volume instanceof HddsVolume) {
-      String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
-          scmId, clusterId);
-      ((HddsVolume) volume).checkTmpDirPaths(id);
     }
   }
 }

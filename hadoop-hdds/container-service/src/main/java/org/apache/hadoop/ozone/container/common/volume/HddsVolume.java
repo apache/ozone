@@ -368,35 +368,20 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  /**
-   * Ensure that volume is initialized properly with
-   * cleanup path. Should disk be re-inserted into
-   * cluster, cleanup path should already be on
-   * disk. This method syncs the HddsVolume
-   * with the path on disk.
-   */
-  public void checkTmpDirPaths() {
-    Path tmpPath = createTmpPath();
-    deleteServiceDirPath = tmpPath.resolve(TMP_DELETE_SERVICE_DIR);
+  private String getIdDir() throws IOException {
+    try {
+      return VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+          this, getClusterID() == null ? "" : getClusterID());
+    } catch (IOException ex) {
+      String errMsg = "Cannot resolve volume container path " +
+          "ID dir for volume {} " + getStorageID() +
+          " when creating volume tmp dir";
+      LOG.error(errMsg, ex);
+      throw new IOException(errMsg, ex);
+    }
   }
 
-  public void checkTmpDirPaths(String id) {
-    // HddsVolume root directory path
-    String hddsRoot = getHddsRootDir().toString();
-
-    // HddsVolume path
-    String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
-
-    Path volPath = Paths.get(vol);
-    Path idPath = Paths.get(id);
-
-    deleteServiceDirPath = volPath
-        .resolve(idPath)
-        .resolve(TMP_DIR)
-        .resolve(TMP_DELETE_SERVICE_DIR);
-  }
-
-  private Path createTmpPath() {
+  private Path createTmpPath() throws IOException {
 
     // HddsVolume root directory path
     String hddsRoot = getHddsRootDir().toString();
@@ -405,12 +390,12 @@ public class HddsVolume extends StorageVolume {
     String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
 
     Path volPath = Paths.get(vol);
-    Path idPath = Paths.get(getClusterID());
+    Path idPath = Paths.get(getIdDir());
 
     return volPath.resolve(idPath).resolve(TMP_DIR);
   }
 
-  private void createTmpDir() {
+  private void createTmpDir() throws IOException {
     tmpDirPath = createTmpPath();
 
     if (Files.notExists(tmpDirPath)) {
@@ -422,7 +407,7 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  public void createDeleteServiceDir() {
+  public void createDeleteServiceDir() throws IOException {
     if (tmpDirPath == null) {
       createTmpDir();
     }

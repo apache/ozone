@@ -263,10 +263,15 @@ public class TestContainerPersistence {
 
   @Test
   public void testAddingBlockToDeletedContainer() throws Exception {
+    // With schema v3, we don't have a container dedicated db,
+    // so skip check the behaviors related to it.
+    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
+
     long testContainerID1 = getTestContainerID();
     Thread.sleep(100);
 
-    Container container1 = addContainer(containerSet, testContainerID1);
+    Container<KeyValueContainerData> container1 =
+        addContainer(containerSet, testContainerID1);
     container1.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
@@ -277,36 +282,29 @@ public class TestContainerPersistence {
     Assert.assertFalse(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
 
-    // With schema v3, we don't have a container dedicated db,
-    // so skip check the behaviors related to it.
-    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
-
     // Adding block to a deleted container should fail.
     exception.expect(StorageContainerException.class);
     exception.expectMessage("Error opening DB.");
     BlockID blockID1 = ContainerTestHelper.getTestBlockID(testContainerID1);
     BlockData someKey1 = new BlockData(blockID1);
-    someKey1.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
+    someKey1.setChunks(new LinkedList<>());
     blockManager.putBlock(container1, someKey1);
   }
 
   @Test
   public void testDeleteNonEmptyContainer() throws Exception {
     long testContainerID2 = getTestContainerID();
-    Container container2 = addContainer(containerSet, testContainerID2);
+    Container<KeyValueContainerData> container2 =
+        addContainer(containerSet, testContainerID2);
     container2.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
 
-    // With schema v3, we don't have a container dedicated db,
-    // so skip check the behaviors related to it.
-    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
-
     // Deleting a non-empty container should fail.
     BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID2);
     BlockData someKey2 = new BlockData(blockID2);
-    someKey2.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
+    someKey2.setChunks(new LinkedList<>());
     blockManager.putBlock(container2, someKey2);
 
     // KeyValueHandler setup
@@ -339,7 +337,8 @@ public class TestContainerPersistence {
   @Test
   public void testDeleteContainerWithRenaming()
       throws Exception {
-    HddsVolume hddsVolume = null;
+    HddsVolume hddsVolume;
+    // If !SchemaV3, build hddsVolume
     if (!schemaVersion.contains(OzoneConsts.SCHEMA_V3)) {
       Files.createDirectories(Paths.get(hddsPath));
 
@@ -359,10 +358,12 @@ public class TestContainerPersistence {
     Thread.sleep(100);
     long testContainerID2 = getTestContainerID();
 
-    Container container1 = addContainer(containerSet, testContainerID1);
+    Container<KeyValueContainerData> container1 =
+        addContainer(containerSet, testContainerID1);
     container1.close();
 
-    Container container2 = addContainer(containerSet, testContainerID2);
+    Container<KeyValueContainerData> container2 =
+        addContainer(containerSet, testContainerID2);
     container2.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
@@ -370,15 +371,11 @@ public class TestContainerPersistence {
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
 
-    KeyValueContainerData container1Data =
-        (KeyValueContainerData) container1.getContainerData();
+    KeyValueContainerData container1Data = container1.getContainerData();
 
-    KeyValueContainerData container2Data =
-        (KeyValueContainerData) container2.getContainerData();
+    KeyValueContainerData container2Data = container2.getContainerData();
 
-    if (schemaVersion.contains(OzoneConsts.SCHEMA_V3)) {
-      hddsVolume = container1Data.getVolume();
-    }
+    hddsVolume = container1Data.getVolume();
 
     // Rename container1 dir
     Assert.assertTrue(KeyValueContainerUtil.ContainerDeleteDirectory

@@ -517,11 +517,12 @@ public final class KeyValueContainerUtil {
      * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
      * @return ListIterator to all the files
      */
-    public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume) {
+    public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume)
+        throws IOException {
       List<File> leftovers = new ArrayList<>();
 
       // Initialize tmp and delete service directories
-      hddsVolume.checkTmpDirPaths();
+      hddsVolume.createDeleteServiceDir();
 
       File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
 
@@ -550,7 +551,12 @@ public final class KeyValueContainerUtil {
       String containerDirName = container.getName();
 
       // Initialize delete directory
-      hddsVolume.createDeleteServiceDir();
+      try {
+        hddsVolume.createDeleteServiceDir();
+      } catch (IOException ex) {
+        LOG.error("Error initializing container-service tmp dir");
+        return false;
+      }
 
       String destinationDirPath = hddsVolume.getDeleteServiceDirPath()
           .resolve(Paths.get(containerDirName)).toString();

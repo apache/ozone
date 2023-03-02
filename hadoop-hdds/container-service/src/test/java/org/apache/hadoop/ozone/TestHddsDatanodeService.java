@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -138,26 +139,30 @@ public class TestHddsDatanodeService {
     // in order to access them after service.stop()
     MutableVolumeSet volumeSet = service
         .getDatanodeStateMachine().getContainer().getVolumeSet();
-    List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
-        volumeSet.getVolumesList());
 
-    for (HddsVolume volume : volumes) {
-      StorageVolumeUtil.checkVolume(volume, clusterId,
-          clusterId, conf, LOG, null);
-      // Create a container and move it under the tmp delete dir.
-      KeyValueContainer container = ContainerTestUtils
-          .setUpTestContainer(volume, clusterId, conf, schemaVersion);
-      assertTrue(container.getContainerFile().exists());
+    for (StorageVolume volume : volumeSet.getVolumesList()) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
+            clusterId, conf, LOG, null);
+        // Create a container and move it under the tmp delete dir.
+        KeyValueContainer container = ContainerTestUtils
+            .setUpTestContainer(hddsVolume, clusterId, conf, schemaVersion);
+        assertTrue(container.getContainerFile().exists());
+      }
     }
 
     service.stop();
     service.join();
     service.close();
 
-    for (HddsVolume hddsVolume : volumes) {
-      ListIterator<File> deleteLeftoverIt = KeyValueContainerUtil
-          .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
-      assertFalse(deleteLeftoverIt.hasNext());
+    for (StorageVolume volume : volumeSet.getVolumesList()) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        ListIterator<File> deleteLeftoverIt = KeyValueContainerUtil
+            .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
+        assertFalse(deleteLeftoverIt.hasNext());
+      }
     }
 
     volumeSet.shutdown();
