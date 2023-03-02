@@ -153,6 +153,11 @@ public final class Pipeline {
     this.leaderId = leaderId;
   }
 
+  /** @return the number of datanodes in this pipeline. */
+  public int size() {
+    return nodeStatus.size();
+  }
+
   /**
    * Returns the list of nodes which form this pipeline.
    *

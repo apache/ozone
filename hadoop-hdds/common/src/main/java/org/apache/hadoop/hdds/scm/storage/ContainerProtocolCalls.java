@@ -285,19 +285,22 @@ public final class ContainerProtocolCalls  {
             .setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .setChunkData(chunk)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
-    Set<DatanodeDetails> excluded = null;
+    final Pipeline pipeline = xceiverClient.getPipeline();
+    final Set<DatanodeDetails> excluded = new HashSet<>();
     for (; ;) {
-      final DatanodeDetails d = xceiverClient.getPipeline()
-          .getClosestNode(excluded);
-      final ReadChunkResponseProto response = readChunk(xceiverClient,
-          chunk, blockID, validators, token, readChunkRequest, d);
-      if (response != null) {
-        return response;
+      final DatanodeDetails d = pipeline.getClosestNode(excluded);
+
+      try {
+        return readChunk(xceiverClient, chunk, blockID,
+            validators, token, readChunkRequest, d);
+      } catch (IOException e) {
+        excluded.add(d);
+        if (excluded.size() < pipeline.size()) {
+          LOG.warn(toErrorMessage(chunk, blockID, d), e);
+        } else {
+          throw e;
+        }
       }
-      if (excluded == null) {
-        excluded = new HashSet<>();
-      }
-      excluded.add(d);
     }
   }
 
@@ -316,18 +319,13 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
     ContainerCommandRequestProto request = builder.build();
-    final ContainerCommandResponseProto reply;
-    try {
-      reply = xceiverClient.sendCommand(request, validators);
-    } catch (IOException e) {
-      LOG.warn(toErrorMessage(chunk, blockID, d), e);
-      return null;
-    }
+    ContainerCommandResponseProto reply =
+        xceiverClient.sendCommand(request, validators);
     final ReadChunkResponseProto response = reply.getReadChunk();
     final long readLen = getLen(response);
     if (readLen != chunk.getLen()) {
-      LOG.warn(toErrorMessage(chunk, blockID, d) + ": readLen=" + readLen);
-      return null;
+      throw new IOException(toErrorMessage(chunk, blockID, d)
+          + ": readLen=" + readLen);
     }
     return response;
   }
