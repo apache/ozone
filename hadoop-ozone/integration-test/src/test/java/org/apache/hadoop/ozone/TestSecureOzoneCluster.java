@@ -26,7 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
-import java.security.PrivilegedExceptionAction;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -1310,27 +1309,12 @@ public final class TestSecureOzoneCluster {
       conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
       conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
       OzoneManager.setTestSecureOmFlag(true);
-      UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-      UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
-
-      assertEquals(currentUser, loginUser);
-
-      UserGroupInformation testUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-              testUserPrincipal, testUserKeytab.getCanonicalPath());
-
-      testUser.doAs((PrivilegedExceptionAction<Void>) () -> {
-        UserGroupInformation user1 = UserGroupInformation.getCurrentUser();
-        UserGroupInformation user2 = UserGroupInformation.getLoginUser();
-        System.out.println("testUser.doAs currentUser = " + user1);
-        System.out.println("testUser.doAs loginUser = " + user2);
-        return null;
-      });
-
+      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       // In this process, SCM has already login using Kerberos. So pass
       // specific UGI to DefaultCertificateClient and OzoneManager to avoid
       // conflict with SCM procedure.
-      DefaultCertificateClient.setUgi(currentUser);
-      OzoneManager.setUgi(currentUser);
+      DefaultCertificateClient.setUgi(ugi);
+      OzoneManager.setUgi(ugi);
       om = OzoneManager.createOm(conf);
       om.start();
 
