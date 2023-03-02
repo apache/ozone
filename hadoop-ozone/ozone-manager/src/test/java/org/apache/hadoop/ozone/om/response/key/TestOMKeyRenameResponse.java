@@ -24,7 +24,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -83,12 +83,17 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbFromKey));
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
-    Assert.assertTrue(omMetadataManager.getRenamedKeyTable()
-        .isExist(fromKeyInfo.getObjectID()));
 
-    RepeatedOmString repeatedOmString =
-        omMetadataManager.getRenamedKeyTable().get(fromKeyInfo.getObjectID());
-    Assert.assertTrue(repeatedOmString.getOmStringList().contains(dbFromKey));
+    String renameDbKey = omMetadataManager.getRenameKey(
+        fromKeyInfo.getVolumeName(), fromKeyInfo.getBucketName(),
+        fromKeyInfo.getObjectID());
+    Assert.assertTrue(omMetadataManager.getRenamedKeyTable()
+        .isExist(renameDbKey));
+
+    OmKeyRenameInfo omKeyRenameInfo =
+        omMetadataManager.getRenamedKeyTable().get(renameDbKey);
+    Assert.assertTrue(omKeyRenameInfo.getOmKeyRenameInfoList()
+        .contains(dbFromKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));

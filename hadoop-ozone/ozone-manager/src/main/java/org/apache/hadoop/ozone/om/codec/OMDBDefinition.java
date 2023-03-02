@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -230,14 +230,14 @@ public class OMDBDefinition implements DBDefinition {
           SnapshotInfo.class,
           new OmDBSnapshotInfoCodec());
 
-  public static final DBColumnFamilyDefinition<Long, RepeatedOmString>
+  public static final DBColumnFamilyDefinition<String, OmKeyRenameInfo>
       RENAMED_KEY_TABLE =
       new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.RENAMED_KEY_TABLE,
-          Long.class,  // objectID
-          new LongCodec(),
-          RepeatedOmString.class, // list of key renames
-          new RepeatedOmStringCodec());
+          String.class,  // /volumeName/bucketName/objectID
+          new StringCodec(),
+          OmKeyRenameInfo.class, // list of key renames
+          new OmKeyRenameInfoCodec());
 
   @Override
   public String getName() {

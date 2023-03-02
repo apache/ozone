@@ -64,7 +64,7 @@ import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.RepeatedOmStringCodec;
+import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
@@ -84,7 +84,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -195,7 +195,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |----------------------------------------------------------------------|
-   * |  renamedKeyTable   |  objectID -> RepeatedString                     |
+   * |  renamedKeyTable | /volumeName/bucketName/objectID -> OmKeyRenameInfo|
    * |----------------------------------------------------------------------|
    */
 
@@ -527,7 +527,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
         .addCodec(OmDBUserPrincipalInfo.class, new OmDBUserPrincipalInfoCodec())
         .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec())
-        .addCodec(RepeatedOmString.class, new RepeatedOmStringCodec());
+        .addCodec(OmKeyRenameInfo.class, new OmKeyRenameInfoCodec());
   }
 
   /**
@@ -632,7 +632,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     // objectID -> renamedKeys (renamed keys for key table)
     renamedKeyTable = this.store.getTable(RENAMED_KEY_TABLE,
-        Long.class, RepeatedOmString.class);
+        String.class, OmKeyRenameInfo.class);
     checkTableStatus(renamedKeyTable, RENAMED_KEY_TABLE, addCacheMetrics);
 
   }
@@ -1628,7 +1628,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<Long, RepeatedOmString> getRenamedKeyTable() {
+  public Table<String, OmKeyRenameInfo> getRenamedKeyTable() {
     return renamedKeyTable;
   }
 
@@ -1692,6 +1692,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(id);
     return openKey.toString();
+  }
+
+  @Override
+  public String getRenameKey(String volumeName, String bucketName,
+                             long objectID) {
+    StringBuilder renameKey = new StringBuilder();
+    renameKey.append(OM_KEY_PREFIX).append(volumeName);
+    renameKey.append(OM_KEY_PREFIX).append(bucketName);
+    renameKey.append(OM_KEY_PREFIX).append(objectID);
+    return renameKey.toString();
   }
 
   @Override

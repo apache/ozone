@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -90,16 +90,17 @@ public class OMKeysRenameResponse extends OMClientResponse {
               newKeyInfo);
 
 
-      RepeatedOmString repeatedOmString = omMetadataManager.getRenamedKeyTable()
-          .get(newKeyInfo.getObjectID());
-      if (repeatedOmString != null) {
-        repeatedOmString.addOmString(fromDbKey);
-      } else {
-        repeatedOmString = new RepeatedOmString(fromDbKey);
-      }
+      String renameDbKey = omMetadataManager.getRenameKey(
+          newKeyInfo.getVolumeName(), newKeyInfo.getBucketName(),
+          newKeyInfo.getObjectID());
 
-      omMetadataManager.getRenamedKeyTable().putWithBatch(
-          batchOperation, newKeyInfo.getObjectID(), repeatedOmString);
+      OmKeyRenameInfo omKeyRenameInfo = omMetadataManager.getRenamedKeyTable()
+          .get(renameDbKey);
+      if (omKeyRenameInfo == null) {
+        omKeyRenameInfo = new OmKeyRenameInfo(fromDbKey);
+        omMetadataManager.getRenamedKeyTable().putWithBatch(
+            batchOperation, renameDbKey, omKeyRenameInfo);
+      }
     }
   }
 

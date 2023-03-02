@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -84,15 +84,16 @@ public class OMKeyRenameResponse extends OmKeyResponse {
             omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
             renameKeyInfo);
 
-    RepeatedOmString repeatedOmString = omMetadataManager.getRenamedKeyTable()
-        .get(renameKeyInfo.getObjectID());
-    if (repeatedOmString != null) {
-      repeatedOmString.addOmString(fromDbKey);
-    } else {
-      repeatedOmString = new RepeatedOmString(fromDbKey);
+    String renameDbKey = omMetadataManager.getRenameKey(
+        renameKeyInfo.getVolumeName(), renameKeyInfo.getBucketName(),
+        renameKeyInfo.getObjectID());
+    OmKeyRenameInfo omKeyRenameInfo = omMetadataManager.getRenamedKeyTable()
+        .get(renameDbKey);
+    if (omKeyRenameInfo == null) {
+      omKeyRenameInfo = new OmKeyRenameInfo(fromDbKey);
+      omMetadataManager.getRenamedKeyTable().putWithBatch(
+          batchOperation, renameDbKey, omKeyRenameInfo);
     }
-    omMetadataManager.getRenamedKeyTable().putWithBatch(
-        batchOperation, renameKeyInfo.getObjectID(), repeatedOmString);
 
   }
 

@@ -27,64 +27,64 @@ import java.util.List;
  * Argument for renamedKeyTable. Helps to store List<String> which represents
  * all the renames that happened to particular key in between snapshots.
  */
-public class RepeatedOmString {
-  private List<String> omStringList;
+public class OmKeyRenameInfo {
+  private List<String> omKeyRenameInfoList;
 
-  public RepeatedOmString(List<String> stringList) {
-    this.omStringList = stringList;
+  public OmKeyRenameInfo(List<String> omKeyRenameInfoList) {
+    this.omKeyRenameInfoList = omKeyRenameInfoList;
   }
 
-  public RepeatedOmString(String string) {
-    this.omStringList = new ArrayList<>();
-    this.omStringList.add(string);
+  public OmKeyRenameInfo(String keyRenameInfo) {
+    this.omKeyRenameInfoList = new ArrayList<>();
+    this.omKeyRenameInfoList.add(keyRenameInfo);
   }
 
-  public void addOmString(String string) {
-    this.omStringList.add(string);
+  public void addOmKeyRenameInfo(String keyRenameInfo) {
+    this.omKeyRenameInfoList.add(keyRenameInfo);
   }
 
-  public List<String> getOmStringList() {
-    return omStringList;
+  public List<String> getOmKeyRenameInfoList() {
+    return omKeyRenameInfoList;
   }
 
-  public List<String> cloneOmStringList() {
-    return new ArrayList<>(omStringList);
+  public List<String> cloneOmKeyRenameInfoList() {
+    return new ArrayList<>(omKeyRenameInfoList);
   }
 
 
-  public static RepeatedOmString getFromProto(RepeatedString
+  public static OmKeyRenameInfo getFromProto(RepeatedString
       repeatedString) throws IOException {
     List<String> list = new ArrayList<>(repeatedString.getKeyNameList());
-    return new RepeatedOmString.Builder().setOmString(list).build();
+    return new OmKeyRenameInfo.Builder().setOmKeyRenameList(list).build();
   }
 
   public RepeatedString getProto() {
-    List<String> list = new ArrayList<>(cloneOmStringList());
+    List<String> list = new ArrayList<>(cloneOmKeyRenameInfoList());
 
     RepeatedString.Builder builder = RepeatedString.newBuilder()
         .addAllKeyName(list);
     return builder.build();
   }
 
-  public RepeatedOmString copyObject() {
-    return new RepeatedOmString(new ArrayList<>(omStringList));
+  public OmKeyRenameInfo copyObject() {
+    return new OmKeyRenameInfo(new ArrayList<>(omKeyRenameInfoList));
   }
 
   /**
-   * Builder of RepeatedOmString.
+   * Builder of OmKeyRenameInfo.
    */
   public static class Builder {
-    private List<String> omStringList;
+    private List<String> omKeyRenameList;
 
     public Builder() { }
 
-    public RepeatedOmString.Builder setOmString(List<String> stringList) {
-      this.omStringList = stringList;
+    public OmKeyRenameInfo.Builder setOmKeyRenameList(List<String> stringList) {
+      this.omKeyRenameList = stringList;
       return this;
     }
 
-    public RepeatedOmString build() {
-      return new RepeatedOmString(omStringList);
+    public OmKeyRenameInfo build() {
+      return new OmKeyRenameInfo(omKeyRenameList);
     }
   }
 

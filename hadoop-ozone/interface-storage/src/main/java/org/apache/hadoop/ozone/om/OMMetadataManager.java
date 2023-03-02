@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmString;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -375,7 +375,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
 
-  Table<Long, RepeatedOmString> getRenamedKeyTable();
+  Table<String, OmKeyRenameInfo> getRenamedKeyTable();
 
   /**
    * Gets the OM Meta table.
@@ -484,6 +484,18 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOpenFileName(long volumeId, long bucketId,
                          long parentObjectId, String fileName, long id);
+
+
+  /**
+   * Given a volume, bucket and a objectID, return the corresponding DB rename
+   * key.
+   *
+   * @param volume   - volume name
+   * @param bucket   - bucket name
+   * @param objectID - objectID of the key
+   * @return DB rename key as String.
+   */
+  String getRenameKey(String volume, String bucket, long objectID);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store.
