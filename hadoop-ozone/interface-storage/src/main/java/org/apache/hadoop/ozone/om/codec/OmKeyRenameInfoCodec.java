@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedString;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyRenameInfo;
 
 import java.io.IOException;
 
@@ -41,7 +41,7 @@ public class OmKeyRenameInfoCodec implements Codec<OmKeyRenameInfo> {
     Preconditions.checkNotNull(rawData,
         "Null byte array can't converted to real object.");
     try {
-      return OmKeyRenameInfo.getFromProto(RepeatedString.parseFrom(rawData));
+      return OmKeyRenameInfo.getFromProto(KeyRenameInfo.parseFrom(rawData));
     } catch (InvalidProtocolBufferException ex) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", ex);

@@ -1028,8 +1028,8 @@ message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
 }
 
-message RepeatedString {
-  repeated string keyName = 1;
+message KeyRenameInfo {
+  repeated string keyNames = 1;
 }
 
 message OzoneFileStatusProto {

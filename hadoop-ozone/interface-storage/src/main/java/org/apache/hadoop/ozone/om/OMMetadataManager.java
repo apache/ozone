@@ -487,8 +487,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
 
   /**
-   * Given a volume, bucket and a objectID, return the corresponding DB rename
-   * key.
+   * Given a volume, bucket and a objectID, return the DB key name in
+   * renamedKeyTable.
    *
    * @param volume   - volume name
    * @param bucket   - bucket name

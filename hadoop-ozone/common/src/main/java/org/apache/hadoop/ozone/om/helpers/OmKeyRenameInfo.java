@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedString;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyRenameInfo;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,63 +28,63 @@ import java.util.List;
  * all the renames that happened to particular key in between snapshots.
  */
 public class OmKeyRenameInfo {
-  private List<String> omKeyRenameInfoList;
+  private List<String> keyNamesList;
 
-  public OmKeyRenameInfo(List<String> omKeyRenameInfoList) {
-    this.omKeyRenameInfoList = omKeyRenameInfoList;
+  public OmKeyRenameInfo(List<String> keyNamesList) {
+    this.keyNamesList = keyNamesList;
   }
 
   public OmKeyRenameInfo(String keyRenameInfo) {
-    this.omKeyRenameInfoList = new ArrayList<>();
-    this.omKeyRenameInfoList.add(keyRenameInfo);
+    this.keyNamesList = new ArrayList<>();
+    this.keyNamesList.add(keyRenameInfo);
   }
 
   public void addOmKeyRenameInfo(String keyRenameInfo) {
-    this.omKeyRenameInfoList.add(keyRenameInfo);
+    this.keyNamesList.add(keyRenameInfo);
   }
 
   public List<String> getOmKeyRenameInfoList() {
-    return omKeyRenameInfoList;
+    return keyNamesList;
   }
 
   public List<String> cloneOmKeyRenameInfoList() {
-    return new ArrayList<>(omKeyRenameInfoList);
+    return new ArrayList<>(keyNamesList);
   }
 
 
-  public static OmKeyRenameInfo getFromProto(RepeatedString
-      repeatedString) throws IOException {
-    List<String> list = new ArrayList<>(repeatedString.getKeyNameList());
+  public static OmKeyRenameInfo getFromProto(KeyRenameInfo
+      keyRenameInfo) throws IOException {
+    List<String> list = new ArrayList<>(keyRenameInfo.getKeyNamesList());
     return new OmKeyRenameInfo.Builder().setOmKeyRenameList(list).build();
   }
 
-  public RepeatedString getProto() {
+  public KeyRenameInfo getProto() {
     List<String> list = new ArrayList<>(cloneOmKeyRenameInfoList());
 
-    RepeatedString.Builder builder = RepeatedString.newBuilder()
-        .addAllKeyName(list);
+    KeyRenameInfo.Builder builder = KeyRenameInfo.newBuilder()
+        .addAllKeyNames(list);
     return builder.build();
   }
 
   public OmKeyRenameInfo copyObject() {
-    return new OmKeyRenameInfo(new ArrayList<>(omKeyRenameInfoList));
+    return new OmKeyRenameInfo(new ArrayList<>(keyNamesList));
   }
 
   /**
    * Builder of OmKeyRenameInfo.
    */
   public static class Builder {
-    private List<String> omKeyRenameList;
+    private List<String> keyNamesList;
 
     public Builder() { }
 
     public OmKeyRenameInfo.Builder setOmKeyRenameList(List<String> stringList) {
-      this.omKeyRenameList = stringList;
+      this.keyNamesList = stringList;
       return this;
     }
 
     public OmKeyRenameInfo build() {
-      return new OmKeyRenameInfo(omKeyRenameList);
+      return new OmKeyRenameInfo(keyNamesList);
     }
   }
 

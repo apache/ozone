@@ -87,7 +87,7 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
 
     while (iterator.hasNext()) {
       String renameDbKey = iterator.next().getKey();
-      if (!renameDbKey.contains(dbSnapshotBucketKey)) {
+      if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
         break;
       }
       omMetadataManager.getRenamedKeyTable()

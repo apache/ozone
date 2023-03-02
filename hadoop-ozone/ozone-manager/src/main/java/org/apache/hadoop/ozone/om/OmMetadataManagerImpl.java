@@ -634,7 +634,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renamedKeyTable = this.store.getTable(RENAMED_KEY_TABLE,
         String.class, OmKeyRenameInfo.class);
     checkTableStatus(renamedKeyTable, RENAMED_KEY_TABLE, addCacheMetrics);
-
+    // TODO: [SNAPSHOT] Initialize table lock for renamedKeyTable.
   }
 
   /**
