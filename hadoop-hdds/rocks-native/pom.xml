@@ -32,8 +32,6 @@
         <cmake.standards>23</cmake.standards>
         <sstDump.include>true</sstDump.include>
     </properties>
-
-
     <build>
         <plugins>
             <plugin>
@@ -115,25 +113,7 @@
 
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>native-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>javah</goal>
-                        </goals>
-                        <configuration>
-                            <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
-                            <javahClassNames>
-                                <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
-                            </javahClassNames>
-                            <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+
             <plugin>
             <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
@@ -154,11 +134,6 @@
                             <goal>run</goal>
                         </goals>
                     </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <executions>
                     <execution>
                         <id>build-zlib</id>
                         <phase>generate-sources</phase>
@@ -260,7 +235,7 @@
                     </execution>
                     <execution>
                         <id>build-rocks-tools</id>
-                        <phase>compile</phase>
+                        <phase>process-classes</phase>
                         <configuration>
                             <tasks>
                                 <mkdir dir="${project.build.directory}/native/rocksdb"/>
@@ -287,12 +262,6 @@
                             <goal>run</goal>
                         </goals>
                     </execution>
-
-                </executions>
-            </plugin>
-            <plugin>
-            <artifactId>maven-antrun-plugin</artifactId>
-                <executions>
                     <execution>
                         <id>copy-lib-file</id>
                         <phase>prepare-package</phase>
@@ -326,6 +295,85 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>java-8</id>
+            <activation>
+                <jdk>1.8</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>javah</goal>
+                                </goals>
+                                <configuration>
+                                    <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
+                                    <javahClassNames>
+                                        <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
+                                    </javahClassNames>
+                                    <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>java-11</id>
+            <activation>
+                <property>
+                    <name>javac.version</name>
+                    <value>11</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>javach</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <phase>compile</phase>
+                                <configuration>
+                                    <executable>${env.JAVA_HOME}/bin/javac</executable>
+                                    <arguments>
+                                        <argument>-classpath</argument>
+                                        <argument>${project.build.outputDirectory}</argument>
+                                        <argument>-h</argument>
+                                        <argument>${project.build.directory}/native/javah</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <phase>compile</phase>
+                                <goals>
+                                    <goal>javah</goal>
+                                </goals>
+                                <configuration>
+                                    <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
+                                    <javahClassNames>
+                                        <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
+                                    </javahClassNames>
+                                    <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 
 </project>
