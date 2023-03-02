@@ -2789,8 +2789,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.BUCKET, bucketName);
     try {
       metrics.incNumSnapshotLists();
-      return metadataManager.listSnapshot(volumeName, bucketName, snapshotPrefix,
-          prevSnapshot, maxListResult);
+      return metadataManager.listSnapshot(volumeName, bucketName,
+          snapshotPrefix, prevSnapshot, maxListResult);
     } catch (Exception ex) {
       metrics.incNumSnapshotListFails();
       auditSuccess = false;

@@ -4156,7 +4156,8 @@ public abstract class TestOzoneRpcClientAbstract {
           snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
 
-    Iterator<? extends OzoneSnapshot> snapshotIter = store.listSnapshot(volumeA, bucketA, null, null);
+    Iterator<? extends OzoneSnapshot> snapshotIter =
+        store.listSnapshot(volumeA, bucketA, null, null);
     int volABucketASnapshotCount = 0;
     while (snapshotIter.hasNext()) {
       OzoneSnapshot snapshot = snapshotIter.next();
