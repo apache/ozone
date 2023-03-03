@@ -27,10 +27,9 @@ import static org.apache.hadoop.util.ProtobufUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Test-cases for {@link org.apache.hadoop.util.ProtobufUtils}
+ * Test-cases for {@link org.apache.hadoop.util.ProtobufUtils}.
  */
 public class TestProtobufUtils {
-
   @Test
   public void testUuidToProtobuf() {
     UUID object = UUID.randomUUID();
