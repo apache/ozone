@@ -162,3 +162,8 @@ no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+
+OZONE-SITE.XML_hdds.secret.key.rotate.duration=5m
+OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=1m
+OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h
