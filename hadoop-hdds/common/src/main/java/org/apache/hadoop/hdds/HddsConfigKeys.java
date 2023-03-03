@@ -228,6 +228,28 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT =
       "";
 
+  public static final String HDDS_SECRET_KEY_FILE =
+      "hdds.secret.key.file.name";
+  public static final String HDDS_SECRET_KEY_FILE_DEFAULT = "secret_keys.json";
+
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
+      "hdds.secret.key.expiry.duration";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
+      "hdds.secret.key.rotate.duration";
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT = "1d";
+
+  public static final String HDDS_SECRET_KEY_ALGORITHM =
+      "hdds.secret.key.algorithm";
+  public static final String HDDS_SECRET_KEY_ALGORITHM_DEFAULT =
+      "HmacSHA256";
+
+  public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION =
+      "hdds.secret.key.rotate.check.duration";
+  public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
+      = "10m";
+
   /**
    * Do not instantiate.
    */

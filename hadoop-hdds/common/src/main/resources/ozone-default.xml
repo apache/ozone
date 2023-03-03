@@ -3958,4 +3958,52 @@
       Max numbers of keys changed allowed for a snapshot diff job.
     </description>
   </property>
+
+  <property>
+    <name>hdds.secret.key.file.name</name>
+    <value>secret_keys.json</value>
+    <tag>SCM, SECURITY</tag>
+    <description>
+      Name of file which stores symmetric secret keys for token signatures.
+    </description>
+  </property>
+  <property>
+    <name>hdds.secret.key.expiry.duration</name>
+    <value>7d</value>
+    <tag>SCM, SECURITY</tag>
+    <description>
+      The duration for which symmetric secret keys issued by SCM are valid.
+      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 7 secret keys (for the
+      last 7 days) are kept valid at any point of time.
+    </description>
+  </property>
+  <property>
+    <name>hdds.secret.key.rotate.duration</name>
+    <value>1d</value>
+    <tag>SCM, SECURITY</tag>
+    <description>
+      The duration that SCM periodically generate a new symmetric secret keys.
+    </description>
+  </property>
+  <property>
+    <name>hdds.secret.key.rotate.check.duration</name>
+    <value>10m</value>
+    <tag>SCM, SECURITY</tag>
+    <description>
+      The duration that SCM periodically checks if it's time to generate new symmetric secret keys.
+      This config has an impact on the practical correctness of secret key expiry and rotation period. For example,
+      if hdds.secret.key.rotate.duration=1d and hdds.secret.key.rotate.check.duration=10m, the actual key rotation
+      will happen each 1d +/- 10m.
+    </description>
+  </property>
+  <property>
+    <name>hdds.secret.key.algorithm</name>
+    <value>HmacSHA256</value>
+    <tag>SCM, SECURITY</tag>
+    <description>
+      The algorithm that SCM uses to generate symmetric secret keys.
+      A valid algorithm is the one supported by KeyGenerator, as described at
+      https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
+    </description>
+  </property>
 </configuration>
