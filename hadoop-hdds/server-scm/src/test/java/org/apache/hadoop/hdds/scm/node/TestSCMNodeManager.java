@@ -81,6 +81,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -979,6 +980,11 @@ public class TestSCMNodeManager {
           new DeleteBlocksCommand(Collections.emptyList()));
     }
 
+    Assertions.assertEquals(3, nodeManager.getTotalDatanodeCommandCount(
+        node1, SCMCommandProto.Type.replicateContainerCommand));
+    Assertions.assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
+        node1, SCMCommandProto.Type.deleteBlocksCommand));
+
     nodeManager.processHeartbeat(node1, layoutInfo,
         CommandQueueReportProto.newBuilder()
             .addCommand(SCMCommandProto.Type.replicateContainerCommand)
@@ -993,6 +999,11 @@ public class TestSCMNodeManager {
     assertEquals(11, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.closeContainerCommand));
     assertEquals(5, nodeManager.getNodeQueuedCommandCount(
+        node1, SCMCommandProto.Type.deleteBlocksCommand));
+
+    Assertions.assertEquals(126, nodeManager.getTotalDatanodeCommandCount(
+        node1, SCMCommandProto.Type.replicateContainerCommand));
+    Assertions.assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
     ArgumentCaptor<DatanodeDetails> captor =
@@ -1018,6 +1029,16 @@ public class TestSCMNodeManager {
         .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
+
+    // Add a a few more commands to the queue and check the counts are the sum.
+    for (int i = 0; i < 5; i++) {
+      nodeManager.addDatanodeCommand(node1.getUuid(),
+          new CloseContainerCommand(1, PipelineID.randomId()));
+    }
+    Assertions.assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
+        node1, SCMCommandProto.Type.replicateContainerCommand));
+    Assertions.assertEquals(16, nodeManager.getTotalDatanodeCommandCount(
+        node1, SCMCommandProto.Type.closeContainerCommand));
   }
 
   @Test
