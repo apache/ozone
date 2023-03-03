@@ -17,6 +17,8 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -33,7 +35,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-
 
 /**
  * Handler of resetting expired deleted blocks from SCM side.
@@ -62,8 +63,8 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
     private List<Long> txList;
 
     @CommandLine.Option(names = {"-i", "--in"},
-        description = "Use file as input, need to be JSON Array format and" +
-            " contains multi \"txID\" key.Example: [{\"txID\":1},{\"txID\":2}]")
+        description = "Use file as input, need to be JSON Array format and " +
+            "contains multi \"txID\" key. Example: [{\"txID\":1},{\"txID\":2}]")
     private String fileName;
   }
 
@@ -91,10 +92,9 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
           System.out.println("The last loaded txID: " +
               txIDs.get(txIDs.size() - 1));
         }
-      } catch (Exception ex) {
+      } catch (JsonIOException | JsonSyntaxException | IOException ex) {
         System.out.println("Cannot parse the file " + group.fileName);
-        ex.printStackTrace();
-        return;
+        throw new IOException(ex);
       }
       count = client.resetDeletedBlockRetryCount(txIDs);
     } else {
