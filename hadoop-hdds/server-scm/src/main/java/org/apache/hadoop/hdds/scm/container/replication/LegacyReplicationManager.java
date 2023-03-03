@@ -428,6 +428,7 @@ public class LegacyReplicationManager {
          * we have to resend close container command to the datanodes.
          */
         if (state == LifeCycleState.CLOSING) {
+          setHealthStateForClosing(replicas, container, report);
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
               sendCloseCommand(
@@ -1611,6 +1612,18 @@ public class LegacyReplicationManager {
     LifeCycleState state = container.getState();
     return replicas.stream()
         .allMatch(r -> compareState(state, r.getState()));
+  }
+
+  private void setHealthStateForClosing(Set<ContainerReplica> replicas,
+                                        ContainerInfo container,
+                                        ReplicationManagerReport report) {
+    if (replicas.size() == 0) {
+      report.incrementAndSample(HealthState.MISSING, container.containerID());
+      report.incrementAndSample(HealthState.UNDER_REPLICATED,
+              container.containerID());
+      report.incrementAndSample(HealthState.MIS_REPLICATED,
+              container.containerID());
+    }
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
