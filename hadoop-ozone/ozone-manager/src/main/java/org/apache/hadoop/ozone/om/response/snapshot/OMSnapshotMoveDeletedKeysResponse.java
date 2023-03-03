@@ -92,8 +92,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
             .getDeletedTable().putWithBatch(batchOperation,
                 nextDBKey.getKey(), nextDBOmKeyInfo);
       } else {
-        omMetadataManager.getDeletedTable()
-            .put(nextDBKey.getKey(), nextDBOmKeyInfo);
+        omMetadataManager.getDeletedTable().putWithBatch(
+            batchOperation, nextDBKey.getKey(), nextDBOmKeyInfo);
       }
     }
   }
