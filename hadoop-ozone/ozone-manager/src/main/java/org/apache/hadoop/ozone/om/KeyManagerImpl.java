@@ -1656,7 +1656,7 @@ public class KeyManagerImpl implements KeyManager {
     // refreshPipeline flag check has been removed as part of
     // https://issues.apache.org/jira/browse/HDDS-3658.
     // Please refer this jira for more details.
-    refreshPipeline(keyInfoList);
+    refreshPipelineFromCache(keyInfoList);
 
     if (omKeyArgs.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
