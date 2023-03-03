@@ -78,24 +78,6 @@ public class CommandQueue {
   }
 
   /**
-   * Explicitly lock the command queue so no other threads can add or remove
-   * commands or query the command counts. Note it must be unlocked via the
-   * unlock method or all commands will be blocked. This allows for a series of
-   * individual calls to the command queue ensuring a consistent state between
-   * the calls.
-   */
-  public void lock() {
-    lock.lock();
-  }
-
-  /**
-   * Unlock the command queue after a previous lock command.
-   */
-  public void unlock() {
-    lock.unlock();
-  }
-
-  /**
    * Returns  a list of Commands for the datanode to execute, if we have no
    * commands returns a empty list otherwise the current set of
    * commands are returned and command map set to empty list again.

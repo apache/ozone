@@ -87,6 +87,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -129,6 +130,12 @@ public class SCMNodeManager implements NodeManager {
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
+
+  /**
+   * Lock used to synchronize some operation in Node manager to ensure a
+   * consistent view of the node state.
+   */
+  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
   /**
    * Constructs SCM machine Manager.
@@ -512,7 +519,7 @@ public class SCMNodeManager implements NodeManager {
       LOG.error("SCM trying to process heartbeat from an " +
           "unregistered node {}. Ignoring the heartbeat.", datanodeDetails);
     }
-    commandQueue.lock();
+    writeLock().lock();
     try {
       Map<SCMCommandProto.Type, Integer> summary =
           commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
@@ -523,7 +530,7 @@ public class SCMNodeManager implements NodeManager {
       }
       return commands;
     } finally {
-      commandQueue.unlock();
+      writeLock().unlock();
     }
   }
 
@@ -756,8 +763,13 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException {
-    DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
-    return datanodeInfo.getCommandCount(cmdType);
+    readLock().lock();
+    try {
+      DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+      return datanodeInfo.getCommandCount(cmdType);
+    } finally {
+      readLock().unlock();
+    }
   }
 
   /**
@@ -769,7 +781,12 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
-    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
+    readLock().lock();
+    try {
+      return commandQueue.getDatanodeCommandCount(dnID, cmdType);
+    } finally {
+      readLock().unlock();
+    }
   }
 
   /**
@@ -1168,13 +1185,14 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getContainers(datanodeDetails.getUuid());
   }
 
-  // TODO:
-  // Since datanode commands are added through event queue, onMessage method
-  // should take care of adding commands to command queue.
-  // Refactor and remove all the usage of this method and delete this method.
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
-    this.commandQueue.addCommand(dnId, command);
+    writeLock().lock();
+    try {
+      this.commandQueue.addCommand(dnId, command);
+    } finally {
+      writeLock().unlock();
+    }
   }
 
   /**
@@ -1212,7 +1230,14 @@ public class SCMNodeManager implements NodeManager {
 
   @Override
   public List<SCMCommand> getCommandQueue(UUID dnID) {
-    return commandQueue.getCommand(dnID);
+    // Getting the queue actually clears it and returns the commands, so this
+    // is a write operation and not a read as the method name suggests.
+    writeLock().lock();
+    try {
+      return commandQueue.getCommand(dnID);
+    } finally {
+      writeLock().unlock();
+    }
   }
 
   /**
@@ -1338,5 +1363,13 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void forceNodesToHealthyReadOnly() {
     nodeStateManager.forceNodesToHealthyReadOnly();
+  }
+
+  private ReentrantReadWriteLock.WriteLock writeLock() {
+    return lock.writeLock();
+  }
+
+  private ReentrantReadWriteLock.ReadLock readLock() {
+    return lock.readLock();
   }
 }
