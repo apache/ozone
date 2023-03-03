@@ -20,9 +20,14 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoCodec;
+import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.crypto.Encryptor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -38,6 +43,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.ozone.test.tag.Flaky;
@@ -57,6 +65,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test HSync.
@@ -219,6 +229,8 @@ public class TestHSync {
       assertTrue(os.hasCapability(StreamCapabilities.HSYNC),
           "KeyOutputStream should support hsync()!");
     }
+
+    testEncryptedStreamCapabilities(false);
   }
 
   @Test
@@ -250,6 +262,35 @@ public class TestHSync {
           "ECKeyOutputStream should not support hflush()!");
       assertFalse(os.hasCapability(StreamCapabilities.HSYNC),
           "ECKeyOutputStream should not support hsync()!");
+    }
+    testEncryptedStreamCapabilities(true);
+  }
+
+  private void testEncryptedStreamCapabilities(boolean isEC) throws IOException,
+      GeneralSecurityException {
+    KeyOutputStream kos;
+    if (isEC) {
+      kos = mock(ECKeyOutputStream.class);
+    } else {
+      kos = mock(KeyOutputStream.class);
+    }
+    CryptoCodec codec = mock(CryptoCodec.class);
+    when(codec.getCipherSuite()).thenReturn(CipherSuite.AES_CTR_NOPADDING);
+    when(codec.getConf()).thenReturn(CONF);
+    Encryptor encryptor = mock(Encryptor.class);
+    when(codec.createEncryptor()).thenReturn(encryptor);
+    CryptoOutputStream cos =
+        new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
+    OzoneOutputStream oos = new OzoneOutputStream(cos);
+    OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
+
+    try (CapableOzoneFSOutputStream cofsos =
+        new CapableOzoneFSOutputStream(ofso)) {
+      if (isEC) {
+        assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
+      } else {
+        assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
+      }
     }
   }
 }

@@ -275,6 +275,11 @@ public class OzoneConfiguration extends Configuration
     return props;
   }
 
+  public Map<String, String> getOzoneProperties() {
+    String ozoneRegex = ".*(ozone|hdds|ratis|container|scm|recon)\\..*";
+    return getValByRegex(ozoneRegex);
+  }
+
   @Override
   public Collection<String> getConfigKeys() {
     return getProps().keySet()

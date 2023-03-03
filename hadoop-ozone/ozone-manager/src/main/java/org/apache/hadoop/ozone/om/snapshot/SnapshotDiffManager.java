@@ -22,7 +22,9 @@ import java.util.Iterator;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -42,6 +44,7 @@ import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.jetbrains.annotations.NotNull;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -72,10 +75,15 @@ public class SnapshotDiffManager {
   private final ManagedRocksDB db;
   private final CodecRegistry codecRegistry;
 
+  private OzoneConfiguration configuration;
+
+
   public SnapshotDiffManager(ManagedRocksDB db,
-                             RocksDBCheckpointDiffer differ) {
+      RocksDBCheckpointDiffer differ,
+      OzoneConfiguration conf) {
     this.db = db;
     this.differ = differ;
+    this.configuration = conf;
     this.codecRegistry = new CodecRegistry();
 
     // Integers are used for indexing persistent list.
@@ -123,6 +131,7 @@ public class SnapshotDiffManager {
         getTablePrefixes(snapshotOMMM, volumeName, bucketName));
   }
 
+  @SuppressWarnings("checkstyle:methodlength")
   public SnapshotDiffReport getSnapshotDiffReport(final String volume,
                                                   final String bucket,
                                                   final OmSnapshot fromSnapshot,
@@ -197,14 +206,22 @@ public class SnapshotDiffManager {
               codecRegistry,
               DiffReportEntry.class);
 
-      final Table<String, OmKeyInfo> fsKeyTable = fromSnapshot
-          .getMetadataManager().getKeyTable(bucketLayout);
-      final Table<String, OmKeyInfo> tsKeyTable = toSnapshot
-          .getMetadataManager().getKeyTable(bucketLayout);
+      final Table<String, OmKeyInfo> fsKeyTable =
+          fromSnapshot.getMetadataManager().getKeyTable(bucketLayout);
+      final Table<String, OmKeyInfo> tsKeyTable =
+          toSnapshot.getMetadataManager().getKeyTable(bucketLayout);
+
+      boolean useFullDiff = configuration.getBoolean(
+          OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+          OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
+
+      Map<String, String> tablePrefixes =
+          getTablePrefixes(toSnapshot.getMetadataManager(), volume, bucket);
+
       final Set<String> deltaFilesForKeyOrFileTable =
           getDeltaFiles(fromSnapshot, toSnapshot,
-              Collections.singletonList(fsKeyTable.getName()),
-              fsInfo, tsInfo, volume, bucket);
+              Collections.singletonList(fsKeyTable.getName()), fsInfo, tsInfo,
+              useFullDiff, tablePrefixes);
 
       addToObjectIdMap(fsKeyTable,
           tsKeyTable,
@@ -212,7 +229,7 @@ public class SnapshotDiffManager {
           objectIdToKeyNameMapForFromSnapshot,
           objectIdToKeyNameMapForToSnapshot,
           objectIDsToCheckMap,
-          false);
+          tablePrefixes);
 
       if (bucketLayout.isFileSystemOptimized()) {
         // add to object ID map for directory.
@@ -222,16 +239,15 @@ public class SnapshotDiffManager {
             toSnapshot.getMetadataManager().getDirectoryTable();
         final Set<String> deltaFilesForDirTable =
             getDeltaFiles(fromSnapshot, toSnapshot,
-                Collections.singletonList(fsDirTable.getName()),
-                fsInfo, tsInfo, volume, bucket);
-
+                Collections.singletonList(fsDirTable.getName()), fsInfo, tsInfo,
+                useFullDiff, tablePrefixes);
         addToObjectIdMap(fsDirTable,
             tsDirTable,
             deltaFilesForDirTable,
             objectIdToKeyNameMapForFromSnapshot,
             objectIdToKeyNameMapForToSnapshot,
             objectIDsToCheckMap,
-            true);
+            tablePrefixes);
       }
 
       generateDiffReport(requestId,
@@ -281,7 +297,11 @@ public class SnapshotDiffManager {
                                 PersistentMap<Long, String> oldObjIdToKeyMap,
                                 PersistentMap<Long, String> newObjIdToKeyMap,
                                 PersistentSet<Long> objectIDsToCheck,
-                                boolean isDirectoryTable) {
+                                Map<String, String> tablePrefixes)
+      throws IOException {
+
+    boolean isDirectoryTable =
+        fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
 
     if (deltaFiles.isEmpty()) {
       return;
@@ -292,7 +312,8 @@ public class SnapshotDiffManager {
         try {
           final WithObjectID oldKey = fsTable.get(key);
           final WithObjectID newKey = tsTable.get(key);
-          if (areKeysEqual(oldKey, newKey)) {
+          if (areKeysEqual(oldKey, newKey) || !isKeyInBucket(key, tablePrefixes,
+              fsTable.getName())) {
             // We don't have to do anything.
             return;
           }
@@ -333,14 +354,16 @@ public class SnapshotDiffManager {
   private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
       OmSnapshot toSnapshot, List<String> tablesToLookUp,
       SnapshotInfo fsInfo, SnapshotInfo tsInfo,
-      String volume, String bucket)
+      boolean useFullDiff, Map<String, String> tablePrefixes)
       throws RocksDBException, IOException {
     // TODO: Refactor the parameter list
 
     final Set<String> deltaFiles = new HashSet<>();
 
     // Check if compaction DAG is available, use that if so
-    if (differ != null && fsInfo != null && tsInfo != null) {
+    if (differ != null && fsInfo != null && tsInfo != null && !useFullDiff) {
+      String volume = fsInfo.getVolumeName();
+      String bucket = fsInfo.getBucketName();
       // Construct DifferSnapshotInfo
       final DifferSnapshotInfo fromDSI =
           getDSIFromSI(fsInfo, fromSnapshot, volume, bucket);
@@ -385,6 +408,7 @@ public class SnapshotDiffManager {
 
       deltaFiles.addAll(fromSnapshotFiles);
       deltaFiles.addAll(toSnapshotFiles);
+      RocksDiffUtils.filterRelevantSstFiles(deltaFiles, tablePrefixes);
     }
 
     return deltaFiles;
@@ -552,5 +576,26 @@ public class SnapshotDiffManager {
       return oldKey.equals(newKey);
     }
     return false;
+  }
+
+
+  /**
+   * check if the given key is in the bucket specified by tablePrefix map.
+   */
+  private boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
+      String tableName) {
+    String volumeBucketDbPrefix;
+    // In case of FSO - either File/Directory table
+    // the key Prefix would be volumeId/bucketId and
+    // in case of non-fso - volumeName/bucketName
+    if (tableName.equals(
+        OmMetadataManagerImpl.DIRECTORY_TABLE) || tableName.equals(
+        OmMetadataManagerImpl.FILE_TABLE)) {
+      volumeBucketDbPrefix =
+          tablePrefixes.get(OmMetadataManagerImpl.DIRECTORY_TABLE);
+    } else {
+      volumeBucketDbPrefix = tablePrefixes.get(OmMetadataManagerImpl.KEY_TABLE);
+    }
+    return key.startsWith(volumeBucketDbPrefix);
   }
 }

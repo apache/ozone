@@ -24,6 +24,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -52,7 +53,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
 
     String toKeyName = UUID.randomUUID().toString();
     OmKeyInfo toKeyInfo = getOmKeyInfo(toKeyName);
-    OmKeyInfo fromKeyInfo = getOmKeyInfo(keyName);
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(toKeyInfo, keyName);
     String dbFromKey = addKeyToTable(fromKeyInfo);
     String dbToKey = getDBKeyName(toKeyInfo);
 
@@ -63,6 +64,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbFromKey));
     Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
+    Assert.assertTrue(omMetadataManager.getRenamedKeyTable().isEmpty());
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
@@ -81,6 +83,17 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbFromKey));
     Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
+
+    String renameDbKey = omMetadataManager.getRenameKey(
+        fromKeyInfo.getVolumeName(), fromKeyInfo.getBucketName(),
+        fromKeyInfo.getObjectID());
+    Assert.assertTrue(omMetadataManager.getRenamedKeyTable()
+        .isExist(renameDbKey));
+
+    OmKeyRenameInfo omKeyRenameInfo =
+        omMetadataManager.getRenamedKeyTable().get(renameDbKey);
+    Assert.assertTrue(omKeyRenameInfo.getOmKeyRenameInfoList()
+        .contains(dbFromKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
@@ -104,7 +117,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
 
     String toKeyName = UUID.randomUUID().toString();
     OmKeyInfo toKeyInfo = getOmKeyInfo(toKeyName);
-    OmKeyInfo fromKeyInfo = getOmKeyInfo(keyName);
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(toKeyInfo, keyName);
     String dbFromKey = addKeyToTable(fromKeyInfo);
     String dbToKey = getDBKeyName(toKeyInfo);
 
@@ -143,6 +156,11 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   protected OmKeyInfo getOmKeyInfo(String keyName) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor, 0L);
+  }
+
+  protected OmKeyInfo getOmKeyInfo(OmKeyInfo toKeyInfo,
+                                   String keyName) {
+    return getOmKeyInfo(keyName);
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {

@@ -25,11 +25,13 @@ import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -76,7 +78,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     this.snapshotDiffDb =
         createDbForSnapshotDiff(ozoneManager.getConfiguration());
-    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ);
+    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
+        ozoneManager.getConfiguration());
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
@@ -95,9 +98,11 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        boolean isSnapshotInCache =
+        CacheValue<SnapshotInfo> cacheValue =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .getCacheValue(new CacheKey<>(snapshotTableKey)) != null;
+                .getCacheValue(new CacheKey<>(snapshotTableKey));
+        boolean isSnapshotInCache = cacheValue != null && Optional.ofNullable(
+            cacheValue.getCacheValue()).isPresent();
 
         // read in the snapshot
         OzoneConfiguration conf = ozoneManager.getConfiguration();
