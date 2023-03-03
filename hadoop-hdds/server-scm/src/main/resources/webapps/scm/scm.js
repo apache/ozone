@@ -24,12 +24,71 @@
         require: {
             overview: "^overview"
         },
-        controller: function ($http) {
+        controller: function ($http,$scope) {
             var ctrl = this;
+            $scope.reverse = false;
+            $scope.columnName = "hostname";
+            let nodeStatusCopy = [];
+            $scope.RecordsToDisplay = "2";
+            $scope.currentPage = 1;
+            $scope.lastIndex = 0;
+            var protocol = "";
+            var portNo = "";
+
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
                 .then(function (result) {
-                    ctrl.nodemanagermetrics = result.data.beans[0];
+                const URLScheme = location.protocol.replace(":" , "");
+                ctrl.nodemanagermetrics = result.data.beans[0];
+
+                $scope.nodeStatus = ctrl.nodemanagermetrics && ctrl.nodemanagermetrics.NodeStatusInfo &&
+                    ctrl.nodemanagermetrics.NodeStatusInfo.map(({ key, value }) => {
+                        value.map(({key, value}) => {
+                            if(key == "HTTP") {
+                                protocol = key;
+                                portNo = value;
+                            }
+                            if(key == "HTTPS"){
+                                protocol = key.toLowerCase() === URLScheme ? key : "HTTP";
+                                portNo = value;
+                            }
+                        });
+                    return {
+                        hostname: key,
+                        opstate: value && value.find((element) => element.key == "OPSTATE").value,
+                        comstate: value && value.find((element) => element.key == "COMSTATE").value,
+                        portno: portNo,
+                        portval: protocol
+                    }});
+                nodeStatusCopy = [...$scope.nodeStatus];
+                $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
+                $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
                 });
+            /*if option is 'All' display all records else display specified record on page*/
+                $scope.UpdateRecordsToShow = () => {
+                    if($scope.RecordsToDisplay == 'All') {
+                        $scope.lastIndex = 1;
+                        $scope.nodeStatus = nodeStatusCopy;
+                    } else {
+                        $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
+                        $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                }
+                $scope.currentPage = 1;
+            }
+            /* Page Slicing  logic */
+                $scope.handlePagination = (pageIndex, isDisabled) => {
+                    if(!isDisabled) {
+                        let startIndex = 0, endIndex = 0;
+                        $scope.currentPage = pageIndex;
+                        startIndex = (pageIndex * $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
+                        endIndex = startIndex + parseInt($scope.RecordsToDisplay);
+                        $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
+                }
+            }
+             /*column sort logic*/
+            $scope.columnSort = (colName) => {
+                $scope.columnName = colName;
+                $scope.reverse = !$scope.reverse;
+            }
 
             const nodeOpStateSortOrder = {
                 "IN_SERVICE": "a",
