@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBRWBatchOperation;
@@ -33,6 +34,7 @@ import java.io.IOException;
 public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
   private RWBatchOperation currentBatchOperation;
+  private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
   public SCMHADBTransactionBufferStub() {
   }
@@ -55,13 +57,23 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
-    table.putWithBatch(getCurrentBatchOperation(), key, value);
+    rwLock.readLock().lock();
+    try {
+      table.putWithBatch(getCurrentBatchOperation(), key, value);
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
-    table.deleteWithBatch(getCurrentBatchOperation(), key);
+    rwLock.readLock().lock();
+    try {
+      table.deleteWithBatch(getCurrentBatchOperation(), key);
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
@@ -94,9 +106,14 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public void flush() throws IOException {
     if (dbStore != null) {
-      dbStore.commitBatchOperation(getCurrentBatchOperation());
-      currentBatchOperation.close();
-      currentBatchOperation = null;
+      rwLock.writeLock().lock();
+      try {
+        dbStore.commitBatchOperation(getCurrentBatchOperation());
+        currentBatchOperation.close();
+        currentBatchOperation = null;
+      } finally {
+        rwLock.writeLock().unlock();
+      }
     }
   }
 
