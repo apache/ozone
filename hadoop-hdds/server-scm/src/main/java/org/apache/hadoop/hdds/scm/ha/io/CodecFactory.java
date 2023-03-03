@@ -23,6 +23,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ProtocolMessageEnum;
 
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
@@ -49,6 +50,7 @@ public final class CodecFactory {
     codecs.put(BigInteger.class, new BigIntegerCodec());
     codecs.put(X509Certificate.class, new X509CertificateCodec());
     codecs.put(ByteString.class, new ByteStringCodec());
+    codecs.put(ManagedSecretKey.class, new ManagedSecretKeyCodec());
   }
 
   private CodecFactory() { }

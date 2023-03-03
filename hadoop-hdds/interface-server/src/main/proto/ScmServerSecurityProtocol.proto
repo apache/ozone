@@ -249,3 +249,12 @@ message SCMRevokeCertificatesResponseProto {
 service SCMSecurityProtocolService {
     rpc submitRequest (SCMSecurityRequest) returns (SCMSecurityResponse);
 }
+
+message ManagedSecretKey {
+    required UUID id = 1;
+    required uint64 creationTime = 2;
+    required uint64 expiryTime = 3;
+    required string algorithm = 4;
+    required bytes encoded = 5;
+}
+
