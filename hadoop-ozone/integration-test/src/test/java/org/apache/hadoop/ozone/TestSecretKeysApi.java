@@ -322,9 +322,6 @@ public final class TestSecretKeysApi {
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(1);
-//    for (int i = 1; i < 3; i++) {
-//      initSCM(builder.path, "scmNode-" + i);
-//    }
 
     cluster = (MiniOzoneHAClusterImpl) builder.build();
     cluster.waitForClusterToBeReady();
@@ -344,27 +341,5 @@ public final class TestSecretKeysApi {
 
   private void enableBlockToken() {
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
-  }
-
-  private void initSCM(String path, String nodeId) throws IOException {
-    Path scmPath = Paths.get(path, nodeId);
-    Files.createDirectories(scmPath);
-    conf.set(OZONE_METADATA_DIRS, scmPath.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    HASecurityUtils.initializeSecurity(scmStore, conf,
-        NetUtils.createSocketAddr(InetAddress.getLocalHost().getHostName(),
-            OZONE_SCM_CLIENT_PORT_DEFAULT), true);
-    scmStore.setPrimaryScmNodeId(scmId);
-    // writes the version file properties
-    scmStore.initialize();
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      scmStore.setSCMHAFlag(true);
-      scmStore.persistCurrentState();
-      SCMRatisServerImpl.initialize(clusterId, scmId,
-          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-              .getLocalNodeDetails(), conf);
-    }
   }
 }

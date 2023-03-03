@@ -103,9 +103,9 @@ enum Type {
     GetLatestCrlId = 10;
     RevokeCertificates = 11;
     GetCert = 12;
-    GetCurrentSecretKey=13;
-    GetSecretKey=14;
-    GetAllSecretKeys=15;
+    GetCurrentSecretKey = 13;
+    GetSecretKey = 14;
+    GetAllSecretKeys = 15;
 }
 
 enum Status {

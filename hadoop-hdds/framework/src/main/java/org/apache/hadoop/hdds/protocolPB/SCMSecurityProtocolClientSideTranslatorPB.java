@@ -72,8 +72,8 @@ import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SC
  * This class is the client-side translator that forwards requests for
  * {@link SCMSecurityProtocol} to the {@link SCMSecurityProtocolPB} proxy.
  */
-public class SCMSecurityProtocolClientSideTranslatorPB
-    implements SCMSecurityProtocol, ProtocolTranslator, Closeable {
+public class SCMSecurityProtocolClientSideTranslatorPB implements
+    SCMSecurityProtocol, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.
@@ -189,9 +189,10 @@ public class SCMSecurityProtocolClientSideTranslatorPB
    *                         certificate.
    */
   @Override
-  public String getCertificate(NodeDetailsProto nodeDetails, String certSignReq)
-      throws IOException {
-    return getCertificateChain(nodeDetails, certSignReq).getX509Certificate();
+  public String getCertificate(NodeDetailsProto nodeDetails,
+      String certSignReq) throws IOException {
+    return getCertificateChain(nodeDetails, certSignReq)
+        .getX509Certificate();
   }
 
   @Override
@@ -428,8 +429,8 @@ public class SCMSecurityProtocolClientSideTranslatorPB
     SCMGetLatestCrlIdRequestProto protoIns =  SCMGetLatestCrlIdRequestProto
         .getDefaultInstance();
     return submitRequest(Type.GetLatestCrlId,
-        builder -> builder.setGetLatestCrlIdRequest(
-            protoIns)).getGetLatestCrlIdResponseProto().getCrlId();
+        builder -> builder.setGetLatestCrlIdRequest(protoIns))
+        .getGetLatestCrlIdResponseProto().getCrlId();
   }
 
   @Override
