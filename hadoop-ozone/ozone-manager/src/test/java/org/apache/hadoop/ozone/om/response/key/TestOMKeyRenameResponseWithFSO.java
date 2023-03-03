@@ -45,6 +45,15 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
   }
 
   @Override
+  protected OmKeyInfo getOmKeyInfo(OmKeyInfo toKeyInfo,
+                                   String keyName) {
+    return OMRequestTestUtils.createOmKeyInfo(toKeyInfo.getVolumeName(),
+        toKeyInfo.getBucketName(), keyName, replicationType,
+        replicationFactor, toKeyInfo.getObjectID(),
+        toKeyInfo.getParentObjectID(), 0L, toKeyInfo.getCreationTime());
+  }
+
+  @Override
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
     OMRequestTestUtils.addFileToKeyTable(false, false,
         keyInfo.getFileName(), keyInfo, clientID, txnLogId, omMetadataManager);
