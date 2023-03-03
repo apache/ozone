@@ -76,6 +76,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>jersey-json</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.kerby</groupId>
+          <artifactId>kerb-simplekdc</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>log4j</groupId>
           <artifactId>log4j</artifactId>
         </exclusion>

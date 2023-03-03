@@ -554,7 +554,7 @@ public class BlockOutputStream extends OutputStream {
       throw e;
     } finally {
       if (close) {
-        cleanup(true);
+        cleanup(false);
       }
     }
   }
@@ -599,7 +599,7 @@ public class BlockOutputStream extends OutputStream {
         // Preconditions.checkArgument(buffer.position() == 0);
         // bufferPool.checkBufferPoolEmpty();
       } else {
-        cleanup(true);
+        cleanup(false);
       }
     }
   }

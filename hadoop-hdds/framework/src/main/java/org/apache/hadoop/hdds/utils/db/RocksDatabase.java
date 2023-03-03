@@ -78,8 +78,8 @@ public final class RocksDatabase {
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
-  private static List<ColumnFamilyHandle> columnFamilyHandles =
-      new ArrayList<>();
+  private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
+      new HashMap<>();
 
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
@@ -149,7 +149,7 @@ public final class RocksDatabase {
         db = ManagedRocksDB.open(dbOptions, dbFile.getAbsolutePath(),
             descriptors, handles);
       }
-      columnFamilyHandles = handles;
+      dbNameToCfHandleMap.put(db.get().getName(), handles);
       // init a column family map.
       AtomicLong counter = new AtomicLong(0);
       for (ColumnFamilyHandle h : handles) {
@@ -542,21 +542,6 @@ public final class RocksDatabase {
     }
   }
 
-  public void compactRange(ColumnFamily family, final byte[] begin,
-                           final byte[] end,
-                           final ManagedCompactRangeOptions options)
-      throws IOException {
-    try {
-      counter.incrementAndGet();
-      db.get().compactRange(family.getHandle(), begin, end, options);
-    } catch (RocksDBException e) {
-      closeOnError(e, true);
-      throw toIOException(this, "compactRange", e);
-    } finally {
-      counter.decrementAndGet();
-    }
-  }
-
   public void compactDB(ManagedCompactRangeOptions options) throws IOException {
     compactRangeDefault(options);
     for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
@@ -595,9 +580,10 @@ public final class RocksDatabase {
 
   private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
       throws IOException {
-    for (ColumnFamilyHandle cf : getColumnFamilyHandles()) {
+    for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
       try {
-        if (cfName.equals(new String(cf.getName(), StandardCharsets.UTF_8))) {
+        String table = new String(cf.getName(), StandardCharsets.UTF_8);
+        if (cfName.equals(table)) {
           return cf;
         }
       } catch (RocksDBException e) {
@@ -606,6 +592,29 @@ public final class RocksDatabase {
       }
     }
     return null;
+  }
+
+  public void compactRange(ColumnFamily family, final byte[] begin,
+      final byte[] end, final ManagedCompactRangeOptions options)
+      throws IOException {
+    try {
+      counter.incrementAndGet();
+      db.get().compactRange(family.getHandle(), begin, end, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public List<LiveFileMetaData> getLiveFilesMetaData() {
+    try {
+      counter.incrementAndGet();
+      return db.get().getLiveFilesMetaData();
+    } finally {
+      counter.decrementAndGet();
+    }
   }
 
   RocksCheckpoint createCheckpoint() {
@@ -909,8 +918,8 @@ public final class RocksDatabase {
     }
   }
 
-  public static List<ColumnFamilyHandle> getColumnFamilyHandles() {
-    return columnFamilyHandles;
+  public static Map<String, List<ColumnFamilyHandle>> getCfHandleMap() {
+    return dbNameToCfHandleMap;
   }
 
 

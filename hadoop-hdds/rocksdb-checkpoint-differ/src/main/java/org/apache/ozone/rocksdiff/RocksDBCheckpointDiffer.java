@@ -35,11 +35,9 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.Options;
-import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileReader;
-import org.rocksdb.SstFileReaderIterator;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +54,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -758,7 +757,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public List<String> getSSTDiffListWithFullPath(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
 
     List<String> sstDiffList = getSSTDiffList(src, dest);
 
@@ -779,7 +778,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized List<String> getSSTDiffList(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
@@ -815,40 +814,26 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     }
 
     if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
-      filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes());
+      filterRelevantSstFilesFullPath(fwdDAGDifferentFiles,
+          src.getTablePrefixes());
     }
 
     return new ArrayList<>(fwdDAGDifferentFiles);
   }
 
-  public void filterRelevantSstFiles(Set<String> inputFiles,
-      Map<String, String> tableToPrefixMap) {
-    for (String filename : inputFiles) {
+  /**
+   * construct absolute sst file path first and
+   * filter the files.
+   */
+  public void filterRelevantSstFilesFullPath(Set<String> inputFiles,
+      Map<String, String> tableToPrefixMap) throws IOException {
+    for (Iterator<String> fileIterator =
+         inputFiles.iterator(); fileIterator.hasNext();) {
+      String filename = fileIterator.next();
       String filepath = getAbsoluteSstFilePath(filename);
-      try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
-        sstFileReader.open(filepath);
-        TableProperties properties = sstFileReader.getTableProperties();
-        String tableName = new String(properties.getColumnFamilyName(), UTF_8);
-        if (tableToPrefixMap.containsKey(tableName)) {
-          String prefix = tableToPrefixMap.get(tableName);
-          SstFileReaderIterator iterator =
-              sstFileReader.newIterator(new ReadOptions());
-          iterator.seekToFirst();
-          String firstKey = RocksDiffUtils
-              .constructBucketKey(new String(iterator.key(), UTF_8));
-          iterator.seekToLast();
-          String lastKey = RocksDiffUtils
-              .constructBucketKey(new String(iterator.key(), UTF_8));
-          if (!RocksDiffUtils
-              .isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
-            inputFiles.remove(filename);
-          }
-        } else {
-          // entry from other tables
-          inputFiles.remove(filename);
-        }
-      } catch (RocksDBException e) {
-        e.printStackTrace();
+      if (!RocksDiffUtils.doesSstFileContainKeyRange(filepath,
+          tableToPrefixMap)) {
+        fileIterator.remove();
       }
     }
   }

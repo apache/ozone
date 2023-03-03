@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,13 +50,13 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -98,12 +99,16 @@ public class ContainerEndpoint {
   }
 
   /**
-   * Return @{@link org.apache.hadoop.ozone.recon.api.types.ContainerMetadata}
+   * Return @{@link org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
-   *
-   * @param limit max no. of containers to get.
    * @param prevKey the containerID after which results are returned.
+   *                start containerID, >=0,
+   *                start searching at the head if 0.
+   * @param limit max no. of containers to get.
+   *              count must be >= 0
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big.
    * @return {@link Response}
    */
   @GET
@@ -112,20 +117,28 @@ public class ContainerEndpoint {
           int limit,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
-    Map<Long, ContainerMetadata> containersMap;
-    long containersCount;
-    try {
-      containersMap =
-              reconContainerMetadataManager.getContainers(limit, prevKey);
-      containersCount = reconContainerMetadataManager.getCountForContainers();
-    } catch (IOException ioEx) {
-      throw new WebApplicationException(ioEx,
-          Response.Status.INTERNAL_SERVER_ERROR);
+    if (limit < 0 || prevKey < 0) {
+      // Send back an empty response
+      return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
+    long containersCount;
+    Collection<ContainerMetadata> containerMetaDataList =
+        containerManager.getContainers(ContainerID.valueOf(prevKey), limit)
+            .stream()
+            .map(container -> {
+              ContainerMetadata containerMetadata =
+                  new ContainerMetadata(container.getContainerID());
+              containerMetadata.setNumberOfKeys(container.getNumberOfKeys());
+              return containerMetadata;
+            })
+            .collect(Collectors.toList());
+
+    containersCount = containerMetaDataList.size();
     ContainersResponse containersResponse =
-        new ContainersResponse(containersCount, containersMap.values());
+        new ContainersResponse(containersCount, containerMetaDataList);
     return Response.ok(containersResponse).build();
   }
+
 
   /**
    * Return @{@link org.apache.hadoop.ozone.recon.api.types.KeyMetadata} for

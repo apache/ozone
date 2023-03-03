@@ -18,13 +18,15 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.ozone.OzoneFileSystem;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -56,6 +58,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -413,17 +416,7 @@ public class TestOmSnapshotFileSystem {
   // based on TestOzoneFileSystem:testListStatusWithIntermediateDir
   public void testListStatusWithIntermediateDir() throws Exception {
     String keyName = "object-dir/object-name";
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setAcls(Collections.emptyList())
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
-        .setLocationInfoList(new ArrayList<>())
-        .build();
-
-    OpenKeySession session = writeClient.openKey(keyArgs);
-    writeClient.commitKey(keyArgs, session.getId());
+    createAndCommitKey(keyName);
 
     Path parent = new Path("/");
 
@@ -448,6 +441,90 @@ public class TestOmSnapshotFileSystem {
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
   }
+
+  @Test
+  public void testGetFileStatus() throws Exception {
+    String dir = "dir";
+    String keyName = dir + "/" + "key";
+    createAndCommitKey(keyName);
+
+    Path parent = new Path("/");
+
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return fs.listStatus(parent).length != 0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+
+    String snapshotKeyPrefix = createSnapshot();
+    Path snapshotParent = new Path(snapshotKeyPrefix + parent);
+    Path dirInSnapshot = new Path(snapshotKeyPrefix + parent + dir);
+    Path keyInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
+
+    Assert.assertEquals(1, fs.listStatus(snapshotParent).length);
+    Assert.assertFalse(fs.getFileStatus(dirInSnapshot).isFile());
+    Assert.assertTrue(fs.getFileStatus(keyInSnapshot).isFile());
+    deleteRootDir();
+  }
+
+  @Test
+  public void testReadFileFromSnapshot() throws Exception {
+    String keyName = "dir/file";
+    byte[] strBytes = "Sample text".getBytes(StandardCharsets.UTF_8);
+    Path parent = new Path("/");
+    Path file = new Path(parent, "dir/file");
+    try (FSDataOutputStream out1 = fs.create(file, FsPermission.getDefault(),
+        true, 8, (short) 3, 1, null)) {
+      out1.write(strBytes);
+    }
+
+    // Wait until the filestatus is updated
+    if (!enabledFileSystemPaths) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return fs.listStatus(parent).length != 0;
+        } catch (IOException e) {
+          LOG.error("listStatus() Failed", e);
+          Assert.fail("listStatus() Failed");
+          return false;
+        }
+      }, 1000, 120000);
+    }
+
+    String snapshotKeyPrefix = createSnapshot();
+    Path fileInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
+
+    try {
+      FSDataInputStream inputStream = fs.open(fileInSnapshot);
+      ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+      inputStream.read(buffer);
+      byte[] readBytes = new byte[strBytes.length];
+      System.arraycopy(buffer.array(), 0, readBytes, 0, strBytes.length);
+      Assert.assertArrayEquals(strBytes, readBytes);
+    } catch (Exception e) {
+      Assert.fail("Failed to read file , Exception : " + e.toString());
+    }
+    deleteRootDir();
+  }
+
+  private static void createAndCommitKey(String keyName) throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setLocationInfoList(new ArrayList<>()).build();
+
+    OpenKeySession session = writeClient.openKey(keyArgs);
+    writeClient.commitKey(keyArgs, session.getId());
+  }
+
 
   /**
    * Tests listStatus operation on root directory.

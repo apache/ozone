@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -45,6 +44,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +62,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLoca
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -160,19 +158,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, commitKeyRequest.getClientID());
 
-      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        OmKeyLocationInfo locationInfo =
-            OmKeyLocationInfo.getFromProtobuf(keyLocation);
-
-        // Strip out tokens before adding to cache.
-        // This way during listStatus token information does not pass on to
-        // client when returning from cache.
-        if (ozoneManager.isGrpcBlockTokenEnabled()) {
-          locationInfo.setToken(null);
-        }
-        locationInfoList.add(locationInfo);
-      }
+      List<OmKeyLocationInfo>
+          locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
       bucketLockAcquired =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -221,6 +208,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+      if (isHSync) {
+        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+            String.valueOf(commitKeyRequest.getClientID()));
+      }
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -265,13 +256,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Add to cache of open key table and key table.
       if (!isHSync) {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            new CacheKey<>(dbOpenKey),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
+            dbOpenKey, trxnLogIndex);
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOzoneKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+          dbOzoneKey, omKeyInfo, trxnLogIndex);
 
       if (oldKeyVersionsToDelete != null) {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
@@ -308,6 +297,25 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  @NotNull
+  protected List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      OzoneManager ozoneManager, KeyArgs commitKeyArgs) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
+      OmKeyLocationInfo locationInfo =
+          OmKeyLocationInfo.getFromProtobuf(keyLocation);
+
+      // Strip out tokens before adding to cache.
+      // This way during listStatus token information does not pass on to
+      // client when returning from cache.
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        locationInfo.setToken(null);
+      }
+      locationInfoList.add(locationInfo);
+    }
+    return locationInfoList;
   }
 
   /**

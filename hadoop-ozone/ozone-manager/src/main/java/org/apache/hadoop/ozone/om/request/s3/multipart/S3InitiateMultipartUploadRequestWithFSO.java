@@ -18,11 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -204,7 +201,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
               volumeId, bucketId, transactionLogIndex,
-              Optional.of(missingParentInfos), Optional.absent());
+              missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
@@ -212,8 +209,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
-          new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
+          multipartKey, multipartKeyInfo, transactionLogIndex);
 
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(

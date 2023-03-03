@@ -78,6 +78,7 @@ message ScmContainerLocationRequest {
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
+  optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
 }
 
 message ScmContainerLocationResponse {
@@ -127,6 +128,7 @@ message ScmContainerLocationResponse {
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
+  optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
 
   enum Status {
     OK = 1;
@@ -175,6 +177,7 @@ enum Type {
   GetReplicationManagerReport = 35;
   ResetDeletedBlockRetryCount = 36;
   GetClosedContainerCount = 37;
+  TransferLeadership = 38;
 }
 
 /**

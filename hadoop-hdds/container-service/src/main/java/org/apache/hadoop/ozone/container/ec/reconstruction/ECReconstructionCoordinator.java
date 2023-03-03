@@ -271,35 +271,35 @@ public class ECReconstructionCoordinator implements Closeable {
               (int) (configuration.getStreamBufferMaxSize() / configuration
                   .getStreamBufferSize()),
               ByteStringConversion.createByteBufferConversion(false));
-      for (int i = 0; i < toReconstructIndexes.size(); i++) {
-        int replicaIndex = toReconstructIndexes.get(i);
-        DatanodeDetails datanodeDetails =
-            targetMap.get(replicaIndex);
-        targetBlockStreams[i] = getECBlockOutputstream(blockLocationInfo,
-                datanodeDetails, repConfig, replicaIndex, bufferPool,
-                configuration);
-        bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
-        // Make sure it's clean. Don't want to reuse the erroneously returned
-        // buffers from the pool.
-        bufs[i].clear();
-      }
-
-      sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
-          .collect(Collectors.toSet()));
-      long length = safeBlockGroupLength;
-      while (length > 0) {
-        int readLen = sis.recoverChunks(bufs);
-        // TODO: can be submitted in parallel
-        for (int i = 0; i < bufs.length; i++) {
-          CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-              future = targetBlockStreams[i].write(bufs[i]);
-          checkFailures(targetBlockStreams[i], future);
+      try {
+        for (int i = 0; i < toReconstructIndexes.size(); i++) {
+          int replicaIndex = toReconstructIndexes.get(i);
+          DatanodeDetails datanodeDetails =
+              targetMap.get(replicaIndex);
+          targetBlockStreams[i] = getECBlockOutputstream(blockLocationInfo,
+              datanodeDetails, repConfig, replicaIndex, bufferPool,
+              configuration);
+          bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
+          // Make sure it's clean. Don't want to reuse the erroneously returned
+          // buffers from the pool.
           bufs[i].clear();
         }
-        length -= readLen;
-      }
 
-      try {
+        sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
+            .collect(Collectors.toSet()));
+        long length = safeBlockGroupLength;
+        while (length > 0) {
+          int readLen = sis.recoverChunks(bufs);
+          // TODO: can be submitted in parallel
+          for (int i = 0; i < bufs.length; i++) {
+            CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+                future = targetBlockStreams[i].write(bufs[i]);
+            checkFailures(targetBlockStreams[i], future);
+            bufs[i].clear();
+          }
+          length -= readLen;
+        }
+
         for (ECBlockOutputStream targetStream : targetBlockStreams) {
           targetStream.executePutBlock(true, true,
               blockLocationInfo.getLength(), blockDataGroup);
@@ -324,9 +324,10 @@ public class ECReconstructionCoordinator implements Closeable {
       // Even after retries if it failed, we should declare the
       // reconstruction as failed.
       // For now, let's throw the exception.
-      throw new IOException(
-          "Chunk write failed at the new target node: " + targetBlockStream
-              .getDatanodeDetails() + ". Aborting the reconstruction process.");
+      throw new IOException("Chunk write failed at the new target node: " +
+          targetBlockStream.getDatanodeDetails() +
+          ". Aborting the reconstruction process.",
+          targetBlockStream.getIoException());
     }
   }
 

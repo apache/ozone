@@ -78,4 +78,10 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
+  public static ManagedRocksDB open(
+      final ManagedOptions managedOptions,
+      final String path
+  ) throws RocksDBException {
+    return new ManagedRocksDB(RocksDB.open(managedOptions, path));
+  }
 }
