@@ -254,7 +254,11 @@ public class TestOMSnapshotCreateRequest {
 
   @Test
   public void testEmptyRenamedKeyTable() throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     OmKeyInfo toKeyInfo = addKey("key1");
     OmKeyInfo fromKeyInfo = addKey("key2");
 
