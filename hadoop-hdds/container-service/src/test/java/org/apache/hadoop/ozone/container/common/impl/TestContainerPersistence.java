@@ -267,45 +267,45 @@ public class TestContainerPersistence {
     // so skip check the behaviors related to it.
     assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
 
-    long testContainerID1 = getTestContainerID();
+    long testContainerID = getTestContainerID();
     Thread.sleep(100);
 
-    Container<KeyValueContainerData> container1 =
-        addContainer(containerSet, testContainerID1);
-    container1.close();
+    Container<KeyValueContainerData> container =
+        addContainer(containerSet, testContainerID);
+    container.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
+        .containsKey(testContainerID));
 
-    container1.delete();
-    containerSet.removeContainer(testContainerID1);
+    container.delete();
+    containerSet.removeContainer(testContainerID);
     Assert.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
+        .containsKey(testContainerID));
 
     // Adding block to a deleted container should fail.
     exception.expect(StorageContainerException.class);
     exception.expectMessage("Error opening DB.");
-    BlockID blockID1 = ContainerTestHelper.getTestBlockID(testContainerID1);
+    BlockID blockID1 = ContainerTestHelper.getTestBlockID(testContainerID);
     BlockData someKey1 = new BlockData(blockID1);
     someKey1.setChunks(new LinkedList<>());
-    blockManager.putBlock(container1, someKey1);
+    blockManager.putBlock(container, someKey1);
   }
 
   @Test
   public void testDeleteNonEmptyContainer() throws Exception {
-    long testContainerID2 = getTestContainerID();
-    Container<KeyValueContainerData> container2 =
-        addContainer(containerSet, testContainerID2);
-    container2.close();
+    long testContainerID = getTestContainerID();
+    Container<KeyValueContainerData> container =
+        addContainer(containerSet, testContainerID);
+    container.close();
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+        .containsKey(testContainerID));
 
     // Deleting a non-empty container should fail.
-    BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID2);
+    BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID);
     BlockData someKey2 = new BlockData(blockID2);
     someKey2.setChunks(new LinkedList<>());
-    blockManager.putBlock(container2, someKey2);
+    blockManager.putBlock(container, someKey2);
 
     // KeyValueHandler setup
     String datanodeId = UUID.randomUUID().toString();
@@ -323,9 +323,9 @@ public class TestContainerPersistence {
     exception.expect(StorageContainerException.class);
     exception.expectMessage(
         "Non-force deletion of non-empty container is not allowed.");
-    kvHandler.deleteContainer(container2, false);
+    kvHandler.deleteContainer(container, false);
     Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+        .containsKey(testContainerID));
   }
 
   /**

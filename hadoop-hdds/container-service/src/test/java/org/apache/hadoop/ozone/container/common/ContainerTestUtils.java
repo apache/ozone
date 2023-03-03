@@ -191,7 +191,7 @@ public final class ContainerTestUtils {
         .thenReturn(scanDataSuccess);
   }
 
-  public static KeyValueContainer setUpTestContainer(
+  public static KeyValueContainer setUpTestContainerUnderTmpDir(
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
@@ -207,16 +207,21 @@ public final class ContainerTestUtils {
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setSchemaVersion(schemaVersion);
+    keyValueContainerData.setState(ContainerProtos
+        .ContainerDataProto.State.DELETED);
 
     KeyValueContainer container =
         new KeyValueContainer(keyValueContainerData, conf);
     container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
 
+    KeyValueContainerUtil
+        .parseKVContainerData(keyValueContainerData, conf);
+
     containerSet.addContainer(container);
 
     // For testing, we are moving the container
     // under the tmp directory, in order to delete
-    // it during versionTask.call()
+    // it from there, during datanode startup or shutdown
     KeyValueContainerUtil.ContainerDeleteDirectory
         .moveToTmpDeleteDirectory(keyValueContainerData, volume);
 

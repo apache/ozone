@@ -72,12 +72,8 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -191,9 +187,9 @@ public class TestEndPoint {
 
         // Create a container and move it under the tmp delete dir.
         KeyValueContainer container = ContainerTestUtils.
-            setUpTestContainer(hddsVolume, clusterId,
+            setUpTestContainerUnderTmpDir(hddsVolume, clusterId,
                 conf, OzoneConsts.SCHEMA_V3);
-        assertTrue(container.getContainerFile().exists());
+        Assertions.assertTrue(container.getContainerFile().exists());
       }
 
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
@@ -206,7 +202,7 @@ public class TestEndPoint {
       // assert that tmp dir is empty
       for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
           volumeSet.getVolumesList())) {
-        Assert.assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+        Assertions.assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
             .getDeleteLeftovers(hddsVolume).hasNext());
       }
     }
@@ -252,14 +248,14 @@ public class TestEndPoint {
           newState);
       List<HddsVolume> volumesList = StorageVolumeUtil.getHddsVolumesList(
           ozoneContainer.getVolumeSet().getFailedVolumesList());
-      assertEquals(1, volumesList.size());
+      Assertions.assertEquals(1, volumesList.size());
       Assertions.assertTrue(logCapturer.getOutput()
           .contains("org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs"));
-      assertEquals(0, ozoneContainer.getVolumeSet().getVolumesList().size());
-      assertEquals(1, ozoneContainer.getVolumeSet().getFailedVolumesList()
-          .size());
-
+      Assertions.assertEquals(0,
+          ozoneContainer.getVolumeSet().getVolumesList().size());
+      Assertions.assertEquals(1,
+          ozoneContainer.getVolumeSet().getFailedVolumesList().size());
     }
   }
 
@@ -476,19 +472,19 @@ public class TestEndPoint {
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()
           .sendHeartbeat(request);
-      assertNotNull(responseProto);
-      assertEquals(3, responseProto.getCommandsCount());
-      assertEquals(0, scmServerImpl.getCommandStatusReportCount());
+      Assertions.assertNotNull(responseProto);
+      Assertions.assertEquals(3, responseProto.getCommandsCount());
+      Assertions.assertEquals(0, scmServerImpl.getCommandStatusReportCount());
 
       // Send heartbeat again from heartbeat endpoint task
       final StateContext stateContext = heartbeatTaskHelper(
           serverAddress, 3000);
       Map<Long, CommandStatus> map = stateContext.getCommandStatusMap();
-      assertNotNull(map);
-      assertEquals(1, map.size(), "Should have 1 objects");
-      assertTrue(map.containsKey(3L));
-      assertEquals(Type.deleteBlocksCommand, map.get(3L).getType());
-      assertEquals(Status.PENDING, map.get(3L).getStatus());
+      Assertions.assertNotNull(map);
+      Assertions.assertEquals(1, map.size(), "Should have 1 objects");
+      Assertions.assertTrue(map.containsKey(3L));
+      Assertions.assertEquals(Type.deleteBlocksCommand, map.get(3L).getType());
+      Assertions.assertEquals(Status.PENDING, map.get(3L).getStatus());
 
       scmServerImpl.clearScmCommandRequests();
     }
