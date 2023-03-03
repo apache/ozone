@@ -102,10 +102,11 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
       ".metadata.inspector";
 
-  static final String DELETE_COUNT_DELTA_KEY
-      = "dbDeleteCount_minus_aggregatedDeleteCount";
-
   private Mode mode;
+
+  public KeyValueContainerMetadataInspector(Mode mode) {
+    this.mode = mode;
+  }
 
   public KeyValueContainerMetadataInspector() {
     mode = Mode.OFF;
@@ -160,10 +161,15 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   @Override
   public void process(ContainerData containerData, DatanodeStore store) {
+    process(containerData, store, REPORT_LOG);
+  }
+
+  public String process(ContainerData containerData, DatanodeStore store,
+      Logger log) {
     // If the system property to process container metadata was not
     // specified, or the inspector is unloaded, this method is a no-op.
     if (mode == Mode.OFF) {
-      return;
+      return null;
     }
 
     KeyValueContainerData kvData = null;
@@ -172,7 +178,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     } else {
       LOG.error("This inspector only works on KeyValueContainers. Inspection " +
           "will not be run for container {}", containerData.getContainerID());
-      return;
+      return null;
     }
 
     JsonObject containerJson = inspectContainer(kvData, store);
@@ -183,15 +189,18 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         .serializeNulls()
         .create();
     String jsonReport = gson.toJson(containerJson);
-    if (correct) {
-      REPORT_LOG.trace(jsonReport);
-    } else {
-      REPORT_LOG.error(jsonReport);
+    if (log != null) {
+      if (correct) {
+        log.trace(jsonReport);
+      } else {
+        log.error(jsonReport);
+      }
     }
+    return jsonReport;
   }
 
-  public static JsonObject inspectContainer(
-      KeyValueContainerData containerData, DatanodeStore store) {
+  static JsonObject inspectContainer(KeyValueContainerData containerData,
+      DatanodeStore store) {
 
     JsonObject containerJson = new JsonObject();
 
@@ -221,36 +230,12 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       JsonObject chunksDirectory =
           getChunksDirectoryJson(new File(containerData.getChunksPath()));
       containerJson.add("chunksDirectory", chunksDirectory);
-
-      checkDeleteCounts(dBMetadata, aggregates, containerJson);
     } catch (IOException ex) {
       LOG.error("Inspecting container {} failed",
           containerData.getContainerID(), ex);
     }
 
     return containerJson;
-  }
-
-  static long getLong(String key, JsonObject json) {
-    final JsonElement e = json.get(key);
-    return e == null || e.isJsonNull() ? 0 : e.getAsLong();
-  }
-
-  static void checkDeleteCounts(JsonObject dBMetadata, JsonObject aggregates,
-      JsonObject container) {
-    try {
-      final long dbDeleteCount = getLong(
-          OzoneConsts.PENDING_DELETE_BLOCK_COUNT, dBMetadata);
-      final long aggregatedDeleteCount = getLong(
-          PendingDeleteType.COUNT.getJsonKey(), aggregates);
-      final long delta = dbDeleteCount - aggregatedDeleteCount;
-      if (delta != 0) {
-        container.addProperty(DELETE_COUNT_DELTA_KEY, delta);
-      }
-    } catch (Throwable t) {
-      LOG.error("Failed to check delete counts for container "
-          + container.get("containerID"), t);
-    }
   }
 
   static JsonObject getDBMetadataJson(Table<String, Long> metadataTable,
@@ -356,6 +341,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
     Table<String, Long> metadataTable = store.getMetadataTable();
 
+    final JsonObject dBMetadata = parent.getAsJsonObject("dBMetadata");
+    final JsonObject aggregates = parent.getAsJsonObject("aggregates");
+
     // Check and repair block count.
     JsonElement blockCountDB = parent.getAsJsonObject("dBMetadata")
         .get(OzoneConsts.BLOCK_COUNT);
@@ -427,6 +415,39 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       errors.add(usedBytesError);
     }
 
+    // check and repair if db delete count mismatches delete transaction count.
+    final JsonElement dbDeleteCountJson = dBMetadata.get(
+        OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
+    final long dbDeleteCount = jsonToLong(dbDeleteCountJson);
+    final JsonElement deleteTransactionCountJson = aggregates.get(
+        PendingDeleteType.COUNT.getJsonKey());
+    final long deleteTransactionCount = jsonToLong(deleteTransactionCountJson);
+    if (dbDeleteCount != deleteTransactionCount) {
+      passed = false;
+
+      final BooleanSupplier deleteCountRepairAction = () -> {
+        if (deleteTransactionCount == 0) {
+          // repair only when delete transaction count is 0
+          final String key = containerData.getPendingDeleteBlockCountKey();
+          try {
+            // reset delete block count to 0 in metadata table
+            metadataTable.put(key, 0L);
+            return true;
+          } catch (IOException ex) {
+            LOG.error("Failed to reset {} for container {}.",
+                key, containerData.getContainerID(), ex);
+          }
+        }
+        return false;
+      };
+
+      final JsonObject deleteCountError = buildErrorAndRepair(
+          "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+          dbDeleteCountJson, deleteTransactionCountJson,
+          deleteCountRepairAction);
+      errors.add(deleteCountError);
+    }
+
     // check and repair chunks dir.
     JsonElement chunksDirPresent = parent.getAsJsonObject("chunksDirectory")
         .get("present");
@@ -454,6 +475,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     parent.addProperty("correct", passed);
     parent.add("errors", errors);
     return passed;
+  }
+
+  static long jsonToLong(JsonElement e) {
+    return e == null || e.isJsonNull() ? 0 : e.getAsLong();
   }
 
   private JsonObject buildErrorAndRepair(String property, JsonElement expected,
@@ -539,9 +564,13 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       try {
         final String blockKey = containerData.getBlockKey(id);
         final BlockData blockData = blockDataTable.get(blockKey);
-        pendingDeleteBytes += blockData == null ? 0 : blockData.getSize();
+        if (blockData != null) {
+          pendingDeleteBytes += blockData.getSize();
+        }
       } catch (Throwable t) {
-        LOG.error("Failed to get block data size for local id #" + id, t);
+        LOG.error("Failed to get block " + id
+            + " in container " + containerData.getContainerID()
+            + " from blockDataTable", t);
       }
     }
     return pendingDeleteBytes;

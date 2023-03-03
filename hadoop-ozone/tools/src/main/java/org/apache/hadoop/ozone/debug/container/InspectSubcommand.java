@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -31,6 +28,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
 /**
@@ -46,15 +44,13 @@ public class InspectSubcommand implements Callable<Void> {
   private ContainerCommands parent;
 
   @Override
-  public Void call() throws Exception {
+  public Void call() throws IOException {
     final OzoneConfiguration conf = parent.getOzoneConf();
     parent.loadContainersFromVolumes();
 
-    final Gson gson = new GsonBuilder()
-        .setPrettyPrinting()
-        .serializeNulls()
-        .create();
-
+    final KeyValueContainerMetadataInspector inspector
+        = new KeyValueContainerMetadataInspector(
+            KeyValueContainerMetadataInspector.Mode.INSPECT);
     for (Container<?> container : parent.getController().getContainerSet()) {
       final ContainerData data = container.getContainerData();
       if (!(data instanceof KeyValueContainerData)) {
@@ -63,9 +59,12 @@ public class InspectSubcommand implements Callable<Void> {
       final KeyValueContainerData kvData = (KeyValueContainerData) data;
       try (DatanodeStore store = BlockUtils.getUncachedDatanodeStore(
           kvData, conf, true)) {
-        final JsonObject json = KeyValueContainerMetadataInspector
-            .inspectContainer(kvData, store);
-        System.out.println(gson.toJson(json));
+        final String json = inspector.process(kvData, store, null);
+        System.out.println(json);
+      } catch (IOException e) {
+        System.err.print("Failed to inspect container "
+            + kvData.getContainerID() + ": ");
+        e.printStackTrace();
       }
     }
 
