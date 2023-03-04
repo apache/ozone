@@ -37,7 +37,8 @@ import java.util.concurrent.Callable;
  */
 @Command(
     name = "inspect",
-    description = "Check the deletion information for all the containers.")
+    description
+        = "Check the metadata of all container replicas on this datanode.")
 public class InspectSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
