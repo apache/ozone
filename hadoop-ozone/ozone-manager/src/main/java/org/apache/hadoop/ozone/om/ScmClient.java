@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.util.CacheMetrics;
 import org.jetbrains.annotations.NotNull;
 
