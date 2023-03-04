@@ -136,4 +136,8 @@ load bats-assert/load.bash
   # Invalid revert title 5
   run dev-support/ci/pr_title_check.sh 'Revert: "HDDS-1234. Hello World"'
   assert_output 'Fail: must start with HDDS'
+
+  # Invalid revert title 6
+  run dev-support/ci/pr_title_check.sh 'Revert "Hello World"'
+  assert_output -e 'Fail: must start with HDDS$'
 }
