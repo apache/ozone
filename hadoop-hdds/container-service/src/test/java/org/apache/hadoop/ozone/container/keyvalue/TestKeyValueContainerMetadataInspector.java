@@ -202,7 +202,7 @@ public class TestKeyValueContainerMetadataInspector
         Arrays.asList(1, 6, 3));
     LOG.info("deleteTransactions = {}", deleteTransactions);
 
-    setDBBlockAndByteCounts(container.getContainerData(), createBlocks,
+    setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
@@ -221,7 +221,7 @@ public class TestKeyValueContainerMetadataInspector
         .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
     LOG.info("deleteTransactions = {}", deleteTransactions);
 
-    setDBBlockAndByteCounts(container.getContainerData(), createBlocks,
+    setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
         createBlocks, createBlocks, setBytes,
@@ -241,7 +241,7 @@ public class TestKeyValueContainerMetadataInspector
         .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
     LOG.info("deleteTransactions = {}", deleteTransactions);
 
-    setDBBlockAndByteCounts(container.getContainerData(), createBlocks,
+    setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
         createBlocks, createBlocks, setBytes,
@@ -363,9 +363,9 @@ public class TestKeyValueContainerMetadataInspector
   }
 
   /**
-     * Checks the erorr list in the provided JsonReport for an error matching
-     * the template passed in with the parameters.
-     */
+   * Checks the erorr list in the provided JsonReport for an error matching
+   * the template passed in with the parameters.
+   */
   private void checkJsonErrorsReport(JsonObject jsonReport,
       String propertyValue, JsonPrimitive correctExpected,
       JsonPrimitive correctActual, boolean correctRepair) {
@@ -402,11 +402,11 @@ public class TestKeyValueContainerMetadataInspector
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {
-    setDBBlockAndByteCounts(containerData, blockCount, byteCount,
+    setDB(containerData, blockCount, byteCount,
         0, Collections.emptyList());
   }
 
-  public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
+  public void setDB(KeyValueContainerData containerData,
       long blockCount, long byteCount,
       long dbDeleteCount, List<DeletedBlocksTransaction> deleteTransactions)
       throws Exception {
