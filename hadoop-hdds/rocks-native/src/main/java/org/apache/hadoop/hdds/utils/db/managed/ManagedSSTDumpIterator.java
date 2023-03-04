@@ -237,20 +237,4 @@ public class ManagedSSTDumpIterator implements
               '}';
     }
   }
-
-  public static void main(String[] args) throws NativeLibraryNotLoadedException, IOException {
-    ManagedSSTDumpTool sstDumpTool =
-            new ManagedSSTDumpTool(new ForkJoinPool(), 50);
-    try (ManagedOptions options = new ManagedOptions();
-         ManagedSSTDumpIterator iterator = new ManagedSSTDumpIterator(sstDumpTool,
-                 "/Users/sbalachandran/Documents/code/dummyrocks/rocks/000025.sst", options, 2000);
-    ) {
-      while (iterator.hasNext()) {
-        System.out.println(iterator.next());
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
-  }
 }
