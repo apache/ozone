@@ -584,29 +584,4 @@ public final class HddsServerUtil {
   public static void addSuppressedLoggingExceptions(RPC.Server server) {
     server.addSuppressedLoggingExceptions(ServerNotLeaderException.class);
   }
-
-  /**
-   * Build javaProcessBuilder.
-   * @param jvmArgs
-   * @param classpath
-   * @param className
-   * @param args
-   * @return ProcessBuilder
-   */
-  public static ProcessBuilder getJavaProcess(List<String> jvmArgs,
-                                           String classpath,
-                                           String className,
-                                           List<String> args) {
-    String javaHome = System.getProperty("java.home");
-    String javaBin = String.format("%1$s%2$sbin%2$sjava",
-            javaHome, File.separator);
-    List<String> command = Lists.newArrayList();
-    command.add(javaBin);
-    command.addAll(jvmArgs);
-    command.add("-cp");
-    command.add(classpath);
-    command.add(className);
-    command.addAll(args);
-    return new ProcessBuilder(command);
-  }
 }

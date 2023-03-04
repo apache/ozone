@@ -21,13 +21,22 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 /**
- * JNI for RocksDB SSTDumpTool.
+ * JNI for RocksDB SSTDumpTool. Pipes the output to an output stream
  */
 public class ManagedSSTDumpTool {
 
@@ -35,30 +44,84 @@ public class ManagedSSTDumpTool {
     NativeLibraryLoader.getInstance()
             .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
   }
+  private int bufferCapacity;
+  private ExecutorService executorService;
 
-  public ManagedSSTDumpTool() throws NativeLibraryNotLoadedException {
+  public ManagedSSTDumpTool(ExecutorService executorService,
+                            int bufferCapacity)
+          throws NativeLibraryNotLoadedException {
     if (!NativeLibraryLoader.getInstance()
             .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
       throw new NativeLibraryNotLoadedException(
               ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }
-
+    this.bufferCapacity = bufferCapacity;
+    this.executorService = executorService;
   }
 
-  public void run(String[] args) {
-    this.runInternal(args);
+  public SSTDumpToolTask run(String[] args, ManagedOptions options)
+          throws NativeLibraryNotLoadedException {
+    PipeInputStream pipeInputStream = new PipeInputStream(bufferCapacity);
+    return new SSTDumpToolTask(this.executorService.submit(() ->
+            this.runInternal(args, options.getNativeHandle(),
+            pipeInputStream.getNativeHandle())), pipeInputStream);
   }
 
-  public void run(Map<String, String> args) {
-    this.run(args.entrySet().stream().map(e -> "--"
+  public SSTDumpToolTask run(Map<String, String> args, ManagedOptions options)
+          throws NativeLibraryNotLoadedException {
+    return this.run(args.entrySet().stream().map(e -> "--"
             + (e.getValue() == null || e.getValue().isEmpty() ? e.getKey() :
-            e.getKey() + "=" + e.getValue())).toArray(String[]::new));
+            e.getKey() + "=" + e.getValue())).toArray(String[]::new), options);
   }
 
-  private native void runInternal(String[] args);
+  private native int runInternal(String[] args, long optionsHandle,
+                                  long pipeHandle);
 
   public static void main(String[] args)
-          throws NativeLibraryNotLoadedException, FileNotFoundException {
-    new ManagedSSTDumpTool().run(args);
+          throws NativeLibraryNotLoadedException, IOException {
+    SSTDumpToolTask task = new ManagedSSTDumpTool(new ForkJoinPool(), 50)
+            .run(new String[]{"--file=/Users/sbalachandran/Documents/code/dummyrocks/rocks/000013.sst",
+                    "--command=scan"},
+                    new ManagedOptions());
+    BufferedReader b = new BufferedReader(new InputStreamReader(
+            task.getPipedOutput()));
+
+    char[] a = new char[10];
+    int numberOfCharsRead = 0;
+    System.out.println("Starting Loop");
+    do {
+      System.out.print(String.valueOf(a, 0, numberOfCharsRead));
+      numberOfCharsRead = b.read(a);
+    }while(numberOfCharsRead >=0);
+    System.out.println("Loop");
+  }
+
+  static class SSTDumpToolTask {
+    private Future<Integer> future;
+    private PipeInputStream pipedOutput;
+
+    SSTDumpToolTask(Future<Integer> future, PipeInputStream pipedOutput) {
+      this.future = future;
+      this.pipedOutput = pipedOutput;
+    }
+
+    public Future<Integer> getFuture() {
+      return future;
+    }
+
+    public PipeInputStream getPipedOutput() {
+      return pipedOutput;
+    }
+
+    public int exitValue() {
+      if (this.future.isDone()) {
+        try {
+          return future.get();
+        } catch (InterruptedException | ExecutionException e) {
+          return 1;
+        }
+      }
+      return 0;
+    }
   }
 }

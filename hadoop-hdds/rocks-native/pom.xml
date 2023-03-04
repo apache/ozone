@@ -25,6 +25,10 @@
     <artifactId>hdds-rocks-native</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.ozone</groupId>
+            <artifactId>hdds-server-framework</artifactId>
+        </dependency>
     </dependencies>
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -113,7 +117,25 @@
 
                 </executions>
             </plugin>
-
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-patch-plugin</artifactId>
+                <version>1.1.1</version>
+                <configuration>
+                    <patchFile>${basedir}/src/main/patches/rocks-native.patch</patchFile>
+                    <strip>1</strip>
+                    <targetDirectory>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}</targetDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>patch</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>apply</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
             <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
@@ -136,7 +158,7 @@
                     </execution>
                     <execution>
                         <id>build-zlib</id>
-                        <phase>generate-sources</phase>
+                        <phase>process-sources</phase>
                         <configuration>
                             <tasks>
                                 <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
@@ -153,7 +175,7 @@
                     </execution>
                     <execution>
                         <id>build-bzip2</id>
-                        <phase>generate-sources</phase>
+                        <phase>process-sources</phase>
                         <configuration>
                             <tasks>
                                 <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true">
@@ -167,7 +189,7 @@
                     </execution>
                     <execution>
                         <id>build-lz4</id>
-                        <phase>generate-sources</phase>
+                        <phase>process-sources</phase>
                         <configuration>
                             <tasks>
                                 <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true">
@@ -181,7 +203,7 @@
                     </execution>
                     <execution>
                         <id>build-zstd</id>
-                        <phase>generate-sources</phase>
+                        <phase>process-sources</phase>
                         <configuration>
                             <tasks>
                                 <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true">
@@ -195,7 +217,7 @@
                     </execution>
                     <execution>
                         <id>build-snappy</id>
-                        <phase>generate-sources</phase>
+                        <phase>process-sources</phase>
                         <configuration>
                             <tasks>
                                 <mkdir dir="${project.build.directory}/snappy/lib"/>
@@ -213,7 +235,7 @@
                     </execution>
                     <execution>
                         <id>build-rocksjava</id>
-                        <phase>generate-resources</phase>
+                        <phase>process-resources</phase>
                         <configuration>
                             <tasks>
                                 <exec executable="chmod" failonerror="true">
@@ -224,7 +246,7 @@
                                 <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
                                     <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                     <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
-                                    <arg line="-j4"/>
+                                    <arg line="-j10"/>
                                     <arg line="tools"/>
                                 </exec>
                             </tasks>
@@ -316,6 +338,7 @@
                                     <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
                                     <javahClassNames>
                                         <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
+                                        <javahClassName>org.apache.hadoop.hdds.utils.db.managed.PipeInputStream</javahClassName>
                                     </javahClassNames>
                                     <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
                                 </configuration>
@@ -353,6 +376,7 @@
                                         <argument>-h</argument>
                                         <argument>${project.build.directory}/native/javah</argument>
                                         <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>
+                                        <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/PipeInputStream.java</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

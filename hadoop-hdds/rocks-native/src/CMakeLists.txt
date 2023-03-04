@@ -36,7 +36,7 @@ endif()
 include_directories(${GENERATED_JAVAH})
 if(${SST_DUMP_INCLUDE})
     include_directories(${ROCKSDB_HEADERS})
-    set(SOURCE_FILES ${NATIVE_DIR}/SSTDumpTool.cpp)
+    set(SOURCE_FILES ${NATIVE_DIR}/SSTDumpTool.cpp ${NATIVE_DIR}/PipeInputStream.cpp ${NATIVE_DIR}/Pipe.h ${NATIVE_DIR}/Pipe.cpp ${NATIVE_DIR}/cplusplus_to_java_convert.h)
     ADD_LIBRARY(rocksdb STATIC IMPORTED)
     set_target_properties(
             rocksdb

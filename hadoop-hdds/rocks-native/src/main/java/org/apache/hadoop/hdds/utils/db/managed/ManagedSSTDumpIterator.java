@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
 
 import java.io.BufferedReader;
@@ -29,6 +30,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
@@ -39,7 +43,6 @@ import java.util.regex.Pattern;
  */
 public class ManagedSSTDumpIterator implements
         Iterator<ManagedSSTDumpIterator.KeyValue>, AutoCloseable {
-  private Process process;
   private static final String SST_DUMP_TOOL_CLASS =
           "org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool";
   private static final String PATTERN_REGEX =
@@ -60,12 +63,16 @@ public class ManagedSSTDumpIterator implements
   private KeyValue nextKey;
 
   private long pollIntervalMillis;
+  private ManagedSSTDumpTool.SSTDumpToolTask sstDumpToolTask;
   private Lock lock;
+  private AtomicBoolean open;
 
 
-  public ManagedSSTDumpIterator(String sstDumptoolJarPath,
+  public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
                                 String sstFilePath,
-                                long pollIntervalMillis) throws IOException {
+                                ManagedOptions options,
+                                long pollIntervalMillis) throws IOException,
+          NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists() || !sstFile.isFile()) {
       throw new IOException(String.format("Invalid SST File Path : %s",
@@ -73,30 +80,44 @@ public class ManagedSSTDumpIterator implements
     }
     this.pollIntervalMillis = pollIntervalMillis;
     this.lock = new ReentrantLock();
-    init(sstFile, sstDumptoolJarPath);
+    init(sstDumpTool, sstFile, options);
   }
 
-  private void init(File sstFile, String sstDumptoolJarPath)
-          throws IOException {
-    List<String> args = Lists.newArrayList(
-            "--file=" + sstFile.getAbsolutePath(),
-            "--command=scan");
-    process = HddsServerUtil.getJavaProcess(Collections.emptyList(),
-            sstDumptoolJarPath, SST_DUMP_TOOL_CLASS, args).start();
+  private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
+                    ManagedOptions options)
+          throws NativeLibraryNotLoadedException {
+    String[] args = {"--file=" + sstFile.getAbsolutePath(),
+            "--command=scan"};
+    this.sstDumpToolTask = sstDumpTool.run(args, options);
     processOutput = new BufferedReader(new InputStreamReader(
-            process.getInputStream(), StandardCharsets.UTF_8));
+            sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
     stdoutString = new StringBuilder();
     currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
     charBuffer = new char[8192];
+    open = new AtomicBoolean(true);
     next();
   }
 
+  /**
+   * Throws Runtime exception in the case iterator is closed or
+   * the native Dumptool exited with non zero exit value.
+   */
   private void checkSanityOfProcess() {
-    if (!process.isAlive() && process.exitValue() != 0) {
+    if (!this.open.get()) {
+      throw new RuntimeException("Iterator has been closed");
+    }
+    if (sstDumpToolTask.getFuture().isDone()
+            && sstDumpToolTask.exitValue() != 0) {
       throw new RuntimeException("Process Terminated with non zero " +
-              String.format("exit value %d", process.exitValue()));
+              String.format("exit value %d", sstDumpToolTask.exitValue()));
     }
   }
+
+  /**
+   *
+   * @return
+   * Throws Runtime Exception in case of SST File read failure
+   */
 
   @Override
   public boolean hasNext() {
@@ -104,11 +125,16 @@ public class ManagedSSTDumpIterator implements
     return nextKey != null;
   }
 
+  /**
+   *
+   * @return next Key
+   * Throws Runtime Exception incase of failure.
+   */
   @Override
-  public KeyValue next() throws RuntimeIOException {
-    checkSanityOfProcess();
+  public KeyValue next() {
+    lock.lock();
     try {
-      lock.lock();
+      checkSanityOfProcess();
       currentKey = nextKey;
       nextKey = null;
       while (!currentMatcher.find()) {
@@ -148,10 +174,23 @@ public class ManagedSSTDumpIterator implements
 
   @Override
   public synchronized void close() throws Exception {
-    if (this.process != null) {
-      this.process.destroyForcibly();
-      this.processOutput.close();
+    lock.lock();
+    try {
+      if (this.sstDumpToolTask != null) {
+        if (!this.sstDumpToolTask.getFuture().isDone()) {
+          this.sstDumpToolTask.getFuture().cancel(true);
+        }
+        this.processOutput.close();
+      }
+      open.compareAndSet(true, false);
+    } finally {
+      lock.unlock();
     }
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    this.close();
   }
 
   /**
@@ -199,5 +238,21 @@ public class ManagedSSTDumpIterator implements
               ", value='" + value + '\'' +
               '}';
     }
+  }
+
+  public static void main(String[] args) throws NativeLibraryNotLoadedException, IOException {
+    ManagedSSTDumpTool sstDumpTool =
+            new ManagedSSTDumpTool(new ForkJoinPool(), 50);
+    try (ManagedOptions options = new ManagedOptions();
+         ManagedSSTDumpIterator iterator = new ManagedSSTDumpIterator(sstDumpTool,
+                 "/Users/sbalachandran/Documents/code/dummyrocks/rocks/000013.sst", options, 2000);
+    ) {
+      while (iterator.hasNext()) {
+        System.out.println(iterator.next());
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
   }
 }
