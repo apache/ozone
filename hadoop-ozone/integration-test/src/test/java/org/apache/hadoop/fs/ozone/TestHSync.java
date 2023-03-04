@@ -54,6 +54,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -73,6 +75,8 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(value = 300)
 public class TestHSync {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestHSync.class);
 
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
@@ -122,10 +126,11 @@ public class TestHSync {
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
-    final Path file = new Path("/file");
-
     try (FileSystem fs = FileSystem.get(CONF)) {
-      runTestHSync(fs, file);
+      for (int i = 0; i < 10; i++) {
+        final Path file = new Path("/file" + i);
+        runTestHSync(fs, file, 1 << i);
+      }
     }
   }
 
@@ -139,17 +144,20 @@ public class TestHSync {
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
-    final Path file = new Path(dir, "file");
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      runTestHSync(fs, file);
+      for (int i = 0; i < 10; i++) {
+        final Path file = new Path(dir, "file" + i);
+        runTestHSync(fs, file, 1 << i);
+      }
     }
   }
 
-  static void runTestHSync(FileSystem fs, Path file) throws Exception {
+  static void runTestHSync(FileSystem fs, Path file, int initialDataSize)
+      throws Exception {
     try (StreamWithLength out = new StreamWithLength(
         fs.create(file, true))) {
-      runTestHSync(fs, file, out, 1);
+      runTestHSync(fs, file, out, initialDataSize);
       for (int i = 1; i < 5; i++) {
         for (int j = -1; j <= 1; j++) {
           int dataSize = (1 << (i * 5)) + j;
@@ -187,6 +195,8 @@ public class TestHSync {
       StreamWithLength out, int dataSize)
       throws Exception {
     final long length = out.getLength();
+    LOG.info("runTestHSync {} with size {}, skipLength={}",
+        file, dataSize, length);
     final byte[] data = new byte[dataSize];
     ThreadLocalRandom.current().nextBytes(data);
     out.writeAndHsync(data);
