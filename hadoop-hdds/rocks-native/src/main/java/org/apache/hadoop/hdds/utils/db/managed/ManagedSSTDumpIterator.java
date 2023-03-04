@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import com.google.common.collect.Lists;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
 
@@ -27,11 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -87,7 +81,7 @@ public class ManagedSSTDumpIterator implements
                     ManagedOptions options)
           throws NativeLibraryNotLoadedException {
     String[] args = {"--file=" + sstFile.getAbsolutePath(),
-            "--command=scan"};
+                     "--command=scan"};
     this.sstDumpToolTask = sstDumpTool.run(args, options);
     processOutput = new BufferedReader(new InputStreamReader(
             sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
@@ -164,8 +158,10 @@ public class ManagedSSTDumpIterator implements
                 currentMatcher.start()));
       }
       prevMatchEndIndex = currentMatcher.end();
-      nextKey =  new KeyValue(currentMatcher.group(1), currentMatcher.group(2),
-              currentMatcher.group(3));
+      nextKey =  new KeyValue(
+              currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
+              currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
+              currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
       return currentKey;
     } finally {
       lock.unlock();
@@ -238,21 +234,5 @@ public class ManagedSSTDumpIterator implements
               ", value='" + value + '\'' +
               '}';
     }
-  }
-
-  public static void main(String[] args) throws NativeLibraryNotLoadedException, IOException {
-    ManagedSSTDumpTool sstDumpTool =
-            new ManagedSSTDumpTool(new ForkJoinPool(), 50);
-    try (ManagedOptions options = new ManagedOptions();
-         ManagedSSTDumpIterator iterator = new ManagedSSTDumpIterator(sstDumpTool,
-                 "/Users/sbalachandran/Documents/code/dummyrocks/rocks/000013.sst", options, 2000);
-    ) {
-      while (iterator.hasNext()) {
-        System.out.println(iterator.next());
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
   }
 }

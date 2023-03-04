@@ -21,16 +21,9 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
@@ -76,26 +69,6 @@ public class ManagedSSTDumpTool {
 
   private native int runInternal(String[] args, long optionsHandle,
                                   long pipeHandle);
-
-  public static void main(String[] args)
-          throws NativeLibraryNotLoadedException, IOException {
-    SSTDumpToolTask task = new ManagedSSTDumpTool(new ForkJoinPool(), 50)
-            .run(new String[]{"--file=/Users/sbalachandran/Documents/code/dummyrocks/rocks/000013.sst",
-                    "--command=scan"},
-                    new ManagedOptions());
-    BufferedReader b = new BufferedReader(new InputStreamReader(
-            task.getPipedOutput()));
-
-    char[] a = new char[10];
-    int numberOfCharsRead = 0;
-    System.out.println("Starting Loop");
-    do {
-      System.out.print(String.valueOf(a, 0, numberOfCharsRead));
-      numberOfCharsRead = b.read(a);
-    }while(numberOfCharsRead >=0);
-    System.out.println("Loop");
-  }
-
   static class SSTDumpToolTask {
     private Future<Integer> future;
     private PipeInputStream pipedOutput;
