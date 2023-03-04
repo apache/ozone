@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -145,7 +144,7 @@ public class ManagedSSTDumpIterator implements
           if (numberOfCharsRead < 0) {
             if (currentKey != null) {
               currentKey.setValue(stdoutString.substring(0,
-                      Math.max(stdoutString.length() -1, 0)));
+                      Math.max(stdoutString.length() - 1, 0)));
             }
             return currentKey;
           }
@@ -157,7 +156,7 @@ public class ManagedSSTDumpIterator implements
       }
       if (currentKey != null) {
         currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
-                currentMatcher.start() -1));
+                currentMatcher.start() - 1));
       }
       prevMatchEndIndex = currentMatcher.end();
       nextKey =  new KeyValue(
