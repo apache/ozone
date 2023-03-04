@@ -35,6 +35,9 @@ assertNotMatch() {
     fi
 }
 
+# strip starting 'Revert "', if any
+TITLE=${TITLE#Revert \"}
+
 assertMatch    '^HDDS'                             'Fail: must start with HDDS'
 assertMatch    '^HDDS-'                            'Fail: missing dash in Jira'
 assertNotMatch '^HDDS-0'                           'Fail: leading zero in Jira'
