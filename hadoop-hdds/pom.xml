@@ -242,6 +242,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>bcpkix-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-rocks-native</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <dependencies>
