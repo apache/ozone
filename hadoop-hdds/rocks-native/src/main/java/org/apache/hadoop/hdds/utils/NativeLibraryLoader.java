@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -58,11 +57,15 @@ public class NativeLibraryLoader {
   }
 
   public static boolean isMac() {
-    return OS.contains("mac");
+    return OS.startsWith("mac");
   }
 
   public static boolean isWindows() {
-    return OS.contains("win");
+    return OS.startsWith("win");
+  }
+
+  public static boolean isLinux() {
+    return OS.startsWith("linux");
   }
 
   private static String getLibOsSuffix() {
@@ -70,9 +73,12 @@ public class NativeLibraryLoader {
       return ".dylib";
     } else if (isWindows()) {
       return ".dll";
+    } else if (isLinux()) {
+      return ".so";
     }
-    return ".so";
+    throw new UnsatisfiedLinkError(String.format("Unsupported OS %s", OS));
   }
+
   private static String appendLibOsSuffix(String libraryFileName) {
     return libraryFileName + getLibOsSuffix();
   }
@@ -108,6 +114,7 @@ public class NativeLibraryLoader {
     this.librariesLoaded.put(libraryName, loaded);
     return isLibraryLoaded(libraryName);
   }
+
   private Optional<File> copyResourceFromJarToTemp(final String libraryName)
           throws IOException {
     final String libraryFileName = getJniLibraryFileName(libraryName);
@@ -128,7 +135,6 @@ public class NativeLibraryLoader {
 
       Files.copy(is, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
       return Optional.ofNullable(temp);
-
     } finally {
       if (is != null) {
         is.close();

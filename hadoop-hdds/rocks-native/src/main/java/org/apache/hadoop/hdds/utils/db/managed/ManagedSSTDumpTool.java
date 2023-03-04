@@ -68,7 +68,7 @@ public class ManagedSSTDumpTool {
   }
 
   private native int runInternal(String[] args, long optionsHandle,
-                                  long pipeHandle);
+                                 long pipeHandle);
 
   /**
    * Class holding piped output of SST Dumptool & future of command.

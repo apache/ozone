@@ -19,6 +19,9 @@
 #include "Pipe.h"
 #include <unistd.h>
 
+const int Pipe::READ_FILE_DESCRIPTOR_IDX = 0;
+const int Pipe::WRITE_FILE_DESCRIPTOR_IDX = 1;
+
 Pipe::Pipe() {
     pipe(p);
     open = true;

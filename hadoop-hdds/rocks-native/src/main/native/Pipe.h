@@ -16,23 +16,28 @@
  * limitations under the License.
  */
 
-#ifndef UNTITLED_PIPE_H
-#define UNTITLED_PIPE_H
-
+#ifndef ROCKS_NATIVE_PIPE_H
+#define ROCKS_NATIVE_PIPE_H
 
 #include <stdio.h>
 
 class Pipe {
     public:
+        static const int READ_FILE_DESCRIPTOR_IDX;
+        static const int WRITE_FILE_DESCRIPTOR_IDX;
         Pipe();
         ~Pipe();
         void close();
         int getReadFd() {
-            return p[0];
+            return getPipeFileDescriptorIndex(READ_FILE_DESCRIPTOR_IDX);
         }
 
         int getWriteFd() {
-            return p[1];
+            return getPipeFileDescriptorIndex(WRITE_FILE_DESCRIPTOR_IDX);
+        }
+
+        int getPipeFileDescriptorIndex(int idx) {
+            return p[idx];
         }
 
         bool isOpen() {
@@ -47,5 +52,4 @@ class Pipe {
 
 };
 
-
-#endif //UNTITLED_PIPE_H
+#endif //ROCKS_NATIVE_PIPE_H

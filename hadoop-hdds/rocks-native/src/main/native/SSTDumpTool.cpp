@@ -19,28 +19,28 @@
 #include "org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool.h"
 #include "rocksdb/options.h"
 #include "rocksdb/sst_dump_tool.h"
-#include "string"
+#include <string>
 #include "cplusplus_to_java_convert.h"
 #include "Pipe.h"
-#include "iostream"
+#include <iostream>
 
-jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal(JNIEnv *env, jobject obj, jobjectArray argsArray,
-jlong optionsHandle, jlong pipeHandle) {
+jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal(JNIEnv *env, jobject obj,
+ jobjectArray argsArray, jlong optionsHandle, jlong pipeHandle) {
     ROCKSDB_NAMESPACE::SSTDumpTool dumpTool;
-    ROCKSDB_NAMESPACE::Options* options = reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(optionsHandle);
-    Pipe* pipe = reinterpret_cast<Pipe*>(pipeHandle);
+    ROCKSDB_NAMESPACE::Options *options = reinterpret_cast<ROCKSDB_NAMESPACE::Options *>(optionsHandle);
+    Pipe *pipe = reinterpret_cast<Pipe *>(pipeHandle);
     int length = env->GetArrayLength(argsArray);
-    char* args[length + 1];
+    char *args[length + 1];
     args[0] = strdup("./sst_dump");
-    for(int i = 0; i < length; i++) {
+    for (int i = 0; i < length; i++) {
         jstring str_val = (jstring)env->GetObjectArrayElement(argsArray, (jsize)i);
-        char* utf_str = (char*)env->GetStringUTFChars(str_val, JNI_FALSE);
-        args[i+1] = strdup(utf_str);
+        char *utf_str = (char *)env->GetStringUTFChars(str_val, JNI_FALSE);
+        args[i + 1] = strdup(utf_str);
         env->ReleaseStringUTFChars(str_val, utf_str);
     }
-    FILE* wr = fdopen(pipe->getWriteFd(), "w");
+    FILE *wr = fdopen(pipe->getWriteFd(), "w");
     int ret = dumpTool.Run(length + 1, args, *options, wr);
-    for (int i = 0; i<length+1; i++) {
+    for (int i = 0; i < length + 1; i++) {
         free(args[i]);
     }
     fclose(wr);

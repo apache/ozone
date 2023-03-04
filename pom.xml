@@ -298,7 +298,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <lz4.version>1.9.3</lz4.version>
     <snappy.version>1.1.8</snappy.version>
     <zstd.version>1.4.9</zstd.version>
-
   </properties>
 
 
@@ -1540,11 +1539,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <artifactId>curator-client</artifactId>
         <version>${curator.version}</version>
       </dependency>
-      <dependency>
-        <groupId>com.googlecode.maven-download-plugin</groupId>
-        <artifactId>download-maven-plugin</artifactId>
-        <version>${download-maven-plugin.version}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -1810,6 +1804,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>io.fabric8</groupId>
           <artifactId>docker-maven-plugin</artifactId>
           <version>${docker-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>com.googlecode.maven-download-plugin</groupId>
+          <artifactId>download-maven-plugin</artifactId>
+          <version>${download-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
