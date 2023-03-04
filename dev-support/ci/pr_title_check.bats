@@ -69,7 +69,7 @@ load bats-assert/load.bash
 
   # starts with 'Revert "'
   run dev-support/ci/pr_title_check.sh 'Revert "HDDS-1234. Hello World"'
-  assert_output 'OK'
+  assert_output -e 'OK$'
 }
 
 @test "check illegal PR title examples" {
