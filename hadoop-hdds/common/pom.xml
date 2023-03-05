@@ -242,10 +242,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>spotbugs-annotations</artifactId>
       <scope>test</scope>
     </dependency>
-      <dependency>
-          <groupId>org.rocksdb</groupId>
-          <artifactId>rocksdbjni</artifactId>
-      </dependency>
   </dependencies>
 
   <build>
