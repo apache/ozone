@@ -257,7 +257,11 @@ public class SnapshotChainManager {
     return status;
   }
 
-  public void loadFromSnapshotInfoTable(OMMetadataManager metadataManager)
+  /**
+   * Loads the snapshot chain from SnapshotInfo table.
+   * @param metadataManager OMMetadataManager
+   */
+  private void loadFromSnapshotInfoTable(OMMetadataManager metadataManager)
           throws IOException {
     // read from snapshotInfo table to populate
     // snapshot chains - both global and local path
@@ -267,6 +271,8 @@ public class SnapshotChainManager {
     Table.KeyValue< String, SnapshotInfo > kv;
     snapshotChainGlobal.clear();
     snapshotChainPath.clear();
+    latestPathSnapshotID.clear();
+    snapshotPathToTableKey.clear();
 
     while (keyIter.hasNext()) {
       kv = keyIter.next();

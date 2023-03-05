@@ -56,8 +56,8 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETION_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETION_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
 
 /**
  * Test Snapshot Deleting Service.
@@ -88,9 +88,9 @@ public class TestSnapshotDeletingService {
     File testDir = PathUtils.getTestDir(TestSnapshotDeletingService.class);
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, testDir.getPath());
-    conf.setTimeDuration(OZONE_SNAPSHOT_DELETION_SERVICE_INTERVAL,
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
         1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SNAPSHOT_DELETION_SERVICE_TIMEOUT,
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         100000, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
     omTestManagers = new OmTestManagers(conf);
@@ -298,3 +298,4 @@ public class TestSnapshotDeletingService {
     }, 1000, 10000);
   }
 }
+

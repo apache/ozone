@@ -3179,7 +3179,7 @@
   </property>
 
   <property>
-    <name>ozone.snapshot.deletion.service.timeout</name>
+    <name>ozone.snapshot.deleting.service.timeout</name>
     <value>300s</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
@@ -3188,7 +3188,7 @@
   </property>
 
   <property>
-    <name>ozone.snapshot.deletion.service.interval</name>
+    <name>ozone.snapshot.deleting.service.interval</name>
     <value>30s</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>

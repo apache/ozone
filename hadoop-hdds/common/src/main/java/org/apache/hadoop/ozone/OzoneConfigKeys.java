@@ -234,15 +234,15 @@ public final class OzoneConfigKeys {
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
       // 300s for default
 
-  public static final String OZONE_SNAPSHOT_DELETION_SERVICE_INTERVAL =
-      "ozone.snapshot.deletion.service.interval";
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
+      "ozone.snapshot.deleting.service.interval";
   public static final String
-      OZONE_SNAPSHOT_DELETION_SERVICE_INTERVAL_DEFAULT = "30s";
+      OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT = "30s";
 
-  public static final String OZONE_SNAPSHOT_DELETION_SERVICE_TIMEOUT =
-      "ozone.snapshot.deletion.service.timeout";
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT =
+      "ozone.snapshot.deleting.service.timeout";
   public static final String
-      OZONE_SNAPSHOT_DELETION_SERVICE_TIMEOUT_DEFAULT = "300s";
+      OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT = "300s";
 
   public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
       "ozone.block.deleting.service.workers";
