@@ -840,9 +840,7 @@
   </property>
   <property>
     <name>ozone.scm.keyvalue.container.deletion-choosing.policy</name>
-    <value>
-      org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy
-    </value>
+    <value>org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The policy used for choosing desired keyvalue containers for block deletion.
@@ -865,9 +863,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.impl</name>
-    <value>
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom
-    </value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -879,9 +875,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.ec.impl</name>
-    <value>
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter
-    </value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -946,9 +940,7 @@
   </property>
   <property>
     <name>ozone.scm.pipeline.leader-choose.policy</name>
-    <value>
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
-    </value>
+    <value>org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
       The policy used for choosing desired leader for pipeline creation.
@@ -1349,14 +1341,12 @@
 
   <property>
     <name>hadoop.tags.custom</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,
-      CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,RECON</value>
+    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,RECON</value>
   </property>
 
   <property>
     <name>ozone.tags.system</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,
-      CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,TOKEN,TLS,RECON</value>
+    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,TOKEN,TLS,RECON</value>
   </property>
 
 
