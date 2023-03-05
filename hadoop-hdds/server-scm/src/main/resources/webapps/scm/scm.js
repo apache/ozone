@@ -29,7 +29,7 @@
             $scope.reverse = false;
             $scope.columnName = "hostname";
             let nodeStatusCopy = [];
-            $scope.RecordsToDisplay = "2";
+            $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
             var protocol = "";
