@@ -173,8 +173,8 @@ public class TestXceiverClientGrpc {
                 .setBytesPerChecksum(512)
                 .setType(ContainerProtos.ChecksumType.CRC32)
                 .build())
-            .setLen(100)
-            .setOffset(100)
+            .setLen(-1)
+            .setOffset(0)
             .build(),
         bid,
         null, null);
