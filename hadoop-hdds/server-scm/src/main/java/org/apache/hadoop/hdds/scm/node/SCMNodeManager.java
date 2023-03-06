@@ -964,6 +964,22 @@ public class SCMNodeManager implements NodeManager {
     return nodeInfo;
   }
 
+  @Override
+  public Map<String, List<String>> getNodeStatusInfo() {
+    Map<String, List<String>> nodes = new HashMap<>();
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      String hostName = dni.getHostName();
+      NodeStatus nodestatus = dni.getNodeStatus();
+      NodeState health = nodestatus.getHealth();
+      NodeOperationalState operationalState = nodestatus.getOperationalState();
+      List<String> ls = new ArrayList<>();
+      ls.add(health.name());
+      ls.add(operationalState.name());
+      nodes.put(hostName, ls);
+    }
+    return nodes;
+  }
+
   private enum UsageMetrics {
     DiskCapacity,
     DiskUsed,
