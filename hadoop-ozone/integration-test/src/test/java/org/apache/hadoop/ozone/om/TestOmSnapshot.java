@@ -666,7 +666,7 @@ public class TestOmSnapshot {
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucketName1, snap2);
     SnapshotDiffReport diff1 =
-        store.snapshotDiff(volume, bucketName1, snap1, snap2);
+        getSnapDiffReport(volume, bucketName1, snap1, snap2);
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
