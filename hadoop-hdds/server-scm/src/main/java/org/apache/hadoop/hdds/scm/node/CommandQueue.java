@@ -35,9 +35,9 @@ import java.util.UUID;
  * <p>
  * Node manager, container Manager and Ozone managers can queue commands for
  * datanodes into this queue. These commands will be sent in the order in which
- * there where queued.
+ * they were queued.
  *
- * Not this class is not thread safe, and accesses must be protected by a lock.
+ * Note this class is not thread safe, and accesses must be protected by a lock.
  */
 public class CommandQueue {
   private final Map<UUID, Commands> commandMap;
