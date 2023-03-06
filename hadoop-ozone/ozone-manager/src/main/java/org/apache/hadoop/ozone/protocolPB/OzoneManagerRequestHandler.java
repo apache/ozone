@@ -1228,17 +1228,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getToken(),
             snapshotDiffRequest.getPageSize());
 
-    OzoneManagerProtocolProtos.SnapshotDiffReportProto snapshotDiffReportProto;
-    if (response.getSnapshotDiffReport() == null) {
-      snapshotDiffReportProto = null;
-    } else {
-      snapshotDiffReportProto = response.getSnapshotDiffReport().toProtobuf();
+    SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
+        .setJobStatus(response.getJobStatus().toProtobuf())
+        .setWaitTimeInMs(response.getWaitTimeInMs());
+
+    if (response.getSnapshotDiffReport() != null) {
+      builder.setSnapshotDiffReport(
+          response.getSnapshotDiffReport().toProtobuf());
     }
 
-    return SnapshotDiffResponse.newBuilder()
-        .setSnapshotDiffReport(snapshotDiffReportProto)
-        .setJobStatus(response.getJobStatus().toProtobuf())
-        .setWaitTimeInMs(response.getWaitTimeInMs()).build();
+    return builder.build();
   }
 
 

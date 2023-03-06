@@ -46,11 +46,12 @@ public class SnapshotDiffHandler extends Handler {
   private String toSnapshot;
 
   @CommandLine.Option(names = {"-t", "--token"},
-      description = "token (optional) ")
+      description = "continuation token for next page (optional)")
   private String token;
 
   @CommandLine.Option(names = {"-p", "--page-size"},
-      description = "page size (optional)")
+      description = "number of diff entries to be returned in the response" +
+          " (optional)")
   private int pageSize;
 
   @Override

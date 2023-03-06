@@ -212,7 +212,6 @@ public class SnapshotDiffReport {
         .append(fromSnapshot)
         .append(" and snapshot: ")
         .append(toSnapshot)
-        .append(",")
         .append(LINE_SEPARATOR);
     for (DiffReportEntry entry : diffList) {
       str.append(entry.toString()).append(LINE_SEPARATOR);
