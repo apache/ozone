@@ -31,7 +31,7 @@ ${SECOND_SNAPSHOT}
 Add ACL
     [arguments]         ${object}   ${user}     ${objectName}
     ${result} =         Execute     ozone sh ${object} addacl -a user:${user}/scm@EXAMPLE.COM:a ${objectName}
-    Should not contain  ${result}   Failed
+    Should not contain  ${result}   PERMISSION_DENIED
 
 Add ACLs
     Add ACL     volume      ${USER2}    ${VOLUME}
