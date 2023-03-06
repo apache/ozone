@@ -122,6 +122,10 @@ public class TestContainerEndpoint {
   private static final long KEY_SEQ_NO = 1L;
   private static final long MODIFICATION_TIME = 0L;
   private static final int BLOCK_SIZE = 4097;
+  private static final long CONTAINER_ID_1 = 20L;
+  private static final long CONTAINER_ID_2 = 21L;
+  private static final long CONTAINER_ID_3 = 22L;
+  private static final long LOCAL_ID = 0L;
 
   private UUID uuid1;
   private UUID uuid2;
@@ -237,12 +241,18 @@ public class TestContainerEndpoint {
 
     //Generate Recon container DB data.
     OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
-    Table tableMock = mock(Table.class);
-    when(tableMock.getName()).thenReturn("KeyTable");
+    Table keyTableMock = mock(Table.class);
+    Table fileTableMock = mock(Table.class);
+
+    when(keyTableMock.getName()).thenReturn("KeyTable");
+    when(fileTableMock.getName()).thenReturn("FileTable");
+
     when(omMetadataManagerMock.getKeyTable(BucketLayout.LEGACY))
-        .thenReturn(tableMock);
+        .thenReturn(keyTableMock);
+
     when(omMetadataManagerMock.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
-        .thenReturn(tableMock);
+        .thenReturn(fileTableMock);
+
     reprocessContainerKeyMapper();
   }
 
@@ -267,15 +277,15 @@ public class TestContainerEndpoint {
         KEY_SEQ_NO,
         MODIFICATION_TIME,
         Collections.singletonList(locationInfoGroup),
-        getBucketLayout(),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
         BLOCK_SIZE);
   }
 
   private OmKeyLocationInfoGroup getLocationInfoGroup1() {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    BlockID block1 = new BlockID(20L, 0L);
-    BlockID block2 = new BlockID(21L, 0L);
-    BlockID block3 = new BlockID(22L, 0L);
+    BlockID block1 = new BlockID(CONTAINER_ID_1, LOCAL_ID);
+    BlockID block2 = new BlockID(CONTAINER_ID_2, LOCAL_ID);
+    BlockID block3 = new BlockID(CONTAINER_ID_3, LOCAL_ID);
 
     OmKeyLocationInfo location1 = new OmKeyLocationInfo.Builder()
         .setBlockID(block1)
@@ -365,7 +375,7 @@ public class TestContainerEndpoint {
     assertEquals(1, keyMetadata.getBlockIds().size());
     Map<Long, List<KeyMetadata.ContainerBlockMetadata>> blockIds =
         keyMetadata.getBlockIds();
-    assertEquals(0, blockIds.get(0L).iterator().next().getLocalID());
+    assertEquals(0, blockIds.get(0L).get(0).getLocalID());
   }
 
   @Test
