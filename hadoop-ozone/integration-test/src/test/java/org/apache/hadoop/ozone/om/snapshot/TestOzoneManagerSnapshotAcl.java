@@ -139,6 +139,11 @@ public class TestOzoneManagerSnapshotAcl {
     metaDir = OMStorage.getOmDbDir(ozoneManagerConf);
   }
 
+  @AfterEach
+  public void cleanup() throws IOException {
+    setDefaultAcls();
+  }
+
   @AfterAll
   public static void tearDown() throws Exception {
     if (cluster != null) {
@@ -157,34 +162,6 @@ public class TestOzoneManagerSnapshotAcl {
     // WHEN-THEN
     Assertions.assertDoesNotThrow(
         () -> ozoneManager.lookupKey(snapshotKeyArgs));
-  }
-
-  private OmKeyArgs getOmKeyArgs(boolean isSnapshot) {
-    return new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(isSnapshot ? snapshotKeyPrefix + keyName : keyName)
-        .build();
-  }
-
-  private void createBucket(BucketLayout bucketLayout,
-      OzoneVolume volume) throws IOException {
-    final String bucketPrefix = "bucket-";
-    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(5);
-    final BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setOwner(ADMIN)
-        .setBucketLayout(bucketLayout).build();
-    volume.createBucket(bucketName, bucketArgs);
-  }
-
-  private void createVolume() throws IOException {
-    final String volumePrefix = "volume-";
-    volumeName = volumePrefix + RandomStringUtils.randomNumeric(5);
-    final VolumeArgs volumeArgs = new VolumeArgs.Builder()
-        .setAdmin(ADMIN)
-        .setOwner(ADMIN)
-        .build();
-    objectStore.createVolume(volumeName, volumeArgs);
   }
 
   @ParameterizedTest
@@ -206,49 +183,6 @@ public class TestOzoneManagerSnapshotAcl {
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
     Assertions.assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
-  }
-
-  private void setKeyAcl() throws IOException {
-    final OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(RESOURCE_TYPE_KEY)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .build();
-    objectStore.setAcl(keyObj, OzoneAcl.parseAcls(
-        "user:" + USER1 + ":r," +
-        "user:" + USER1 + ":x," +
-        "user:" + USER2 + ":r," +
-        "user:" + USER2 + ":x"));
-  }
-
-  private void createKey(OzoneBucket bucket)
-      throws IOException {
-    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(5);
-    byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
-    final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
-    fileKey.write(data);
-    fileKey.close();
-  }
-
-  private void createSnapshot()
-      throws IOException, InterruptedException, TimeoutException {
-    final String snapshotPrefix = "snapshot-";
-    final String snapshotName =
-        snapshotPrefix + RandomStringUtils.randomNumeric(5);
-    objectStore.createSnapshot(volumeName, bucketName, snapshotName);
-    snapshotKeyPrefix = OmSnapshotManager
-        .getSnapshotPrefix(snapshotName);
-    final SnapshotInfo snapshotInfo = ozoneManager
-        .getMetadataManager()
-        .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
-    final String snapshotDirName = metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
-        1000, 120000);
   }
 
   @ParameterizedTest
@@ -288,20 +222,6 @@ public class TestOzoneManagerSnapshotAcl {
     // when same user reads same key from active fs, read allowed.
     Assertions.assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(omKeyArgs, assumeS3Context));
-  }
-
-  private static Stream<Arguments> getListStatusArguments() {
-    return Stream.of(
-        arguments(BucketLayout.OBJECT_STORE, false, false),
-        arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, false, false),
-        arguments(BucketLayout.LEGACY, false, false),
-        arguments(BucketLayout.OBJECT_STORE, true, false),
-        arguments(BucketLayout.LEGACY, true, false),
-        arguments(BucketLayout.OBJECT_STORE, false, true),
-        arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, false, true),
-        arguments(BucketLayout.LEGACY, false, true),
-        arguments(BucketLayout.OBJECT_STORE, true, true),
-        arguments(BucketLayout.LEGACY, true, true));
   }
 
   @ParameterizedTest
@@ -416,21 +336,6 @@ public class TestOzoneManagerSnapshotAcl {
         bucketName, keyName, KEY_PREFIX, maxKeys));
   }
 
-  private void setBucketAcl() throws IOException {
-    OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .build();
-
-    objectStore.setAcl(bucketObj, OzoneAcl.parseAcls(
-        "user:" + USER1 + ":r," +
-        "user:" + USER1 + ":l," +
-        "user:" + USER2 + ":r," +
-        "user:" + USER2 + ":l"));
-  }
-
   @ParameterizedTest
   @EnumSource(BucketLayout.class)
   public void testGetAclWithAllowedUser(BucketLayout bucketLayout)
@@ -503,11 +408,6 @@ public class TestOzoneManagerSnapshotAcl {
     setBucketAcl();
   }
 
-  @AfterEach
-  public void cleanup() throws IOException {
-    setDefaultAcls();
-  }
-
   private void setDefaultAcls() throws IOException {
     final OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.VOLUME)
@@ -538,6 +438,106 @@ public class TestOzoneManagerSnapshotAcl {
     objectStore.setAcl(keyObj, OzoneAcl.parseAcls(
         "user:" + USER1 + ":r," +
         "user:" + USER1 + ":x"));
+  }
+
+  private void setKeyAcl() throws IOException {
+    final OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(RESOURCE_TYPE_KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    objectStore.setAcl(keyObj, OzoneAcl.parseAcls(
+        "user:" + USER1 + ":r," +
+            "user:" + USER1 + ":x," +
+            "user:" + USER2 + ":r," +
+            "user:" + USER2 + ":x"));
+  }
+
+  private void createKey(OzoneBucket bucket)
+      throws IOException {
+    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(5);
+    byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
+    final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
+    fileKey.write(data);
+    fileKey.close();
+  }
+
+  private void createSnapshot()
+      throws IOException, InterruptedException, TimeoutException {
+    final String snapshotPrefix = "snapshot-";
+    final String snapshotName =
+        snapshotPrefix + RandomStringUtils.randomNumeric(5);
+    objectStore.createSnapshot(volumeName, bucketName, snapshotName);
+    snapshotKeyPrefix = OmSnapshotManager
+        .getSnapshotPrefix(snapshotName);
+    final SnapshotInfo snapshotInfo = ozoneManager
+        .getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
+    final String snapshotDirName = metaDir + OM_KEY_PREFIX +
+        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
+        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
+        1000, 120000);
+  }
+
+  private void setBucketAcl() throws IOException {
+    OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+
+    objectStore.setAcl(bucketObj, OzoneAcl.parseAcls(
+        "user:" + USER1 + ":r," +
+            "user:" + USER1 + ":l," +
+            "user:" + USER2 + ":r," +
+            "user:" + USER2 + ":l"));
+  }
+
+  private static Stream<Arguments> getListStatusArguments() {
+    return Stream.of(
+        arguments(BucketLayout.OBJECT_STORE, false, false),
+        arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, false, false),
+        arguments(BucketLayout.LEGACY, false, false),
+        arguments(BucketLayout.OBJECT_STORE, true, false),
+        arguments(BucketLayout.LEGACY, true, false),
+        arguments(BucketLayout.OBJECT_STORE, false, true),
+        arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, false, true),
+        arguments(BucketLayout.LEGACY, false, true),
+        arguments(BucketLayout.OBJECT_STORE, true, true),
+        arguments(BucketLayout.LEGACY, true, true));
+  }
+
+  private OmKeyArgs getOmKeyArgs(boolean isSnapshot) {
+    return new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(isSnapshot ? snapshotKeyPrefix + keyName : keyName)
+        .build();
+  }
+
+  private void createBucket(BucketLayout bucketLayout,
+      OzoneVolume volume) throws IOException {
+    final String bucketPrefix = "bucket-";
+    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(5);
+    final BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setOwner(ADMIN)
+        .setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName, bucketArgs);
+  }
+
+  private void createVolume() throws IOException {
+    final String volumePrefix = "volume-";
+    volumeName = volumePrefix + RandomStringUtils.randomNumeric(5);
+    final VolumeArgs volumeArgs = new VolumeArgs.Builder()
+        .setAdmin(ADMIN)
+        .setOwner(ADMIN)
+        .build();
+    objectStore.createVolume(volumeName, volumeArgs);
   }
 
 }
