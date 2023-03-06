@@ -84,7 +84,7 @@ public final class ContainerUtils {
     if (ex.getResult() == CLOSED_CONTAINER_IO ||
         ex.getResult() == CONTAINER_NOT_OPEN) {
       if (log.isDebugEnabled()) {
-        log.warn(logInfo, request.getCmdType(), request.getTraceID(),request.getGetBlock().getBlockID(),
+        log.debug(logInfo, request.getCmdType(), request.getTraceID(),request.getGetBlock().getBlockID(),
             ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
       }
     } else {
