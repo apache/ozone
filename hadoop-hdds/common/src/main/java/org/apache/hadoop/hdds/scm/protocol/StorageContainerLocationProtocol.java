@@ -328,7 +328,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
-      int startTxId) throws IOException;
+      long startTxId) throws IOException;
 
   /**
    * Reset the failed deleted block retry count.

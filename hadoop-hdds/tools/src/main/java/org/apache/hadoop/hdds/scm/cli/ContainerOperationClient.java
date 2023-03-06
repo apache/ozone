@@ -472,7 +472,7 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
-      int startTxId) throws IOException {
+      long startTxId) throws IOException {
     return storageContainerLocationClient.getFailedDeletedBlockTxn(count,
         startTxId);
   }

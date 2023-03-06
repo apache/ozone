@@ -494,7 +494,7 @@ message ReplicationManagerReportResponseProto {
 message GetFailedDeletedBlocksTxnRequestProto {
   optional string traceID = 1;
   required int32 count = 2;
-  optional int32 startTxId = 3;
+  optional int64 startTxId = 3;
 }
 
 message GetFailedDeletedBlocksTxnResponseProto {

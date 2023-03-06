@@ -61,7 +61,7 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
       defaultValue = "0",
       description = "The least transaction ID to start with, default 0." +
           " Only work with -c/--count")
-  private int startTxId;
+  private long startTxId;
 
   @CommandLine.Option(names = {"-o", "--out"},
       description = "Print transactions into file in JSON format.")

@@ -1188,7 +1188,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
       GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
-    int startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
+    long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
     return GetFailedDeletedBlocksTxnResponseProto.newBuilder()
         .addAllDeletedBlocksTransactions(
             impl.getFailedDeletedBlockTxn(request.getCount(), startTxId))

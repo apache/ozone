@@ -849,7 +849,7 @@ public class SCMClientProtocolServer implements
   }
 
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
-      int startTxId) throws IOException {
+      long startTxId) throws IOException {
     List<DeletedBlocksTransactionInfo> result;
     try {
       result = scm.getScmBlockManager().getDeletedBlockLog()

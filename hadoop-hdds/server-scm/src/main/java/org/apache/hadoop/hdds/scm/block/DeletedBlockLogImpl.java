@@ -129,7 +129,7 @@ public class DeletedBlockLogImpl
 
   @Override
   public List<DeletedBlocksTransaction> getFailedTransactions(int count,
-      int startTxId) throws IOException {
+      long startTxId) throws IOException {
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
