@@ -28,11 +28,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -68,6 +71,11 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String state;
 
+  @CommandLine.Option(names = { "--json" },
+            defaultValue = "false",
+            description = "Format output as JSON")
+    private boolean json;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     Optional<Predicate<? super Pipeline>> replicationFilter =
@@ -81,7 +89,14 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
       stream = stream.filter(p -> p.getPipelineState().toString()
           .compareToIgnoreCase(state) == 0);
     }
-    stream.forEach(System.out::println);
+
+    if (json) {
+      List<Pipeline> pipelineList = stream.collect(Collectors.toList());
+      System.out.print(
+              JsonUtils.toJsonStringWithDefaultPrettyPrinter(pipelineList));
+    } else {
+      stream.forEach(System.out::println);
+    }
   }
 
   private Optional<Predicate<? super Pipeline>> getReplicationFilter() {

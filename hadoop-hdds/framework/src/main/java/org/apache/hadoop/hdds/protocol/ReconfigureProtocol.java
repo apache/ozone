@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.retry.Idempotent;
 
 import java.io.IOException;
@@ -34,6 +34,12 @@ import java.util.List;
 public interface ReconfigureProtocol {
 
   long VERSIONID = 1L;
+
+  /**
+   * Get the name of service to be reconfigured.
+   */
+  @Idempotent
+  String getServerName() throws IOException;
 
   /**
    * Asynchronously reload configuration on disk and apply changes.

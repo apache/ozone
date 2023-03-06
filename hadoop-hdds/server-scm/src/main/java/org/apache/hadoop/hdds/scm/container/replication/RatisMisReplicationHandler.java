@@ -53,19 +53,8 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
               + " %s.Expected Container Replication Type : RATIS",
               containerInfo.getReplicationType().toString()));
     }
-    // count pending adds and deletes
-    int pendingAdd = 0, pendingDelete = 0;
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd++;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete++;
-      }
-    }
-    return new RatisContainerReplicaCount(
-            containerInfo, replicas, pendingAdd,
-            pendingDelete, containerInfo.getReplicationFactor().getNumber(),
-            minHealthyForMaintenance);
+    return new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+        minHealthyForMaintenance, true);
   }
 
   @Override

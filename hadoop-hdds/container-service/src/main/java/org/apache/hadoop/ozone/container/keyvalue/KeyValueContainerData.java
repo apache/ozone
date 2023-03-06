@@ -317,6 +317,14 @@ public class KeyValueContainerData extends ContainerData {
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
 
+  public void resetPendingDeleteBlockCount(DBHandle db) throws IOException {
+    // Reset the in memory metadata.
+    numPendingDeletionBlocks.set(0);
+    // Reset the metadata on disk.
+    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+    metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
+  }
+
   public int getReplicaIndex() {
     return replicaIndex;
   }

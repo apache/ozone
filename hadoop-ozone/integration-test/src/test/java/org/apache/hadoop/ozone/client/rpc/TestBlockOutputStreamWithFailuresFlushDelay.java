@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -150,6 +151,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
    */
   @AfterEach
   public void shutdown() {
+    IOUtils.close(null, client);
     if (cluster != null) {
       cluster.shutdown();
     }

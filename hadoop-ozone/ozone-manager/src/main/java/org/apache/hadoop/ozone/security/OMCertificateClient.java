@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -162,26 +163,27 @@ public class OMCertificateClient extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     try {
       SCMGetCertResponseProto response = getScmSecureClient()
           .getOMCertChain(omInfo, getEncodedString(request));
 
       String pemEncodedCert = response.getX509Certificate();
       CertificateCodec certCodec = new CertificateCodec(
-          getSecurityConfig(), certPath);
+          getSecurityConfig(), certificatePath);
 
       // Store SCM CA certificate.
       if (response.hasX509CACertificate()) {
         String pemEncodedRootCert = response.getX509CACertificate();
         storeCertificate(pemEncodedRootCert,
-            true, true, false, certCodec, false);
-        storeCertificate(pemEncodedCert, true, false, false, certCodec, false);
+            CAType.SUBORDINATE, certCodec, false);
+        storeCertificate(pemEncodedCert, CAType.NONE, certCodec,
+            false);
 
         // Store Root CA certificate if available.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              true, false, true, certCodec, false);
+              CAType.ROOT, certCodec, false);
         }
         return CertificateCodec.getX509Certificate(pemEncodedCert)
             .getSerialNumber().toString();

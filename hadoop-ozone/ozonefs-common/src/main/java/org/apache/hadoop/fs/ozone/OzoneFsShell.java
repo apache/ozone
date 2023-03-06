@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.ToolRunner;
 
+import java.util.concurrent.Callable;
+
 /** Provide command line access to a Ozone FileSystem. */
 @InterfaceAudience.Private
 public class OzoneFsShell extends FsShell {
@@ -78,13 +80,17 @@ public class OzoneFsShell extends FsShell {
     TracingUtil.initTracing("FsShell", conf);
     conf.setQuietMode(false);
     shell.setConf(conf);
-    int res;
-    try {
-      res = ToolRunner.run(shell, argv);
-    } finally {
-      shell.close();
-    }
+    int res = TracingUtil.executeInNewSpan("main",
+        (Callable<Integer>) () -> shell.execute(argv));
     System.exit(res);
+  }
+
+  private int execute(String[] argv) throws Exception {
+    try {
+      return ToolRunner.run(this, argv);
+    } finally {
+      close();
+    }
   }
 
   // TODO: this should be abstract in a base class

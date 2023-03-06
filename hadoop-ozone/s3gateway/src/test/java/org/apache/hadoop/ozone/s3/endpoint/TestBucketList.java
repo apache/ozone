@@ -24,9 +24,13 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.Assert;
+
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import static org.junit.Assert.fail;
 import org.junit.Test;
 
@@ -51,11 +55,11 @@ public class TestBucketList {
 
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("dir1/",
-        getBucketResponse.getCommonPrefixes().get(0).getPrefix());
+        getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
 
     Assert.assertEquals(1, getBucketResponse.getContents().size());
     Assert.assertEquals("file1",
-        getBucketResponse.getContents().get(0).getKey());
+        getBucketResponse.getContents().get(0).getKey().getName());
 
   }
 
@@ -74,7 +78,7 @@ public class TestBucketList {
 
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("dir1/",
-        getBucketResponse.getCommonPrefixes().get(0).getPrefix());
+        getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
 
     Assert.assertEquals(0, getBucketResponse.getContents().size());
 
@@ -99,11 +103,11 @@ public class TestBucketList {
 
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("dir1/dir2/",
-        getBucketResponse.getCommonPrefixes().get(0).getPrefix());
+        getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
 
     Assert.assertEquals(1, getBucketResponse.getContents().size());
     Assert.assertEquals("dir1/file2",
-        getBucketResponse.getContents().get(0).getKey());
+        getBucketResponse.getContents().get(0).getKey().getName());
 
   }
 
@@ -144,7 +148,7 @@ public class TestBucketList {
 
     Assert.assertEquals(3, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("file2", getBucketResponse.getContents().get(0)
-        .getKey());
+        .getKey().getName());
 
   }
 
@@ -240,9 +244,9 @@ public class TestBucketList {
     Assert.assertEquals(0, getBucketResponse.getContents().size());
     Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("test/dir1/",
-        getBucketResponse.getCommonPrefixes().get(0).getPrefix());
+        getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
     Assert.assertEquals("test/dir2/",
-        getBucketResponse.getCommonPrefixes().get(1).getPrefix());
+        getBucketResponse.getCommonPrefixes().get(1).getPrefix().getName());
 
     getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, maxKeys,
@@ -251,9 +255,9 @@ public class TestBucketList {
     Assert.assertEquals(1, getBucketResponse.getContents().size());
     Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals("test/dir3/",
-        getBucketResponse.getCommonPrefixes().get(0).getPrefix());
+        getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
     Assert.assertEquals("test/file8",
-        getBucketResponse.getContents().get(0).getKey());
+        getBucketResponse.getContents().get(0).getKey().getName());
 
   }
 
@@ -361,6 +365,103 @@ public class TestBucketList {
     Assert.assertEquals(0, getBucketResponse.getContents().size());
 
 
+  }
+
+  @Test
+  public void testEncodingType() throws IOException, OS3Exception {
+    /*
+    * OP1 -> Create key "data=1970" and "data==1970" in a bucket
+    * OP2 -> List Object, if encodingType == url the result will be like blow:
+
+        <?xml version="1.0" encoding="UTF-8"?>
+          <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+              ...
+              <Prefix>data%3D</Prefix>
+              <StartAfter>data%3D</StartAfter>
+              <Delimiter>%3D</Delimiter>
+              <EncodingType>url</EncodingType>
+              ...
+              <Contents>
+                  <Key>data%3D1970</Key>
+                  ....
+              </Contents>
+              <CommonPrefixes>
+                  <Prefix>data%3D%3D</Prefix>
+              </CommonPrefixes>
+          </ListBucketResult>
+
+      if encodingType == null , the = will not be encoded to "%3D"
+    * */
+
+    BucketEndpoint getBucket = new BucketEndpoint();
+    OzoneClient ozoneClient =
+        createClientWithKeys("data=1970", "data==1970");
+    getBucket.setClient(ozoneClient);
+
+    String delimiter = "=";
+    String prefix = "data=";
+    String startAfter = "data=";
+    String encodingType = ENCODING_TYPE;
+
+    ListObjectResponse response = (ListObjectResponse) getBucket.get(
+        "b1", delimiter, encodingType, null, 1000, prefix,
+        null, startAfter, null, null, null).getEntity();
+
+    // Assert encodingType == url.
+    // The Object name will be encoded by ObjectKeyNameAdapter
+    // if encodingType == url
+    assertEncodingTypeObject(delimiter, encodingType, response.getDelimiter());
+    assertEncodingTypeObject(prefix, encodingType, response.getPrefix());
+    assertEncodingTypeObject(startAfter, encodingType,
+        response.getStartAfter());
+    Assert.assertNotNull(response.getCommonPrefixes());
+    Assert.assertNotNull(response.getContents());
+    assertEncodingTypeObject(prefix + delimiter, encodingType,
+        response.getCommonPrefixes().get(0).getPrefix());
+    Assert.assertEquals(encodingType,
+        response.getContents().get(0).getKey().getEncodingType());
+
+    response = (ListObjectResponse) getBucket.get(
+        "b1", delimiter, null, null, 1000, prefix,
+        null, startAfter, null, null, null).getEntity();
+
+    // Assert encodingType == null.
+    // The Object name will not be encoded by ObjectKeyNameAdapter
+    // if encodingType == null
+    assertEncodingTypeObject(delimiter, null, response.getDelimiter());
+    assertEncodingTypeObject(prefix, null, response.getPrefix());
+    assertEncodingTypeObject(startAfter, null, response.getStartAfter());
+    Assert.assertNotNull(response.getCommonPrefixes());
+    Assert.assertNotNull(response.getContents());
+    assertEncodingTypeObject(prefix + delimiter, null,
+        response.getCommonPrefixes().get(0).getPrefix());
+    Assert.assertNull(response.getContents().get(0).getKey().getEncodingType());
+
+  }
+
+  @Test
+  public void testEncodingTypeException() throws IOException, OS3Exception {
+    BucketEndpoint getBucket = new BucketEndpoint();
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    getBucket.setClient(client);
+    try {
+      ListObjectResponse response = (ListObjectResponse) getBucket.get(
+          "b1", null, "unSupportType", null, 1000, null,
+          null, null, null, null, null).getEntity();
+      Assert.fail();
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof OS3Exception);
+      Assert.assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(),
+          ((OS3Exception) e).getCode());
+    }
+
+  }
+
+  private void assertEncodingTypeObject(
+      String exceptName, String exceptEncodingType, EncodingTypeObject object) {
+    Assert.assertEquals(exceptName, object.getName());
+    Assert.assertEquals(exceptEncodingType, object.getEncodingType());
   }
 
   private OzoneClient createClientWithKeys(String... keys) throws IOException {

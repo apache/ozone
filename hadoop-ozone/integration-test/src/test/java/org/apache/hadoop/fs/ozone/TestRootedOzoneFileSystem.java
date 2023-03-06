@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -135,6 +136,7 @@ public class TestRootedOzoneFileSystem {
       LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+  private static OzoneClient client;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -166,6 +168,7 @@ public class TestRootedOzoneFileSystem {
 
   @Parameterized.AfterParam
   public static void teardownParam() {
+    IOUtils.closeQuietly(client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();
@@ -257,7 +260,8 @@ public class TestRootedOzoneFileSystem {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = cluster.getClient().getObjectStore();
+    client = cluster.getClient();
+    objectStore = client.getObjectStore();
 
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
@@ -2208,5 +2212,44 @@ public class TestRootedOzoneFileSystem {
         .setSourceBucket(sourceBucket);
     OzoneVolume ozoneVolume = objectStore.getVolume(linkVolume);
     ozoneVolume.createBucket(linkBucket, builder.build());
+  }
+
+  @Test
+  public void testSnapshotRead() throws Exception {
+    // Init data
+    OzoneBucket bucket1 =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    Path volume1Path = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
+    Path bucket1Path = new Path(volume1Path, bucket1.getName());
+    Path file1 = new Path(bucket1Path, "key1");
+    Path file2 = new Path(bucket1Path, "key2");
+
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+
+    OzoneBucket bucket2 =
+        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    Path volume2Path = new Path(OZONE_URI_DELIMITER, bucket2.getVolumeName());
+    Path bucket2Path = new Path(volume2Path, bucket2.getName());
+
+    fs.mkdirs(bucket2Path);
+    Path snapPath1 = fs.createSnapshot(bucket1Path, "snap1");
+    Path snapPath2 = fs.createSnapshot(bucket2Path, "snap1");
+
+    Path file3 = new Path(bucket1Path, "key3");
+    ContractTestUtils.touch(fs, file3);
+
+    Path snapPath3 = fs.createSnapshot(bucket1Path, "snap2");
+
+    try {
+      FileStatus[] f1 = fs.listStatus(snapPath1);
+      FileStatus[] f2 = fs.listStatus(snapPath2);
+      FileStatus[] f3 = fs.listStatus(snapPath3);
+      Assert.assertEquals(2, f1.length);
+      Assert.assertEquals(0, f2.length);
+      Assert.assertEquals(3, f3.length);
+    } catch (Exception e) {
+      Assert.fail("Failed to read/list on snapshotPath, exception: " + e);
+    }
   }
 }

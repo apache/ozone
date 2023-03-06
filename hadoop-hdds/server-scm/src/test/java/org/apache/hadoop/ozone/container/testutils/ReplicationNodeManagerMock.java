@@ -86,6 +86,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
     return null;
   }
 
+  @Override
+  public Map<String, List<String>> getNodeStatusInfo() {
+    return null;
+  }
+
   /**
    * Gets all Live Datanodes that is currently communicating with SCM.
    *

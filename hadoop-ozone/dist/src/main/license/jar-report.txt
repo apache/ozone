@@ -74,6 +74,7 @@ share/ozone/lib/hdds-hadoop-dependency-server.jar
 share/ozone/lib/hdds-interface-admin.jar
 share/ozone/lib/hdds-interface-client.jar
 share/ozone/lib/hdds-interface-server.jar
+share/ozone/lib/hdds-managed-rocksdb.jar
 share/ozone/lib/hdds-server-framework.jar
 share/ozone/lib/hdds-server-scm.jar
 share/ozone/lib/hdds-tools.jar
@@ -252,6 +253,6 @@ share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/stax-ex.jar
 share/ozone/lib/txw2.jar
-share/ozone/lib/weld-servlet.Final.jar
+share/ozone/lib/weld-servlet-shaded.Final.jar
 share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zstd-jni.jar

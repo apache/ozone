@@ -179,7 +179,6 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
         .setNodes(nodes)
         .build();
 
-    boolean success = false;
     List<ContainerProtos.ChunkInfo> chunks;
     XceiverClientSpi xceiverClientSpi = null;
     try {
@@ -196,9 +195,8 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
           .getBlock(xceiverClientSpi, datanodeBlockID, token);
 
       chunks = response.getBlockData().getChunksList();
-      success = true;
     } finally {
-      if (!success && xceiverClientSpi != null) {
+      if (xceiverClientSpi != null) {
         getXceiverClientFactory().releaseClientForReadData(
             xceiverClientSpi, false);
       }

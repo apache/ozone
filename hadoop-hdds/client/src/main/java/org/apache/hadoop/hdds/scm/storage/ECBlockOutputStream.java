@@ -129,7 +129,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
       List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
 
       Preconditions.checkArgument(
-          currentChunks.size() == checksumBlockDataChunks.size());
+          currentChunks.size() == checksumBlockDataChunks.size(),
+          "The chunk list has " + currentChunks.size()
+              + " entries, but the checksum chunks has "
+              + checksumBlockDataChunks.size()
+              + " entries. They should be equal in size.");
       List<ChunkInfo> newChunkList = new ArrayList<>();
 
       for (int i = 0; i < currentChunks.size(); i++) {

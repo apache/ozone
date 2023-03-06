@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -110,8 +109,7 @@ public class ContainerBalancerTask implements Runnable {
   private Set<DatanodeDetails> selectedSources;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
-  private Map<ContainerMoveSelection,
-      CompletableFuture<LegacyReplicationManager.MoveResult>>
+  private Map<ContainerMoveSelection, CompletableFuture<MoveManager.MoveResult>>
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
   private int nextIterationIndex;
@@ -756,7 +754,7 @@ public class ContainerBalancerTask implements Runnable {
   private boolean moveContainer(DatanodeDetails source,
                                 ContainerMoveSelection moveSelection) {
     ContainerID containerID = moveSelection.getContainerID();
-    CompletableFuture<LegacyReplicationManager.MoveResult> future;
+    CompletableFuture<MoveManager.MoveResult> future;
     try {
       ContainerInfo containerInfo = containerManager.getContainer(containerID);
       future = replicationManager
@@ -772,7 +770,7 @@ public class ContainerBalancerTask implements Runnable {
                   moveSelection.getTargetNode().getUuidString(), ex);
               metrics.incrementNumContainerMovesFailedInLatestIteration(1);
             } else {
-              if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
+              if (result == MoveManager.MoveResult.COMPLETED) {
                 sizeActuallyMovedInLatestIteration +=
                     containerInfo.getUsedBytes();
                 if (LOG.isDebugEnabled()) {
@@ -805,9 +803,9 @@ public class ContainerBalancerTask implements Runnable {
       if (future.isCompletedExceptionally()) {
         return false;
       } else {
-        LegacyReplicationManager.MoveResult result = future.join();
+        MoveManager.MoveResult result = future.join();
         moveSelectionToFutureMap.put(moveSelection, future);
-        return result == LegacyReplicationManager.MoveResult.COMPLETED;
+        return result == MoveManager.MoveResult.COMPLETED;
       }
     } else {
       moveSelectionToFutureMap.put(moveSelection, future);
