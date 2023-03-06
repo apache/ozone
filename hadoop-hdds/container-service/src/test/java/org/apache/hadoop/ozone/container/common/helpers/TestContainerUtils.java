@@ -91,7 +91,6 @@ public class TestContainerUtils {
 
     // Read should return an empty value if file doesn't exist
     File nonExistFile = new File(tempDir, "non_exist.id");
-    nonExistFile.delete();
     assertThrows(IOException.class,
         () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
 
@@ -113,11 +112,10 @@ public class TestContainerUtils {
     assertWriteRead(tempDir, id1);
   }
 
-  private static void assertWriteRead(File tempDir, DatanodeDetails details)
-      throws IOException {
+  private static void assertWriteRead(@TempDir File tempDir,
+      DatanodeDetails details) throws IOException {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
-    file.delete();
     ContainerUtils.writeDatanodeDetailsTo(details, file);
 
     DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
@@ -128,7 +126,6 @@ public class TestContainerUtils {
 
   private void createMalformedIDFile(File malformedFile)
       throws IOException {
-    malformedFile.delete();
     DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);
 
