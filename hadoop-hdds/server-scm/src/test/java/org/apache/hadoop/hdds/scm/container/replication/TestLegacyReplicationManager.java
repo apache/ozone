@@ -400,6 +400,62 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
     }
 
+    /**
+     * Create closing container with 1 replica.
+     * Expectation: Missing containers 0.
+     * Remove the only replica.
+     * Expectation: Missing containers 1.
+     */
+    @Test
+    public void testClosingMissingContainer()
+            throws IOException, TimeoutException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+      final ContainerID id = container.containerID();
+
+      containerStateManager.addContainer(container.getProtobuf());
+
+      // One replica in OPEN state
+      final Set<ContainerReplica> replicas = getReplicas(id, State.OPEN,
+              randomDatanodeDetails());
+
+      for (ContainerReplica replica : replicas) {
+        containerStateManager.updateContainerReplica(id, replica);
+      }
+
+      final int currentCloseCommandCount = datanodeCommandHandler
+              .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentCloseCommandCount + 1,
+              datanodeCommandHandler.getInvocationCount(
+                      SCMCommandProto.Type.closeContainerCommand));
+
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+      Assertions.assertEquals(0, report.getStat(
+              ReplicationManagerReport.HealthState.MISSING));
+
+      for (ContainerReplica replica : replicas) {
+        containerStateManager.removeContainerReplica(id, replica);
+      }
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentCloseCommandCount + 1,
+              datanodeCommandHandler.getInvocationCount(
+                      SCMCommandProto.Type.closeContainerCommand));
+
+      report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.MISSING));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    }
+
     @Test
     public void testReplicateCommandTimeout()
             throws IOException, TimeoutException {
