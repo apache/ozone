@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Iterator;
 
 /**
  * ozone sh snapshot list.
@@ -50,10 +50,9 @@ public class ListSnapshotHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    List<? extends OzoneSnapshot> snapshotInfos = client.getObjectStore()
-        .listSnapshot(volumeName, bucketName);
-    int counter = printAsJsonArray(snapshotInfos.iterator(),
-        snapshotInfos.size());
+    Iterator<? extends OzoneSnapshot> snapshotInfos = client.getObjectStore()
+        .listSnapshot(volumeName, bucketName, null, null);
+    int counter = printAsJsonArray(snapshotInfos, Integer.MAX_VALUE);
     if (isVerbose()) {
       out().printf("Found : %d snapshots for o3://%s/ %s ", counter,
           volumeName, bucketName);
