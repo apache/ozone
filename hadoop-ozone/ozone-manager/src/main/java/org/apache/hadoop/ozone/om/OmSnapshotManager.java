@@ -78,7 +78,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     this.snapshotDiffDb =
         createDbForSnapshotDiff(ozoneManager.getConfiguration());
-    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ);
+    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
+        ozoneManager.getConfiguration());
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
