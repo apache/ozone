@@ -78,7 +78,7 @@ public class SnapshotDiffResponse {
       str.append("\n");
       str.append("Please retry after ");
       str.append(waitTimeInMs);
-      str.append("millis.");
+      str.append(" ms.");
     }
     return str.toString();
   }

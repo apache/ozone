@@ -49,7 +49,7 @@ public class SnapshotDiffHandler extends Handler {
       description = "token (optional) ")
   private String token;
 
-  @CommandLine.Option(names = {"-p", "--pageSize"},
+  @CommandLine.Option(names = {"-p", "--page-size"},
       description = "page size (optional)")
   private int pageSize;
 
