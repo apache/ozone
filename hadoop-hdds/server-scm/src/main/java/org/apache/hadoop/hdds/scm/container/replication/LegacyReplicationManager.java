@@ -248,57 +248,6 @@ public class LegacyReplicationManager {
    */
   private final InflightMap inflightDeletion;
 
-
-  /**
-   * This is used for indicating the result of move option and
-   * the corresponding reason. this is useful for tracking
-   * the result of move option
-   */
-  public enum MoveResult {
-    // both replication and deletion are completed
-    COMPLETED,
-    // RM is not running
-    FAIL_NOT_RUNNING,
-    // RM is not ratis leader
-    FAIL_NOT_LEADER,
-    // replication fail because the container does not exist in src
-    REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
-    // replication fail because the container exists in target
-    REPLICATION_FAIL_EXIST_IN_TARGET,
-    // replication fail because the container is not cloesed
-    REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
-    // replication fail because the container is in inflightDeletion
-    REPLICATION_FAIL_INFLIGHT_DELETION,
-    // replication fail because the container is in inflightReplication
-    REPLICATION_FAIL_INFLIGHT_REPLICATION,
-    // replication fail because of timeout
-    REPLICATION_FAIL_TIME_OUT,
-    // replication fail because of node is not in service
-    REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication fail because node is unhealthy
-    REPLICATION_FAIL_NODE_UNHEALTHY,
-    // deletion fail because of node is not in service
-    DELETION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication succeed, but deletion fail because of timeout
-    DELETION_FAIL_TIME_OUT,
-    // replication succeed, but deletion fail because because
-    // node is unhealthy
-    DELETION_FAIL_NODE_UNHEALTHY,
-    // replication succeed, but if we delete the container from
-    // the source datanode , the policy(eg, replica num or
-    // rack location) will not be satisfied, so we should not delete
-    // the container
-    DELETE_FAIL_POLICY,
-    //  replicas + target - src does not satisfy placement policy
-    PLACEMENT_POLICY_NOT_SATISFIED,
-    //unexpected action, remove src at inflightReplication
-    UNEXPECTED_REMOVE_SOURCE_AT_INFLIGHT_REPLICATION,
-    //unexpected action, remove target at inflightDeletion
-    UNEXPECTED_REMOVE_TARGET_AT_INFLIGHT_DELETION,
-    //write DB error
-    FAIL_CAN_NOT_RECORD_TO_DB
-  }
-
   /**
    * This is used for tracking container move commands
    * which are not yet complete.
