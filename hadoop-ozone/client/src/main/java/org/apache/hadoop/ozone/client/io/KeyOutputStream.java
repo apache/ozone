@@ -452,8 +452,11 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   @Override
   public void hsync() throws IOException {
     checkNotClosed();
+    final long hsyncPos = writeOffset;
     handleFlushOrClose(StreamAction.HSYNC);
-    blockOutputStreamEntryPool.hsyncKey(offset);
+    Preconditions.checkState(offset >= hsyncPos,
+        "offset = %s < hsyncPos = %s", offset, hsyncPos);
+    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
   }
 
   /**

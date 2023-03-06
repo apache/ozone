@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -156,7 +155,8 @@ public class TestContainerBalancerTask {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
         Mockito.any(DatanodeDetails.class),
         Mockito.any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(MoveResult.COMPLETED));
+        .thenReturn(CompletableFuture.
+            completedFuture(MoveManager.MoveResult.COMPLETED));
 
     when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
@@ -721,7 +721,7 @@ public class TestContainerBalancerTask {
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(
-            MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
+            MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
 
     startBalancer(balancerConfiguration);
@@ -774,12 +774,12 @@ public class TestContainerBalancerTask {
       throws NodeNotFoundException, IOException,
       IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException, TimeoutException {
-    CompletableFuture<MoveResult> future
+    CompletableFuture<MoveManager.MoveResult> future
         = CompletableFuture.supplyAsync(() ->
-        MoveResult.REPLICATION_FAIL_TIME_OUT);
-    CompletableFuture<MoveResult> future2
+        MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT);
+    CompletableFuture<MoveManager.MoveResult> future2
         = CompletableFuture.supplyAsync(() ->
-        MoveResult.DELETION_FAIL_TIME_OUT);
+        MoveManager.MoveResult.DELETION_FAIL_TIME_OUT);
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
@@ -806,14 +806,15 @@ public class TestContainerBalancerTask {
       InvalidContainerBalancerConfigurationException,
       TimeoutException {
 
-    CompletableFuture<MoveResult> f = new CompletableFuture();
-    f.completeExceptionally(new RuntimeException("Runtime Exception"));
+    CompletableFuture<MoveManager.MoveResult> future =
+        new CompletableFuture<>();
+    future.completeExceptionally(new RuntimeException("Runtime Exception"));
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
         .thenThrow(new ContainerNotFoundException("Test Container not found"),
             new NodeNotFoundException("Test Node not found"))
-        .thenReturn(f).thenReturn(CompletableFuture.supplyAsync(() -> {
+        .thenReturn(future).thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
             Thread.sleep(200);
           } catch (Exception ex) {
@@ -1025,7 +1026,7 @@ public class TestContainerBalancerTask {
     // do nothing as testcase is not threaded
   }
 
-  private CompletableFuture<MoveResult>
+  private CompletableFuture<MoveManager.MoveResult>
       genCompletableFuture(int sleepMilSec) {
     return CompletableFuture.supplyAsync(() -> {
       try {
@@ -1033,7 +1034,7 @@ public class TestContainerBalancerTask {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-      return MoveResult.COMPLETED;
+      return MoveManager.MoveResult.COMPLETED;
     });
   }
 }

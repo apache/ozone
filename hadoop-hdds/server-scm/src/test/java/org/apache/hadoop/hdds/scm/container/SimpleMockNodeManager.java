@@ -385,6 +385,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public Map<String, List<String>> getNodeStatusInfo() {
+    return null;
+  }
+
+  @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher publisher) {
   }
