@@ -19,50 +19,31 @@ package org.apache.hadoop.ozone.admin.scm;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
+
+import java.util.concurrent.Callable;
 
 /**
- * Subcommand for admin operations related to SCM.
+ * Subcommand to group container related operations.
  */
 @CommandLine.Command(
-    name = "scm",
-    description = "Ozone Storage Container Manager specific admin operations",
+    name = "deletedBlocksTxn",
+    description = "SCM deleted blocks transaction specific operations",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        GetScmRatisRolesSubcommand.class,
-        FinalizeScmUpgradeSubcommand.class,
-        FinalizationScmStatusSubcommand.class,
-        TransferScmLeaderSubCommand.class,
-        DeletedBlocksTxnCommands.class
+        GetFailedDeletedBlocksTxnSubcommand.class,
+        ResetDeletedBlockRetryCountSubcommand.class,
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ScmAdmin extends GenericCli implements SubcommandWithParent {
+public class DeletedBlocksTxnCommands implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OzoneAdmin parent;
-
-  @Spec
-  private CommandSpec spec;
-
-  public OzoneAdmin getParent() {
-    return parent;
-  }
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   @Override
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
   }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
-  }
-
 }
+
