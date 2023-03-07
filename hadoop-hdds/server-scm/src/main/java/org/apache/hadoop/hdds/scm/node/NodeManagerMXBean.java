@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
-import java.util.List;
 import java.util.Map;
 
 /**
