@@ -18,9 +18,8 @@
 package org.apache.hadoop.hdds.conf;
 
 /**
- * Available config tags.
- * <p>
- * Note: the values are defined in ozone-default.xml by hadoop.tags.custom.
+ * The definitive list of configuration tags.  Used as a source to define the
+ * value of {@code hadoop.tags.custom} and {@code ozone.tags.system}.
  */
 public enum ConfigTag {
   OZONE,
