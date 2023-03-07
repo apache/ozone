@@ -28,6 +28,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -45,8 +46,10 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_TAGS_CUSTOM;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
 
 /**
  * Configuration for ozone.
@@ -301,6 +304,20 @@ public class OzoneConfiguration extends Configuration
       }
     }
     return configMap;
+  }
+
+  @Override
+  public void addTags(Properties prop) {
+    if (!prop.containsKey(OZONE_TAGS_SYSTEM_KEY)) {
+      String ozoneTags = Arrays.stream(ConfigTag.values())
+          .map(Enum::name)
+          .sorted()
+          .collect(Collectors.joining(","));
+      prop.setProperty(HADOOP_TAGS_CUSTOM, ozoneTags);
+      prop.setProperty(OZONE_TAGS_SYSTEM_KEY, ozoneTags);
+    }
+
+    super.addTags(prop);
   }
 
   private static void addDeprecatedKeys() {
