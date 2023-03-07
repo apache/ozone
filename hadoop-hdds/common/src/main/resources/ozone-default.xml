@@ -20,9 +20,7 @@
 <!-- wish to modify from this file into ozone-site.xml and change them -->
 <!-- there.  If ozone-site.xml does not already exist, create it.      -->
 
-<!--Tags supported are OZONE, CBLOCK, MANAGEMENT, SECURITY, PERFORMANCE,   -->
-<!--DEBUG, CLIENT, SERVER, OM, SCM, CRITICAL, RATIS, CONTAINER, REQUIRED, -->
-<!--REST, STORAGE, PIPELINE, STANDALONE                                    -->
+<!--Tags supported are defined in org.apache.hadoop.hdds.conf.ConfigTag-->
 
 <configuration>
 
