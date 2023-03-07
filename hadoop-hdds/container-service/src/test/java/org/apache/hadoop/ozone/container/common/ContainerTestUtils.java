@@ -34,7 +34,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -195,7 +194,6 @@ public final class ContainerTestUtils {
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
-    ContainerSet containerSet = new ContainerSet(1000);
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
     long containerId = HddsUtils.getTime();
@@ -216,8 +214,7 @@ public final class ContainerTestUtils {
 
     KeyValueContainerUtil
         .parseKVContainerData(keyValueContainerData, conf);
-
-    containerSet.addContainer(container);
+    container.close();
 
     // For testing, we are moving the container
     // under the tmp directory, in order to delete
