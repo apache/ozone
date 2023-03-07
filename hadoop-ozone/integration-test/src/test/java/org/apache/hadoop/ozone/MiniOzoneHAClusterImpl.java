@@ -170,7 +170,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return this.scmhaService.getServiceByIndex(index);
   }
 
-  private OzoneManager getOMLeader(boolean waitForLeaderElection)
+  public OzoneManager getOMLeader(boolean waitForLeaderElection)
       throws TimeoutException, InterruptedException {
     if (waitForLeaderElection) {
       final OzoneManager[] om = new OzoneManager[1];
