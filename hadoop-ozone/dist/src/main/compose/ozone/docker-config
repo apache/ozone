@@ -16,9 +16,6 @@
 
 CORE-SITE.XML_fs.defaultFS=ofs://om
 CORE-SITE.XML_fs.trash.interval=1
-# For HttpFS service it is required to enable proxying users.
-CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts=*
-CORE-SITE.XML_hadoop.proxyuser.hadoop.groups=*
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874

@@ -37,7 +37,6 @@ Daemon commands:
    stopped.
    * **s3g** - Start the S3 compatible REST gateway
    * **recon** - The Web UI service of Ozone can be started with this command.
-   * **httpfs** - Start the HttpFS gateway
    
 Client commands:
 

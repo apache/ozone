@@ -28,8 +28,8 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20230104-1</docker.ozone-runner.version>
-    <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20211102-1</docker.ozone-testkr5b.image>
+    <docker.ozone-runner.version>20220623-1</docker.ozone-runner.version>
+    <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20210419-1</docker.ozone-testkr5b.image>
   </properties>
 
   <build>
@@ -74,8 +74,8 @@
               </outputDirectory>
               <includes>*.classpath</includes>
               <includeArtifactIds>
-                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-httpfsgateway,
-                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools
+                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-insight,
+                ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -222,10 +222,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-insight</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-httpfsgateway</artifactId>
     </dependency>
   </dependencies>
   <profiles>
