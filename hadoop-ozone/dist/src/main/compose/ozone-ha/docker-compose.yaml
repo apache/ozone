@@ -100,14 +100,6 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       <<: *replication
     command: ["ozone","scm"]
-  httpfs:
-    <<: *common-config
-    environment:
-      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
-    ports:
-      - 14000:14000
-    command: [ "ozone","httpfs" ]
   s3g:
     <<: *common-config
     environment:

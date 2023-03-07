@@ -39,8 +39,6 @@ execute_robot_test ${SCM} s3
 
 execute_robot_test ${SCM} admincli
 
-execute_robot_test ${SCM} httpfs
-
 export SCM=scm2.org
 execute_robot_test ${SCM} admincli
 stop_docker_env

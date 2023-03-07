@@ -63,21 +63,7 @@ services:
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
-  httpfs:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-    hostname: httpfs
-    volumes:
-      - ../..:/opt/hadoop
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
-    ports:
-      - 14000:14000
-    env_file:
-      - ./docker-config
-    command: [ "/opt/hadoop/bin/ozone","httpfs" ]
-    environment:
-      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      OZONE_OPTS:
+
   s3g:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: s3g
