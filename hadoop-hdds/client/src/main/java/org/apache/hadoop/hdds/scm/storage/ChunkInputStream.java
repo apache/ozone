@@ -425,8 +425,7 @@ public class ChunkInputStream extends InputStream
     ReadChunkResponseProto readChunkResponse;
 
     List<CheckedBiFunction> validators =
-        ContainerProtocolCalls.getValidatorList();
-    validators.add(validator);
+        ContainerProtocolCalls.getValidatorList(validator);
 
     readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
         readChunkInfo, blockID, validators, token);
