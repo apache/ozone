@@ -343,16 +343,12 @@ public final class ContainerProtocolCalls  {
       List<CheckedBiFunction> validators,
       ContainerCommandRequestProto.Builder builder,
       DatanodeDetails d) throws IOException {
-    final String id = d.getUuidString();
     final ContainerCommandRequestProto request = builder
         .setDatanodeUuid(d.getUuidString()).build();
     ContainerCommandResponseProto reply =
         xceiverClient.sendCommand(request, validators);
     final ReadChunkResponseProto response = reply.getReadChunk();
     final long readLen = getLen(response);
-    if (readLen == -1) {
-      throw new IOException(toErrorMessage(chunk, blockID, d) + ": eof");
-    }
     if (readLen != chunk.getLen()) {
       throw new IOException(toErrorMessage(chunk, blockID, d)
           + ": readLen=" + readLen);
