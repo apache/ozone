@@ -49,7 +49,6 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_TAGS_CUSTOM;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
 
 /**
  * Configuration for ozone.
@@ -57,6 +56,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
+  public static final String OZONE_TAGS_SYSTEM_KEY =
+      "ozone.tags.system";
+
   static {
     addDeprecatedKeys();
 
