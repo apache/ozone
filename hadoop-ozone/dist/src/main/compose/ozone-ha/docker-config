@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# For HttpFS service it is required to enable proxying users.
+CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts=*
+CORE-SITE.XML_hadoop.proxyuser.hadoop.groups=*
+
 CORE-SITE.XML_fs.defaultFS=ofs://omservice/
 
 OZONE-SITE.XML_ozone.om.service.ids=omservice
