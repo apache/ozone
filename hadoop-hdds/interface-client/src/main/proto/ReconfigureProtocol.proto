@@ -32,6 +32,14 @@ option java_generic_services = true;
 option java_generate_equals_and_hash = true;
 package hadoop.hdds;
 
+/** Query server name */
+message GetServerNameRequestProto {
+}
+
+message GetServerNameResponseProto {
+  required string name = 1;
+}
+
 /** Asks OM/SCM to reload configuration file. */
 message StartReconfigureRequestProto {
 }
@@ -69,6 +77,10 @@ message ListReconfigurePropertiesResponseProto {
  * See the request and response for details of rpc call.
  */
 service ReconfigureProtocolService {
+
+  rpc getServerName(GetServerNameRequestProto)
+      returns(GetServerNameResponseProto);
+
   rpc getReconfigureStatus(GetReconfigureStatusRequestProto)
       returns(GetReconfigureStatusResponseProto);
 

@@ -1219,11 +1219,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private SnapshotDiffResponse snapshotDiff(
       SnapshotDiffRequest snapshotDiffRequest) throws IOException {
-    return SnapshotDiffResponse.newBuilder().setSnapshotDiffReport(
-        impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
+    org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse response =
+        impl.snapshotDiff(
+            snapshotDiffRequest.getVolumeName(),
             snapshotDiffRequest.getBucketName(),
             snapshotDiffRequest.getFromSnapshot(),
-            snapshotDiffRequest.getToSnapshot()).toProtobuf()).build();
+            snapshotDiffRequest.getToSnapshot(),
+            snapshotDiffRequest.getToken(),
+            snapshotDiffRequest.getPageSize());
+
+    SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
+        .setJobStatus(response.getJobStatus().toProtobuf())
+        .setWaitTimeInMs(response.getWaitTimeInMs());
+
+    if (response.getSnapshotDiffReport() != null) {
+      builder.setSnapshotDiffReport(
+          response.getSnapshotDiffReport().toProtobuf());
+    }
+
+    return builder.build();
   }
 
 

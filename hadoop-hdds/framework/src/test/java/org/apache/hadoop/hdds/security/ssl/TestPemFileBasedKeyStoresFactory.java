@@ -30,8 +30,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServi
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.CertificateClientTest;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Server;
@@ -57,7 +57,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public class TestPemFileBasedKeyStoresFactory {
   private OzoneConfiguration conf;
-  private CertificateClientTest caClient;
+  private CertificateClientTestImpl caClient;
   private SecurityConfig secConf;
   private static final int RELOAD_INTERVAL = 2000;
 
@@ -68,7 +68,7 @@ public class TestPemFileBasedKeyStoresFactory {
         RELOAD_INTERVAL);
     conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
         RELOAD_INTERVAL);
-    caClient = new CertificateClientTest(conf);
+    caClient = new CertificateClientTestImpl(conf);
     secConf = new SecurityConfig(conf);
   }
   @Test

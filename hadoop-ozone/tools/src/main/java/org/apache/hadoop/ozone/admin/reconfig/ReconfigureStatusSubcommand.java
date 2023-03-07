@@ -46,9 +46,10 @@ public class ReconfigureStatusSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
         .getSingleNodeReconfigureProxy(parent.getAddress());
+    String serverName = reconfigProxy.getServerName();
     ReconfigurationTaskStatus status = reconfigProxy.getReconfigureStatus();
-    System.out.printf("Reconfiguring status for node [%s]: ",
-        parent.getAddress());
+    System.out.printf("%s: Reconfiguring status for node [%s]: ",
+        serverName, parent.getAddress());
     printReconfigurationStatus(status);
     return null;
   }

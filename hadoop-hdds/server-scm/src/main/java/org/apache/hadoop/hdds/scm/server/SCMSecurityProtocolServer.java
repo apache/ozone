@@ -22,6 +22,7 @@ import com.google.protobuf.BlockingService;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -64,7 +65,6 @@ import org.apache.hadoop.security.KerberosInfo;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,8 +224,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    */
   private String getEncodedCertToString(String certSignReq, NodeType nodeType)
       throws IOException {
-
-    Future<X509CertificateHolder> future;
+    Future<CertPath> future;
     if (nodeType == NodeType.SCM) {
       future = rootCertificateServer.requestCertificate(certSignReq,
               KERBEROS_TRUSTED, nodeType);
@@ -302,7 +301,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.debug("Getting CA certificate.");
     try {
       return CertificateCodec.getPEMEncodedString(
-          scmCertificateServer.getCACertificate());
+          scmCertificateServer.getCaCertPath());
     } catch (CertificateException e) {
       throw new SCMSecurityException("getRootCertificate operation failed. ",
           e, GET_CA_CERT_FAILED);
@@ -422,9 +421,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   }
 
   public void join() throws InterruptedException {
-    LOGGER.trace("Join RPC server for SCMSecurityProtocolServer.");
+    LOGGER.info("Join RPC server for SCMSecurityProtocolServer.");
     getRpcServer().join();
-    LOGGER.trace("Join gRPC server for SCMSecurityProtocolServer.");
+    LOGGER.info("Join gRPC server for SCMSecurityProtocolServer.");
     getGrpcUpdateServer().join();
 
   }

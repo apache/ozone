@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,5 +48,5 @@ public interface NodeManagerMXBean {
    * Commissioned State & Operational State column for dataNode
    */
   Map<String, Map<String, String>> getNodeStatusInfo();
-
+  
 }

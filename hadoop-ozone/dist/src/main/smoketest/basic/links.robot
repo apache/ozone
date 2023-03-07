@@ -69,6 +69,17 @@ ACL verified on source bucket
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
+Create link loop
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+                        Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
+                        Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
+                        Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
+
+Delete link loop
+                        Execute                     ozone sh bucket delete ${target}/loop1
+                        Execute                     ozone sh bucket delete ${target}/loop2
+                        Execute                     ozone sh bucket delete ${target}/loop3
+
 *** Test Cases ***
 Link to non-existent bucket
                         Execute                     ozone sh bucket link ${source}/no-such-bucket ${target}/dangling-link
@@ -140,11 +151,10 @@ ACL verified on source bucket
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source bucket
 
 Loop in link chain is detected
-                        Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
-                        Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
-                        Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
+    [setup]             Create link loop
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/loop2
                         Should Contain              ${result}    DETECTED_LOOP
+    [teardown]          Delete link loop
 
 Multiple links to same bucket are allowed
     Execute                         ozone sh bucket link ${source}/bucket1 ${target}/link3

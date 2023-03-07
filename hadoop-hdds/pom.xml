@@ -40,6 +40,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>client</module>
     <module>common</module>
     <module>framework</module>
+    <module>managed-rocksdb</module>
     <module>rocksdb-checkpoint-differ</module>
     <module>container-service</module>
     <module>server-scm</module>
@@ -69,6 +70,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-common</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-managed-rocksdb</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 

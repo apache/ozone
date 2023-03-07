@@ -603,6 +603,11 @@ public final class OzoneConfigKeys {
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
       TimeUnit.HOURS.toMillis(1);
 
+  public static final String OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF =
+      "ozone.om.snapshot.force.full.diff";
+
+  public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
+
   /**
    * There is no need to instantiate this class.
    */

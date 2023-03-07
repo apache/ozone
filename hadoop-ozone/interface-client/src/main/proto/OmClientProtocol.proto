@@ -464,10 +464,10 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
-
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
+    SSL_CONNECTION_FAILURE = 89;
 }
 
 /**
@@ -1026,6 +1026,10 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+}
+
+message KeyRenameInfo {
+  repeated string keyNames = 1;
 }
 
 message OzoneFileStatusProto {
@@ -1688,6 +1692,8 @@ message SnapshotDiffRequest {
   optional string bucketName = 2;
   optional string fromSnapshot = 3;
   optional string toSnapshot = 4;
+  optional string token = 5;
+  optional uint32 pageSize = 6;
 }
 
 message DeleteSnapshotRequest {
@@ -1743,7 +1749,16 @@ message ListSnapshotResponse {
 }
 
 message SnapshotDiffResponse {
+  enum JobStatusProto {
+    QUEUED = 1;
+    IN_PROGRESS = 2;
+    DONE = 3;
+    REJECTED = 4;
+    FAILED = 5;
+  }
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional JobStatusProto jobStatus = 2;
+  optional int64 waitTimeInMs = 3;
 }
 
 message DeleteSnapshotResponse {
@@ -1756,6 +1771,7 @@ message SnapshotDiffReportProto {
   optional string fromSnapshot = 3;
   optional string toSnapshot = 4;
   repeated DiffReportEntryProto diffList = 5;
+  optional string token = 6;
 }
 
 message DiffReportEntryProto {

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +73,7 @@ public class IncrementalContainerReportHandler extends
       return;
     }
 
-    boolean success = true;
+    boolean success = false;
     // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
     // do not run at the same time or it can result in a data consistency
     // issue between the container list in NodeManager and the replicas in
@@ -98,20 +99,20 @@ public class IncrementalContainerReportHandler extends
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher);
           }
+          success = true;
         } catch (ContainerNotFoundException e) {
-          success = false;
           LOG.warn("Container {} not found!", replicaProto.getContainerID());
         } catch (NodeNotFoundException ex) {
-          success = false;
           LOG.error("Received ICR from unknown datanode {}",
               report.getDatanodeDetails(), ex);
         } catch (ContainerReplicaNotFoundException e) {
-          success = false;
           LOG.warn("Container {} replica not found!",
               replicaProto.getContainerID());
+        } catch (NotLeaderException nle) {
+          LOG.warn("Failed to process " + replicaProto.getState()
+              + " Container " + id + " due to " + nle);
         } catch (IOException | InvalidStateTransitionException |
                  TimeoutException e) {
-          success = false;
           LOG.error("Exception while processing ICR for container {}",
               replicaProto.getContainerID(), e);
         }
