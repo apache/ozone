@@ -52,7 +52,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
-import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -67,7 +66,8 @@ public class TestRatisUnderReplicationHandler {
   private ReplicationManager replicationManager;
 
   @Before
-  public void setup() throws NodeNotFoundException, AllSourcesOverloadedException {
+  public void setup() throws NodeNotFoundException,
+      AllSourcesOverloadedException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
@@ -83,7 +83,8 @@ public class TestRatisUnderReplicationHandler {
       Return NodeStatus with NodeOperationalState as specified in
       DatanodeDetails, and NodeState as HEALTHY.
     */
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+    Mockito.when(
+        replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
           return new NodeStatus(dn.getPersistedOpState(),

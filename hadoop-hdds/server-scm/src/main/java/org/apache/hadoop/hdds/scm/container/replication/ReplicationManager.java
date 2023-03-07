@@ -455,7 +455,6 @@ public class ReplicationManager implements SCMService {
       createThrottledReplicationCommand(long containerID,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
       throws AllSourcesOverloadedException {
-    LOG.info("IN the real RM impt");
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds = new ArrayList<>();
     for (DatanodeDetails source : sources)  {
       try {
