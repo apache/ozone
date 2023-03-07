@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.security.ssl;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.CertificateClientTest;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.BeforeClass;
@@ -39,12 +39,12 @@ public class TestReloadingX509TrustManager {
   private final LogCapturer reloaderLog =
       LogCapturer.captureLogs(ReloadingX509TrustManager.LOG);
   private static OzoneConfiguration conf;
-  private static CertificateClientTest caClient;
+  private static CertificateClientTestImpl caClient;
 
   @BeforeClass
   public static void setUp() throws Exception {
     conf = new OzoneConfiguration();
-    caClient = new CertificateClientTest(conf);
+    caClient = new CertificateClientTestImpl(conf);
   }
 
   @Test
@@ -59,6 +59,7 @@ public class TestReloadingX509TrustManager {
       X509Certificate cert1 = caClient.getCACertificate();
       assertEquals(cert1, tm.getAcceptedIssuers()[0]);
 
+      caClient.renewRootCA();
       caClient.renewKey();
       X509Certificate cert2 = caClient.getCACertificate();
       assertNotEquals(cert1, cert2);

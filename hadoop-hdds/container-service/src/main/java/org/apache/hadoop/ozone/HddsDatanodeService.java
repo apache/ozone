@@ -352,8 +352,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // persist cert ID to VERSION file
       datanodeDetails.setCertSerialId(dnCertSerialId);
       persistDatanodeDetails(datanodeDetails);
-      // set new certificate ID
-      certClient.setCertificateId(dnCertSerialId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
+import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
@@ -169,8 +169,7 @@ public class ReconServer extends GenericCli {
       throws IOException {
     LOG.info("Initializing secure Recon.");
     certClient = new ReconCertificateClient(new SecurityConfig(configuration),
-        reconStorage.getReconCertSerialId(), reconStorage.getClusterID(),
-        reconStorage.getReconId(), this::saveNewCertId, null);
+        reconStorage, this::saveNewCertId, null);
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
@@ -178,8 +177,7 @@ public class ReconServer extends GenericCli {
       reconStorage.unsetReconCertSerialId();
       reconStorage.persistCurrentState();
       certClient = new ReconCertificateClient(new SecurityConfig(configuration),
-          reconStorage.getReconCertSerialId(), reconStorage.getClusterID(),
-          reconStorage.getReconId(), this::saveNewCertId, this::terminateRecon);
+          reconStorage, this::saveNewCertId, this::terminateRecon);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -192,8 +190,6 @@ public class ReconServer extends GenericCli {
           certClient.getCSRBuilder().build());
       reconStorage.setReconCertSerialId(certId);
       reconStorage.persistCurrentState();
-      // set new certificate ID
-      certClient.setCertificateId(certId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
