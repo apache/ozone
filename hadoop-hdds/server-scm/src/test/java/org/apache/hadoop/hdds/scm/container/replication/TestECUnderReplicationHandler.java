@@ -583,13 +583,10 @@ public class TestECUnderReplicationHandler {
         testUnderReplicationWithMissingIndexes(Collections.emptyList(),
             availableReplicas, 1, 0, policy);
     Assertions.assertEquals(1, cmds.size());
-    ReplicateContainerCommand cmd =
-        (ReplicateContainerCommand) cmds.iterator().next().getValue();
-
-    List<DatanodeDetails> sources = cmd.getSourceDatanodes();
-    Assertions.assertEquals(1, sources.size());
-    Assertions.assertEquals(decomReplica.getDatanodeDetails(),
-        cmd.getSourceDatanodes().get(0));
+    // With push replication the command should always be sent to the
+    // decommissioning source.
+    DatanodeDetails target = cmds.iterator().next().getKey();
+    Assertions.assertEquals(decomReplica.getDatanodeDetails(), target);
   }
 
   @Test
@@ -612,13 +609,10 @@ public class TestECUnderReplicationHandler {
         availableReplicas, 0, 1, policy);
 
     Assertions.assertEquals(1, cmds.size());
-    ReplicateContainerCommand cmd =
-        (ReplicateContainerCommand) cmds.iterator().next().getValue();
-
-    List<DatanodeDetails> sources = cmd.getSourceDatanodes();
-    Assertions.assertEquals(1, sources.size());
-    Assertions.assertEquals(maintReplica.getDatanodeDetails(),
-        cmd.getSourceDatanodes().get(0));
+    // With push replication the command should always be sent to the
+    // entering_maintenance source.
+    DatanodeDetails target = cmds.iterator().next().getKey();
+    Assertions.assertEquals(maintReplica.getDatanodeDetails(), target);
   }
 
   public Set<Pair<DatanodeDetails, SCMCommand<?>>>
