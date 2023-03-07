@@ -28,6 +28,7 @@ import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretCache;
@@ -56,6 +58,8 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.apache.ratis.protocol.RaftPeerId;
 import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
@@ -140,7 +144,12 @@ public class TestOzoneDelegationTokenSecretManager {
     CertPath certPath = fact.engineGenerateCertPath(
         ImmutableList.of(singleCert));
 
-    return new OMCertificateClient(securityConfig) {
+    OMStorage omStorage = mock(OMStorage.class);
+    when(omStorage.getOmCertSerialId()).thenReturn(null);
+    when(omStorage.getClusterID()).thenReturn("test");
+    when(omStorage.getOmId()).thenReturn(UUID.randomUUID().toString());
+    return new OMCertificateClient(
+        securityConfig, omStorage, null, null, null) {
       @Override
       public CertPath getCertPath() {
         return certPath;

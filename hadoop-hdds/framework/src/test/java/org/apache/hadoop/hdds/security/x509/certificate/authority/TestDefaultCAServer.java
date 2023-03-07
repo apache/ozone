@@ -370,7 +370,7 @@ public class TestDefaultCAServer {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
     SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf));
+        new SCMCertificateClient(new SecurityConfig(conf), null);
 
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
@@ -421,7 +421,7 @@ public class TestDefaultCAServer {
     CertificateApprover approver = new DefaultApprover(new DefaultCAProfile(),
         securityConfig);
     SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf));
+        new SCMCertificateClient(new SecurityConfig(conf), null);
     String scmId = RandomStringUtils.randomAlphabetic(4);
     String clusterId = RandomStringUtils.randomAlphabetic(4);
     KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
@@ -485,7 +485,7 @@ public class TestDefaultCAServer {
 
 
     SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf));
+        new SCMCertificateClient(new SecurityConfig(conf), null);
 
     CertificateClient.InitResponse response = scmCertificateClient.init();
     assertEquals(CertificateClient.InitResponse.GETCERT, response);
@@ -525,7 +525,7 @@ public class TestDefaultCAServer {
 
     // Write to the location where Default CA Server reads from.
     scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(certificateHolder));
+        CertificateCodec.getPEMEncodedString(certificateHolder), CAType.NONE);
 
     CertificateCodec certCodec =
         new CertificateCodec(new SecurityConfig(conf),
