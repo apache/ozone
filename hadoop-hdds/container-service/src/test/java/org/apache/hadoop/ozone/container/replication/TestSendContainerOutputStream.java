@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.Mock;
 
 import java.io.OutputStream;
 
@@ -34,20 +35,23 @@ import static org.mockito.Mockito.verify;
 class TestSendContainerOutputStream
     extends GrpcOutputStreamTest<SendContainerRequest> {
 
+  @Mock
+  private AutoCloseable client;
+
   TestSendContainerOutputStream() {
     super(SendContainerRequest.class);
   }
 
   @Override
   protected OutputStream createSubject() {
-    return new SendContainerOutputStream(getObserver(),
+    return new SendContainerOutputStream(client, getObserver(),
         getContainerId(), getBufferSize(), NO_COMPRESSION);
   }
 
   @ParameterizedTest
   @EnumSource
   void usesCompression(CopyContainerCompression compression) throws Exception {
-    OutputStream subject = new SendContainerOutputStream(
+    OutputStream subject = new SendContainerOutputStream(client,
         getObserver(), getContainerId(), getBufferSize(), compression);
 
     byte[] bytes = getRandomBytes(16);
