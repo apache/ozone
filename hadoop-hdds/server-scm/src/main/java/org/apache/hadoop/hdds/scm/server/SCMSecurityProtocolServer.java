@@ -100,7 +100,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
 
-  // SecretKey may not be enabled if when neither block token nor container
+  // SecretKey may not be enabled when neither block token nor container
   // token is enabled.
   private final SecretKeyManager secretKeyManager;
 
