@@ -108,8 +108,8 @@ public class ManagedSSTDumpIterator implements
   }
 
   /**
-   *
-   * @return
+   * Checks the status of the process & sees if there is another record.
+   * @return True if next exists & false otherwise
    * Throws Runtime Exception in case of SST File read failure
    */
 
