@@ -19,10 +19,8 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,20 +36,17 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertPath;
-import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -68,7 +63,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -110,9 +104,8 @@ import org.slf4j.Logger;
  */
 public abstract class DefaultCertificateClient implements CertificateClient {
 
-  private static final Random RANDOM = new SecureRandom();
-
   public static final String CERT_FILE_NAME_FORMAT = "%s.crt";
+
   private final Logger logger;
   private final SecurityConfig securityConfig;
   private final KeyCodec keyCodec;
@@ -123,7 +116,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
-  private long localCrlId;
   private String component;
   private List<String> pemEncodedCACerts = null;
   private KeyStoresFactory serverKeyStoresFactory;
@@ -145,7 +137,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Set<CertificateNotification> notificationReceivers;
   private static UserGroupInformation ugi;
 
-  DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
+  protected DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
       String certSerialId, String component,
       Consumer<String> saveCertId, Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
@@ -153,21 +145,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     keyCodec = new KeyCodec(securityConfig, component);
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
-    this.certSerialId = certSerialId;
     this.component = component;
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
 
-    loadAllCertificates();
-  }
-
-  public synchronized void setCertificateId(String certId) {
-    Preconditions.checkArgument(certSerialId == null,
-        "certSerialId should only be set once if not renew");
-    this.certSerialId = certId;
-    // reload all new certs
-    loadAllCertificates();
+    updateCertSerialId(certSerialId);
   }
 
   /**
@@ -375,29 +358,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return this.getCertificateFromScm(certId);
   }
 
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    try {
-      return getScmSecureClient().getCrls(crlIds);
-    } catch (Exception e) {
-      getLogger().error("Error while getting CRL with " +
-          "CRL ids:{} from scm.", crlIds, e);
-      throw new CertificateException("Error while getting CRL with " +
-          "CRL ids:" + crlIds, e);
-    }
-  }
-
-  @Override
-  public long getLatestCrlId() throws IOException {
-    try {
-      return getScmSecureClient().getLatestCrlId();
-    } catch (Exception e) {
-      getLogger().error("Error while getting latest CRL id from scm.", e);
-      throw new CertificateException("Error while getting latest CRL id from" +
-          " scm.", e);
-    }
-  }
-
   /**
    * Get certificate from SCM and store it in local file system.
    * @param certId
@@ -410,7 +370,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         certId);
     try {
       String pemEncodedCert = getScmSecureClient().getCertificate(certId);
-      this.storeCertificate(pemEncodedCert);
+      this.storeCertificate(pemEncodedCert, CAType.NONE);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception e) {
       getLogger().error("Error while getting Certificate with " +
@@ -418,50 +378,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throw new CertificateException("Error while getting certificate for " +
           "certSerialId:" + certId, e, CERTIFICATE_ERROR);
     }
-  }
-
-  /**
-   * Verifies if this certificate is part of a trusted chain.
-   *
-   * @param certificate - certificate.
-   * @return true if it trusted, false otherwise.
-   */
-  @Override
-  public boolean verifyCertificate(X509Certificate certificate) {
-    throw new UnsupportedOperationException("Operation not supported.");
-  }
-
-  /**
-   * Creates digital signature over the data stream using the s private key.
-   *
-   * @param stream - Data stream to sign.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public byte[] signDataStream(InputStream stream)
-      throws CertificateException {
-    try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
-      sign.initSign(getPrivateKey());
-      byte[] buffer = new byte[1024 * 4];
-
-      int len;
-      while (-1 != (len = stream.read(buffer))) {
-        sign.update(buffer, 0, len);
-      }
-      return sign.sign();
-    } catch (NoSuchAlgorithmException | NoSuchProviderException
-        | InvalidKeyException | SignatureException | IOException e) {
-      getLogger().error("Error while signing the stream", e);
-      throw new CertificateException("Error while signing the stream", e,
-          CRYPTO_SIGN_ERROR);
-    }
-  }
-
-  @Override
-  public String getSecurityProvider() {
-    return securityConfig.getProvider();
   }
 
   /**
@@ -473,8 +389,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public byte[] signData(byte[] data) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
+          securityConfig.getProvider());
 
       sign.initSign(getPrivateKey());
       sign.update(data);
@@ -485,42 +401,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       getLogger().error("Error while signing the stream", e);
       throw new CertificateException("Error while signing the stream", e,
           CRYPTO_SIGN_ERROR);
-    }
-  }
-
-  @Override
-  public String getSignatureAlgorithm() {
-    return securityConfig.getSignatureAlgo();
-  }
-
-  /**
-   * Verifies a digital Signature, given the signature and the certificate of
-   * the signer.
-   *
-   * @param stream - Data Stream.
-   * @param signature - Byte Array containing the signature.
-   * @param cert - Certificate of the Signer.
-   * @return true if verified, false if not.
-   */
-  @Override
-  public boolean verifySignature(InputStream stream, byte[] signature,
-      X509Certificate cert) throws CertificateException {
-    try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
-      sign.initVerify(cert);
-      byte[] buffer = new byte[1024 * 4];
-
-      int len;
-      while (-1 != (len = stream.read(buffer))) {
-        sign.update(buffer, 0, len);
-      }
-      return sign.verify(signature);
-    } catch (NoSuchAlgorithmException | NoSuchProviderException
-        | InvalidKeyException | SignatureException | IOException e) {
-      getLogger().error("Error while signing the stream", e);
-      throw new CertificateException("Error while signing the stream", e,
-          CRYPTO_SIGNATURE_VERIFICATION_ERROR);
     }
   }
 
@@ -537,8 +417,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public boolean verifySignature(byte[] data, byte[] signature,
       X509Certificate cert) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
+          securityConfig.getProvider());
       sign.initVerify(cert);
       sign.update(data);
       return sign.verify(signature);
@@ -562,8 +442,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private boolean verifySignature(byte[] data, byte[] signature,
       PublicKey pubKey) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
+          securityConfig.getProvider());
       sign.initVerify(pubKey);
       sign.update(data);
       return sign.verify(signature);
@@ -604,32 +484,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           e, CSR_ERROR);
     }
     return builder;
-  }
-
-  /**
-   * Get the certificate of well-known entity from SCM.
-   *
-   * @param query - String Query, please see the implementation for the
-   * discussion on the query formats.
-   * @return X509Certificate or null if not found.
-   */
-  @Override
-  public X509Certificate queryCertificate(String query) {
-    // TODO:
-    throw new UnsupportedOperationException("Operation not supported");
-  }
-
-  /**
-   * Stores the Certificate  for this client. Don't use this api to add trusted
-   * certificates of others.
-   *
-   * @param pemEncodedCert - pem encoded X509 Certificate
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeCertificate(String pemEncodedCert)
-      throws CertificateException {
-    this.storeCertificate(pemEncodedCert, CAType.NONE);
   }
 
   /**
@@ -677,31 +531,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throw new CertificateException("Error while storing certificate.", e,
           CERTIFICATE_ERROR);
     }
-  }
-
-  /**
-   * Stores the trusted chain of certificates for a specific .
-   *
-   * @param ks - Key Store.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeTrustChain(CertStore ks)
-      throws CertificateException {
-    throw new UnsupportedOperationException("Operation not supported.");
-  }
-
-
-  /**
-   * Stores the trusted chain of certificates for a specific .
-   *
-   * @param certificates - List of Certificates.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeTrustChain(List<X509Certificate> certificates)
-      throws CertificateException {
-    throw new UnsupportedOperationException("Operation not supported.");
   }
 
   /**
@@ -957,10 +786,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   protected boolean validateKeyPair(PublicKey pubKey)
       throws CertificateException {
     byte[] challenge =
-        RandomStringUtils.random(1000, 0, 0, false, false, null, RANDOM)
-            .getBytes(StandardCharsets.UTF_8);
-    byte[]  sign = signDataStream(new ByteArrayInputStream(challenge));
-    return verifySignature(challenge, sign, pubKey);
+        RandomStringUtils.random(1000, 0, 0, false, false, null,
+                new SecureRandom()).getBytes(StandardCharsets.UTF_8);
+    return verifySignature(challenge, signData(challenge), pubKey);
   }
 
   /**
@@ -1015,14 +843,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public void storeRootCACertificate(String pemEncodedCert)
-      throws CertificateException {
-    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
-        component);
-    storeCertificate(pemEncodedCert, CAType.ROOT, certificateCodec, true);
-  }
-
-  @Override
   public synchronized List<String> getCAList() {
     return pemEncodedCACerts;
   }
@@ -1045,63 +865,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throw new CertificateException("Error during updating CA list", e,
           CERTIFICATE_ERROR);
     }
-  }
-
-  @Override
-  public boolean processCrl(CRLInfo crl) {
-    List<String> certIds2Remove = new ArrayList();
-    crl.getX509CRL().getRevokedCertificates().forEach(
-        cert -> certIds2Remove.add(cert.getSerialNumber().toString()));
-    boolean reinitCert = removeCertificates(certIds2Remove);
-    setLocalCrlId(crl.getCrlSequenceID());
-    return reinitCert;
-  }
-
-  private synchronized boolean removeCertificates(List<String> certIds) {
-    boolean reInitCert = false;
-
-    // For now, remove self cert and ca cert is not implemented
-    // both requires a restart of the service.
-    if ((certSerialId != null && certIds.contains(certSerialId)) ||
-        (caCertId != null && certIds.contains(caCertId)) ||
-        (rootCaCertId != null && certIds.contains(rootCaCertId))) {
-      reInitCert = true;
-    }
-
-    Path basePath = securityConfig.getCertificateLocation(component);
-    for (String certId : certIds) {
-      if (certificateMap.containsKey(certId)) {
-        // remove on disk
-        String certName = String.format(CERT_FILE_NAME_FORMAT, certId);
-
-        if (certId.equals(caCertId)) {
-          certName = CAType.SUBORDINATE.getFileNamePrefix() + certName;
-        }
-
-        if (certId.equals(rootCaCertId)) {
-          certName = CAType.ROOT.getFileNamePrefix() + certName;
-        }
-
-        FileUtils.deleteQuietly(basePath.resolve(certName).toFile());
-        // remove in memory
-        certificateMap.remove(certId);
-
-        // TODO: reset certSerialId, caCertId or rootCaCertId
-      }
-    }
-    return reInitCert;
-  }
-
-  public long getLocalCrlId() {
-    return this.localCrlId;
-  }
-
-  /**
-   * Set Local CRL id.
-   * @param crlId
-   */
-  public void setLocalCrlId(long crlId) {
-    this.localCrlId = crlId;
   }
 
   @Override
@@ -1216,7 +979,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     // Get certificate signed
     String newCertSerialId;
     try {
-      CertificateSignRequest.Builder csrBuilder = getCSRBuilder(newKeyPair);
+      CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+      csrBuilder.setKey(newKeyPair);
       newCertSerialId = signAndStoreCertificate(csrBuilder.build(),
           Paths.get(newCertPath));
     } catch (Exception e) {
@@ -1363,11 +1127,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     privateKey = null;
     publicKey = null;
     certPath = null;
-    certSerialId = null;
     caCertId = null;
     rootCaCertId = null;
 
-    setCertificateId(newCertId);
+    updateCertSerialId(newCertId);
     getLogger().info("Reset and reload key and all certificates.");
   }
 
@@ -1379,27 +1142,27 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return (OzoneConfiguration)securityConfig.getConfiguration();
   }
 
-  @Override
-  public abstract String signAndStoreCertificate(
+  private synchronized void updateCertSerialId(String newCertSerialId) {
+    certSerialId = newCertSerialId;
+    loadAllCertificates();
+  }
+
+  protected abstract String signAndStoreCertificate(
       PKCS10CertificationRequest request, Path certificatePath)
       throws CertificateException;
 
-  public String signAndStoreCertificate(PKCS10CertificationRequest request)
-      throws CertificateException {
-    return signAndStoreCertificate(request,
-        getSecurityConfig().getCertificateLocation(getComponentName()));
+  public String signAndStoreCertificate(
+      PKCS10CertificationRequest request) throws CertificateException {
+    updateCertSerialId(signAndStoreCertificate(request,
+        getSecurityConfig().getCertificateLocation(getComponentName())));
+    return certSerialId;
   }
-
-  @Override
-  public abstract CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException;
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
       throws IOException {
     if (scmSecurityProtocolClient == null) {
       scmSecurityProtocolClient =
-          getScmSecurityClientWithMaxRetry(
-              (OzoneConfiguration) securityConfig.getConfiguration(), ugi);
+          getScmSecurityClientWithMaxRetry(getConfig(), ugi);
     }
     return scmSecurityProtocolClient;
   }

@@ -55,7 +55,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -272,25 +271,6 @@ public class TestHddsSecureDatanodeInit {
     } catch (Throwable e) {
       // Ignore all Throwable,
     }
-  }
-
-  @Test
-  public void testGetCSR() throws Exception {
-    keyCodec.writePublicKey(publicKey);
-    keyCodec.writePrivateKey(privateKey);
-    service.setCertificateClient(client);
-    PKCS10CertificationRequest csr =
-        client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
   }
 
   @Test

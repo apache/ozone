@@ -35,6 +35,7 @@ import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -79,7 +80,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   public ReloadingX509KeyManager(String type, CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     this.type = type;
-    keyManagerRef = new AtomicReference<X509ExtendedKeyManager>();
+    keyManagerRef = new AtomicReference<>();
     keyManagerRef.set(loadKeyManager(caClient));
   }
 
@@ -121,12 +122,18 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
 
   @Override
   public X509Certificate[] getCertificateChain(String s) {
-    return keyManagerRef.get().getCertificateChain(s);
+    // see https://bugs.openjdk.org/browse/JDK-4891485
+    // the KeyManager stores the chain in a case-insensitive way making the
+    // alias lowercase upon initialization.
+    return keyManagerRef.get().getCertificateChain(s.toLowerCase(Locale.ROOT));
   }
 
   @Override
   public PrivateKey getPrivateKey(String s) {
-    return keyManagerRef.get().getPrivateKey(s);
+    // see: https://bugs.openjdk.org/browse/JDK-4891485
+    // the KeyManager stores the chain in a case-insensitive way making the
+    // alias lowercase upon initialization.
+    return keyManagerRef.get().getPrivateKey(s.toLowerCase(Locale.ROOT));
   }
 
   public ReloadingX509KeyManager loadFrom(CertificateClient caClient) {

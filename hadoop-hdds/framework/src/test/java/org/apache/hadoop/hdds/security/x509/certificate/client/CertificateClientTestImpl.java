@@ -14,11 +14,10 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Path;
+import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -28,12 +27,10 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertPath;
-import java.security.cert.CertStore;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -51,11 +48,8 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 
@@ -81,8 +75,8 @@ public class CertificateClientTestImpl implements CertificateClient {
   private final SecurityConfig securityConfig;
   private KeyPair keyPair;
   private X509Certificate x509Certificate;
-  private final KeyPair rootKeyPair;
-  private final X509Certificate rootCert;
+  private KeyPair rootKeyPair;
+  private X509Certificate rootCert;
   private HDDSKeyGenerator keyGen;
   private DefaultApprover approver;
   private KeyStoresFactory serverKeyStoresFactory;
@@ -127,7 +121,8 @@ public class CertificateClientTestImpl implements CertificateClient {
     // Generate normal certificate, signed by RootCA certificate
     approver = new DefaultApprover(new DefaultProfile(), securityConfig);
 
-    CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+    CertificateSignRequest.Builder csrBuilder =
+        new CertificateSignRequest.Builder();
     // Get host name.
     csrBuilder.setKey(keyPair)
         .setConfiguration(config)
@@ -218,37 +213,16 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public boolean verifyCertificate(X509Certificate certificate) {
-    return true;
-  }
-
-  @Override
-  public void setCertificateId(String certSerialId) {
-  }
-
-  @Override
-  public byte[] signDataStream(InputStream stream)
-      throws CertificateException {
-    return new byte[0];
-  }
-
-  @Override
   public byte[] signData(byte[] data) throws CertificateException {
     return new byte[0];
-  }
-
-  @Override
-  public boolean verifySignature(InputStream stream, byte[] signature,
-      X509Certificate cert) throws CertificateException {
-    return true;
   }
 
   @Override
   public boolean verifySignature(byte[] data, byte[] signature,
       X509Certificate cert) throws CertificateException {
     try {
-      Signature sign = Signature.getInstance(getSignatureAlgorithm(),
-          getSecurityProvider());
+      Signature sign = Signature.getInstance(securityConfig.getSignatureAlgo(),
+          securityConfig.getProvider());
       sign.initVerify(cert);
       sign.update(data);
       return sign.verify(signature);
@@ -261,20 +235,8 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair key)
-      throws CertificateException {
-    return null;
-  }
-
-  @Override
   public CertificateSignRequest.Builder getCSRBuilder() {
     return new CertificateSignRequest.Builder();
-  }
-
-  @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
-    return null;
   }
 
   @Override
@@ -284,50 +246,13 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public X509Certificate queryCertificate(String query) {
-    return null;
-  }
-
-  @Override
-  public void storeCertificate(String cert)
-      throws CertificateException {
-  }
-
-  @Override
   public void storeCertificate(String cert, CAType caType)
       throws CertificateException {
-  }
-
-  /**
-   * Stores the trusted chain of certificates for a specific component.
-   *
-   * @param keyStore - Cert Store.
-   * @throws CertificateException - on Error.
-   */
-  @Override
-  public void storeTrustChain(CertStore keyStore) throws CertificateException {
-
-  }
-
-  @Override
-  public void storeTrustChain(List<X509Certificate> certificates)
-      throws CertificateException {
-
   }
 
   @Override
   public InitResponse init() throws CertificateException {
     return null;
-  }
-
-  @Override
-  public String getSignatureAlgorithm() {
-    return securityConfig.getSignatureAlgo();
-  }
-
-  @Override
-  public String getSecurityProvider() {
-    return securityConfig.getProvider();
   }
 
   @Override
@@ -338,11 +263,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public X509Certificate getRootCACertificate() {
     return x509Certificate;
-  }
-
-  @Override
-  public void storeRootCACertificate(String pemEncodedCert) {
-
   }
 
   @Override
@@ -359,33 +279,31 @@ public class CertificateClientTestImpl implements CertificateClient {
     return null;
   }
 
-  @Override
-  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
-    return Collections.emptyList();
-  }
-
-  @Override
-  public long getLatestCrlId() throws IOException {
-    return 0;
-  }
-
-  @Override
-  public long getLocalCrlId() {
-    return 0;
-  }
-
-  @Override
-  public void setLocalCrlId(long crlId) {
-  }
-
-  @Override
-  public boolean processCrl(CRLInfo crl) {
-    return false;
+  public void renewRootCA() throws Exception {
+    LocalDateTime start = LocalDateTime.now();
+    String rootCACertDuration = config.get(HDDS_X509_MAX_DURATION,
+        HDDS_X509_MAX_DURATION_DEFAULT);
+    LocalDateTime end = start.plus(Duration.parse(rootCACertDuration));
+    rootKeyPair = keyGen.generateKey();
+    SelfSignedCertificate.Builder builder =
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(start)
+            .setEndDate(end)
+            .setClusterID("cluster1")
+            .setKey(rootKeyPair)
+            .setSubject("rootCA-new@localhost")
+            .setConfiguration(config)
+            .setScmID("scm1")
+            .makeCA(BigInteger.ONE.add(BigInteger.ONE));
+    rootCert = new JcaX509CertificateConverter().getCertificate(
+        builder.build());
+    certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
   }
 
   public void renewKey() throws Exception {
     KeyPair newKeyPair = keyGen.generateKey();
-    CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
+    CertificateSignRequest.Builder csrBuilder =
+        new CertificateSignRequest.Builder();
     // Get host name.
     csrBuilder.setKey(newKeyPair)
         .setConfiguration(config)
@@ -427,6 +345,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     @Override
     public void run() {
       try {
+        renewRootCA();
         renewKey();
       } catch (Exception e) {
         throw new RuntimeException(e);

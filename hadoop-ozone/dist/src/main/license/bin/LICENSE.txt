@@ -296,6 +296,7 @@ Apache License 2.0
    com.google.inject.extensions:guice-servlet
    com.google.inject:guice
    com.google.j2objc:j2objc-annotations
+   com.googlecode.json-simple:json-simple
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
@@ -366,6 +367,8 @@ Apache License 2.0
    org.apache.commons:commons-lang3
    org.apache.commons:commons-pool2
    org.apache.commons:commons-text
+   org.apache.curator:curator-client
+   org.apache.curator:curator-framework
    org.apache.derby:derby
    org.apache.hadoop:hadoop-annotations
    org.apache.hadoop:hadoop-auth
@@ -411,6 +414,8 @@ Apache License 2.0
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
    org.apache.thrift:libthrift
+   org.apache.zookeeper:zookeeper
+   org.apache.zookeeper:zookeeper-jute
    org.codehaus.jackson:jackson-core-asl
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl

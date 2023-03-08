@@ -67,7 +67,6 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
-import org.apache.hadoop.hdds.scm.node.CommandQueueReportHandler;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
@@ -421,8 +420,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             pipelineManager, containerManager, scmContext);
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(scmNodeManager);
-    CommandQueueReportHandler commandQueueReportHandler =
-        new CommandQueueReportHandler(scmNodeManager);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(
             scmSafeModeManager, pipelineManager, scmContext, configuration);
@@ -463,8 +460,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
-    eventQueue.addHandler(SCMEvents.COMMAND_QUEUE_REPORT,
-        commandQueueReportHandler);
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND_COUNT_UPDATED,
         new DatanodeCommandCountUpdatedHandler(replicationManager));
 
