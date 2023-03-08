@@ -24,6 +24,11 @@ import org.apache.hadoop.classification.InterfaceStability;
 /**
  * Interface to query streams for supported capabilities.
  *
+ * This is copied from Hadoop3 code to make Ozone compatible with Hadoop2.7
+ * runtime dependency. Hadoop 2.7 does not support StreamCapabilities API.
+ *
+ * TODO: remove this interface once we drop Hadoop 2.7 support.
+ *
  * Capability strings must be in lower case.
  *
  * Constant strings are chosen over enums in order to allow other file systems

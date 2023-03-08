@@ -27,14 +27,24 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Static methods to implement policies for {@link StreamCapabilities}.
+ *
+ * This is copied from Hadoop3 code to make Ozone compatible with Hadoop2.7
+ * runtime dependency. Hadoop 2.7 does not support StreamCapabilities API.
+ *
+ * TODO: remove this interface once we drop Hadoop 2.7 support.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class StreamCapabilitiesPolicy {
+public final class StreamCapabilitiesPolicy {
   public static final String CAN_UNBUFFER_NOT_IMPLEMENTED_MESSAGE =
       "claims unbuffer capabilty but does not implement CanUnbuffer";
   static final Logger LOG = LoggerFactory.getLogger(
       StreamCapabilitiesPolicy.class);
+
+  // Utility classes should not have public constructors
+  private StreamCapabilitiesPolicy() {
+    throw new IllegalStateException("Utility class");
+  }
   /**
    * Implement the policy for {@link CanUnbuffer#unbuffer()}.
    *
