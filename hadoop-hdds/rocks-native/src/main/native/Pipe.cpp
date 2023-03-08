@@ -28,8 +28,8 @@ Pipe::Pipe() {
 }
 
 Pipe::~Pipe() {
-    ::close(p[0]);
-    ::close(p[1]);
+    ::close(p[Pipe::READ_FILE_DESCRIPTOR_IDX]);
+    ::close(p[Pipe::WRITE_FILE_DESCRIPTOR_IDX]);
 }
 
 void Pipe::close() {
