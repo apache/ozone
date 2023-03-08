@@ -105,11 +105,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final SecretKeyManager secretKeyManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-                            CertificateServer rootCertificateServer,
-                            CertificateServer scmCertificateServer,
-                            X509Certificate rootCACert,
-                            StorageContainerManager scm,
-                            @Nullable SecretKeyManager secretKeyManager)
+      CertificateServer rootCertificateServer,
+      CertificateServer scmCertificateServer,
+      X509Certificate rootCACert, StorageContainerManager scm,
+      @Nullable SecretKeyManager secretKeyManager)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
